@@ -1,5 +1,8 @@
 package org.jdownloader.controlling.filter;
 
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,6 +14,7 @@ import java.util.regex.Pattern;
 
 import jd.plugins.LinkInfo;
 
+import org.appwork.utils.ByteArrayUtils;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.FiletypeFilter.TypeMatchType;
 import org.jdownloader.gui.IconKey;
@@ -33,6 +37,8 @@ public class CompiledFiletypeFilter {
         public boolean isValidExtension(String extension);
 
         public String name();
+
+        public boolean matchesMagic(final InputStream inputStream) throws IOException;
     }
 
     // https://www.htmlstrip.com/mime-file-type-checker
@@ -185,6 +191,11 @@ public class CompiledFiletypeFilter {
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
         }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
+        }
     }
 
     public static enum ExecutableExtensions implements CompiledFiletypeExtension {
@@ -257,6 +268,11 @@ public class CompiledFiletypeFilter {
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
         }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
+        }
     }
 
     public static enum SubtitleExtensions implements CompiledFiletypeExtension {
@@ -327,6 +343,11 @@ public class CompiledFiletypeFilter {
         @Override
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
+        }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
         }
     }
 
@@ -593,6 +614,11 @@ public class CompiledFiletypeFilter {
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
         }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
+        }
     }
 
     private static String getExtensionFromMimeType(String mimeType, CompiledFiletypeExtension fileTypeExtension) {
@@ -780,6 +806,11 @@ public class CompiledFiletypeFilter {
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
         }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
+        }
     }
 
     public static enum VideoExtensions implements CompiledFiletypeExtension {
@@ -905,6 +936,11 @@ public class CompiledFiletypeFilter {
         @Override
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
+        }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
         }
     }
 
@@ -1087,10 +1123,31 @@ public class CompiledFiletypeFilter {
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
         }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
+        }
     }
 
     public static enum ImageExtensions implements CompiledFiletypeExtension {
+        JXL {
+
+            private final Pattern pattern = Pattern.compile("(?i)image/jxl");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
         JPG("(jpe|jpe?g|jfif)") {
+
+            public boolean matchesMagic(InputStream inputStream) throws IOException {
+                final byte[] read = new byte[3];
+                new DataInputStream(inputStream).readFully(read);
+                return ByteArrayUtils.contains(read, new byte[] { (byte) 0xff, (byte) 0xd8, (byte) 0xff });
+            }
+
             private final Pattern pattern = Pattern.compile("(?i)image/jpe?g");
 
             @Override
@@ -1108,6 +1165,12 @@ public class CompiledFiletypeFilter {
             }
         },
         GIF {
+            public boolean matchesMagic(InputStream inputStream) throws IOException {
+                final byte[] read = new byte[6];
+                new DataInputStream(inputStream).readFully(read);
+                return ByteArrayUtils.contains(read, new byte[] { 0x47, 0x49, 0x46, 0x38, 0x37, 0x61 }) || ByteArrayUtils.contains(read, new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 });
+            }
+
             private final Pattern pattern = Pattern.compile("(?i)image/gif");
 
             @Override
@@ -1126,6 +1189,14 @@ public class CompiledFiletypeFilter {
             }
         },
         PNG {
+
+            @Override
+            public boolean matchesMagic(InputStream inputStream) throws IOException {
+                final byte[] read = new byte[4];
+                new DataInputStream(inputStream).readFully(read);
+                return ByteArrayUtils.contains(read, new byte[] { (byte) 0x89, 0x50, 0x4e, 0x47 });
+            }
+
             private final Pattern pattern = Pattern.compile("(?i)image/png");
 
             @Override
@@ -1151,6 +1222,13 @@ public class CompiledFiletypeFilter {
         },
         RAW,
         SVG {
+            @Override
+            public boolean matchesMagic(InputStream inputStream) throws IOException {
+                final byte[] read = new byte[4];
+                new DataInputStream(inputStream).readFully(read);
+                return ByteArrayUtils.contains(read, new byte[] { 0x3c, 0x73, 0x76, 0x67 });
+            }
+
             private final Pattern pattern = Pattern.compile("(?i)image/svg\\+xml");
 
             @Override
@@ -1159,6 +1237,13 @@ public class CompiledFiletypeFilter {
             }
         },
         ICO {
+
+            public boolean matchesMagic(InputStream inputStream) throws IOException {
+                final byte[] read = new byte[4];
+                new DataInputStream(inputStream).readFully(read);
+                return ByteArrayUtils.contains(read, new byte[] { 0x00, 0x00, 0x01, 0x00 });
+            }
+
             private final Pattern pattern = Pattern.compile("(?i)image/x-icon");
 
             @Override
@@ -1233,6 +1318,11 @@ public class CompiledFiletypeFilter {
         @Override
         public String getExtensionFromMimeType(String mimeType) {
             return CompiledFiletypeFilter.getExtensionFromMimeType(mimeType, this);
+        }
+
+        @Override
+        public boolean matchesMagic(InputStream inputStream) throws IOException {
+            return false;
         }
     }
 

@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 2, names = {}, urls = {})
 public class EdiskCz extends PluginForHost {
     public EdiskCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +142,7 @@ public class EdiskCz extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    /* TODO: Implement English(and missing) errormessages */
+    /* TODO: Implement English(and missing) error messages */
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);

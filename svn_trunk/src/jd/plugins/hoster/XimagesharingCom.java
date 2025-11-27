@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47638 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
 public class XimagesharingCom extends XFileSharingProBasic {
     public XimagesharingCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -60,10 +60,10 @@ public class XimagesharingCom extends XFileSharingProBasic {
         return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
-    /** 2019-07-10: Special: Enable mass-linkchecking feature as this filehost usually has filenames inside their URLs. */
     @Override
-    public boolean checkLinks(final DownloadLink[] urls) {
-        return super.massLinkcheckerWebsite(urls);
+    protected boolean supportsMassLinkcheckOverWebsite() {
+        /** 2019-07-10: Special: Enable mass-linkchecking feature as this filehost usually has filenames inside their URLs. */
+        return true;
     }
 
     @Override

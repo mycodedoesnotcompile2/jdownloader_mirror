@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51318 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -192,19 +192,6 @@ public class TerabytezOrg extends XFileSharingProBasic {
             return getFUID(link, type);
         }
     }
-    // @Override
-    // protected String getNormalizedDownloadURL(final DownloadLink link) {
-    // final String url = super.getNormalizedDownloadURL(link);
-    // final String url_without_filename = new Regex(url, "^(https?://[^/]+/[a-z0-9]{12})").getMatch(0);
-    // if (url_without_filename != null) {
-    // /*
-    // * 2025-08-12: Small workaround to allow "massLinkcheckerWebsite" to work, else it may fail with error "Filename don't match!".
-    // */
-    // return url_without_filename;
-    // } else {
-    // return url;
-    // }
-    // }
 
     @Override
     protected String getContentURL(final DownloadLink link) {

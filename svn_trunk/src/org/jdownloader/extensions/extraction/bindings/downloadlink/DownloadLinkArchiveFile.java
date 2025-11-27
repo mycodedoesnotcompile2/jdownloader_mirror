@@ -29,32 +29,19 @@ import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.ExtractionController;
 import org.jdownloader.extensions.extraction.ExtractionProgress;
 import org.jdownloader.extensions.extraction.ExtractionStatus;
+import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.settings.CleanAfterDownloadAction;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
 public class DownloadLinkArchiveFile implements ArchiveFile {
-    private final List<DownloadLink>       downloadLinks;
-    private final String                   name;
-    private final String                   filePath;
-    private volatile long                  size;
-    private final int                      hashCode;
-    private final AtomicReference<Boolean> exists                = new AtomicReference<Boolean>(null);
-    private boolean                        fileArchiveFileExists = false;
-
-    public boolean isFileArchiveFileExists() {
-        return fileArchiveFileExists;
-    }
-
-    public void setFileArchiveFileExists(boolean fileArchiveFileExists) {
-        if (fileArchiveFileExists) {
-            this.fileArchiveFileExists = true;
-            setExists(true);
-        } else {
-            invalidateExists();
-        }
-    }
+    private final List<DownloadLink>      downloadLinks;
+    private final String                  name;
+    private final String                  filePath;
+    private volatile long                 size;
+    private final int                     hashCode;
+    private final AtomicReference<Object> exists = new AtomicReference<Object>(null);
 
     @Override
     public LinkInfo getLinkInfo() {
@@ -105,7 +92,7 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
 
     @Override
     public Boolean isComplete() {
-        if (isFileArchiveFileExists() && exists()) {
+        if (isFileArchiveFileExists()) {
             return Boolean.TRUE;
         }
         for (DownloadLink downloadLink : getDownloadLinks()) {
@@ -122,7 +109,7 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
 
     public void deleteFile(DeleteOption option) {
         DownloadWatchDog.getInstance().delete(new ArrayList<DownloadLink>(getDownloadLinks()), option, true);
-        setFileArchiveFileExists(false);
+        invalidateExists();
     }
 
     public List<DownloadLink> getDownloadLinks() {
@@ -389,18 +376,41 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
         return exists(false);
     };
 
+    public FileArchiveFile getFileArchiveFile() {
+        final Object ret = exists.get();
+        if (ret instanceof FileArchiveFile) {
+            return (FileArchiveFile) ret;
+        }
+        return null;
+    }
+
+    public boolean isFileArchiveFileExists() {
+        final Object ret = exists.get();
+        if (ret instanceof FileArchiveFile) {
+            return ((FileArchiveFile) ret).exists();
+        }
+        return false;
+    }
+
     @Override
     public boolean exists(boolean ignoreCache) {
+        final Object ret = ignoreCache ? null : exists.get();
+        if (ret instanceof FileArchiveFile) {
+            return ((FileArchiveFile) ret).exists(ignoreCache);
+        } else if (ret instanceof Boolean) {
+            return ((Boolean) ret).booleanValue();
+        }
         final File file = new File(getFilePath());
         if (FileStateManager.getInstance().hasFileState(file, FILESTATE.WRITE_EXCLUSIVE)) {
             return false;
         }
-        Boolean ret = ignoreCache ? null : exists.get();
-        if (ret == null) {
-            ret = file.isFile();
-            exists.compareAndSet(null, ret);
-        }
-        return ret;
+        final Boolean fileExists = file.isFile();
+        exists.compareAndSet(null, fileExists);
+        return fileExists.booleanValue();
+    }
+
+    protected void setExists(FileArchiveFile archiveFile) {
+        exists.set(archiveFile);
     }
 
     protected void setExists(boolean b) {
@@ -423,7 +433,6 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
 
     @Override
     public void invalidateExists() {
-        this.fileArchiveFileExists = false;
         exists.set(null);
     }
 

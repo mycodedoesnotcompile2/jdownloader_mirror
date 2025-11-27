@@ -48,6 +48,7 @@ import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
 import org.appwork.shutdown.ShutdownVetoListener;
 import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.ModifyLock;
 import org.appwork.utils.StringUtils;
@@ -894,7 +895,9 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                                 if (!abortFlag.get() && skipArchiveIDSet.add(archive.getArchiveID())) {
                                     archives.add(archive);
                                     optimizeCachedPackageChildren(archive);
-                                    System.out.println("count:" + archives.size());
+                                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                        System.out.println("found archives:" + archives.size());
+                                    }
                                     if (maxArchives > 0 && archives.size() >= maxArchives) {
                                         abortFlag.set(true);
                                         return;

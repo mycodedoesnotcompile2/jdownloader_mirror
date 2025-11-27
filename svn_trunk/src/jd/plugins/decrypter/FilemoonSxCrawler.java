@@ -37,7 +37,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilemoonSx;
 
-@DecrypterPlugin(revision = "$Revision: 51193 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
@@ -63,21 +63,30 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    public static final String getDefaultAnnotationPatternPartFilemoon() {
-        return "/(?:e|d)/[a-z0-9]+(/[^/]+)?";
+    public static final String getDefaultAnnotationPatternPartFilemoonCrawler() {
+        return "/(d|e|[a-z]{4})/([a-z0-9]+(/[^/]+)?)";
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + FilemoonSxCrawler.getDefaultAnnotationPatternPartFilemoon());
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + FilemoonSxCrawler.getDefaultAnnotationPatternPartFilemoonCrawler());
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final FilemoonSx hosterPlugin = (FilemoonSx) this.getNewPluginForHostInstance(this.getHost());
-        final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), param.getCryptedUrl(), true);
+        /**
+         * 2025-11-26: Do some replacements to ensure that links are compatible with the default XFS supported plugin patterns. <br>
+         */
+        String contenturl = param.getCryptedUrl();
+        /* Correct url if necessary */
+        final String path0 = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        if (!new Regex(path0, "(d|e)").patternFind()) {
+            contenturl = contenturl.replace("/" + path0 + "/", "/e/");
+        }
+        final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), contenturl, true);
         final XFSConfigVideoFilemoonSx cfg = PluginJsonConfig.get(XFSConfigVideoFilemoonSx.class);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (!cfg.isCrawlSubtitle()) {
@@ -105,53 +114,54 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
         fp.setName(packagename);
         ret.add(link);
         /* Look for subtitles if user wants them. */
-        try {
+        crawlSubtitles: try {
             final String cryptedScripts[] = br.getRegex("p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
-            if (cryptedScripts != null && cryptedScripts.length != 0) {
-                for (String s : cryptedScripts) {
-                    String decoded = null;
-                    try {
-                        Regex params = new Regex(s, "'(.*?[^\\\\])',(\\d+),(\\d+),'(.*?)'");
-                        String p = params.getMatch(0).replaceAll("\\\\", "");
-                        int a = Integer.parseInt(params.getMatch(1));
-                        int c = Integer.parseInt(params.getMatch(2));
-                        String[] k = params.getMatch(3).split("\\|");
-                        while (c != 0) {
-                            c--;
-                            if (k[c].length() != 0) {
-                                p = p.replaceAll("\\b" + Integer.toString(c, a) + "\\b", k[c]);
-                            }
+            if (cryptedScripts == null || cryptedScripts.length == 0) {
+                break crawlSubtitles;
+            }
+            for (String s : cryptedScripts) {
+                String decoded = null;
+                try {
+                    Regex params = new Regex(s, "'(.*?[^\\\\])',(\\d+),(\\d+),'(.*?)'");
+                    String p = params.getMatch(0).replaceAll("\\\\", "");
+                    int a = Integer.parseInt(params.getMatch(1));
+                    int c = Integer.parseInt(params.getMatch(2));
+                    String[] k = params.getMatch(3).split("\\|");
+                    while (c != 0) {
+                        c--;
+                        if (k[c].length() != 0) {
+                            p = p.replaceAll("\\b" + Integer.toString(c, a) + "\\b", k[c]);
                         }
-                        decoded = p;
-                    } catch (Exception e) {
-                        logger.log(e);
                     }
-                    final String subtitleJS = new Regex(decoded, "tracks\\s*:\\s*(\\[\\{[^\\]]+\\])").getMatch(0);
-                    final List<Map<String, Object>> tracks = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(subtitleJS);
-                    final List<Map<String, Object>> subtitles = new ArrayList<Map<String, Object>>();
-                    for (final Map<String, Object> track : tracks) {
-                        final String trackType = track.get("kind").toString();
-                        if (!trackType.equalsIgnoreCase("captions")) {
-                            /* Skip e.g. "thumbnails" */
-                            continue;
-                        }
-                        subtitles.add(track);
+                    decoded = p;
+                } catch (Exception e) {
+                    logger.log(e);
+                }
+                final String subtitleJS = new Regex(decoded, "tracks\\s*:\\s*(\\[\\{[^\\]]+\\])").getMatch(0);
+                final List<Map<String, Object>> tracks = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(subtitleJS);
+                final List<Map<String, Object>> subtitles = new ArrayList<Map<String, Object>>();
+                for (final Map<String, Object> track : tracks) {
+                    final String trackType = track.get("kind").toString();
+                    if (!trackType.equalsIgnoreCase("captions")) {
+                        /* Skip e.g. "thumbnails" */
+                        continue;
                     }
-                    for (final Map<String, Object> subtitleInfo : subtitles) {
-                        final String subtitleURL = subtitleInfo.get("file").toString();
-                        // final String subtitleLanguage = subtitleInfo.get("label").toString();
-                        final URL subtitleURLFull = br.getURL(subtitleURL);
-                        final DownloadLink subtitle = createDownloadlink(subtitleURLFull.toString());
-                        if (subtitles.size() == 1) {
-                            /* There is only one subtitle --> Set same title as video-file. */
-                            subtitle.setFinalFileName(packagename + ".vtt");
-                        } else {
-                            /* There are multiple subtitles available -> Set different name for each */
-                            subtitle.setFinalFileName(packagename + "_" + Plugin.getFileNameFromURL(subtitleURLFull));
-                        }
-                        subtitle.setAvailable(true);
-                        ret.add(subtitle);
+                    subtitles.add(track);
+                }
+                for (final Map<String, Object> subtitleInfo : subtitles) {
+                    final String subtitleURL = subtitleInfo.get("file").toString();
+                    // final String subtitleLanguage = subtitleInfo.get("label").toString();
+                    final URL subtitleURLFull = br.getURL(subtitleURL);
+                    final DownloadLink subtitle = createDownloadlink(subtitleURLFull.toString());
+                    if (subtitles.size() == 1) {
+                        /* There is only one subtitle --> Set same title as video-file. */
+                        subtitle.setFinalFileName(packagename + ".vtt");
+                    } else {
+                        /* There are multiple subtitles available -> Set different name for each */
+                        subtitle.setFinalFileName(packagename + "_" + Plugin.getFileNameFromURL(subtitleURLFull));
                     }
+                    subtitle.setAvailable(true);
+                    ret.add(subtitle);
                 }
             }
         } catch (final Throwable ignore) {

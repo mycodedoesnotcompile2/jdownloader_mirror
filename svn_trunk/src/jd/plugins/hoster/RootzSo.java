@@ -18,12 +18,14 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.HTMLSearch;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -31,14 +33,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.decrypter.BuzzheavierComFolder;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
-public class BuzzheavierCom extends PluginForHost {
-    public BuzzheavierCom(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51877 $", interfaceVersion = 3, names = {}, urls = {})
+public class RootzSo extends PluginForHost {
+    public RootzSo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -57,8 +55,7 @@ public class BuzzheavierCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "buzzheavier.com" });
-        ret.add(new String[] { "fuckingfast.net" });
+        ret.add(new String[] { "rootz.so" });
         return ret;
     }
 
@@ -74,8 +71,7 @@ public class BuzzheavierCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            /* Links are added via crawler plugin -> No pattern */
-            ret.add("");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/d/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -91,7 +87,7 @@ public class BuzzheavierCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), BuzzheavierComFolder.PATTERN_FILE_FOLDER).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
     @Override
@@ -104,33 +100,29 @@ public class BuzzheavierCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    private String internal_file_id = null;
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        final String fid = this.getFID(link);
+        br.getHeaders().put("Referer", link.getPluginPatternMatcher());
+        /* API Docs: https://www.rootz.so/docs */
+        br.getPage("https://www." + getHost() + "/api/files/download-by-short/" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "/notfound")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*File Not Found Or Deleted")) {
+            /* e.g. {"success":false,"error":"File not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = HTMLSearch.searchMetaTagName(br.getRequest(), "title");
-        final String filesize = br.getRegex("Size - ([^<]+) \\| Views - \\d+").getMatch(0);
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
-        }
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
-        }
-        final String sha1hash = br.getRegex("SHA-1:?\\s*</strong>\\s*<code>\\s*([a-f0-9]{40})").getMatch(0);
-        if (sha1hash != null) {
-            link.setSha1Hash(sha1hash);
-        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+        link.setFinalFileName(data.get("fileName").toString());
+        link.setVerifiedFileSize(((Number) data.get("size")).longValue());
+        /* This id is required for downloading. */
+        internal_file_id = data.get("fileId").toString();
         return AvailableStatus.TRUE;
     }
 
@@ -140,20 +132,12 @@ public class BuzzheavierCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
-        // final String directlinkproperty = "directurl";
         requestFileInformation(link);
-        final String dllink = br.getURL() + "/download";
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            /* Check for special redirect */
-            br.followConnection();
-            dl = null;
-            final String hxRedirect = br.getRequest().getResponseHeader("Hx-Redirect");
-            if (hxRedirect == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, hxRedirect, this.isResumeable(link, null), this.getMaxChunks(link, null));
+        if (StringUtils.isEmpty(internal_file_id)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
+        final String dllink = "/api/files/proxy-download/" + internal_file_id;
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
@@ -166,13 +150,5 @@ public class BuzzheavierCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

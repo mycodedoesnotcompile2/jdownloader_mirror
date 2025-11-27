@@ -17,33 +17,46 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
-public class PicbaronCom extends XFileSharingProBasic {
-    public PicbaronCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51883 $", interfaceVersion = 3, names = {}, urls = {})
+public class DigitalsiloCom extends XFileSharingProBasic {
+    public DigitalsiloCom(final PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium(super.getPremiumLink());
+        this.enablePremium(super.getPurchasePremiumURL());
+    }
+
+    @Override
+    protected String getMainPage(final Browser br) {
+        final String main_default = super.getMainPage(br);
+        if (main_default == null) {
+            return null;
+        }
+        /* Their XFS is hosted on a sub-path which is special compared to most default XFS installations. */
+        return main_default + "/storage";
     }
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2019-02-08: null<br />
+     * captchatype-info: reCaptchaV2 <br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "picbaron.com" });
+        ret.add(new String[] { "digitalsilo.com" });
         return ret;
     }
 
@@ -57,49 +70,47 @@ public class PicbaronCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return DigitalsiloCom.buildAnnotationUrls(getPluginDomains());
     }
 
-    @Override
-    public boolean websiteSupportsHTTPS() {
-        return true;
-    }
+    /** Special pattern that is different compared to default XFS plugin patterns. */
+    private static final Pattern PATTERN_SPECIAL = Pattern.compile("/storage/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
 
-    @Override
-    protected boolean supports_availablecheck_filesize_html() {
-        return false;
-    }
-
-    @Override
-    public boolean isImagehoster() {
-        return true;
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_SPECIAL.pattern());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return false;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return true;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return false;
+            return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
     }
 
     @Override
     public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return 1;
+            return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
 
@@ -119,11 +130,13 @@ public class PicbaronCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean supportsMassLinkcheckOverWebsite() {
-        /*
-         * 2020-06-29: Use mass linkchecker as their URLs will nearly always contain filenames --> It is okay to only find filesizes during
-         * availablecheck!
-         */
-        return true;
+    protected URL_TYPE getURLType(final String url) {
+        /* We only support one type thus we can return this enum without the need to check. */
+        return URL_TYPE.NORMAL;
+    }
+
+    @Override
+    protected String getFUID(final String url, URL_TYPE type) {
+        return new Regex(url, PATTERN_SPECIAL).getMatch(0);
     }
 }

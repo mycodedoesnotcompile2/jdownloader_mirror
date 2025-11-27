@@ -19,8 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -34,7 +32,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
 public class FuckingfastCo extends PluginForHost {
     public FuckingfastCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,8 +119,8 @@ public class FuckingfastCo extends PluginForHost {
         }
         /* E.g. check for rate-limit */
         this.throwConnectionExceptions(br, br.getHttpConnection());
-        String filename = HTMLSearch.searchMetaTag(br, "title");
-        final String filesize = br.getRegex(">\\s*Size: ([^<]+) \\|\\s*Downloads:\\s*\\d+\\s*<").getMatch(0);
+        String filename = HTMLSearch.searchMetaTagName(br.getRequest(), "title");
+        final String filesize = br.getRegex(">\\s*Size\\s*(?::|-)\\s*([^<]+)\\s*\\|").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);

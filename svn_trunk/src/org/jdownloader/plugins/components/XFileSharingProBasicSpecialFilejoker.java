@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
 public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
     public XFileSharingProBasicSpecialFilejoker(final PluginWrapper wrapper) {
         super(wrapper);
@@ -40,10 +40,6 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
 
     @Override
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
-        /* Set fallback-filename */
-        if (!link.isNameSet()) {
-            setWeakFilename(link, null);
-        }
         return requestFileInformationWebsiteXFSOld(link, account);
     }
 

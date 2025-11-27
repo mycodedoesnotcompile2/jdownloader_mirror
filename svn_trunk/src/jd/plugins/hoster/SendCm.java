@@ -36,6 +36,22 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
@@ -55,23 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51852 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -214,8 +214,8 @@ public class SendCm extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             /**
-             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br> Looks like this is supposed to help with
-             * Cloudflare problems.
+             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br>
+             * Looks like this is supposed to help with Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
             handleDownload(link, account, null, directurl);
@@ -617,9 +617,6 @@ public class SendCm extends XFileSharingProBasic {
                         } else {
                             link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
                         }
-                        if (!link.isNameSet()) {
-                            setWeakFilename(link, null);
-                        }
                         /*
                          * We cannot check shortLinks via API so if we're unable to convert them to TYPE_NORMAL we basically already checked
                          * them here. Also we have to avoid sending wrong fileIDs to the API otherwise linkcheck WILL fail!
@@ -674,9 +671,6 @@ public class SendCm extends XFileSharingProBasic {
                     }
                     /* E.g. check for "result":[{"status":404,"filecode":"xxxxxxyyyyyy"}] */
                     final int status = ((Number) fileinfo.get("status")).intValue();
-                    if (!link.isNameSet()) {
-                        setWeakFilename(link, null);
-                    }
                     final String hash_sha256 = (String) fileinfo.get("file_sha256");
                     if (hash_sha256 != null) {
                         link.setSha256Hash(hash_sha256);
@@ -718,7 +712,7 @@ public class SendCm extends XFileSharingProBasic {
                         /* Trust API filenames -> Set as final filename. */
                         link.setFinalFileName(filename);
                     } else {
-                        /* Use cached name */
+                        /* Use cached name with video extension */
                         final String name = link.getName();
                         if (name != null && isVideohost) {
                             link.setName(this.applyFilenameExtension(filename, ".mp4"));

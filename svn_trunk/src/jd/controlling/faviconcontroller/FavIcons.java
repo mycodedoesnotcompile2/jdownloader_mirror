@@ -15,7 +15,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ConnectException;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -43,9 +45,11 @@ import javax.swing.ImageIcon;
 
 import jd.captcha.utils.GifDecoder;
 import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
 import jd.http.Browser.BrowserException;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
 import jd.plugins.PluginForHost;
 import net.sf.image4j.codec.ico.ICODecoder;
 
@@ -67,6 +71,7 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.PublicSuffixList;
 import org.jdownloader.controlling.FileCreationManager;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
@@ -690,6 +695,18 @@ public class FavIcons {
             favBr.setDebug(true);
             favBr.setVerbose(true);
         }
+        favBr.getHeaders().put("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0");
+        favBr.getHeaders().put("Sec-GPC", "1");
+        favBr.getHeaders().put("Connection", "keep-alive");
+        favBr.getHeaders().put("Upgrade-Insecure-Requests", "1");
+        favBr.getHeaders().put("Sec-Fetch-Dest", "document");
+        favBr.getHeaders().put("Sec-Fetch-Mode", "navigate");
+        favBr.getHeaders().put("Sec-Fetch-Site", "none");
+        favBr.getHeaders().put("Sec-Fetch-User", "?1");
+        favBr.getHeaders().put("Priority", "u=0, i");
+        favBr.getHeaders().put("Pragma", "no-cache");
+        favBr.getHeaders().put("Cache-Control", "no-cache");
+        favBr.getHeaders().put("TE", "trailers");
         favBr.setLogger(logger);
         favBr.setConnectTimeout(10000);
         favBr.setReadTimeout(10000);
@@ -721,6 +738,11 @@ public class FavIcons {
                         }
                     }
                     if (favBr.getRedirectLocation() != null) {
+                        try {
+                            Thread.sleep(500);// helps to prevent cloudflare protection
+                        } catch (InterruptedException e) {
+                            throw new IOException(e);
+                        }
                         favBr.followRedirect(true);
                         if (!isSameDomain(favBr, host, siteSupportedNames)) {
                             throw new IOException("redirect to different domain?" + favBr._getURL().getHost() + "!=" + host);
@@ -733,6 +755,20 @@ public class FavIcons {
                         break;
                     }
                 } catch (final BrowserException e) {
+                    if (Exceptions.containsInstanceOf(e, UnknownHostException.class, ConnectException.class, SocketTimeoutException.class)) {
+                        continue;
+                    }
+                    if (e instanceof BlockedByException) {
+                        try {
+                            final Browser br = favBr.cloneBrowser();
+                            br.setRequest(null);
+                            final BufferedImage ret = download_FavIconTag(br, favBr.getURL("/favicon.ico").toExternalForm(), host);
+                            if (ret != null) {
+                                return ret;
+                            }
+                        } catch (IOException ignore) {
+                        }
+                    }
                     logger.log(e);
                     final Request reg = e.getRequest();
                     if (reg != null && reg.getHttpConnection() != null && reg.getHttpConnection().getResponseCode() == 429 && retryCount == 0) {
@@ -774,6 +810,11 @@ public class FavIcons {
                 retryFlag = false;
                 try {
                     final Browser brc = favBr.cloneBrowser();
+                    try {
+                        Thread.sleep(250);// helps to prevent cloudflare protection
+                    } catch (InterruptedException e) {
+                        throw new IOException(e);
+                    }
                     final BufferedImage ret = download_FavIconTag(brc, favIconURL, host);
                     if (ret != null) {
                         images.add(ret);
@@ -844,54 +885,60 @@ public class FavIcons {
             if (!StringUtils.isEmpty(url)) {
                 /* favicon tag with ico extension */
                 favBr.setFollowRedirects(true);
-                favBr.getHeaders().put("Accept-Encoding", null);
-                con = favBr.openGetConnection(url);
+                GetRequest request = favBr.createGetRequest(url);
+                con = favBr.openRequestConnection(request);
                 /* we use bufferedinputstream to reuse it later if needed */
                 bytes = IO.readStream(-1, con.getInputStream());
                 if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text") || bytes == null || bytes.length == 0) {
+                    favBr.getLogger().info("could not load:" + con.getURL() + "|responseCode=" + con.getResponseCode() + "|contentType=" + con.getContentType() + "|bytes=" + bytes.length);
                     return null;
                 }
                 try {
-                    List<BufferedImage> ret = null;
-                    if (bytes.length > 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x01 && bytes[3] == 0x00 || StringUtils.containsIgnoreCase(con.getContentType(), "image/x-icon")) {
+                    if (CompiledFiletypeFilter.ImageExtensions.PNG.matchesMagic(new ByteArrayInputStream(bytes))) {
+                        // PNG magic
+                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                        if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                            return img;
+                        }
+                        return null;
+                    } else if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(new ByteArrayInputStream(bytes))) {
                         // ICO magic
-                        ret = ICODecoder.read(new ByteArrayInputStream(bytes));
-                    } else if (bytes.length > 4 && bytes[0] == 0x3c && bytes[1] == 0x73 && bytes[2] == 0x76 && bytes[3] == 0x67 || StringUtils.containsIgnoreCase(con.getContentType(), "image/svg+xml")) {
+                        final List<BufferedImage> ret = ICODecoder.read(new ByteArrayInputStream(bytes));
+                        final BufferedImage img = returnBestImage(ret);
+                        if (img != null) {
+                            return img;
+                        }
+                        return null;
+                    } else if (CompiledFiletypeFilter.ImageExtensions.SVG.matchesMagic(new ByteArrayInputStream(bytes)) || CompiledFiletypeFilter.ImageExtensions.SVG.matchesMimeType(con.getContentType()) > 0) {
                         // SVG magic
                         final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
-                        if (img != null) {
-                            ret = new ArrayList<BufferedImage>();
-                            ret.add(img);
+                        if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                            return img;
                         }
-                    } else if (bytes.length > 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff) {
+                        return null;
+                    } else if (CompiledFiletypeFilter.ImageExtensions.JPG.matchesMagic(new ByteArrayInputStream(bytes))) {
                         // JPG magic
                         final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
-                        if (img != null) {
-                            ret = new ArrayList<BufferedImage>();
-                            ret.add(img);
+                        if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                            return img;
                         }
-                    } else if (bytes.length >= 67 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71) {
-                        // smalltest single pixel png has 67 bytes with PNG magic
-                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
-                        if (img != null) {
-                            ret = new ArrayList<BufferedImage>();
-                            ret.add(img);
-                        }
-                    } else if (bytes.length >= 35 && bytes[0] == 71 && bytes[1] == 73 && bytes[2] == 70) {
+                        return null;
+                    } else if (CompiledFiletypeFilter.ImageExtensions.GIF.matchesMagic(new ByteArrayInputStream(bytes))) {
                         // smalltest single pixel gif has 35 bytes with GIF magic
                         final GifDecoder gifDecoder = new GifDecoder();
                         /* reset bufferedinputstream to begin from start */
                         if (gifDecoder.read(new ByteArrayInputStream(bytes)) == 0) {
                             final BufferedImage img = gifDecoder.getImage();
-                            if (img != null) {
-                                ret = new ArrayList<BufferedImage>();
-                                ret.add(img);
+                            if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                                return img;
                             }
+                            return null;
                         }
                     }
                     /* try first with iconloader */
-                    if (ret == null && bytes.length >= 70) {
+                    if (bytes.length >= 70) {
                         // smallest single pixel icon has 70 bytes
+                        List<BufferedImage> ret = null;
                         try {
                             ret = ICODecoder.read(new ByteArrayInputStream(bytes));
                         } catch (final IOException e) {
@@ -904,20 +951,18 @@ public class FavIcons {
                                 throw e;
                             }
                         }
-                    }
-                    if (ret == null) {
-                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
-                        if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                        final BufferedImage img = returnBestImage(ret);
+                        if (img != null) {
                             return img;
+                        } else {
+                            throw new Throwable("Try again with other ImageLoader");
                         }
-                        return null;
                     }
-                    final BufferedImage img = returnBestImage(ret);
-                    if (img != null) {
+                    final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                    if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
                         return img;
-                    } else {
-                        throw new Throwable("Try again with other ImageLoader");
                     }
+                    return null;
                 } catch (Throwable e) {
                     /* maybe redirect to different icon format? */
                     final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));

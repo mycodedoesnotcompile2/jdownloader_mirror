@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 46939 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
 public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
     public DaddyScriptsDaddysLinkProtector(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,9 +44,6 @@ public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "protect.dmd247.com" });
-        ret.add(new String[] { "isra.click" });
         ret.add(new String[] { "lnk.snahp.eu" });
         return ret;
     }
@@ -92,37 +89,36 @@ public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
                 passwordFail = false;
                 captchaFail = false;
                 break;
-            } else {
-                /* 2017-01-30: Either captcha OR password */
-                if (confirmationForm.hasInputFieldByName("security_code")) {
-                    captchaFail = true;
-                    final String captcha_method_name;
-                    if (counter > 1) {
-                        /* 3rd try, ask user and do not rely on auto-solver */
-                        captcha_method_name = "ziddu.com_manualcaptcha";
-                    } else {
-                        captcha_method_name = "ziddu6.com";
-                    }
-                    final String code = this.getCaptchaCode(captcha_method_name, "/CaptchaSecurityImages.php?width=100&height=40&characters=5", param);
-                    confirmationForm.put("security_code", Encoding.urlEncode(code));
-                } else if (confirmationForm.hasInputFieldByName("Pass1")) {
-                    passwordFail = true;
-                    if (counter == 0) {
-                        passCode = this.getPluginConfig().getStringProperty("LAST_WORKING_PASSWORD");
-                    } else {
-                        passCode = null;
-                    }
-                    if (StringUtils.isEmpty(passCode)) {
-                        passCode = getUserInput("Password?", param);
-                    }
-                    confirmationForm.put("Pass1", Encoding.urlEncode(passCode));
-                } else {
-                    passwordFail = false;
-                    captchaFail = false;
-                    break;
-                }
-                submitForm(confirmationForm);
             }
+            /* 2017-01-30: Either captcha OR password */
+            if (confirmationForm.hasInputFieldByName("security_code")) {
+                captchaFail = true;
+                final String captcha_method_name;
+                if (counter > 1) {
+                    /* 3rd try, ask user and do not rely on auto-solver */
+                    captcha_method_name = "ziddu.com_manualcaptcha";
+                } else {
+                    captcha_method_name = "ziddu6.com";
+                }
+                final String code = this.getCaptchaCode(captcha_method_name, "/CaptchaSecurityImages.php?width=100&height=40&characters=5", param);
+                confirmationForm.put("security_code", Encoding.urlEncode(code));
+            } else if (confirmationForm.hasInputFieldByName("Pass1")) {
+                passwordFail = true;
+                if (counter == 0) {
+                    passCode = this.getPluginConfig().getStringProperty("LAST_WORKING_PASSWORD");
+                } else {
+                    passCode = null;
+                }
+                if (StringUtils.isEmpty(passCode)) {
+                    passCode = getUserInput("Password?", param);
+                }
+                confirmationForm.put("Pass1", Encoding.urlEncode(passCode));
+            } else {
+                passwordFail = false;
+                captchaFail = false;
+                break;
+            }
+            submitForm(confirmationForm);
         } while (confirmationForm != null && counter <= 4);
         /*
          * 2020-02-12: Some hosts will only require a captcha on the first try and allow all further URLs to be processed without captchas

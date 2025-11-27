@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51784 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51877 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class VidhideCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidhidepro.com", "vidhide.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com", "vidhidefast.com", "seraphinapl.com", "taylorplayer.com", "dinisglows.com", "dingtezuni.com" });
+        ret.add(new String[] { "vidhidepro.com", "vidhide.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com", "vidhidefast.com", "seraphinapl.com", "taylorplayer.com", "dinisglows.com", "dingtezuni.com", "dintezuvio.com" });
         return ret;
     }
 
@@ -345,6 +345,15 @@ public class VidhideCom extends XFileSharingProBasic {
             /* E.g. in availablecheck */
             return filesizeStrChosen;
         }
+        // setFilename: {
+        // /* Set filename here in case it hasn't been set before */
+        // final String[] fileInfo = this.scanInfo(internal_getFileInfoArray());
+        // final String filename = fileInfo[0];
+        // if (filename == null) {
+        // break setFilename;
+        // }
+        // this.setFilename(filename, link, br);
+        // }
         getPage(br, continueURL);
         checkErrors(br, continueURL, link, account);
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download_orig");

@@ -26,6 +26,7 @@ import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.BooleanStatus;
 import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
+import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
 import org.jdownloader.settings.GeneralSettings;
@@ -131,8 +132,8 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
      * and that are already belong to different archive
      */
     public List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, final String file, final String archivePartFilePattern) {
-        final String pattern = modifyPartFilePattern(archivePartFilePattern);
-        final Pattern pat = Pattern.compile(pattern, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
+        final String patternString = modifyPartFilePattern(archivePartFilePattern);
+        final Pattern patternPattern = Pattern.compile(patternString, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
         final String fileParent = new File(file).getParent();
         final HashMap<String, ArchiveFile> map = new HashMap<String, ArchiveFile>();
         DownloadController.getInstance().visitNodes(new AbstractNodeVisitor<DownloadLink, FilePackage>() {
@@ -158,7 +159,7 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                     // http://board.jdownloader.org/showthread.php?t=59031
                     return false;
                 }
-                if (pat.matcher(nodeFile).matches()) {
+                if (patternPattern.matcher(nodeFile).matches()) {
                     final String nodeName = node.getView().getDisplayName();
                     DownloadLinkArchiveFile af = (DownloadLinkArchiveFile) map.get(nodeName);
                     if (af == null) {
@@ -171,8 +172,8 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                 return true;
             }
         }, true);
-        final List<ArchiveFile> localFiles = new FileArchiveFactory(new File(getFilePath())).createPartFileList(unitType, filePathParts, file, pattern);
-        for (ArchiveFile localFile : localFiles) {
+        final List<FileArchiveFile> localFiles = new FileArchiveFactory(new File(getFilePath())).createPartFileList(unitType, filePathParts, file, patternString);
+        for (FileArchiveFile localFile : localFiles) {
             final ArchiveFile archiveFile = map.get(localFile.getName());
             if (archiveFile == null) {
                 // There is a matching local file, without a downloadlink link. this can happen if the user removes finished downloads
@@ -180,7 +181,7 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                 map.put(localFile.getName(), localFile);
             } else if (archiveFile instanceof DownloadLinkArchiveFile) {
                 final DownloadLinkArchiveFile af = (DownloadLinkArchiveFile) archiveFile;
-                af.setFileArchiveFileExists(localFile.exists());
+                af.setExists(localFile);
             }
         }
         return new ArrayList<ArchiveFile>(map.values());

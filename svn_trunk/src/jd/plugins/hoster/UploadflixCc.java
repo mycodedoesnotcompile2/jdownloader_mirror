@@ -18,15 +18,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadflixCc extends XFileSharingProBasic {
     public UploadflixCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class UploadflixCc extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uploadflix.cc", "uploadflix.com", "dl.uploadflix.cc", "dl.uploadflix.com" });
+        ret.add(new String[] { "uploadflix.cc", "uploadflix.com", "dl.uploadflix.cc", "dl.uploadflix.com", "1uploadflix.net" });
         return ret;
     }
 

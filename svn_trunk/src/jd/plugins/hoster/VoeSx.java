@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -358,33 +358,26 @@ public class VoeSx extends XFileSharingProBasic {
             final boolean embedOnly = br.containsHTML(">\\s*This video can be watched as embed only");
             br.setFollowRedirects(true);
             boolean fallBackFileName = true;
-            try {
-                getPage(this.getMainPage(link) + "/e/" + this.getFUIDFromURL(link));
-                if (this.isOffline(link, br)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                final String[] fileInfo = internal_getFileInfoArray();
-                scanInfo(br.getRequest().getHtmlCode(), fileInfo);
-                processFileInfo(fileInfo, br, link);
-                if (!StringUtils.isEmpty(fileInfo[0])) {
-                    /* Correct- and set filename */
-                    setFilename(fileInfo[0], link, br);
-                    fallBackFileName = false;
-                } else {
-                    /*
-                     * Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or
-                     * not.
-                     */
-                    fallBackFileName = true;
-                }
-                final String dllink = getDllinkVideohost(link, account, br, br.getRequest().getHtmlCode());
-                if (StringUtils.isEmpty(dllink) && embedOnly) {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "This video can be watched as embed only");
-                }
-            } finally {
-                if (fallBackFileName) {
-                    this.setWeakFilename(link, br);
-                }
+            getPage(this.getMainPage(link) + "/e/" + this.getFUIDFromURL(link));
+            if (this.isOffline(link, br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final String[] fileInfo = internal_getFileInfoArray();
+            scanInfo(br.getRequest().getHtmlCode(), fileInfo);
+            processFileInfo(fileInfo, br, link);
+            if (!StringUtils.isEmpty(fileInfo[0])) {
+                /* Correct- and set filename */
+                setFilename(fileInfo[0], link, br);
+                fallBackFileName = false;
+            } else {
+                /*
+                 * Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or not.
+                 */
+                fallBackFileName = true;
+            }
+            final String dllink = getDllinkVideohost(link, account, br, br.getRequest().getHtmlCode());
+            if (StringUtils.isEmpty(dllink) && embedOnly) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "This video can be watched as embed only");
             }
             return AvailableStatus.TRUE;
         } else {
@@ -725,9 +718,6 @@ public class VoeSx extends XFileSharingProBasic {
                         } else {
                             link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
                         }
-                        if (!link.isNameSet()) {
-                            setWeakFilename(link, null);
-                        }
                         /*
                          * We cannot check shortLinks via API so if we're unable to convert them to TYPE_NORMAL we basically already checked
                          * them here. Also we have to avoid sending wrong fileIDs to the API otherwise linkcheck WILL fail!
@@ -781,9 +771,6 @@ public class VoeSx extends XFileSharingProBasic {
                     }
                     /* E.g. check for "result":[{"status":404,"filecode":"xxxxxxyyyyyy"}] */
                     final int status = ((Number) fileInfo.get("status")).intValue();
-                    if (!link.isNameSet()) {
-                        setWeakFilename(link, null);
-                    }
                     String filename = null;
                     boolean isVideohost = false;
                     if (status != 200) {

@@ -17,6 +17,7 @@ import jd.utils.JDUtilities;
 
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.images.IconIO;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
@@ -194,6 +195,7 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         if (!updatePermission && "linkcrawlerretry".equals(getDomain())) {
             updatePermission = true;
         }
+        updatePermission = updatePermission || DebugMode.TRUE_IN_IDE_ELSE_FALSE;
         Icon ret = getHosterIcon();
         final boolean hasHosterIcon = ret != null;
         if (ret == null || (!hosterIconUpdatePermission && updatePermission)) {

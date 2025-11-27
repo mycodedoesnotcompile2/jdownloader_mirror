@@ -35,17 +35,21 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51872 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
 
-    private static final Pattern PATTERN_SUPPORTED = Pattern.compile("/([a-z0-9]{12})(/([^/]+)(?:\\.html)?)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SUPPORTED                    = Pattern.compile("/([a-z0-9]{12})(/([^/]+)(?:\\.html)?)?", Pattern.CASE_INSENSITIVE);
+    public static final String   PROPERTY_REQUIRES_SPECIAL_WORKAROUND = "requires_special_workaround";
+    private boolean              allowSpecialWorkaround               = false;
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -160,6 +164,48 @@ public class IsraCloud extends XFileSharingProBasic {
     }
 
     @Override
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* This is a stable version of JDownloader -> Disable special workaround for now (2025-11-26). */
+            allowSpecialWorkaround = false;
+            return super.requestFileInformationWebsite(link, account);
+        }
+        if (new Regex(link.getPluginPatternMatcher(), "(?i).*\\.html$").patternFind()) {
+            /* No special workaround needed for such links */
+            allowSpecialWorkaround = false;
+            return super.requestFileInformationWebsite(link, account);
+        }
+        final Boolean storedInformationRequiresSpecialWorkaround = (Boolean) link.getProperty(PROPERTY_REQUIRES_SPECIAL_WORKAROUND);
+        if (storedInformationRequiresSpecialWorkaround != null) {
+            /* Auto handling has been performed before -> We know how to check this link */
+            if (Boolean.TRUE.equals(storedInformationRequiresSpecialWorkaround)) {
+                allowSpecialWorkaround = true;
+                return super.requestFileInformationWebsite(link, account);
+            } else {
+                allowSpecialWorkaround = false;
+                return super.requestFileInformationWebsite(link, account);
+            }
+        }
+        /* Auto handling */
+        try {
+            final AvailableStatus result = super.requestFileInformationWebsite(link, account);
+            link.setProperty(PROPERTY_REQUIRES_SPECIAL_WORKAROUND, false);
+            return result;
+        } catch (final PluginException e) {
+            if (e.getLinkStatus() != LinkStatus.ERROR_FILE_NOT_FOUND) {
+                throw e;
+            }
+            /* File looks to be offline -> Maybe special workaround is required to access it. */
+            logger.info("File looks to be offline -> Trying auto workaround");
+            allowSpecialWorkaround = true;
+            final AvailableStatus result = super.requestFileInformationWebsite(link, account);
+            logger.info("No exception happened -> Success -> File is online and special workaround is required to access it.");
+            link.setProperty(PROPERTY_REQUIRES_SPECIAL_WORKAROUND, true);
+            return result;
+        }
+    }
+
+    @Override
     protected void sendRequest(final Browser ibr, final Request request) throws Exception {
         prepReq(ibr, request);
         super.sendRequest(ibr, request);
@@ -173,11 +219,8 @@ public class IsraCloud extends XFileSharingProBasic {
 
     private void prepReq(final Browser ibr, final Request request) throws MalformedURLException {
         /* Set special headers to allow users to download special "temporary file ids". */
-        final boolean enableSpecialHandling = false;
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            return;
-        }
-        if (!enableSpecialHandling) {
+        if (!allowSpecialWorkaround) {
+            /* Do not change request */
             return;
         }
         final String fid = new Regex(request.getURL().getPath(), PATTERN_SUPPORTED).getMatch(0);

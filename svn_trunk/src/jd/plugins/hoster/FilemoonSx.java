@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSx extends XFileSharingProBasic {
     public FilemoonSx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -78,6 +78,18 @@ public class FilemoonSx extends XFileSharingProBasic {
 
     public static String[] getAnnotationUrls() {
         return FilemoonSxCrawler.getAnnotationUrls();
+    }
+
+    public static final String getDefaultAnnotationPatternPartFilemoon() {
+        return "/(?:e|d)/([a-z0-9]+(/[^/]+)?)";
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + getDefaultAnnotationPatternPartFilemoon());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -210,6 +222,10 @@ public class FilemoonSx extends XFileSharingProBasic {
             /* Access download page if this hasn't already been done. */
             final String file_id = this.getFUIDFromURL(link);
             if (!br.getURL().matches(".*/download/" + file_id + ".*")) {
+                if (!br.getURL().matches(".*/d/" + file_id + ".*")) {
+                    /* Access pre download page */
+                    br.getPage("/d/" + file_id);
+                }
                 final String step_continue_to_official_download = br.getRegex("/download/" + file_id).getMatch(-1);
                 if (step_continue_to_official_download == null) {
                     throw new PluginException(LinkStatus.ERROR_FATAL, error_download_impossible);
@@ -260,7 +276,7 @@ public class FilemoonSx extends XFileSharingProBasic {
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
         /* 2023-04-20: New */
-        final String dllink = br.getRegex(">\\s*Your download link</div>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
+        final String dllink = br.getRegex(">\\s*Your download link\\s*</div>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
         if (dllink != null) {
             return dllink;
         } else {

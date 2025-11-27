@@ -67,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51623 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -112,6 +112,7 @@ public abstract class HighWayCore extends UseNet {
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE, System.getProperty("user.language"));
         br.setCustomCharset("utf-8");
         br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(503);
         return br;
     }
 
@@ -247,6 +248,7 @@ public abstract class HighWayCore extends UseNet {
             }
             if (account == null) {
                 /* Some items might be checkable without account but we require an account for all items just in case. */
+                logger.info("Cannot check this link without account");
                 return AvailableStatus.UNCHECKABLE;
             }
             this.login(account, false);
@@ -364,17 +366,11 @@ public abstract class HighWayCore extends UseNet {
          * needed to get the individual host limits.
          */
         synchronized (account) {
-            final boolean fetchAccountInfo;
             synchronized (getMapLock()) {
                 if (getMap(HighWayCore.hostMaxchunksMap).isEmpty() || getMap(HighWayCore.hostMaxdlsMap).isEmpty()) {
-                    fetchAccountInfo = true;
-                } else {
-                    fetchAccountInfo = false;
+                    logger.info("Performing full login to set individual host limits");
+                    this.fetchAccountInfo(account);
                 }
-            }
-            if (fetchAccountInfo) {
-                logger.info("Performing full login to set individual host limits");
-                this.fetchAccountInfo(account);
             }
         }
         if (isUsenetLink(link)) {
@@ -383,22 +379,33 @@ public abstract class HighWayCore extends UseNet {
         }
         boolean resume = this.isResumeable(link, account);
         final int maxChunks = this.getMaxChunks(link, account);
-        int statuscode;
-        if (!this.attemptStoredDownloadurlDownload(link, resume, maxChunks)) {
+        final String directlinkproperty = this.getHost() + "directlink";
+        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        String dllink;
+        if (storedDirecturl != null) {
+            logger.info("Re-using stored directurl: " + storedDirecturl);
+            dllink = storedDirecturl;
+        } else {
             this.login(account, false);
             /* Request creation of downloadlink */
             Map<String, Object> entries = null;
             String passCode = link.getDownloadPassword();
             int counter = 0;
+            int statuscode;
+            final Boolean storedInformationRequiresSpecialWorkaround = (Boolean) link.getProperty(IsraCloud.PROPERTY_REQUIRES_SPECIAL_WORKAROUND);
             do {
                 if (counter > 0) {
                     passCode = getUserInput("Password?", link);
                 }
-                String getdata = "json&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this));
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
                 if (passCode != null) {
-                    getdata += "&pass=" + Encoding.urlEncode(passCode);
+                    query.appendEncoded("pass", passCode);
+                } else if (storedInformationRequiresSpecialWorkaround != null) {
+                    /* Provide special workaround information via pass field. */
+                    query.appendEncoded("pass", "special_workaround_state_" + storedInformationRequiresSpecialWorkaround);
                 }
-                br.getPage(getWebsiteBase() + "load.php?" + getdata);
+                br.getPage(getWebsiteBase() + "load.php?json=1&" + query.toString());
                 entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 statuscode = ((Number) entries.get("code")).intValue();
                 if (statuscode != STATUSCODE_PASSWORD_NEEDED_OR_WRONG) {
@@ -430,7 +437,7 @@ public abstract class HighWayCore extends UseNet {
                 displayBubbleNotification((String) infoMsgO, (String) infoMsgO);
             }
             entries = this.cacheDLChecker(entries, this.br, link, account);
-            String dllink = (String) entries.get("download");
+            dllink = entries.get("download").toString();
             /* Validate URL */
             dllink = new URL(dllink).toExternalForm();
             String hash = (String) entries.get("hash");
@@ -451,53 +458,28 @@ public abstract class HighWayCore extends UseNet {
                     logger.info("Unsupported file-hash string: " + hash);
                 }
             }
-            link.setProperty(getDirectlinkProperty(), dllink);
-            br.setAllowedResponseCodes(new int[] { 503 });
+            link.setProperty(directlinkproperty, dllink);
+        }
+        try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 this.checkErrors(this.br, link, account);
                 getMultiHosterManagement().handleErrorGeneric(account, null, "unknowndlerror", 1, 3 * 60 * 1000l);
             }
+        } catch (final Exception e) {
+            if (storedDirecturl != null) {
+                link.removeProperty(directlinkproperty);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
+            } else {
+                throw e;
+            }
         }
         controlSlot(+1);
         try {
             dl.startDownload();
         } finally {
-            // remove usedHost slot from hostMap
             controlSlot(-1);
-        }
-    }
-
-    private String getStoredDirectlink(final DownloadLink link) {
-        return link.getStringProperty(getDirectlinkProperty());
-    }
-
-    private String getDirectlinkProperty() {
-        return this.getHost() + "directlink";
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final boolean resumable, final int maxchunks) throws Exception {
-        final String url = this.getStoredDirectlink(link);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, resumable, maxchunks);
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
         }
     }
 
@@ -772,22 +754,21 @@ public abstract class HighWayCore extends UseNet {
                 if (!validateCookies) {
                     /* Do not validate cookies */
                     return;
-                } else {
-                    logger.info("Checking cookies");
-                    br.getPage(this.getAPIBase() + "?logincheck");
-                    /* Don't check for errors here as a failed login can trigger error dialogs which we don't want here! */
-                    // this.checkErrors(this.br, account);
-                    try {
-                        this.checkErrors(br, null, account);
-                        /* No exception --> Success */
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return;
-                    } catch (final PluginException ignore) {
-                        logger.log(ignore);
-                        logger.info("Cookie login failed");
-                        br.clearCookies(null);
-                    }
+                }
+                logger.info("Checking cookies");
+                br.getPage(this.getAPIBase() + "?logincheck");
+                /* Don't check for errors here as a failed login can trigger error dialogs which we don't want here! */
+                // this.checkErrors(this.br, account);
+                try {
+                    this.checkErrors(br, null, account);
+                    /* No exception --> Success */
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
+                } catch (final PluginException ignore) {
+                    logger.log(ignore);
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
                 }
             }
             logger.info("Performing full login");
@@ -984,7 +965,7 @@ public abstract class HighWayCore extends UseNet {
             if (msg.equalsIgnoreCase("UserOrPassInvalid")) {
                 throw new AccountInvalidException();
             } else {
-                logger.warning("Unknown/Unhandled errormessage: " + msg);
+                logger.warning("Unknown- or no error message: " + msg);
             }
         }
     }

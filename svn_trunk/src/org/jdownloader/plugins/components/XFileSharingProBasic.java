@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,16 +135,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     @Override
-    protected String getDefaultFileName(DownloadLink link) {
-        try {
-            String urlfilename = new Regex(link.getPluginPatternMatcher(), "(?i).+/(.+)\\.html$").getMatch(0);
-            if (urlfilename != null) {
-                urlfilename = URLEncode.decodeURIComponent(urlfilename, "UTF-8", true);
-                return urlfilename;
-            }
-        } catch (Exception e) {
-        }
-        return super.getDefaultFileName(link);
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFallbackFilename(link, br);
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -452,20 +444,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected boolean supports_availablecheck_filesize_alt_fast() {
         return true;
-    }
-
-    /**
-     * See also function getFilesizeViaAvailablecheckAlt!
-     *
-     * @return true: Website uses old version of getFilesizeViaAvailablecheckAlt. Old will be tried first, then new if it fails. <br>
-     *         false: Website uses current version of getFilesizeViaAvailablecheckAlt - it will be used first and if it fails, old call will
-     *         be tried. <br>
-     *         2019-07-09: Do not override this anymore - this code will auto-detect this situation!<br>
-     *         default: false
-     */
-    @Deprecated
-    protected boolean prefer_availablecheck_filesize_alt_type_old() {
-        return false;
     }
 
     /**
@@ -811,7 +789,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final URL url;
         try {
             url = new URL(link.getPluginPatternMatcher());
-        } catch (MalformedURLException e) {
+        } catch (final MalformedURLException e) {
+            /* This should never happen */
             e.printStackTrace();
             return null;
         }
@@ -1246,11 +1225,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (!StringUtils.isEmpty(fileInfo[0])) {
             /* Correct- and set filename */
             setFilename(fileInfo[0], link, br);
-        } else {
-            /*
-             * Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or not.
-             */
-            this.setWeakFilename(link, br);
         }
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1])) {
@@ -1320,9 +1294,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (!StringUtils.isEmpty(fileInfo[0])) {
             /* Correct- and set filename */
             setFilename(fileInfo[0], link, br);
-        } else {
-            /* Fallback */
-            this.setWeakFilename(link, br);
         }
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1]) && !isFilesizeSet) {
@@ -1415,11 +1386,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (!StringUtils.isEmpty(fileInfo[0])) {
             /* Correct- and set filename */
             setFilename(fileInfo[0], link, br);
-        } else {
-            /*
-             * Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or not.
-             */
-            this.setWeakFilename(link, br);
         }
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1])) {
@@ -1492,10 +1458,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
-        /* Set fallback-filename */
-        if (!link.isNameSet()) {
-            setWeakFilename(link, null);
-        }
         final URL_TYPE urltype = this.getURLType(link);
         if (isXFSOld(urltype)) {
             return requestFileInformationWebsiteXFSOld(link, account);
@@ -1909,11 +1871,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * <b>Use this only if:</b> <br>
      * - You have verified that the filehost has a mass-linkchecker and it is working fine with this code. <br>
      * - The contentURLs contain a filename as a fallback e.g. https://host.tld/<fuid>/someFilename.png.html <br>
-     * - If used for single URLs inside 'normal linkcheck' (e.g. inside requestFileInformation), call with setWeakFilename = false <br>
      * - If the normal way via website is blocked somehow e.g. 'site-verification' captcha <br>
-     * <b>- If used to check multiple URLs (mass-linkchecking feature), call with setWeakFilename = true!! </b>
      */
-    public boolean massLinkcheckerWebsite(final DownloadLink[] urls) {
+    protected boolean massLinkcheckerWebsite(final DownloadLink[] urls) {
         if (urls == null || urls.length == 0) {
             return false;
         }
@@ -1924,115 +1884,106 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String checkTypeNew = "check_files";
         final SubConfiguration cfg = this.getPluginConfig();
         final String checkType_last_used_and_working = cfg.getStringProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING, null);
-        String checkURL = null;
-        int linkcheckTypeTryCount = 0;
+        final Browser br = createNewBrowserInstance();
+        this.prepBrowser(br, getMainPage(br));
+        br.setCookiesExclusive(true);
         try {
-            final Browser br = createNewBrowserInstance();
-            this.prepBrowser(br, getMainPage());
-            br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
             final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
             Form checkForm = null;
-            while (true) {
+            while (index < urls.length) {
                 links.clear();
-                while (true) {
-                    /* We test max 50 links at once. 2020-05-28: Checked to up to 100 but let's use max. 50. */
-                    if (index == urls.length || links.size() == 50) {
-                        break;
-                    } else {
-                        links.add(urls[index]);
-                        index++;
-                    }
-                }
-                sb.delete(0, sb.capacity());
-                for (final DownloadLink link : links) {
-                    try {
-                        this.resolveShortURL(br.cloneBrowser(), link, null);
-                    } catch (final PluginException e) {
-                        logger.log(e);
-                        if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
-                            link.setAvailable(false);
-                        } else {
-                            link.setAvailable(true);
-                        }
-                        if (!link.isNameSet()) {
-                            setWeakFilename(link, null);
-                        }
-                        /*
-                         * We cannot check shortLinks via mass-linkchecker so if we're unable to convert them to TYPE_NORMAL we basically
-                         * already checked them here. Also we have to avoid sending wrong fileIDs to the API otherwise linkcheck WILL fail!
-                         */
+                /* Collect links that we are going to check. */
+                while (index < urls.length && links.size() < 50) {
+                    final DownloadLink link = urls[index];
+                    index++;
+                    /**
+                     * ShortURLs need to be single-checked. <br>
+                     * Skip them here so that this happens later.
+                     */
+                    if (supportsShortURLs() && isShortURL(link)) {
                         continue;
                     }
+                    links.add(link);
+                }
+                if (links.isEmpty()) {
+                    /* This should be a super rare edge case */
+                    logger.info("All links were short-urls and thus cannot be checked via mass linkchecker");
+                    break;
+                }
+                sb.delete(0, sb.length());
+                for (final DownloadLink link : links) {
+                    if (sb.length() > 0) {
+                        /* Add URL-encoded newline */
+                        sb.append("%0A");
+                    }
                     sb.append(URLEncode.encodeURIComponent(this.getNormalizedDownloadURL(link)));
-                    sb.append("%0A");
                 }
                 {
-                    /* Check if the mass-linkchecker works and which check we have to use */
-                    while (linkcheckTypeTryCount <= 1) {
-                        if (checkTypeCurrent != null) {
-                            /* No matter which checkType we tried first - it failed and we need to try the other one! */
-                            if (checkTypeCurrent.equals(checkTypeNew)) {
-                                checkTypeCurrent = checkTypeOld;
-                            } else {
-                                checkTypeCurrent = checkTypeNew;
-                            }
-                        } else if (this.prefer_availablecheck_filesize_alt_type_old()) {
-                            /* Old checkType forced? */
-                            checkTypeCurrent = checkTypeOld;
-                        } else if (checkType_last_used_and_working != null) {
-                            /* Try to re-use last working method */
-                            checkTypeCurrent = checkType_last_used_and_working;
-                        } else {
-                            /* First launch */
-                            checkTypeCurrent = checkTypeNew;
+                    /* Check if the mass-linkchecker works and which check-type we have to use */
+                    /* Build list of check types to try */
+                    final List<String> checkTypesToTry = new ArrayList<String>();
+                    if (checkTypeCurrent != null) {
+                        /* Re-use result of last run -> If we found a working type there is no need to try further ones. */
+                        checkTypesToTry.add(checkTypeCurrent);
+                    } else {
+                        if (checkType_last_used_and_working != null) {
+                            checkTypesToTry.add(checkType_last_used_and_working);
                         }
+                        if (!checkTypesToTry.contains(checkTypeNew)) {
+                            checkTypesToTry.add(checkTypeNew);
+                        }
+                        if (!checkTypesToTry.contains(checkTypeOld)) {
+                            checkTypesToTry.add(checkTypeOld);
+                        }
+                    }
+                    boolean foundUsableCheckType = false;
+                    int checkTypeIndex = 0;
+                    findUsableLinkcheckType: while (checkTypeIndex < checkTypesToTry.size()) {
+                        checkTypeCurrent = checkTypesToTry.get(checkTypeIndex);
+                        checkTypeIndex++;
                         /*
                          * Sending the Form without a previous request might e.g. fail if the website requires "www." but
                          * supports_availablecheck_filesize_alt_fast returns false.
                          */
-                        if (br.getURL() != null) {
-                            checkURL = "/?op=" + checkTypeCurrent;
-                        } else {
-                            checkURL = getMainPage() + "/?op=" + checkTypeCurrent;
-                        }
+                        final String checkURL = getMainPage(br) + "/?op=" + checkTypeCurrent;
                         /* Get- and prepare Form */
-                        if (this.supports_availablecheck_filesize_alt_fast()) {
+                        if (!this.supports_availablecheck_filesize_alt_fast()) {
+                            /* Try to get the Form IF NEEDED as it can contain tokens which would otherwise be missing. */
+                            getPage(br, checkURL);
+                            checkForm = br.getFormByInputFieldKeyValue("op", checkTypeCurrent);
+                            if (checkForm == null) {
+                                logger.info("Failed to find Form for checkType: " + checkTypeCurrent);
+                                continue findUsableLinkcheckType;
+                            }
+                        } else {
                             /* Quick way - we do not access the page before and do not need to parse the Form. */
                             checkForm = new Form();
                             checkForm.setMethod(MethodType.POST);
                             checkForm.setAction(checkURL);
                             checkForm.put("op", checkTypeCurrent);
                             checkForm.put("process", "Check+URLs");
-                        } else {
-                            /* Try to get the Form IF NEEDED as it can contain tokens which would otherwise be missing. */
-                            getPage(br, checkURL);
-                            checkForm = br.getFormByInputFieldKeyValue("op", checkTypeCurrent);
-                            if (checkForm == null) {
-                                logger.info("Failed to find Form for checkType: " + checkTypeCurrent);
-                                linkcheckTypeTryCount++;
-                                continue;
-                            }
                         }
                         checkForm.put("list", sb.toString());
                         this.submitForm(br, checkForm);
                         /*
-                         * Some hosts will not display any errorpage but also we will not be able to find any of our checked file-IDs inside
-                         * the html --> Use this to find out about non-working linkchecking method!
+                         * Some hosts will not display any error page but also we will not be able to find any of our checked file-IDs
+                         * inside the html --> Use this to find out about non-working linkchecking method!
                          */
                         final String example_fuid = this.getFUIDFromURL(links.get(0));
-                        if (br.getHttpConnection().getResponseCode() == 404 || !br.getURL().contains(checkTypeCurrent) || !br.containsHTML(example_fuid)) {
-                            /*
-                             * This method of linkcheck is not supported - increase the counter by one to find out if ANY method worked in
-                             * the end.
-                             */
+                        final boolean isValidResponse = br.getHttpConnection().getResponseCode() != 404 && br.getURL().contains(checkTypeCurrent) && br.containsHTML(example_fuid);
+                        if (!isValidResponse) {
                             logger.info("Failed to find check_files Status via checkType: " + checkTypeCurrent);
-                            linkcheckTypeTryCount++;
-                            continue;
-                        } else {
-                            break;
+                            continue findUsableLinkcheckType;
                         }
+                        foundUsableCheckType = true;
+                        break findUsableLinkcheckType;
+                    }
+                    if (!foundUsableCheckType) {
+                        logger.warning("Failed to find usable linkcheck type");
+                        linkcheckerHasFailed = true;
+                        return false;
                     }
                 }
                 for (final DownloadLink link : links) {
@@ -2041,16 +1992,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         linkcheckerHasFailed = true;
                         continue;
                     }
-                    if (!link.isNameSet()) {
-                        /*
-                         * Fallback! We cannot get 'good' filenames via this call so we have to rely on our fallback-filenames (fuid or
-                         * filename inside URL)!
-                         */
-                        setWeakFilename(link, null);
-                    }
-                }
-                if (index == urls.length) {
-                    break;
                 }
             }
         } catch (final Exception e) {
@@ -2127,7 +2068,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * @throws Exception
      */
     protected String getFnameViaAbuseLink(final Browser br, final DownloadLink link) throws Exception {
-        getPage(br, getMainPage() + "/?op=report_file&id=" + this.getFUIDFromURL(link), false);
+        getPage(br, getMainPage(br) + "/?op=report_file&id=" + this.getFUIDFromURL(link), false);
         /*
          * 2019-07-10: ONLY "No such file" as response might always be wrong and should be treated as a failure! Example: xvideosharing.com
          */
@@ -4051,14 +3992,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
             }
             return filenameURL;
+        }
+        if (this.internal_isVideohoster_enforce_video_filename(link, br)) {
+            return this.getFUIDFromURL(link) + ".mp4";
+        } else if (this.isImagehoster()) {
+            return this.getFUIDFromURL(link) + ".jpg";
         } else {
-            if (this.internal_isVideohoster_enforce_video_filename(link, br)) {
-                return this.getFUIDFromURL(link) + ".mp4";
-            } else if (this.isImagehoster()) {
-                return this.getFUIDFromURL(link) + ".jpg";
-            } else {
-                return this.getFUIDFromURL(link);
-            }
+            return this.getFUIDFromURL(link);
         }
     }
 
@@ -5914,9 +5854,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         } else {
                             link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
                         }
-                        if (!link.isNameSet()) {
-                            setWeakFilename(link, null);
-                        }
                         /*
                          * We cannot check shortLinks via API so if we're unable to convert them to TYPE_NORMAL we basically already checked
                          * them here. Also we have to avoid sending wrong fileIDs to the API otherwise linkcheck WILL fail!
@@ -5971,9 +5908,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     }
                     /* E.g. check for "result":[{"status":404,"filecode":"xxxxxxyyyyyy"}] */
                     final int status = ((Number) fileinfo.get("status")).intValue();
-                    if (!link.isNameSet()) {
-                        setWeakFilename(link, null);
-                    }
                     String filename = null;
                     boolean isVideohost = false;
                     if (status != 200) {
@@ -6176,17 +6110,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return true;
         } else {
             return false;
-        }
-    }
-
-    /**
-     * Use this to set filename based on filename inside URL or fuid as filename either before a linkcheck happens so that there is a
-     * readable filename displayed in the linkgrabber or also for mass-linkchecking as in this case these is no filename given inside HTML.
-     */
-    protected void setWeakFilename(final DownloadLink link, final Browser br) {
-        final String weakFilename = this.getFallbackFilename(link, br);
-        if (weakFilename != null) {
-            link.setName(weakFilename);
         }
     }
 

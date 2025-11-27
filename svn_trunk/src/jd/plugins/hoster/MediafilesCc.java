@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafilesCc extends YetiShareCore {
     public MediafilesCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,11 +107,13 @@ public class MediafilesCc extends YetiShareCore {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        /* 2025-11-26 */
+        return 1;
     }
 
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return -1;
+        /* 2025-11-26 */
+        return 1;
     }
 
     @Override

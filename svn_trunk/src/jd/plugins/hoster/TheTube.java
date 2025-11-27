@@ -18,15 +18,16 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.decrypter.CtDiskComFolder;
 
-@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
 public class TheTube extends XFileSharingProBasic {
     public TheTube(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,8 +44,13 @@ public class TheTube extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "the.tube" });
+        ret.add(new String[] { "the.tube", "they.tube" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(String host) {
+        return this.rewriteHost(CtDiskComFolder.getPluginDomains(), host, "the.tube");
     }
 
     public static String[] getAnnotationNames() {

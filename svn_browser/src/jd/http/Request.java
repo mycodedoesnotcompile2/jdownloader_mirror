@@ -558,7 +558,9 @@ public abstract class Request {
     protected String getSuggestedAcceptHeader(final URL url) {
         if (url != null && url.getPath() != null) {
             final String path = url.getPath();
-            if (path.matches(".+jpe?g$")) {
+            if (path.matches(".+ico$")) {
+                return "image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5";
+            } else if (path.matches(".+jpe?g$")) {
                 return "image/jpeg,image/*;q=0.8,*/*;q=0.5";
             } else if (path.matches(".+png$")) {
                 return "image/png,image/*;q=0.8,*/*;q=0.5";
