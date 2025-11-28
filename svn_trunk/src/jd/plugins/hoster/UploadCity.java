@@ -28,6 +28,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -37,8 +38,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 @HostPlugin(revision = "$Revision: 51893 $", interfaceVersion = 3, names = {}, urls = {})
-public class BestfileIo extends PluginForHost {
-    public BestfileIo(PluginWrapper wrapper) {
+public class UploadCity extends PluginForHost {
+    public UploadCity(PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -56,11 +57,8 @@ public class BestfileIo extends PluginForHost {
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bestfile.io" });
-        ret.add(new String[] { "zippyshare.day" });
-        /* 2025-11-27: Also similar: zapupload.top, upload.city */
-        /* Similar but different: easyupload.us */
+        ret.add(new String[] { "upload.city" });
+        /* Similar but different: bestfile.io */
         return ret;
     }
 
@@ -76,18 +74,9 @@ public class BestfileIo extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:[a-z]{2}/)?([A-Za-z0-9]+)/file");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]{10,})/(file|preview)");
         }
         return ret.toArray(new String[0]);
-    }
-
-    @Override
-    public boolean isResumeable(final DownloadLink link, final Account account) {
-        return true;
-    }
-
-    public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
     }
 
     @Override
@@ -105,6 +94,15 @@ public class BestfileIo extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
+    }
+
+    @Override
     protected String getDefaultFileName(DownloadLink link) {
         return this.getFID(link);
     }
@@ -112,12 +110,14 @@ public class BestfileIo extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        final String contenturl = link.getPluginPatternMatcher().replaceFirst("(?i)/preview$", "/file");
+        br.setCookie(getHost(), "adb", "0");
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("class=\"filebox-title mb-1\">([^<]+)<").getMatch(0);
-        String filesize = br.getRegex("File size(?:\\s*:)?\\s*</strong>([^<]+)<").getMatch(0);
+        String filename = br.getRegex("<span class=\"text-break h3\">([^<]+)</span>").getMatch(0);
+        String filesize = br.getRegex("<span>\\((\\d+[^<]+)\\)\\s*</span>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -135,9 +135,24 @@ public class BestfileIo extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
+        final Form dlform = br.getFormByInputFieldKeyValue("method", "free");
+        if (dlform == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        br.getHeaders().put("Origin", "https://" + br.getHost(false));
+        br.submitForm(dlform);
+        final Form dlform2 = br.getFormbyProperty("id", "down_2Form");
+        if (dlform2 == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        br.submitForm(dlform2);
         final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
         if (csrftoken == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String waitSecondsStr = br.getRegex("(\\d{1,2})\\s*</span>\\s*Seconds").getMatch(0);
+        if (waitSecondsStr != null) {
+            this.sleep(Long.parseLong(waitSecondsStr) * 1000, link);
         }
         final String fileID = this.getFID(link);
         final Browser brc = br.cloneBrowser();
@@ -145,7 +160,7 @@ public class BestfileIo extends PluginForHost {
         brc.getHeaders().put("X-Csrf-Token", csrftoken);
         // brc.getHeaders().put("", "");
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        brc.postPage("/" + fileID + "/download/create", new UrlQuery());
+        brc.postPage("/" + fileID + "/file/generate", new UrlQuery());
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String dllink = entries.get("download_link").toString();
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));

@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51849 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51893 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadUs extends PluginForHost {
     public EasyuploadUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,11 +100,12 @@ public class EasyuploadUs extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
         this.setBrowserExclusive();
         final String contenturl = link.getPluginPatternMatcher().replaceFirst("(?i)/preview$", "/file");
         br.getPage(contenturl);

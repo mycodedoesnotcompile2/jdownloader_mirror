@@ -48,7 +48,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "premium.rpnet.biz" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51886 $", interfaceVersion = 3, names = { "premium.rpnet.biz" }, urls = { "" })
 public class RPNetBiz extends PluginForHost {
     private static final String          mName                    = "rpnet.biz";
     private static final String          mProt                    = "http://";
@@ -123,16 +123,22 @@ public class RPNetBiz extends PluginForHost {
         } else if (br.containsHTML("IP Ban in effect for")) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, "Your account is temporarily banned", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
         }
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        /* Response for expired/free accounts: {"accountInfo":{"premiumExpiry":null,"currentServer":"RPNETSERVER"}} */
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> accountinfo = (Map<String, Object>) entries.get("accountInfo");
         final String currentServer = (String) accountinfo.get("currentServer");
-        final long expiryDate = ((Number) accountinfo.get("premiumExpiry")).longValue();
-        ai.setValidUntil(expiryDate * 1000, br);
+        final Number expiryDate = (Number) accountinfo.get("premiumExpiry");
+        if (expiryDate != null) {
+            ai.setValidUntil(expiryDate.longValue() * 1000, br);
+            account.setType(AccountType.PREMIUM);
+        } else {
+            ai.setExpired(true);
+            account.setType(AccountType.FREE);
+        }
         final String hosts = br.getPage(api_base + "hostlist.php");
         final ArrayList<String> supportedHosts = new ArrayList<String>(Arrays.asList(hosts.split(",")));
         ai.setMultiHostSupport(this, supportedHosts);
-        account.setType(AccountType.PREMIUM);
-        String status = "Premium Account";
+        String status = account.getType().getLabel();
         if (!StringUtils.isEmpty(currentServer)) {
             status += String.format(" [Current server: %s]", currentServer);
         }

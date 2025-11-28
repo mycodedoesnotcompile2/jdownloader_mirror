@@ -1326,7 +1326,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                 /*
                  * we don't want to keep reference on text during the whole link grabbing/checking/collecting way
                  */
-                final String jobText = job.getText();
+                final String jobText = job.consumeText();
                 // keep text if it is tiny.
                 // if we have the text in the job, we can display it for example in the balloons
                 if (StringUtils.isNotEmpty(jobText) && jobText.length() > 500) {
@@ -1475,9 +1475,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
     /*
      * converts a CrawledPackage into a FilePackage
-     *
+     * 
      * if plinks is not set, then the original children of the CrawledPackage will get added to the FilePackage
-     *
+     * 
      * if plinks is set, then only plinks will get added to the FilePackage
      */
     private FilePackage createFilePackage(final CrawledPackage pkg, List<CrawledLink> plinks) {

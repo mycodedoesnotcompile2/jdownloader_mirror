@@ -6,11 +6,16 @@ import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcollector.LinkOrigin;
 import jd.controlling.linkcollector.LinkOriginDetails;
 
+import org.appwork.utils.StringUtils;
+
 public class CrawlerJobSandbox {
     protected final LinkCollectingJob job;
 
     public CrawlerJobSandbox(LinkCollectingJob job) {
         this.job = job;
+        if (job != null) {
+            this.text = job.getText();
+        }
     }
 
     @Override
@@ -71,10 +76,6 @@ public class CrawlerJobSandbox {
         job.setCrawlerPassword(text);
     }
 
-    public String getText() {
-        return job.getText();
-    }
-
     public boolean isDeepAnalysisEnabled() {
         return job.isDeepAnalyse();
     }
@@ -91,7 +92,28 @@ public class CrawlerJobSandbox {
         return job.getArchivPasswords();
     }
 
-    public void setText(String text) {
-        job.setText(text);
+    private String text = null;
+
+    public String getText() {
+        final String ret = job.getText();
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        } else {
+            return text;
+        }
+    }
+
+    public boolean isConsumed() {
+        return job.isConsumed();
+    }
+
+    public boolean setText(String text) {
+        if (job.setText(text)) {
+            this.text = text;
+            return true;
+        } else {
+            this.text = null;
+            return false;
+        }
     }
 }

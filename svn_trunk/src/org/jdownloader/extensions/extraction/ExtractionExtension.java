@@ -172,29 +172,39 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         extractor.setLogger(logger);
     }
 
-    public synchronized ExtractionController addToQueue(final Archive archive, boolean forceAskForUnknownPassword) {
+    public ExtractionController addToQueue(final Archive archive, boolean forceAskForUnknownPassword) {
         return addToQueue(null, archive, forceAskForUnknownPassword);
+    }
+
+    protected ExtractionController getQueuedExtractionController(final Archive archive) {
+        // check if we have this archive already in queue.
+        synchronized (extractionQueue) {
+            for (final ExtractionController ec : extractionQueue.getJobs()) {
+                if (ec.isSameArchive(archive)) {
+                    return ec;
+                } else if (ec.isOutDatedArchive(archive)) {
+                    if (extractionQueue.remove(ec)) {
+                        logger.info("removed outdated Archive(" + ec.getArchive().getArchiveID() + "|started:" + ec.gotStarted());
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**
      * Adds an archive to the extraction queue.
      */
-    public synchronized ExtractionController addToQueue(Object caller, final Archive archive, boolean forceAskForUnknownPassword) {
+    public ExtractionController addToQueue(Object caller, final Archive archive, boolean forceAskForUnknownPassword) {
         if (archive == null) {
             return null;
         } else if (archive.getArchiveFiles().size() == 0) {
             logger.info("Empty Archive(" + archive.getArchiveID() + "|" + caller + "):" + archive.getName());
             return null;
         }
-        // check if we have this archive already in queue.
-        for (final ExtractionController ec : extractionQueue.getJobs()) {
-            if (ec.isSameArchive(archive)) {
-                return ec;
-            } else if (ec.isOutDatedArchive(archive)) {
-                if (extractionQueue.remove(ec)) {
-                    logger.info("removed outdated Archive(" + ec.getArchive().getArchiveID() + "|started:" + ec.gotStarted());
-                }
-            }
+        ExtractionController ec = getQueuedExtractionController(archive);
+        if (ec != null) {
+            return ec;
         }
         DummyArchive dummyArchive = null;
         try {
@@ -217,13 +227,20 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         } else {
             logger.info("Supported Archive(" + archive.getArchiveID() + "|" + caller + "):" + dummyArchive.toString());
         }
-        archive.getFactory().fireArchiveAddedToQueue(archive);
-        final ExtractionController controller = new ExtractionController(this, archive, extractor);
-        controller.setAskForUnknownPassword(forceAskForUnknownPassword);
-        controller.setIfFileExistsAction(getIfFileExistsAction(archive));
-        extractor.setConfig(getSettings());
-        extractionQueue.addAsynch(controller);
+        final ExtractionController controller;
+        synchronized (extractionQueue) {
+            ec = getQueuedExtractionController(archive);
+            if (ec != null) {
+                return ec;
+            }
+            controller = new ExtractionController(this, archive, extractor);
+            controller.setAskForUnknownPassword(forceAskForUnknownPassword);
+            controller.setIfFileExistsAction(getIfFileExistsAction(archive));
+            extractor.setConfig(getSettings());
+            extractionQueue.addAsynch(controller);
+        }
         fireEvent(new ExtractionEvent(controller, ExtractionEvent.Type.QUEUED));
+        archive.getFactory().fireArchiveAddedToQueue(archive);
         return controller;
     }
 
@@ -260,8 +277,10 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         return org.jdownloader.gui.IconKey.ICON_EXTRACT;
     }
 
-    public synchronized void abortAll() {
-        extractionQueue.killQueue();
+    public void abortAll() {
+        synchronized (extractionQueue) {
+            extractionQueue.killQueue();
+        }
     }
 
     /**
@@ -592,12 +611,14 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         return ret;
     }
 
-    public synchronized List<ExtractionController> getExtractionControllers(final Object archiveFactory) {
+    public List<ExtractionController> getExtractionControllers(final Object archiveFactory) {
         final List<ExtractionController> ret = new ArrayList<ExtractionController>();
-        for (ExtractionController ec : extractionQueue.getJobs()) {
-            final Archive archive = ec.getArchive();
-            if (archive.contains(archiveFactory)) {
-                ret.add(ec);
+        synchronized (extractionQueue) {
+            for (ExtractionController ec : extractionQueue.getJobs()) {
+                final Archive archive = ec.getArchive();
+                if (archive.contains(archiveFactory)) {
+                    ret.add(ec);
+                }
             }
         }
         if (ret.size() > 0) {
@@ -607,7 +628,7 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         }
     }
 
-    public synchronized ExtractionController getExtractionController(final Object archiveFactory) {
+    public ExtractionController getExtractionController(final Object archiveFactory) {
         final List<ExtractionController> ret = getExtractionControllers(archiveFactory);
         if (ret != null && ret.size() > 0) {
             return ret.get(0);
@@ -745,7 +766,10 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
             skipArchiveIDSet.addAll(ignoreArchiveIDs);
         }
         final AtomicBoolean abortFlag = new AtomicBoolean(false);
-        final LinkedList<Object> linkedNodes = new LinkedList<Object>(nodes);
+        final LinkedList<Object> linkedNodes = new LinkedList<Object>();
+        if (nodes != null) {
+            linkedNodes.addAll(nodes);
+        }
         final List<Thread> helperThreads = new ArrayList<Thread>();
         for (int threadIndex = 0; threadIndex < 8; threadIndex++) {
             final Thread helperThread = new Thread("getArchivesFromPackageChildren:thread=" + threadIndex + "|nodesIdentityHashCode=" + System.identityHashCode(nodes) + "|size=" + nodes.size()) {
@@ -851,10 +875,14 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                     try {
                         archiveBuildLoop: while (!abortFlag.get()) {
                             final Object child;
-                            synchronized (linkedNodes) {
+                            queue: synchronized (linkedNodes) {
                                 child = linkedNodes.poll();
-                                if (child == null && linkedNodes.size() == 0) {
-                                    break;
+                                if (child != null) {
+                                    break queue;
+                                } else if (linkedNodes.size() == 0) {
+                                    break archiveBuildLoop;
+                                } else {
+                                    continue archiveBuildLoop;
                                 }
                             }
                             final List<AbstractPackageChildrenNode> packageChildren;

@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -43,9 +39,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50733 $", interfaceVersion = 3, names = { "box.com" }, urls = { "https?://(?:\\w+\\.)*box\\.(?:net|com)/s(?:hared)?/([a-z0-9]{32}|[a-z0-9]{20})(?:/(?:folder|file)/(\\d+))?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51887 $", interfaceVersion = 3, names = { "box.com" }, urls = { "https?://(?:\\w+\\.|app\\.)*box\\.(?:net|com)/s(?:hared)?/([a-z0-9]{32}|[a-z0-9]{20})(?:/(?:folder|file)/(\\d+))?" })
 public class BoxComCrawler extends PluginForDecrypt {
-    private static final String            TYPE_APP      = "https?://(?:\\w+\\.)*box\\.(?:net|com)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})(?:/folder/\\d+)?";
+    private static final String            TYPE_APP      = "https?://(?:\\w+\\.|app\\.)*box\\.(?:net|com)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})(?:/folder/\\d+)?";
     private static final String            TYPE_APP_FILE = "https?://[^/]+/s(?:hared)?/([a-z0-9]{32}|[a-z0-9]{20})/file/(\\d+)";
     private String                         cryptedlink   = null;
     private static AtomicReference<String> lastValidPW   = new AtomicReference<String>(null);
@@ -179,7 +179,7 @@ public class BoxComCrawler extends PluginForDecrypt {
             if (page == 1) {
                 /* Init some stuff */
                 final Map<String, Object> folderInfoMap = (Map<String, Object>) rootMap.get("/app-api/enduserapp/shared-folder");
-                currentFolderName = (String) folderInfoMap.get("currentFolderName");
+                currentFolderName = folderInfoMap == null ? null : (String) folderInfoMap.get("currentFolderName");
                 subFolder = getAdoptedCloudFolderStructure();
                 if (subFolder == null) {
                     subFolder = currentFolderName;

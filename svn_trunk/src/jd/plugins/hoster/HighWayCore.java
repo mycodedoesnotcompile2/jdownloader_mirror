@@ -67,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51885 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -399,11 +399,11 @@ public abstract class HighWayCore extends UseNet {
                 }
                 final UrlQuery query = new UrlQuery();
                 query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
-                if (passCode != null) {
-                    query.appendEncoded("pass", passCode);
-                } else if (storedInformationRequiresSpecialWorkaround != null) {
-                    /* Provide special workaround information via pass field. */
+                if (counter == 0 && storedInformationRequiresSpecialWorkaround != null) {
+                    /* Provide special workaround information via pass field that is only used by one plugin. */
                     query.appendEncoded("pass", "special_workaround_state_" + storedInformationRequiresSpecialWorkaround);
+                } else if (passCode != null) {
+                    query.appendEncoded("pass", passCode);
                 }
                 br.getPage(getWebsiteBase() + "load.php?json=1&" + query.toString());
                 entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);

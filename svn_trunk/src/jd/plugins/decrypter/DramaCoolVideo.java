@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49515 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51889 $", interfaceVersion = 3, names = {}, urls = {})
 public class DramaCoolVideo extends PluginForDecrypt {
     public DramaCoolVideo(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,27 +132,12 @@ public class DramaCoolVideo extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (links != null && links.length > 0) {
-            final ArrayList<String> gogoplayURLs = new ArrayList<String>();
             for (String link : links) {
                 if (link.startsWith("/")) {
                     link = br.getURL(link).toString();
                 }
                 // link = Encoding.htmlDecode(link);
-                if (Gogoplay4Com.looksLikeSupportedPattern(link)) {
-                    /*
-                     * Do not add those in first run because those will lead to captchas and return the same URLs that we might find here
-                     * directly in html without captchas.
-                     */
-                    gogoplayURLs.add(link);
-                } else {
-                    ret.add(createDownloadlink(link));
-                }
-            }
-            if (ret.isEmpty() && !gogoplayURLs.isEmpty()) {
-                /* Fallback: User will need to solve captchas to crawl those URLs! */
-                for (final String gogoplayURL : gogoplayURLs) {
-                    ret.add(createDownloadlink(gogoplayURL));
-                }
+                ret.add(createDownloadlink(link));
             }
         }
         if (title != null) {

@@ -3,6 +3,7 @@ package jd.controlling.linkcollector;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jd.controlling.linkcrawler.CrawledLinkModifier;
 
@@ -35,7 +36,6 @@ public class LinkCollectingJob {
 
     }
 
-    private String                    jobContent;
     private String                    customSourceUrl;
     private final UniqueAlltimeLongID uniqueAlltimeID = new UniqueAlltimeLongID();
     private boolean                   assignJobID     = false;
@@ -131,23 +131,71 @@ public class LinkCollectingJob {
     }
 
     public LinkCollectingJob(LinkOriginDetails origin) {
-        this(origin, null);
+        this(origin, "DUMMY");
     }
 
     public LinkCollectingJob(LinkOriginDetails origin, String jobContent) {
         if (origin == null) {
             throw new IllegalArgumentException("origin is null");
         }
-        this.jobContent = jobContent;
+        this.jobContent.set(jobContent);
         this.origin = origin;
     }
 
+    private final AtomicReference<CharSequence> jobContent = new AtomicReference<CharSequence>();
+
     public String getText() {
-        return jobContent;
+        final CharSequence ret = jobContent.get();
+        if (ret == null) {
+            return null;
+        }
+        return ret.toString();
     }
 
-    public void setText(String text) {
-        this.jobContent = text;
+    protected String consumeText() {
+        while (true) {
+            final CharSequence content = jobContent.get();
+            if (content == null) {
+                // already consumed
+                return null;
+            } else if (content instanceof String) {
+                // not yet consumed
+                if (jobContent.compareAndSet(content, new StringBuffer(content))) {
+                    // change to consumed
+                    return (String) content;
+                }
+            } else if (content instanceof CharSequence) {
+                // CharSequence -> already consumed
+                return null;
+            }
+        }
+    }
+
+    public boolean isConsumed() {
+        return !(jobContent.get() instanceof String);
+    }
+
+    public boolean setText(String text) {
+        while (true) {
+            final CharSequence content = jobContent.get();
+            if (content == null) {
+                // already consumed -> no longer can change it
+                return false;
+            } else if (content instanceof String) {
+                // not yet consumed
+                if (jobContent.compareAndSet(content, text)) {
+                    // we could change
+                    return true;
+                }
+            } else if (content instanceof CharSequence) {
+                // already consumed -> no longer can change it
+                if (text == null && jobContent.compareAndSet(content, null)) {
+                    // except to null
+                    return true;
+                }
+                return false;
+            }
+        }
     }
 
     private final LinkOriginDetails origin;

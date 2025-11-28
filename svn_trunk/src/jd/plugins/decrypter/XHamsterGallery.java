@@ -23,10 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +44,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51887 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +96,7 @@ public class XHamsterGallery extends PluginForDecrypt {
             sb.append("photos/gallery/[0-9A-Za-z_\\-/]+-\\d+");
             sb.append("|my/favorites/videos(?:/[a-f0-9]{24}-[\\w\\-]+)?");
             sb.append("|users/(?:profiles/)?[^/]+/videos");
-            sb.append("|users/(?:profiles/)?[^/]+/shorts");
+            sb.append("|users/(?:profiles/)?[^/]+/(shorts|moments)");
             sb.append("|users/(?:profiles/)?[^/]+/favorites/videos");
             sb.append("|users/(?:profiles/)?[^/]+/photos");
             sb.append("|creators/[^/]+/photos");
@@ -115,7 +115,7 @@ public class XHamsterGallery extends PluginForDecrypt {
     private static final String TYPE_VIDEOS_OF_USER                  = "(?i)https?://[^/]+/users/(?:profiles/)?([^/]+)/videos";
     private static final String TYPE_VIDEOS_FAVORITES_OF_USER        = "(?i)https?://[^/]+/users/(?:profiles/)?([^/]+)/favorites/videos";
     private static final String TYPE_PHOTO_GALLERIES_OF_USER_CREATOR = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/photos";
-    private static final String TYPE_SHORTS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/shorts";
+    private static final String TYPE_SHORTS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/(shorts|moments)";
     private static final String TYPE_VIDEOS_OF_CHANNEL               = "(?i)https?://[^/]+/channels/([^/]+)";
     private static final String TYPE_VIDEOS_OF_USER_PORNSTAR         = "(?i)https?://[^/]+/(?:[^/]+/)?pornstars/([^/]+)";
     private static final String TYPE_VIDEOS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(?:[^/]+/)?creators/([^/]+)";

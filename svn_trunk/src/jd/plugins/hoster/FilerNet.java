@@ -51,11 +51,10 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51859 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51895 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -432,13 +431,19 @@ public class FilerNet extends PluginForHost {
         final Map<String, Object> entries = (Map<String, Object>) loginAPI(account, true);
         final Map<String, Object> data = (Map<String, Object>) entries.get("data");
         final AccountInfo ai = new AccountInfo();
-        if (data.get("state").toString().equalsIgnoreCase("premium")) {
+        if (Boolean.TRUE.equals(data.get("premium")) || "premium".equalsIgnoreCase(StringUtils.valueOfOrNull(data.get("state")))) {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(10);
-            final Long trafficLeft = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
-            ai.setTrafficLeft(trafficLeft.longValue());
+            final Long traffic = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
+            final Long trafficLeft = (Long) ReflectionUtils.cast(data.get("traffic_left"), Long.class);
+            if (trafficLeft != null) {
+                ai.setTrafficLeft(trafficLeft.longValue());
+            }
             final Long validUntil = (Long) ReflectionUtils.cast(data.get("until"), Long.class);
-            ai.setValidUntil(validUntil.longValue() * 1000, br);
+            if (validUntil != null) {
+                // old api no longer has this field?!
+                ai.setValidUntil(validUntil.longValue() * 1000, br);
+            }
         } else {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(10);
@@ -461,7 +466,7 @@ public class FilerNet extends PluginForHost {
             ai.setTrafficMax(maxtrafficValue.longValue());
         } else {
             /* fallback to hardcoded default */
-            ai.setTrafficMax(SizeFormatter.getSize("125gb"));
+            ai.setTrafficMax(134217728000l/* SizeFormatter.getSize("125gb") */);
         }
         return ai;
     }

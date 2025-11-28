@@ -20,15 +20,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -36,7 +32,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49495 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 51891 $", interfaceVersion = 2, names = {}, urls = {})
 public class AnimeFrenzy extends antiDDoSForDecrypt {
     public AnimeFrenzy(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,8 +43,8 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "animefrenzy.vip", "animefrenzy.net", "animefrenzy.org" });
+        /* 2025-11-27: All domains except animefrenzy.cc are dead */
+        ret.add(new String[] { "animefrenzy.cc", "animefrenzy.vip", "animefrenzy.net", "animefrenzy.org" });
         return ret;
     }
 
@@ -92,16 +91,9 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
                 ret.add(createDownloadlink(link));
             }
         }
-        /* 2022-03-24: New */
-        final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
-        for (final String url : urls) {
-            if (Gogoplay4Com.looksLikeSupportedPattern(url)) {
-                ret.add(this.createDownloadlink(url));
-            }
-        }
-        /* 2022-10-13: Look for selfhosted content */
         final String embedURL = br.getRegex("(/player/v\\d+[^\"']+)").getMatch(0);
         if (embedURL != null) {
+            /* 2022-10-13: Look for selfhosted content */
             this.getPage(embedURL);
             final String hlsmaster = br.getRegex("file\\s*:\\s*\"(https?://[^\"]+\\.m3u8)\"").getMatch(0);
             if (hlsmaster != null) {
@@ -177,7 +169,7 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
     }
 
     private String buildEmbedURL(final String host, final String id) {
-        String result = null;
+        final String result;
         if (host.equals("trollvid")) {
             result = "https//trollvid.net/embed/" + id;
         } else if (host.equals("mp4.sh")) {
@@ -186,10 +178,6 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
             result = "//www.mp4upload.com/embed-" + id + ".html";
         } else if (host.equals("xstreamcdn")) {
             result = "https://www.xstreamcdn.com/v/" + id;
-        } else if (host.equals("vidstreaming")) {
-            result = Gogoplay4Com.createStreamingURLForThisPlugin(id);
-        } else if (host.equalsIgnoreCase("vidstream")) {
-            result = Gogoplay4Com.createDownloadURLForThisPlugin(id);
         } else if (host.equals("yare.wtf")) {
             result = "https://yare.wtf/vidstreaming/download/" + id;
         } else if (host.equals("facebook")) {
@@ -198,6 +186,7 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
             result = "https//upload2.com/embed/" + id;
         } else {
             logger.info("Unknown host: " + host);
+            result = null;
         }
         return result;
     }

@@ -32,6 +32,21 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -51,22 +66,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.youtube.YoutubeHelper;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51702 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 51886 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -416,6 +416,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         String sophoraID_from_url = this.getSophoraIDFromURL_safe(contenturl);
         if (sophoraID_from_url != null) {
             /* We know that this is a single video so we can skip the steps down below. */
+            logger.info("Found single video_id in user added url");
             return crawlZdfVideoViaSophoraID(param, sophoraID_from_url);
         }
         br.getPage(contenturl);
@@ -428,6 +429,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
         if (sophoraID_from_url != null) {
             /* We know that this is a single video so we can skip the steps down below. */
+            logger.info("Found single video_id in browser url");
             return crawlZdfVideoViaSophoraID(param, sophoraID_from_url);
         }
         final Regex seriesURLRegex = new Regex(br.getURL(), "https://[^/]+/([\\w-]+)/([\\w-]+)[^/]*");
@@ -440,7 +442,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             final Integer season = seasonStr != null ? Integer.parseInt(seasonStr) : null;
             return this.crawlZdfSeries(param, seriesSlug, seriesHash, season);
         }
-        final String[] sophoraIDs = new Regex(html_unescaped, "\"__typename\":\"Video\",\"id\":\"[^\"]+\",\"canonical\":\"([\\w-]+)").getColumn(0);
+        final String[] sophoraIDs = new Regex(html_unescaped, "\"__typename\":\"Video\",[^\\}]*\"canonical\":\"([\\w-]+)").getColumn(0);
         if (sophoraIDs != null && sophoraIDs.length > 0) {
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
             final HashSet<String> uniqueSophoraIDs = new HashSet<String>();
@@ -602,7 +604,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         final Map<String, Object> mainVideoContent = (Map<String, Object>) entries.get("mainVideoContent");
         if (mainVideoContent == null) {
             /* Not a single video? Maybe we have a playlist / embedded video(s)! */
-            logger.info("Content is not a video --> Scanning html for embedded content");
+            logger.info("Content is not a video");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> relsTarget = (Map<String, Object>) mainVideoContent.get("http://zdf.de/rels/target");
@@ -1054,8 +1056,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                     final String realQuality = ((String) qualitymap.get("quality")).toLowerCase(Locale.ENGLISH);
                     final ArrayList<Object[]> qualities = new ArrayList<Object[]>();
                     /**
-                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br> We want to keep all
-                     * versions though!
+                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br>
+                     * We want to keep all versions though!
                      */
                     final List<String[]> betterQualities = getBetterQualities(uri);
                     final HashSet<String> optimizedQualityIdentifiers = new HashSet<String>();
@@ -1098,8 +1100,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         final DownloadLink dl = this.createDownloadlinkForHosterplugin(finalDownloadURL);
                         dl.setContentUrl(param.getCryptedUrl());
                         /**
-                         * Usually filesize is only given for the official downloads.</br> Only set it here if we haven't touched the
-                         * original downloadurls!
+                         * Usually filesize is only given for the official downloads.</br>
+                         * Only set it here if we haven't touched the original downloadurls!
                          */
                         if (thisFilesize > 0) {
                             dl.setAvailable(true);
@@ -1519,9 +1521,11 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in zdfmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
-     * hosted on their other website on zdfmediathek instead as zdfmediathek is providing a fairly stable search function while other
-     * websites hosting the same content such as kika.de can be complicated to parse. </br> This does not (yet) support pagination!
+     * Searches for videos in zdfmediathek that match the given search term. </br>
+     * This is mostly used as a workaround to find stuff that is hosted on their other website on zdfmediathek instead as zdfmediathek is
+     * providing a fairly stable search function while other websites hosting the same content such as kika.de can be complicated to parse.
+     * </br>
+     * This does not (yet) support pagination!
      */
     public ArrayList<DownloadLink> crawlZDFMediathekSearchResultsVOD(final String tvChannel, final String searchTerm, final int maxResults, final String externalID) throws Exception {
         if (StringUtils.isEmpty(tvChannel) || StringUtils.isEmpty(searchTerm) || StringUtils.isEmpty(externalID)) {

@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
@@ -40,7 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51885 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
@@ -165,26 +164,17 @@ public class IsraCloud extends XFileSharingProBasic {
 
     @Override
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* This is a stable version of JDownloader -> Disable special workaround for now (2025-11-26). */
-            allowSpecialWorkaround = false;
-            return super.requestFileInformationWebsite(link, account);
-        }
-        if (new Regex(link.getPluginPatternMatcher(), "(?i).*\\.html$").patternFind()) {
-            /* No special workaround needed for such links */
-            allowSpecialWorkaround = false;
-            return super.requestFileInformationWebsite(link, account);
-        }
         final Boolean storedInformationRequiresSpecialWorkaround = (Boolean) link.getProperty(PROPERTY_REQUIRES_SPECIAL_WORKAROUND);
         if (storedInformationRequiresSpecialWorkaround != null) {
             /* Auto handling has been performed before -> We know how to check this link */
-            if (Boolean.TRUE.equals(storedInformationRequiresSpecialWorkaround)) {
-                allowSpecialWorkaround = true;
-                return super.requestFileInformationWebsite(link, account);
-            } else {
-                allowSpecialWorkaround = false;
-                return super.requestFileInformationWebsite(link, account);
-            }
+            allowSpecialWorkaround = storedInformationRequiresSpecialWorkaround.booleanValue();
+            return super.requestFileInformationWebsite(link, account);
+        }
+        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), PATTERN_SUPPORTED).getMatch(1);
+        if (filenameFromURL != null) {
+            /* Special workaround not needed for such links */
+            allowSpecialWorkaround = false;
+            return super.requestFileInformationWebsite(link, account);
         }
         /* Auto handling */
         try {
@@ -193,6 +183,7 @@ public class IsraCloud extends XFileSharingProBasic {
             return result;
         } catch (final PluginException e) {
             if (e.getLinkStatus() != LinkStatus.ERROR_FILE_NOT_FOUND) {
+                /* A type of error which is not suitable for workaround/retry happened. */
                 throw e;
             }
             /* File looks to be offline -> Maybe special workaround is required to access it. */
