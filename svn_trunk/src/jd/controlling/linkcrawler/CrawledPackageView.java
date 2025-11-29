@@ -30,7 +30,8 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
 
     protected volatile long                fileSize                       = -1;
     private volatile DomainInfo[]          domains                        = new DomainInfo[0];
-    protected volatile boolean             enabled                        = false;
+
+    private volatile int                   enabled                        = 0;
     private volatile int                   offline                        = 0;
     private volatile int                   online                         = 0;
     private volatile int                   count                          = 0;
@@ -86,7 +87,7 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
         final HashMap<String, DomainInfo> domains           = new HashMap<String, DomainInfo>();
         int                               count             = 0;
         int                               newOnline         = 0;
-        boolean                           newEnabled        = false;
+        int                               newEnabled        = 0;
         int                               newOffline        = 0;
         String                            sameSource        = null;
         boolean                           sameSourceFullUrl = true;
@@ -99,7 +100,7 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
             commonSourceUrl += "[...]";
         }
         long size = -1;
-        boolean atLeastOneEnabled = tmp.newEnabled;
+        final boolean atLeastOneEnabled = tmp.newEnabled > 0;
         for (final LinkInfo linkInfo : tmp.linkInfos.values()) {
             if (atLeastOneEnabled == true && linkInfo.enabled == false) {
                 continue;
@@ -135,7 +136,7 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
         }
         // enabled
         if (link.isEnabled()) {
-            tmp.newEnabled = true;
+            tmp.newEnabled++;
         }
         if (link.getLinkState() == AvailableLinkState.OFFLINE) {
             // offline
@@ -187,7 +188,17 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
         return domains;
     }
 
+    @Override
+    public int getDisabledCount() {
+        return Math.max(0, size() - getEnabledCount());
+    }
+
+    @Override
     public boolean isEnabled() {
+        return getEnabledCount() > 0;
+    }
+
+    public int getEnabledCount() {
         return enabled;
     }
 

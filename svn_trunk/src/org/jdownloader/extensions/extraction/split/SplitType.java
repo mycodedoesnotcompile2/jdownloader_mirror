@@ -571,16 +571,16 @@ public enum SplitType implements UnitType {
     }
 
     public static Archive createArchive(ArchiveFactory link, SplitType splitType, boolean allowDeepInspection) throws ArchiveException {
-        final String linkPath = link.getFilePath();
-        final String[] filePathParts = splitType.getMatches(linkPath);
+        final String linkFileName = link.getName();
+        final String[] filePathParts = splitType.getMatches(linkFileName);
         if (filePathParts != null && splitType.isValidPart(-1, link)) {
             final Pattern pattern = splitType.buildArchivePattern(filePathParts);
             if (pattern == null) {
                 return null;
             }
-            final List<? extends ArchiveFile> foundArchiveFiles = link.createPartFileList(splitType, filePathParts, linkPath, pattern.pattern());
+            final List<? extends ArchiveFile> foundArchiveFiles = link.createPartFileList(splitType, filePathParts, pattern.pattern());
             if (foundArchiveFiles == null || foundArchiveFiles.size() == 0) {
-                throw new ArchiveException("Broken archive support!SplitType:" + splitType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Path:" + linkPath + "|Pattern:" + pattern.pattern() + "|DeepInspection:" + allowDeepInspection);
+                throw new ArchiveException("Broken archive support!SplitType:" + splitType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Name:" + linkFileName + "|Pattern:" + pattern.pattern() + "|DeepInspection:" + allowDeepInspection);
             }
             final BitSet availableParts = new BitSet();
             int lowestPartNumber = Integer.MAX_VALUE;

@@ -131,12 +131,15 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
      * optimize this, eg check for single part and try to avoid file system stuff and maybe skip links with different archive type/extension
      * and that are already belong to different archive
      */
-    public List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, final String file, final String archivePartFilePattern) {
+    public List<ArchiveFile> createPartFileList(final UnitType unitType, final String[] filePathParts, final String archivePartFilePattern) {
         final String patternString = modifyPartFilePattern(archivePartFilePattern);
         final Pattern patternPattern = Pattern.compile(patternString, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
-        final String fileParent = new File(file).getParent();
+        final String fileParent = new File(getFilePath()).getParent();
         final HashMap<String, ArchiveFile> map = new HashMap<String, ArchiveFile>();
         DownloadController.getInstance().visitNodes(new AbstractNodeVisitor<DownloadLink, FilePackage>() {
+            final boolean caseSensitive = !CrossSystem.isWindows();
+            final String  fileNameCheck = filePathParts[0] + ".";
+
             @Override
             public Boolean visitPackageNode(FilePackage pkg) {
                 if (CrossSystem.isWindows()) {
@@ -159,7 +162,12 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                     // http://board.jdownloader.org/showthread.php?t=59031
                     return false;
                 }
-                if (patternPattern.matcher(nodeFile).matches()) {
+                final String linkName = new File(nodeFile).getName();
+                if (linkName.length() < fileNameCheck.length()) {
+                    return true;
+                } else if ((!caseSensitive && !StringUtils.startsWithCaseInsensitive(linkName, fileNameCheck)) || (caseSensitive && !linkName.startsWith(fileNameCheck))) {
+                    return true;
+                } else if (patternPattern.matcher(linkName).matches()) {
                     final String nodeName = node.getView().getDisplayName();
                     DownloadLinkArchiveFile af = (DownloadLinkArchiveFile) map.get(nodeName);
                     if (af == null) {
@@ -172,7 +180,7 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                 return true;
             }
         }, true);
-        final List<FileArchiveFile> localFiles = new FileArchiveFactory(new File(getFilePath())).createPartFileList(unitType, filePathParts, file, patternString);
+        final List<FileArchiveFile> localFiles = new FileArchiveFactory(new File(getFilePath())).createPartFileList(unitType, filePathParts, patternString);
         for (FileArchiveFile localFile : localFiles) {
             final ArchiveFile archiveFile = map.get(localFile.getName());
             if (archiveFile == null) {

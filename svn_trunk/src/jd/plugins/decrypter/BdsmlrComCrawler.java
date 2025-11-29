@@ -20,6 +20,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -39,13 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BdsmlrCom;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 51149 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51908 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BdsmlrCom.class })
 public class BdsmlrComCrawler extends PluginForDecrypt {
     public BdsmlrComCrawler(PluginWrapper wrapper) {
@@ -78,6 +78,11 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
     private static final String PROPERTY_POST_ID  = "post_id";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final String contenturl = param.getCryptedUrl();
+        if (new Regex(contenturl, "https?://cdn\\d+\\.bdsmlr\\.com/?$").patternFind()) {
+            /* CDN subdomain: This may happen if user adds a direct-url to an image. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
+        }
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account != null) {
             final BdsmlrCom hostPlugin = (BdsmlrCom) this.getNewPluginForHostInstance(this.getHost());
@@ -148,14 +153,14 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         if (ret.isEmpty()) {
             logger.info("Didn't find anything in HTML ");
         }
-        /* Now crawl first pagination page which typically contains less items than the rest */
+        /* Crawl first pagination page which typically contains less items than the rest */
         final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
         if (csrftoken == null) {
             if (br.containsHTML("\"sorry\"\\s*>\\s*Sorry, please login")) {
                 throw new AccountRequiredException();
             }
             logger.warning("Pagination failed");
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find csrftoken");
         }
         final String infinitescrollDate = br.getRegex("class=\"infinitescroll\" data-time=\"(\\d{4}[^\"]+)\"").getMatch(0);
         if (infinitescrollDate == null) {
@@ -208,8 +213,9 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
                     final String postID = result.getStringProperty(PROPERTY_POST_ID);
                     if (!dupes.add(postID)) {
                         /**
-                         * 2023-03-31: This should never happen but it looks like it can happen. </br> As long as the current page we're
-                         * crawling contains at least one new item, the crawler will continue even if there were some dupes.
+                         * 2023-03-31: This should never happen but it looks like it can happen. </br>
+                         * As long as the current page we're crawling contains at least one new item, the crawler will continue even if
+                         * there were some dupes.
                          */
                         logger.info("Skipping dupe: " + postID);
                         numberofSkippedDuplicates++;

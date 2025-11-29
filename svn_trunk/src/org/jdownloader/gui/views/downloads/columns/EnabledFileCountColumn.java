@@ -1,0 +1,152 @@
+package org.jdownloader.gui.views.downloads.columns;
+
+import java.text.NumberFormat;
+
+import javax.swing.JComponent;
+import javax.swing.JPopupMenu;
+import javax.swing.SwingConstants;
+
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+
+import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.renderer.RenderLabel;
+import org.jdownloader.gui.translate._GUI;
+
+public class EnabledFileCountColumn extends ExtColumn<AbstractNode> {
+    private final RenderLabel countRenderer;
+    private NumberFormat      formatter;
+
+    public JPopupMenu createHeaderPopup() {
+        return FileColumn.createColumnPopup(this, getMinWidth() == getMaxWidth() && getMaxWidth() > 0);
+    }
+
+    public EnabledFileCountColumn() {
+        super(_GUI.T.EnabledFileCountColumn_EnabledFileCountColumn(), null);
+        this.countRenderer = new RenderLabel();
+        this.countRenderer.setHorizontalAlignment(SwingConstants.LEFT);
+        this.setRowSorter(new ExtDefaultRowSorter<AbstractNode>() {
+            @Override
+            public int compare(final AbstractNode o1, final AbstractNode o2) {
+                final int s1 = getNumberOfItems(o1);
+                final int s2 = getNumberOfItems(o2);
+                if (s1 == s2) {
+                    return 0;
+                } else if (this.getSortOrderIdentifier() != ExtColumn.SORT_ASC) {
+                    return s1 > s2 ? -1 : 1;
+                } else {
+                    return s1 < s2 ? -1 : 1;
+                }
+            }
+        });
+        formatter = updateNumberFormat();
+    }
+
+    @Override
+    protected NumberFormat updateNumberFormat() {
+        return formatter = super.updateNumberFormat();
+    }
+
+    @Override
+    public void configureEditorComponent(final AbstractNode value, final boolean isSelected, final int row, final int column) {
+    }
+
+    @Override
+    public void configureRendererComponent(final AbstractNode value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+        this.countRenderer.setText(StringUtils.toString(formatter, getNumberOfItems(value)));
+    }
+
+    @Override
+    public Object getCellEditorValue() {
+        return null;
+    }
+
+    /**
+     * @return
+     */
+    @Override
+    public JComponent getEditorComponent(final AbstractNode value, final boolean isSelected, final int row, final int column) {
+        return null;
+    }
+
+    /**
+     * @return
+     */
+    @Override
+    public JComponent getRendererComponent(final AbstractNode value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+        return this.countRenderer;
+    }
+
+    @Override
+    protected String getTooltipText(final AbstractNode value) {
+        return StringUtils.toString(formatter, getNumberOfItems(value));
+    }
+
+    @Override
+    public boolean isEditable(final AbstractNode obj) {
+        return false;
+    }
+
+    @Override
+    public boolean isSortable(final AbstractNode obj) {
+        return true;
+    }
+
+    @Override
+    public void resetEditor() {
+    }
+
+    @Override
+    public void resetRenderer() {
+        this.countRenderer.setEnabled(true);
+        this.countRenderer.setOpaque(false);
+        this.countRenderer.setBorder(ExtColumn.DEFAULT_BORDER);
+    }
+
+    @Override
+    public void setValue(final Object value, final AbstractNode object) {
+    }
+
+    @Override
+    protected boolean isDefaultResizable() {
+        return false;
+    }
+
+    @Override
+    public boolean isDefaultVisible() {
+        return false;
+    }
+
+    @Override
+    public int getDefaultWidth() {
+        return 70;
+    }
+
+    @Override
+    public int getMinWidth() {
+        return getDefaultWidth();
+    }
+
+    protected int getNumberOfItems(AbstractNode o) {
+        if (o instanceof AbstractPackageNode) {
+            return ((AbstractPackageNode) o).getView().getEnabledCount();
+        } else {
+            if (o.isEnabled()) {
+                return 1;
+            }
+            return 0;
+        }
+    }
+
+    @Override
+    public boolean isEnabled(AbstractNode obj) {
+        if (obj instanceof CrawledPackage) {
+            return ((CrawledPackage) obj).getView().isEnabled();
+        } else {
+            return obj.isEnabled();
+        }
+    }
+}

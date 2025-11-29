@@ -99,7 +99,7 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
         }
     }
 
-    public List<FileArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String patternString) {
+    public List<FileArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String patternString) {
         final Pattern pattern = Pattern.compile(patternString, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
         final List<FileArchiveFile> ret = new ArrayList<FileArchiveFile>();
         File directory = getFile();

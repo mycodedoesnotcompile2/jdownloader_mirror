@@ -1706,15 +1706,15 @@ public enum ArchiveType implements UnitType {
     }
 
     public static Archive createArchive(final ArchiveFactory link, final boolean allowDeepInspection, final ArchiveType... archiveTypes) throws ArchiveException {
-        final String linkPath = link.getFilePath();
+        final String linkFileName = link.getName();
         Boolean isKnownMultiPart = null;
         archiveTypeLoop: for (final ArchiveType archiveType : archiveTypes) {
             if (isKnownMultiPart != null && archiveType.isMultiPartType() != isKnownMultiPart.booleanValue()) {
                 continue archiveTypeLoop;
             }
-            final String[] filePathParts = archiveType.getMatches(linkPath);
-            final Boolean validPart = filePathParts != null ? archiveType.isValidPart(-1, link, false) : null;
-            if (filePathParts != null && !Boolean.FALSE.equals(validPart)) {
+            final String[] fileNameParts = archiveType.getMatches(linkFileName);
+            final Boolean validPart = fileNameParts != null ? archiveType.isValidPart(-1, link, false) : null;
+            if (fileNameParts != null && !Boolean.FALSE.equals(validPart)) {
                 final Boolean isMultiPart;
                 if (isKnownMultiPart != null) {
                     isMultiPart = isKnownMultiPart;
@@ -1726,15 +1726,15 @@ public enum ArchiveType implements UnitType {
                 if (isKnownMultiPart == null) {
                     isKnownMultiPart = isMultiPart;
                 }
-                final Pattern pattern = archiveType.buildArchivePattern(filePathParts, isMultiPart);
+                final Pattern pattern = archiveType.buildArchivePattern(fileNameParts, isMultiPart);
                 if (pattern == null) {
                     continue archiveTypeLoop;
                 } else if (isMultiPart != null && archiveType.isMultiPartType() != isMultiPart.booleanValue()) {
                     continue archiveTypeLoop;
                 }
-                final List<? extends ArchiveFile> foundArchiveFiles = link.createPartFileList(archiveType, filePathParts, linkPath, pattern.pattern());
+                final List<? extends ArchiveFile> foundArchiveFiles = link.createPartFileList(archiveType, fileNameParts, pattern.pattern());
                 if (foundArchiveFiles == null || foundArchiveFiles.size() == 0) {
-                    throw new ArchiveException("Broken archive support!ArchiveType:" + archiveType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Path:" + linkPath + "|Pattern:" + pattern.pattern() + "|MultiPart:" + isMultiPart + "|DeepInspection:" + allowDeepInspection);
+                    throw new ArchiveException("Broken archive support!ArchiveType:" + archiveType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Name:" + linkFileName + "|Pattern:" + pattern.pattern() + "|MultiPart:" + isMultiPart + "|DeepInspection:" + allowDeepInspection);
                 }
                 final BitSet availableParts = new BitSet();
                 int lowestPartNumber = Integer.MAX_VALUE;
@@ -1763,7 +1763,7 @@ public enum ArchiveType implements UnitType {
                         }
                     }
                 }
-                Archive ret = finalizeArchive(archiveType, link, availableParts, archiveFiles, foundArchiveFiles, allowDeepInspection, filePathParts, isMultiPart, partStringLength, highestPartNumber);
+                Archive ret = finalizeArchive(archiveType, link, availableParts, archiveFiles, foundArchiveFiles, allowDeepInspection, fileNameParts, isMultiPart, partStringLength, highestPartNumber);
                 if (ret != null) {
                     return ret;
                 }
@@ -1777,14 +1777,14 @@ public enum ArchiveType implements UnitType {
                 } else {
                     continue archiveTypeLoop;
                 }
-                final String[] filePathParts2 = maybeArchiveType.getMatches(linkPath);
+                final String[] fileNameParts2 = maybeArchiveType.getMatches(linkFileName);
                 final Boolean isMultiPart2;
                 if (allowDeepInspection) {
                     isMultiPart2 = maybeArchiveType.isMultiPart(link, false);
                 } else {
                     isMultiPart2 = null;
                 }
-                ret = finalizeArchive(maybeArchiveType, link, availableParts, archiveFiles, foundArchiveFiles, allowDeepInspection, filePathParts2, isMultiPart2, partStringLength, highestPartNumber);
+                ret = finalizeArchive(maybeArchiveType, link, availableParts, archiveFiles, foundArchiveFiles, allowDeepInspection, fileNameParts2, isMultiPart2, partStringLength, highestPartNumber);
                 if (ret != null) {
                     return ret;
                 }

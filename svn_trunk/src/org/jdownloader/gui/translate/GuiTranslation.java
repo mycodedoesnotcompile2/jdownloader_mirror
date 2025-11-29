@@ -636,6 +636,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "File Count" })
     String FileCountColumn_FileCountColumn();
 
+    @Default(lngs = { "en" }, values = { "Enabled File Count" })
+    String EnabledFileCountColumn_EnabledFileCountColumn();
+
     @Default(lngs = { "en" }, values = { "Bytes Left" })
     String RemainingColumn_RemainingColumn();
 

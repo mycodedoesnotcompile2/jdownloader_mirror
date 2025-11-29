@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51893 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51908 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadCity extends PluginForHost {
     public UploadCity(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,6 +135,7 @@ public class UploadCity extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
+        final String fileID = this.getFID(link);
         final Form dlform = br.getFormByInputFieldKeyValue("method", "free");
         if (dlform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -150,18 +151,26 @@ public class UploadCity extends PluginForHost {
         if (csrftoken == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String waitSecondsStr = br.getRegex("(\\d{1,2})\\s*</span>\\s*Seconds").getMatch(0);
-        if (waitSecondsStr != null) {
-            this.sleep(Long.parseLong(waitSecondsStr) * 1000, link);
+        final boolean skipWaitTime = true;
+        if (!skipWaitTime) {
+            final String waitSecondsStr = br.getRegex("(\\d{1,2})\\s*</span>\\s*Seconds").getMatch(0);
+            if (waitSecondsStr != null) {
+                this.sleep(Long.parseLong(waitSecondsStr) * 1000, link);
+            }
         }
-        final String fileID = this.getFID(link);
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("Origin", "https://" + br.getHost());
         brc.getHeaders().put("X-Csrf-Token", csrftoken);
-        // brc.getHeaders().put("", "");
+        brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        /* Super important cookie! */
+        brc.setCookie(br.getHost(), "rqf", fileID);
         brc.postPage("/" + fileID + "/file/generate", new UrlQuery());
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String error = (String) entries.get("error");
+        if (error != null) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, error);
+        }
         final String dllink = entries.get("download_link").toString();
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(brc, dl.getConnection());

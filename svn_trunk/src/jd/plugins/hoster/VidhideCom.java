@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51877 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51899 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class VidhideCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidhidepro.com", "vidhide.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com", "vidhidefast.com", "seraphinapl.com", "taylorplayer.com", "dinisglows.com", "dingtezuni.com", "dintezuvio.com" });
+        ret.add(new String[] { "vidhide.com", "vidhidepro.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com", "vidhidefast.com", "seraphinapl.com", "taylorplayer.com", "dinisglows.com", "dingtezuni.com", "dintezuvio.com", "dhtpre.com" });
         return ret;
     }
 
@@ -67,7 +67,6 @@ public class VidhideCom extends XFileSharingProBasic {
         deadDomains.add("filelions.site"); // 2024-08-02
         deadDomains.add("alions.pro"); // 2024-08-02
         deadDomains.add("filelions.site"); // 2024-11-25
-        deadDomains.add("vidhide.com"); // 2025-03-14
         return deadDomains;
     }
 

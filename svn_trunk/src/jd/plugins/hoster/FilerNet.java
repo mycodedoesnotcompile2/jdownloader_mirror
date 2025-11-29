@@ -23,6 +23,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -45,16 +54,7 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51895 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51908 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -72,7 +72,7 @@ public class FilerNet extends PluginForHost {
     private static final String  SETTING_WAIT_MINUTES_ON_ERROR_CODE_415             = "SETTING_WAIT_MINUTES_ON_ERROR_CODE_415";
     private static final int     defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415      = 5;
     /* API Docs: https://filer.net/api */
-    public static final String   API_BASE                                           = "https://api.filer.net/api";
+    public static final String   API_BASE                                           = "https://filer.net/api";
     public static final String   WEBSITE_BASE                                       = "https://filer.net";
 
     @SuppressWarnings("deprecation")
@@ -93,9 +93,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
-                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
-                 * preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
+                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
+                 * this, http protocol would be used even if user preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -283,8 +283,8 @@ public class FilerNet extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final Map<String, Object> resp = (Map<String, Object>) callAPI(null, getAPI_BASE() + "/status/" + getFileID(link) + ".json");
         final Map<String, Object> data = (Map<String, Object>) resp.get("data");
-        link.setFinalFileName(data.get("name").toString());
-        link.setVerifiedFileSize(((Number) data.get("size")).longValue());
+        link.setFinalFileName(data.get("file_name").toString());
+        link.setVerifiedFileSize(((Number) data.get("file_size")).longValue());
         return AvailableStatus.TRUE;
     }
 
@@ -318,7 +318,6 @@ public class FilerNet extends PluginForHost {
             /* 2025-11-20: key was changed and type is now reCaptcha Enterprise. */
             final String reCaptchaKey = "6LfUvREsAAAAAHd79QK9HOfIAEVGqK4G4JxovEEn";
             final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey) {
-
                 @Override
                 protected Map<String, Object> getV3Action(String source) {
                     final Map<String, Object> ret = new HashMap<String, Object>();
@@ -431,10 +430,14 @@ public class FilerNet extends PluginForHost {
         final Map<String, Object> entries = (Map<String, Object>) loginAPI(account, true);
         final Map<String, Object> data = (Map<String, Object>) entries.get("data");
         final AccountInfo ai = new AccountInfo();
+        final Number register_date = (Number) data.get("register_date");
+        if (register_date != null) {
+            ai.setCreateTime(register_date.longValue() * 1000);
+        }
         if (Boolean.TRUE.equals(data.get("premium")) || "premium".equalsIgnoreCase(StringUtils.valueOfOrNull(data.get("state")))) {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(10);
-            final Long traffic = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
+            // final Long traffic = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
             final Long trafficLeft = (Long) ReflectionUtils.cast(data.get("traffic_left"), Long.class);
             if (trafficLeft != null) {
                 ai.setTrafficLeft(trafficLeft.longValue());
@@ -479,12 +482,15 @@ public class FilerNet extends PluginForHost {
             requestFileInformation(link);
             this.loginAPI(account, false);
             br.setFollowRedirects(false);
+            /* When doing this request, API will answer with json AND a redirect location (if no error happens). */
             br.getPage(getAPI_BASE() + "/dl/" + getFileID(link) + ".json");
             final String dllink = br.getRedirectLocation();
             if (dllink == null) {
                 this.checkErrorsAPI(account);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            /* If we don't remove the auth header, a redirect to error 410 will happen: https://filer.net/error/410 */
+            br.removeAuthentication(this.getAPIBasicAuthentication(account));
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
@@ -505,7 +511,7 @@ public class FilerNet extends PluginForHost {
     }
 
     /** Only use this if a json response is expected!! */
-    private Object callAPI(final Account account, final Request req) throws Exception {
+    private Object callAPI(final Account account, Request req) throws Exception {
         final URLConnectionAdapter con = br.openRequestConnection(req);
         if (con.getResponseCode() == 401 && account != null) {
             con.disconnect();

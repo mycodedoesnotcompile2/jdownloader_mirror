@@ -23,6 +23,10 @@ public abstract class ChildrenView<PackageType extends AbstractPackageNode<Child
 
     abstract public int size();
 
+    abstract public int getEnabledCount();
+
+    abstract public int getDisabledCount();
+
     abstract public boolean isEnabled();
 
     abstract public ChildrenAvailablility getAvailability();

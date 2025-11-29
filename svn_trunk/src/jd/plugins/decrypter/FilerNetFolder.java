@@ -21,6 +21,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -41,7 +42,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.FilerNet;
 
-@DecrypterPlugin(revision = "$Revision: 51777 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51898 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilerNet.class })
 public class FilerNetFolder extends PluginForDecrypt {
     public FilerNetFolder(PluginWrapper wrapper) {
@@ -89,43 +90,54 @@ public class FilerNetFolder extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final PluginForHost hostPlugin = getNewPluginForHostInstance(getHost());
-        br.getPage(((FilerNet) hostPlugin).getAPI_BASE() + "/folder/" + folderID + ".json");
-        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        int code = ((Integer) ReflectionUtils.cast(entries.get("code"), Integer.class)).intValue();
-        if (code == 506) {
-            /* Offline folder */
+        br.getPage(((FilerNet) hostPlugin).getAPI_BASE() + "/folder/" + folderID);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            /* {"message":"Folder not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (code == 201) {
-            /* Password protected folder */
-            for (int i = 1; i <= 3; i++) {
-                final String passCode = getUserInput("Password?", param);
-                br.getPage("/api/folder/" + folderID + ".json?password=" + Encoding.urlEncode(passCode));
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                code = ((Integer) ReflectionUtils.cast(entries.get("code"), Integer.class)).intValue();
-                if (code == 201) {
-                    logger.info("Wrong password: " + passCode);
-                    continue;
-                }
-                break;
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Object codeO = entries.get("code");
+        if (codeO != null) {
+            int code = ((Integer) ReflectionUtils.cast(codeO, Integer.class)).intValue();
+            if (code == 506) {
+                /* Offline folder */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            /*
+             * 2025-11-28: Looks like password protected folders do not exist anymore at least I was unable to set a password on self owned
+             * folders.
+             */
             if (code == 201) {
-                throw new DecrypterException(DecrypterException.PASSWORD);
+                /* Password protected folder */
+                int attempt = 0;
+                while (code == 201 && attempt < 3) {
+                    attempt++;
+                    final String passCode = getUserInput("Password?", param);
+                    br.getPage("/api/folder/" + folderID + "?password=" + Encoding.urlEncode(passCode));
+                    entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    code = ((Integer) ReflectionUtils.cast(entries.get("code"), Integer.class)).intValue();
+                    if (code == 201) {
+                        logger.info("Wrong password: " + passCode);
+                    }
+                }
+                if (code == 201) {
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
             }
         }
-        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-        final int count = ((Integer) ReflectionUtils.cast(data.get("count"), Integer.class)).intValue();
-        if (count == 0) {
-            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, folderID);
-        }
-        String title = (String) data.get("name");
-        if (title == null) {
+        String title = (String) entries.get("name");
+        if (StringUtils.isEmpty(title)) {
             /* Fallback */
-            title = "filer.net folder: " + folderID;
+            title = folderID;
         }
-        final List<Map<String, Object>> files = (List<Map<String, Object>>) data.get("files");
+        final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
+        if (files == null || files.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, title);
+        }
         for (final Map<String, Object> file : files) {
-            final DownloadLink link = createDownloadlink(file.get("link").toString());
+            // file.get("premiumOnly");
+            final String file_id = file.get("hash").toString();
+            final DownloadLink link = createDownloadlink("https://" + getHost() + "/get/" + file_id);
             link.setFinalFileName(file.get("name").toString());
             link.setVerifiedFileSize(((Long) ReflectionUtils.cast(file.get("size"), Long.class)).longValue());
             link.setAvailable(true);

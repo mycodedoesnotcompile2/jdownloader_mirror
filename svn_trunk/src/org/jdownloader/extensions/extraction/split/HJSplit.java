@@ -190,7 +190,8 @@ public class HJSplit extends IExtraction {
             }
             if (allowDeepInspection) {
                 try {
-                    return SplitType.createArchive(factory, splitType, allowDeepInspection) != null;
+                    final Archive archive = SplitType.createArchive(factory, splitType, allowDeepInspection);
+                    return archive != null && splitType == archive.getSplitType();
                 } catch (ArchiveException e) {
                     getLogger().log(e);
                 }

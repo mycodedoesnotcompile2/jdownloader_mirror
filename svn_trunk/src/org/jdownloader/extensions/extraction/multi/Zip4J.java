@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -273,6 +275,33 @@ public class Zip4J extends IExtraction {
         }
     }
 
+    public void setLastModifiedDate(FileHeader item, File extractTo) {
+        // Set last write time
+        try {
+            final long modified;
+            if (getConfig().isUseOriginalFileDate()) {
+                final int date = item.getLastModFileTime();
+                if (date >= 0) {
+                    modified = date * 1000l;
+                } else {
+                    modified = -1;
+                }
+            } else {
+                modified = System.currentTimeMillis();
+            }
+            if (modified == 0) {
+                return;
+            }
+            if (!extractTo.setLastModified(modified)) {
+                logger.warning("Could not set last write/modified time(" + modified + "/" + new Date(modified) + ") for " + item.getFileName());
+            } else {
+                logger.warning("Set last write/modified time(" + modified + "/" + new Date(modified) + ")  for " + item.getFileName());
+            }
+        } catch (final Throwable e) {
+            logger.log(e);
+        }
+    }
+
     @Override
     public void extract(final ExtractionController ctrl) {
         final Archive archive = getExtractionController().getArchive();
@@ -287,6 +316,7 @@ public class Zip4J extends IExtraction {
             byte[] readBuffer = new byte[32767];
             for (int index = 0; index < items.size(); index++) {
                 final FileHeader item = (FileHeader) items.get(index);
+
                 // Skip folders
                 if (item == null || item.isDirectory()) {
                     continue;
@@ -340,6 +370,7 @@ public class Zip4J extends IExtraction {
                             is.close(true);
                         }
                     }
+                    setLastModifiedDate(item, extractTo);
                 } finally {
                     ctrl.setCurrentActiveItem(null);
                 }
@@ -417,7 +448,8 @@ public class Zip4J extends IExtraction {
     public Boolean isSupported(ArchiveFactory factory, boolean allowDeepInspection) {
         if (allowDeepInspection) {
             try {
-                return buildArchive(factory, allowDeepInspection) != null;
+                final Archive archive = buildArchive(factory, allowDeepInspection);
+                return archive != null && Arrays.asList(SUPPORTED_ARCHIVE_TYPES).contains(archive.getArchiveType());
             } catch (ArchiveException e) {
                 getLogger().log(e);
                 return false;

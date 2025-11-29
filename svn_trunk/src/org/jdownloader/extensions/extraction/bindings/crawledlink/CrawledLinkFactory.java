@@ -90,7 +90,7 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
         }
     }
 
-    public List<ArchiveFile> createPartFileList(final UnitType unitType, final String[] filePathParts, final String file, String archivePartFilePattern) {
+    public List<ArchiveFile> createPartFileList(final UnitType unitType, final String[] filePathParts, String archivePartFilePattern) {
         final String patternString = modifyPartFilePattern(archivePartFilePattern);
         final boolean caseSensitive = !CrossSystem.isWindows();
         final Pattern patternPattern = Pattern.compile(patternString, caseSensitive ? Pattern.CASE_INSENSITIVE : 0);
@@ -141,7 +141,7 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
             }
             final File directory = LinkTreeUtils.getDownloadDirectory(parentNode);
             if (directory != null) {
-                final List<FileArchiveFile> localFiles = new FileArchiveFactory(directory).createPartFileList(unitType, filePathParts, file, patternString);
+                final List<FileArchiveFile> localFiles = new FileArchiveFactory(directory).createPartFileList(unitType, filePathParts, patternString);
                 for (FileArchiveFile localFile : localFiles) {
                     final ArchiveFile archiveFile = map.get(localFile.getName());
                     if (archiveFile == null) {

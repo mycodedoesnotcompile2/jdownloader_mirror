@@ -44,10 +44,10 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 
 public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
     private static class LinkInfo {
+        private boolean      enabled    = true;
         private long         bytesTotal = -1;
         private long         bytesDone  = -1;
         private long         speed      = -1;
-        private boolean      enabled    = true;
         private DownloadLink link;
     }
 
@@ -124,6 +124,7 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
         return ret > 0 || ret == Integer.MIN_VALUE;
     }
 
+    @Override
     public int getDisabledCount() {
         return Math.max(0, size() - enabledCount);
     }
@@ -228,11 +229,11 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
     private final static AbstractIcon          EXTRACTICONSTART     = new AbstractIcon(IconKey.ICON_EXTRACT_RUN, 16);
     private final static AbstractIcon          FALSEICON            = new AbstractIcon(IconKey.ICON_FALSE, 16);
     public final static Comparator<DomainInfo> DOMAININFOCOMPARATOR = new Comparator<DomainInfo>() {
-        @Override
-        public int compare(DomainInfo o1, DomainInfo o2) {
-            return o1.getTld().compareTo(o2.getTld());
-        }
-    };
+                                                                        @Override
+                                                                        public int compare(DomainInfo o1, DomainInfo o2) {
+                                                                            return o1.getTld().compareTo(o2.getTld());
+                                                                        }
+                                                                    };
 
     protected void writeTempToFields(final Temp tmp) {
         long size = -1;
@@ -893,6 +894,11 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
 
     public boolean isRunning() {
         return lastRunningState;
+    }
+
+    @Override
+    public int getEnabledCount() {
+        return enabledCount;
     }
 
     @Override
