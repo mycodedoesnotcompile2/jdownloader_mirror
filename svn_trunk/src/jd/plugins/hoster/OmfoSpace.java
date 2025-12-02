@@ -23,7 +23,6 @@ import java.util.Map;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -39,8 +38,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 @HostPlugin(revision = "$Revision: 51914 $", interfaceVersion = 3, names = {}, urls = {})
-public class UploadCity extends PluginForHost {
-    public UploadCity(PluginWrapper wrapper) {
+public class OmfoSpace extends PluginForHost {
+    public OmfoSpace(PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -59,9 +58,16 @@ public class UploadCity extends PluginForHost {
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "upload.city" });
+        ret.add(new String[] { "omfo.space", "365file.me", "365file.net" });
         /* Similar but different: bestfile.io */
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        /* 2025-12-01: This domain is not dead but file links won't work with it. */
+        deadDomains.add("365file.net");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -76,7 +82,7 @@ public class UploadCity extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]{10,})/(file|preview)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]{10,})");
         }
         return ret.toArray(new String[0]);
     }
@@ -112,7 +118,7 @@ public class UploadCity extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        final String contenturl = link.getPluginPatternMatcher().replaceFirst("(?i)/preview$", "/file");
+        final String contenturl = link.getPluginPatternMatcher();
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -147,9 +153,6 @@ public class UploadCity extends PluginForHost {
         if (dlform2 == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* TODO: Check if captcha can be skipped. */
-        final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
-        dlform2.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
         br.submitForm(dlform2);
         final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
         if (csrftoken == null) {

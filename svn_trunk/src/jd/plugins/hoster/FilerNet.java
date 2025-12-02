@@ -23,15 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -54,7 +45,16 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51908 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51915 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -63,9 +63,10 @@ public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_UNKNOWNERROR                            = 599;
     private static final String  ERRORMESSAGE_UNKNOWNERRORTEXT                      = "Unknown file error";
     private static final String  DIRECT_WEB                                         = "directlinkWeb";
+    private static final String  PREMIUM_ONLY                                       = "premium_only";
     private static final String  DIRECT_API                                         = "directlinkApi";
     /* Plugin settings */
-    private static final String  DISABLE_HTTPS                                      = "DISABLE_HTTPS";
+    private static final String  DISABLE_HTTPS                                      = "DISABLE_HTTPS_2";
     private static final boolean defaultSETTING_DISABLE_HTTPS                       = false;
     private static final String  SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS        = "WAIT_MINUTES_ON_NO_FREE_SLOTS";
     private static final int     defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS = 10;
@@ -93,13 +94,17 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
-                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
-                 * this, http protocol would be used even if user preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
+                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
+                 * preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
-                request.setURL(new URL(rewriteProtocol(request.getURL().toExternalForm())));
+                final String host = request.getURL().getHost();
+                if (!"api.filer.net".equalsIgnoreCase(host) && !"filer.net".equalsIgnoreCase(host)) {
+                    // api and website always redirect to https
+                    request.setURL(new URL(rewriteProtocol(request.getURL().toExternalForm())));
+                }
                 return super.openRequestConnection(request, followRedirects);
             }
 
@@ -142,12 +147,9 @@ public class FilerNet extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    private String getContentUrl(final DownloadLink link) {
-        return rewriteProtocol("https://" + this.getHost() + "/get/" + getFileID(link));
-    }
-
     public String getAPI_BASE() {
-        return rewriteProtocol(API_BASE);
+        // api always redirects to https
+        return API_BASE;
     }
 
     public String rewriteProtocol(String url) {
@@ -241,32 +243,16 @@ public class FilerNet extends PluginForHost {
                     sb.append(this.getFileID(link));
                 }
                 final Map<String, Object> entries = (Map<String, Object>) this.callAPI(getAPI_BASE() + "/multi_status/" + sb.toString() + ".json");
-                final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
+                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
                 for (final DownloadLink link : links) {
                     final String fid = this.getFileID(link);
-                    Map<String, Object> info = null;
-                    for (final Map<String, Object> map : data) {
-                        final String this_hash = (String) map.get("hash");
-                        if (this_hash == null) {
-                            continue;
-                        }
-                        if (this_hash.equals(fid)) {
-                            info = map;
-                            break;
-                        }
-                    }
+                    final Map<String, Object> info = (Map<String, Object>) data.get(fid);
                     if (info == null) {
                         /* No info about item found in json response -> Assume that this item is offline. */
                         link.setAvailable(false);
                         continue;
                     }
-                    final String filename = info.get("name").toString();
-                    final Number filesize = (Number) info.get("size");
-                    link.setFinalFileName(filename);
-                    if (filesize != null) {
-                        link.setVerifiedFileSize(filesize.longValue());
-                    }
-                    link.setAvailable(true);
+                    setFileInformation(link, info);
                 }
                 if (index == urls.length) {
                     break;
@@ -279,13 +265,37 @@ public class FilerNet extends PluginForHost {
         return true;
     }
 
+    public boolean setFileInformation(final DownloadLink link, Map<String, Object> map) throws Exception {
+        final String fid = this.getFileID(link);
+        if (!StringUtils.equals(fid, (String) map.get("file_hash"))) {
+            link.setAvailable(false);
+            return false;
+        }
+        final String file_name = map.get("file_name").toString();
+        link.setFinalFileName(file_name);
+        final Number file_size = (Number) map.get("file_size");
+        if (file_size != null) {
+            link.setVerifiedFileSize(file_size.longValue());
+        }
+        final Boolean premium_only = (Boolean) map.get("premium_only");
+        if (Boolean.TRUE.equals(premium_only)) {
+            link.setProperty(PREMIUM_ONLY, Boolean.TRUE);
+        } else {
+            link.removeProperty(PREMIUM_ONLY);
+        }
+        link.setAvailable(true);
+        return true;
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final Map<String, Object> resp = (Map<String, Object>) callAPI(null, getAPI_BASE() + "/status/" + getFileID(link) + ".json");
         final Map<String, Object> data = (Map<String, Object>) resp.get("data");
-        link.setFinalFileName(data.get("file_name").toString());
-        link.setVerifiedFileSize(((Number) data.get("file_size")).longValue());
-        return AvailableStatus.TRUE;
+        if (setFileInformation(link, data)) {
+            return AvailableStatus.TRUE;
+        } else {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
     }
 
     @Override
@@ -297,6 +307,18 @@ public class FilerNet extends PluginForHost {
     /** Handles free- and free account downloads. */
     public void handleFreeDownloads(final DownloadLink link, final Account account) throws Exception {
         doWebsiteApi(account, link);
+    }
+
+    private boolean isPremiumOnly(final DownloadLink link) {
+        return link != null && Boolean.TRUE.equals(link.getBooleanProperty(PREMIUM_ONLY, Boolean.FALSE));
+    }
+
+    @Override
+    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
+        if (isPremiumOnly(downloadLink) && !AccountType.PREMIUM.is(account)) {
+            return false;
+        }
+        return super.canHandle(downloadLink, account);
     }
 
     private void doWebsiteApi(final Account account, final DownloadLink link) throws Exception {
@@ -312,7 +334,12 @@ public class FilerNet extends PluginForHost {
         } else {
             final String fid = getFileID(link);
             Map<String, Object> data = (Map<String, Object>) callAPI(null, "https://" + getHost() + "/api/file/" + fid);
-            if (Boolean.TRUE.equals(data.get("premiumOnly")) && (account == null || !AccountType.PREMIUM.equals(account.getType()))) {
+            if (Boolean.TRUE.equals(data.get("premiumOnly"))) {
+                link.setProperty(PREMIUM_ONLY, Boolean.TRUE);
+            } else {
+                link.removeProperty(PREMIUM_ONLY);
+            }
+            if (!canHandle(link, account)) {
                 throw new AccountRequiredException("File is only downloadable by premium users");
             }
             /* 2025-11-20: key was changed and type is now reCaptcha Enterprise. */
@@ -661,6 +688,7 @@ public class FilerNet extends PluginForHost {
     public void resetDownloadlink(final DownloadLink link) {
         link.removeProperty(DIRECT_WEB);
         link.removeProperty(DIRECT_API);
+        link.removeProperty(PREMIUM_ONLY);
     }
 
     private void setConfigElements() {

@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51910 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -166,6 +166,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP         = "ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
     private static final String               PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_VERSION           = "ALT_AVAILABLECHECK_LAST_FAILURE_VERSION";
     public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING                   = "ALT_AVAILABLECHECK_LAST_WORKING";
+    public static final String                PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL                          = "last_working_payment_url";
     protected static final String             PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE       = "allow_api_download_attempt_in_website_mode";
     private String                            videoStreamDownloadurl                                            = null;
     private boolean                           hasCheckedEmbedHandling                                           = false;
@@ -1877,13 +1878,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (urls == null || urls.length == 0) {
             return false;
         }
-        boolean linkcheckerHasFailed = false;
+        boolean linkcheckerSuccess = false;
         String checkTypeCurrent = null;
         /* Checks linkchecking via: examplehost.com/?op=checkfiles AND examplehost.com/?op=check_files */
         final String checkTypeOld = "checkfiles";
         final String checkTypeNew = "check_files";
         final SubConfiguration cfg = this.getPluginConfig();
-        final String checkType_last_used_and_working = cfg.getStringProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING, null);
         final Browser br = createNewBrowserInstance();
         this.prepBrowser(br, getMainPage(br));
         br.setCookiesExclusive(true);
@@ -1928,7 +1928,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         /* Re-use result of last run -> If we found a working type there is no need to try further ones. */
                         checkTypesToTry.add(checkTypeCurrent);
                     } else {
+                        final String checkType_last_used_and_working = cfg.getStringProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING);
                         if (checkType_last_used_and_working != null) {
+                            /* Add last working type to list first. */
                             checkTypesToTry.add(checkType_last_used_and_working);
                         }
                         if (!checkTypesToTry.contains(checkTypeNew)) {
@@ -1982,35 +1984,37 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     }
                     if (!foundUsableCheckType) {
                         logger.warning("Failed to find usable linkcheck type");
-                        linkcheckerHasFailed = true;
+                        linkcheckerSuccess = false;
                         return false;
                     }
                 }
                 for (final DownloadLink link : links) {
                     if (massLinkcheckerParseFileInfo(br, link) == AvailableStatus.UNCHECKED) {
-                        logger.warning("Failed to find any information for current DownloadLink --> Possible mass-linkchecker failure");
-                        linkcheckerHasFailed = true;
-                        continue;
+                        logger.warning("Failed to find any information for current DownloadLink --> Possible mass-linkchecker failure for: " + link.getPluginPatternMatcher());
+                    } else {
+                        /* At least one item has been properly detected -> Assume that linkcheck is working. */
+                        linkcheckerSuccess = true;
                     }
+                }
+                if (!linkcheckerSuccess) {
+                    logger.warning("Failed to find at least one valid file status -> Stopping");
+                    return false;
                 }
             }
         } catch (final Exception e) {
             logger.log(e);
+            logger.info("Linkchecker has failed due to exception");
             return false;
         } finally {
-            if (linkcheckerHasFailed) {
+            if (linkcheckerSuccess) {
+                cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING, checkTypeCurrent);
+            } else {
                 logger.info("Seems like checkfiles availablecheck is not supported by this host");
                 cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, System.currentTimeMillis());
                 cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_VERSION, getPluginVersionHash());
-            } else {
-                cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING, checkTypeCurrent);
             }
         }
-        if (linkcheckerHasFailed) {
-            return false;
-        } else {
-            return true;
-        }
+        return linkcheckerSuccess;
     }
 
     /** Parses and sets file info returned after doing a mass-linkchecking request to a an XFS website. */
@@ -2037,24 +2041,24 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (isOffline) {
             link.setAvailable(false);
             return AvailableStatus.FALSE;
-        } else {
-            /* We know that the file is online - let's try to find the filesize ... */
-            link.setAvailable(true);
-            try {
-                final String[] tabla_data = new Regex(html_for_fuid, "<td>?(.*?)</td>").getColumn(0);
-                final String size = tabla_data.length >= 2 ? tabla_data[2] : null;
-                if (size != null) {
-                    /*
-                     * Filesize should definitly be given - but at this stage we are quite sure that the file is online so let's not throw a
-                     * fatal error if the filesize cannot be found.
-                     */
-                    link.setDownloadSize(SizeFormatter.getSize(size));
-                }
-            } catch (final Throwable ignore) {
-                logger.log(ignore);
-            }
-            return AvailableStatus.TRUE;
         }
+        /* We know that the file is online - let's find the filesize ... */
+        link.setAvailable(true);
+        try {
+            final String[] tabla_data = new Regex(html_for_fuid, "<td>?(.*?)</td>").getColumn(0);
+            final String size = tabla_data.length >= 2 ? tabla_data[2] : null;
+            if (size != null) {
+                /*
+                 * Filesize should definitely be given - but at this stage we are quite sure that the file is online so let's not throw an
+                 * exception if the filesize cannot be found.
+                 */
+                link.setDownloadSize(SizeFormatter.getSize(size));
+            }
+        } catch (final Throwable ignore) {
+            logger.log(ignore);
+            logger.warning("Failed to find file size for fuid: " + fuid);
+        }
+        return AvailableStatus.TRUE;
     }
 
     /**
@@ -4449,20 +4453,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
              * A more accurate expire time, down to the second. Usually shown on 'extend premium account' page. Case[0] e.g. 'flashbit.cc',
              * Case [1] e.g. takefile.link
              */
-            final LinkedHashSet<String> paymentURLs;
-            final String last_working_payment_url = this.getPluginConfig().getStringProperty("property_last_working_payment_url", null);
+            final LinkedHashSet<String> paymentURLs = new LinkedHashSet<String>();
+            final String last_working_payment_url = this.getPluginConfig().getStringProperty(PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL);
             if (StringUtils.isNotEmpty(last_working_payment_url)) {
-                paymentURLs = new LinkedHashSet<String>();
                 logger.info("Found stored last_working_payment_url --> Trying this first in an attempt to save http requests: " + last_working_payment_url);
                 paymentURLs.add(last_working_payment_url);
-                /* Add all remaining URLs, start with the last working one */
-                for (final String paymentURL : supports_precise_expire_date) {
-                    paymentURLs.add(paymentURL);
-                }
             } else {
                 /* Add all possible payment URLs. */
-                logger.info("last_working_payment_url is not available --> Going through all possible paymentURLs");
-                paymentURLs = new LinkedHashSet<String>(Arrays.asList(supports_precise_expire_date));
+                logger.info("last_working_payment_url is not available --> Going through all possible paymentURLs in default order");
+            }
+            /* Add all remaining URLs, start with the last working one */
+            for (final String paymentURL : supports_precise_expire_date) {
+                paymentURLs.add(paymentURL);
             }
             /* Go through possible paymentURLs in an attempt to find an exact expiredate if the account is premium. */
             int i = -1;
@@ -4518,7 +4520,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 /* Later we will decide whether we are going to use this value or not. */
                 logger.info("Successfully found precise expire-date via paymentURL: \"" + paymentURL + "\" : " + expireSecond);
-                this.getPluginConfig().setProperty("property_last_working_payment_url", paymentURL);
+                this.getPluginConfig().setProperty(PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL, paymentURL);
                 break;
             }
         }

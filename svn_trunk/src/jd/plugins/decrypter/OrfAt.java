@@ -13,6 +13,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -32,16 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51099 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51911 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,10 +105,10 @@ public class OrfAt extends PluginForDecrypt {
     private final String                                      PROPERTY_SLUG         = "slug";
     /* E.g. https://radiothek.orf.at/ooe --> "ooe" --> Channel == "oe2o" */
     private static LinkedHashMap<String, Map<String, Object>> CHANNEL_CACHE         = new LinkedHashMap<String, Map<String, Object>>() {
-        protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
-            return size() > 50;
-        };
-    };
+                                                                                        protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
+                                                                                            return size() > 50;
+                                                                                        };
+                                                                                    };
     public SubConfiguration                                   cfg                   = null;
 
     /** Wrapper for podcast URLs containing md5 file-hashes inside URL. */
@@ -171,7 +171,6 @@ public class OrfAt extends PluginForDecrypt {
         if (StringUtils.isEmpty(encryptedID)) {
             throw new IllegalArgumentException();
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage("https://api-tvthek.orf.at/api/v4.3/public/episode/encrypted/" + Encoding.urlEncode(encryptedID));
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* E.g. {"error":{"code":404,"message":"Not Found"}} */
@@ -263,7 +262,11 @@ public class OrfAt extends PluginForDecrypt {
         final boolean settingPreferBestVideo = cfg != null ? cfg.getBooleanProperty(ORFMediathek.Q_BEST, ORFMediathek.Q_BEST_default) : false;
         final boolean settingEnableFastCrawl = cfg != null ? cfg.getBooleanProperty(ORFMediathek.SETTING_ENABLE_FAST_CRAWL, ORFMediathek.SETTING_ENABLE_FAST_CRAWL_default) : true;
         boolean isProgressiveStreamAvailable = false;
-        if (segments != null) {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        crawlSegments: {
+            if (segments == null || segments.isEmpty()) {
+                break crawlSegments;
+            }
             final List<String> selectedDeliveryTypes = new ArrayList<String>();
             final boolean enforceProgressive = true;
             final boolean allowProgressive = cfg != null ? cfg.getBooleanProperty(ORFMediathek.PROGRESSIVE_STREAM, ORFMediathek.PROGRESSIVE_STREAM_default) : true;
@@ -285,13 +288,14 @@ public class OrfAt extends PluginForDecrypt {
                 final String segmentID = segment.get("id").toString();
                 String thumbnailurl = null;
                 final Map<String, Object> thisEmbedded = (Map<String, Object>) segment.get("_embedded");
-                final Map<String, Object> thisplaylist = (Map<String, Object>) thisEmbedded.get("playlist");
+                final Map<String, Object> segment_embedded_playlist = (Map<String, Object>) thisEmbedded.get("playlist");
+                final String segment_embedded_playlist_title = segment_embedded_playlist.get("title").toString();
                 thumbnailurl = (String) JavaScriptEngineFactory.walkJson(segment, "_embedded/image/public_urls/highlight_teaser/url");
                 if (thumbnailurlFromFirstSegment == null) {
                     thumbnailurlFromFirstSegment = thumbnailurl;
                 }
-                final List<Map<String, Object>> sources = (List<Map<String, Object>>) thisplaylist.get("sources");
-                final List<Map<String, Object>> subtitlemaps = (List<Map<String, Object>>) thisplaylist.get("subtitles");
+                final List<Map<String, Object>> sources = (List<Map<String, Object>>) segment_embedded_playlist.get("sources");
+                final List<Map<String, Object>> subtitlemaps = (List<Map<String, Object>>) segment_embedded_playlist.get("subtitles");
                 String subtitleurl = null;
                 if (subtitlemaps != null && subtitlemaps.size() > 0) {
                     /* Look for subtitle in user preferred format */
@@ -311,7 +315,6 @@ public class OrfAt extends PluginForDecrypt {
                     /* Only one segment -> We can use gapless subtitle as fallback */
                     subtitleurl = gapless_subtitleurl;
                 }
-                final String titlethis = thisplaylist.get("title").toString();
                 int numberofSkippedDRMItems = 0;
                 final Map<String, Long> qualityIdentifierToFilesizeMap = new HashMap<String, Long>();
                 final List<DownloadLink> videoresults = new ArrayList<DownloadLink>();
@@ -391,8 +394,9 @@ public class OrfAt extends PluginForDecrypt {
                             if (e instanceof DecrypterRetryException) {
                                 throw e;
                             } else {
-                                /* Ignore Exception */
+                                /* Ignore other Exception types */
                                 logger.log(e);
+                                logger.info("Exception happened during file size check");
                             }
                         } finally {
                             try {
@@ -490,17 +494,16 @@ public class OrfAt extends PluginForDecrypt {
                     thumbnail.setAvailable(true);
                     finalresults.add(thumbnail);
                 }
-                // TODO: Check if this can still happen
                 if (videoresults.isEmpty() && numberofSkippedDRMItems > 0) {
                     /* Seems like all available video streams are DRM protected. */
-                    final DownloadLink dummy = this.createOfflinelink(br.getURL(), "DRM_" + titlethis, "This video is DRM protected and cannot be downloaded with JDownloader.");
+                    final DownloadLink dummy = this.createOfflinelink(br.getURL(), "DRM_" + segment_embedded_playlist_title, "This video is DRM protected and cannot be downloaded with JDownloader.");
                     finalresults.add(dummy);
                 }
                 /* Add more properties which are the same for all results of this segment */
                 for (final DownloadLink result : finalresults) {
                     result.setProperty(ORFMediathek.PROPERTY_VIDEO_POSITION, videoPosition);
                     result.setProperty(ORFMediathek.PROPERTY_VIDEO_POSITION_MAX, segments.size());
-                    result.setProperty(ORFMediathek.PROPERTY_TITLE, titlethis);
+                    result.setProperty(ORFMediathek.PROPERTY_TITLE, segment_embedded_playlist_title);
                     result.setProperty(ORFMediathek.PROPERTY_SEGMENT_ID, segmentID);
                     ret.add(result);
                 }
@@ -518,37 +521,41 @@ public class OrfAt extends PluginForDecrypt {
         }
         final boolean alreadyFoundGaplessProgressive = segments.size() == 1 && isProgressiveStreamAvailable;
         final boolean gaplessNeeded = isCrawlGaplessAndVideoChapters || isCrawlGaplessOnly;
-        final boolean crawlGapless;
+        final boolean allowCrawlGapless;
         if (has_active_youth_protection) {
             /* With a bit of luck, this can skip age protection */
-            crawlGapless = true;
+            logger.info("Trying to crawl gapless items only to avoid youth protection");
+            allowCrawlGapless = true;
             /* Non-gapless items remain youth-blocked so let's discard them if we find gapless items. */
             isCrawlGaplessOnly = true;
         } else if (ret.isEmpty()) {
             /* Found nothing -> Try to crawl gapless items */
             logger.info("Found nothing -> Trying to crawl gapless version as fallback");
-            crawlGapless = true;
+            allowCrawlGapless = true;
         } else if (gaplessNeeded && !alreadyFoundGaplessProgressive) {
             logger.info("User prefers gapless and already crawled items don't looke like gapless");
-            crawlGapless = true;
+            allowCrawlGapless = true;
         } else {
             /* Do not crawl gapless streams */
-            crawlGapless = false;
+            allowCrawlGapless = false;
         }
         int numberofGaplessItems = 0;
-        gaplessHandling: if (crawlGapless) {
+        crawlGapless: {
+            if (!allowCrawlGapless) {
+                break crawlGapless;
+            }
             /* Gapless video handling */
             logger.info("Crawling gapless video streams");
             /* Check if any gapless sources are available. */
             final Map<String, Object> sourcesForGaplessVideo = (Map<String, Object>) entries.get("sources");
             if (sourcesForGaplessVideo == null || sourcesForGaplessVideo.isEmpty()) {
                 logger.info("No gapless sources available -> Returning items we found so far");
-                break gaplessHandling;
+                break crawlGapless;
             }
             final List<Map<String, Object>> sources_hls = (List<Map<String, Object>>) sourcesForGaplessVideo.get("hls");
             if (sources_hls == null || sources_hls.isEmpty()) {
                 logger.info("No gapless HLS sources available -> Returning items we found so far");
-                break gaplessHandling;
+                break crawlGapless;
             }
             final String[] possibleGaplessAudioAndVideoQualityIdentifiers = new String[] { "Q8C", "Q6A", "Q4A" };
             final List<String> availableAudioAndVideoGaplessQualities = new ArrayList<String>();
@@ -563,7 +570,7 @@ public class OrfAt extends PluginForDecrypt {
             }
             if (availableAudioAndVideoGaplessQualities.isEmpty()) {
                 logger.info("No gapless audio/video combined HLS sources available -> Returning items we found so far");
-                break gaplessHandling;
+                break crawlGapless;
             }
             if (!settingPreferBestVideo && availableAndSelectedAudioAndVideoGaplessQualities.size() > 0) {
                 /* Process only the items we want && are available -> Speeds up things */
@@ -589,7 +596,7 @@ public class OrfAt extends PluginForDecrypt {
             }
             if (sources_hls_modified.isEmpty()) {
                 logger.info("No gapless audio/video combined HLS sources available because: Failed to find modifyable original links -> Returning items we found so far");
-                break gaplessHandling;
+                break crawlGapless;
             }
             final List<DownloadLink> gaplessresults = new ArrayList<DownloadLink>();
             DownloadLink best = null;
@@ -597,7 +604,7 @@ public class OrfAt extends PluginForDecrypt {
                 /* Every HLS master leads to exactly one quality. */
                 br.getPage(hlsMaster);
                 if (ORFMediathek.isGeoBlocked(br.getURL())) {
-                    /* Item is GEO-blocked */
+                    /* Item is GEO-blocked. If one quality is GEO-blocked, all qualities are. */
                     throw new DecrypterRetryException(RetryReason.GEO);
                 }
                 int heigthMax = 0;
@@ -636,8 +643,9 @@ public class OrfAt extends PluginForDecrypt {
             }
             if (gaplessresults.isEmpty()) {
                 /**
-                 * All possible results were skipped? -> This should never happen / very very rare case. </br> Either all available video
-                 * resolutions are unsupported resolutions or GEO-blocked detection failed or something super unexpected happened.
+                 * All possible results were skipped? -> This should never happen / very very rare case. </br>
+                 * Either all available video resolutions are unsupported resolutions or GEO-blocked detection failed or something super
+                 * unexpected happened.
                  */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -700,7 +708,8 @@ public class OrfAt extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /**
-         * Add more properties which are the same for all results. </br> It is important that all items run through this loop!
+         * Add more properties which are the same for all results. </br>
+         * It is important that all items run through this loop!
          */
         for (final DownloadLink result : ret) {
             if (!result.hasProperty(ORFMediathek.PROPERTY_CONTENT_TYPE)) {
@@ -827,7 +836,8 @@ public class OrfAt extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlArticle(final CryptedLink param) throws Exception {
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -836,28 +846,28 @@ public class OrfAt extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);
         final String oon_audioEntries[] = br.getRegex("<div class=\"oon-audio\"(.*?)\\s*</div>").getColumn(0);
-        if (oon_audioEntries.length > 0) {
-            for (final String oon_audioEntry : oon_audioEntries) {
-                final String url = new Regex(oon_audioEntry, "data-url\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
-                if (url == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final DownloadLink link = createDownloadlink(url);
-                link.setContentUrl(param.getCryptedUrl());
-                String name = getFileNameFromURL(new URL(url));
-                if (title != null) {
-                    name = title + "-" + name;
-                    fp.add(link);
-                }
-                if (name != null) {
-                    link.setFinalFileName(name);
-                }
-                link.setProperty(DirectHTTP.FIXNAME, name);
-                ret.add(link);
-            }
-            return ret;
+        if (oon_audioEntries == null || oon_audioEntries.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        for (final String oon_audioEntry : oon_audioEntries) {
+            final String url = new Regex(oon_audioEntry, "data-url\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
+            if (url == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final DownloadLink link = createDownloadlink(url);
+            link.setContentUrl(contenturl);
+            String name = getFileNameFromURL(new URL(url));
+            if (title != null) {
+                name = title + "-" + name;
+                fp.add(link);
+            }
+            if (name != null) {
+                link.setFinalFileName(name);
+            }
+            link.setProperty(DirectHTTP.FIXNAME, name);
+            ret.add(link);
+        }
+        return ret;
     }
 
     /** Crawls all episodes of a podcast or only a specific episode. */
@@ -1116,7 +1126,7 @@ public class OrfAt extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (numberofOfflineItems > 0) {
-            logger.info("Skippen offline items: " + numberofOfflineItems);
+            logger.info("Number of skipped offline items: " + numberofOfflineItems);
         }
         return ret;
     }

@@ -29,6 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BuzzheavierComFolder;
@@ -36,7 +37,8 @@ import jd.plugins.decrypter.BuzzheavierComFolder;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51915 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { BuzzheavierComFolder.class })
 public class BuzzheavierCom extends PluginForHost {
     public BuzzheavierCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,26 +56,18 @@ public class BuzzheavierCom extends PluginForHost {
         return "https://" + getHost();
     }
 
-    private static List<String[]> getPluginDomains() {
-        final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "buzzheavier.com" });
-        ret.add(new String[] { "fuckingfast.net" });
-        return ret;
-    }
-
     public static String[] getAnnotationNames() {
-        return buildAnnotationNames(getPluginDomains());
+        return buildAnnotationNames(BuzzheavierComFolder.getPluginDomains());
     }
 
     @Override
     public String[] siteSupportedNames() {
-        return buildSupportedNames(getPluginDomains());
+        return buildSupportedNames(BuzzheavierComFolder.getPluginDomains());
     }
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
+        for (final String[] domains : BuzzheavierComFolder.getPluginDomains()) {
             /* Links are added via crawler plugin -> No pattern */
             ret.add("");
         }

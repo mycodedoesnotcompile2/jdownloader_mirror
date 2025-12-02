@@ -19,12 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -44,12 +47,26 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BdsmlrCom;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51908 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51913 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BdsmlrCom.class })
 public class BdsmlrComCrawler extends PluginForDecrypt {
     public BdsmlrComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(new int[] { 500 });
+        return br;
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     public static String[] getAnnotationNames() {
@@ -68,27 +85,39 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://[\\w\\-]+\\." + buildHostsPatternPart(domains) + "(/.+)?");
+            ret.add("https?://[\\w-]+\\." + buildHostsPatternPart(domains) + "(/.+)?");
         }
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_USER_PROFILE = "(?i)https?://([\\w\\-]+)\\.[^/]+(/.+)?";
-    private static final String TYPE_POST         = "(?i)https?://([\\w\\-]+)\\.[^/]+/post/(\\d+)$";
-    private static final String PROPERTY_POST_ID  = "post_id";
+    private static final Pattern PATTERN_USER_PROFILE = Pattern.compile("https?://([\\w-]+)\\.[^/]+(/.+)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_POST         = Pattern.compile("/post/(\\d+)$", Pattern.CASE_INSENSITIVE);
+    /* Direct-URLs typically contain CDN host "cdnXXX." or "ocdnXXX." where "XXX" is numbers. */
+    private static final Pattern PATTERN_DIRECT       = Pattern.compile("https?://[^/]+/uploads/.+", Pattern.CASE_INSENSITIVE);
+    private static final String  PROPERTY_POST_ID     = "post_id";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final String contenturl = param.getCryptedUrl();
-        if (new Regex(contenturl, "https?://cdn\\d+\\.bdsmlr\\.com/?$").patternFind()) {
+        if (new Regex(contenturl, PATTERN_DIRECT).patternFind()) {
             /* CDN subdomain: This may happen if user adds a direct-url to an image. */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
+            final DownloadLink direct = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(contenturl));
+            /**
+             * Important and this may save us the need for one http request. <br>
+             * This is NOT the referer that the browser would use (that would be https://username.bdsmlr.com/") but the url itself as
+             * referrer works fine too.
+             */
+            direct.setReferrerUrl(contenturl);
+            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+            ret.add(direct);
+            return ret;
         }
+        /* Login if an account exists */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account != null) {
             final BdsmlrCom hostPlugin = (BdsmlrCom) this.getNewPluginForHostInstance(this.getHost());
             hostPlugin.login(account, false);
         }
-        if (param.getCryptedUrl().matches(TYPE_POST)) {
+        if (new Regex(contenturl, PATTERN_POST).patternFind()) {
             return crawlPost(param);
         } else {
             return crawlUser(param, account);
@@ -97,14 +126,13 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlPost(final CryptedLink param) throws IOException, PluginException {
         final String contenturl = param.getCryptedUrl();
-        final Regex urlinfo = new Regex(contenturl, TYPE_POST);
+        final Regex urlinfo = new Regex(contenturl, PATTERN_POST);
         final String username = urlinfo.getMatch(0);
         final String postID = urlinfo.getMatch(1);
         if (username == null) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.setAllowedResponseCodes(new int[] { 500 });
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -113,12 +141,12 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username + "_" + postID);
-        return crawlPosts(br, fp);
+        return crawlPosts(fp);
     }
 
     private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account) throws IOException, PluginException, InterruptedException {
         String contenturl = param.getCryptedUrl();
-        final String username = new Regex(contenturl, TYPE_USER_PROFILE).getMatch(0);
+        final String username = new Regex(contenturl, PATTERN_USER_PROFILE).getMatch(0);
         if (username == null) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -148,10 +176,14 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         } else {
             fp.setName(username);
         }
+        if (account == null && br.containsHTML(">\\s*This blog contains adult content and you're only seeing a review of it")) {
+            /* Inform user that an account may be needed to crawl all items. */
+            this.displayBubbleNotification(fp.getName() + " | Adult content warning", "You may need to add an account to be able to crawl all items.");
+        }
         /* First check if there is already some downloadable content in the html of the current page. */
-        ret.addAll(crawlPosts(br, fp));
+        ret.addAll(crawlPosts(fp));
         if (ret.isEmpty()) {
-            logger.info("Didn't find anything in HTML ");
+            logger.info("Didn't find anything in HTML");
         }
         /* Crawl first pagination page which typically contains less items than the rest */
         final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
@@ -165,6 +197,10 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         final String infinitescrollDate = br.getRegex("class=\"infinitescroll\" data-time=\"(\\d{4}[^\"]+)\"").getMatch(0);
         if (infinitescrollDate == null) {
             logger.info("Stopping because: Pagination parameter 'infinitescroll' is not available");
+            if (ret.isEmpty()) {
+                /* No items found so far AND pagination impossible -> Something went seriously wrong */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find infinitescrollDate");
+            }
             return ret;
         }
         br.getHeaders().put("Accept", "*/*");
@@ -183,7 +219,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         } else {
             br.postPage("/loadfirst", query);
         }
-        ret.addAll(crawlPosts(br, fp));
+        ret.addAll(crawlPosts(fp));
         if (this.isAbort()) {
             throw new InterruptedException();
         }
@@ -203,7 +239,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
             } else {
                 br.postPage("/infinitepb2/" + username, query);
             }
-            final ArrayList<DownloadLink> results = crawlPosts(br, fp);
+            final ArrayList<DownloadLink> results = crawlPosts(fp);
             int numberofNewItems = 0;
             int numberofSkippedDuplicates = 0;
             if (results.isEmpty()) {
@@ -220,16 +256,15 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
                         logger.info("Skipping dupe: " + postID);
                         numberofSkippedDuplicates++;
                         continue;
-                    } else {
-                        ret.add(result);
-                        numberofNewItems++;
                     }
+                    ret.add(result);
+                    numberofNewItems++;
                 }
             }
             logger.info("Crawled page " + page + " | Index: " + index + " | New crawled items on this page: " + numberofNewItems + " | Crawled supported items total: " + ret.size() + " | lastPostID: " + lastPostID);
             if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break;
+                /* Aborted by user */
+                throw new InterruptedException();
             } else if (lastPostID == null) {
                 logger.info("Stopping because: lastPostID is null");
                 break profileLoop;
@@ -251,7 +286,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
     private int               lastNumberofPosts = 0;
     private ArrayList<String> lastPostIDList    = new ArrayList<String>();
 
-    private ArrayList<DownloadLink> crawlPosts(final Browser br, final FilePackage fp) throws PluginException, IOException {
+    private ArrayList<DownloadLink> crawlPosts(final FilePackage fp) throws PluginException, IOException {
         lastPostID = null;
         lastNumberofPosts = 0;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -280,6 +315,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
             if (postURL == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            final String referer_url = "https://" + username.toLowerCase(Locale.ROOT) + "." + br.getHost(false) + "/";
             if (type.equalsIgnoreCase("typelink")) {
                 /* Post containing links to external websites such as youtube.com. */
                 int numberofAddedItems = 0;
@@ -317,28 +353,37 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
                 final HashSet<String> dups = new HashSet<String>();
                 for (final String direct[] : directs) {
                     final String directurl = direct[0];
-                    if (dups.add(directurl)) {
-                        final String year = direct[1];
-                        final String month = direct[2];
-                        final DownloadLink dl = this.createDownloadlink(directurl);
-                        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                            dl.setContentUrl(directurl);
-                        } else {
-                            dl.setContentUrl(postURL);
-                        }
-                        if (dups.size() > 1) {
-                            dl.setFinalFileName(username + "_" + year + "_" + month + "_" + postID + "_" + dups.size() + Plugin.getFileNameExtensionFromURL(directurl));
-                        } else {
-                            dl.setFinalFileName(username + "_" + year + "_" + month + "_" + postID + Plugin.getFileNameExtensionFromURL(directurl));
-                        }
-                        if (fp != null) {
-                            dl._setFilePackage(fp);
-                        }
-                        dl.setAvailable(true);
-                        dl.setProperty(PROPERTY_POST_ID, postID);
-                        ret.add(dl);
-                        distribute(dl);
+                    if (!dups.add(directurl)) {
+                        /* Skip duplicates */
+                        logger.info("Skipping dupe: " + directurl);
+                        continue;
                     }
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !new Regex(directurl, PATTERN_DIRECT).patternFind()) {
+                        logger.warning("!!DEV!! Found direct-URL which does not fit known direct-URL pattern -> " + directurl);
+                    }
+                    final String year = direct[1];
+                    final String month = direct[2];
+                    final DownloadLink link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        /* Make direct-urls easier accessible for plugin developers. */
+                        link.setContentUrl(directurl);
+                    } else {
+                        link.setContentUrl(postURL);
+                    }
+                    if (dups.size() > 1) {
+                        link.setFinalFileName(username + "_" + year + "_" + month + "_" + postID + "_" + dups.size() + Plugin.getFileNameExtensionFromURL(directurl));
+                    } else {
+                        link.setFinalFileName(username + "_" + year + "_" + month + "_" + postID + Plugin.getFileNameExtensionFromURL(directurl));
+                    }
+                    if (fp != null) {
+                        link._setFilePackage(fp);
+                    }
+                    link.setAvailable(true);
+                    link.setProperty(PROPERTY_POST_ID, postID);
+                    /* Important! Some URLs cannot be accessed without the expected referrer value and server will return error 403! */
+                    link.setReferrerUrl(referer_url);
+                    ret.add(link);
+                    distribute(link);
                 }
             }
         }

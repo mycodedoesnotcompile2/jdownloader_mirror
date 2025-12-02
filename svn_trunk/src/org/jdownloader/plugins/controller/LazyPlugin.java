@@ -296,6 +296,22 @@ public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferen
                 return false;
             }
         },
+        REQUIRES_FFMPEG {
+            @Override
+            public String getLabel() {
+                return "This plugin requires FFmpeg";
+            }
+
+            @Override
+            public String getTooltip() {
+                return "This plugin requires FFmpeg";
+            }
+
+            @Override
+            public boolean isInternal() {
+                return false;
+            }
+        },
         BUBBLE_NOTIFICATION {
             @Override
             public String getLabel() {

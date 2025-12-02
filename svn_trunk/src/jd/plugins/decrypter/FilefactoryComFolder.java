@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51668 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51911 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -118,15 +118,24 @@ public class FilefactoryComFolder extends PluginForDecrypt {
                 if (!br.getURL().contains(folder_id)) {
                     /* old website: e.g. redirect to error page such as: https://www.filefactory.com/error.php?code=300 */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (br.containsHTML(">\\s*There are no files in this folder")) {
-                    /* Empty folder */
-                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
                 }
                 /* Folder title is not available in CSV file thus to get it, we need to look into the html code of the older URL. */
                 String folderTitle = br.getRegex("<h1>Files in\\s*<span>([^<]+)</span>").getMatch(0);
-                final FilePackage fp = FilePackage.getInstance();
                 if (!StringUtils.isEmpty(folderTitle)) {
                     folderTitle = Encoding.htmlDecode(folderTitle).trim();
+                }
+                if (br.containsHTML(">\\s*There are no files in this folder")) {
+                    /* Empty folder */
+                    final String titleForEmptyFolder;
+                    if (!StringUtils.isEmpty(folderTitle)) {
+                        titleForEmptyFolder = folder_id + "_" + folderTitle;
+                    } else {
+                        titleForEmptyFolder = folder_id;
+                    }
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, titleForEmptyFolder);
+                }
+                final FilePackage fp = FilePackage.getInstance();
+                if (!StringUtils.isEmpty(folderTitle)) {
                     fp.setName(folderTitle);
                 } else {
                     logger.warning("Failed to find folder title");
@@ -261,7 +270,7 @@ public class FilefactoryComFolder extends PluginForDecrypt {
             }
             int numberOfFiles = -1;
             int maxItemsPerPage = -1;
-            String title = null;
+            String folderTitle = null;
             FilePackage fp = null;
             int maxPage = 1;
             int page = 1;
@@ -299,13 +308,19 @@ public class FilefactoryComFolder extends PluginForDecrypt {
                     numberOfFiles = ((Number) entries.get("totalCount")).intValue();
                     maxPage = ((Number) pagination.get("pageCount")).intValue();
                     maxItemsPerPage = ((Number) pagination.get("itemsPerPage")).intValue();
+                    folderTitle = (String) folder.get("name");
                     if (numberOfFiles == 0) {
-                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+                        final String titleForEmptyFolder;
+                        if (!StringUtils.isEmpty(folderTitle)) {
+                            titleForEmptyFolder = folder_id + "_" + folderTitle;
+                        } else {
+                            titleForEmptyFolder = folder_id;
+                        }
+                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, titleForEmptyFolder);
                     }
-                    title = (String) folder.get("name");
                     fp = FilePackage.getInstance();
-                    if (title != null) {
-                        fp.setName(title);
+                    if (folderTitle != null) {
+                        fp.setName(folderTitle);
                     } else {
                         /* Fallback */
                         fp.setName(folder_id);

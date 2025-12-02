@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
@@ -34,9 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51901 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51913 $", interfaceVersion = 3, names = {}, urls = {})
 public class BdsmlrCom extends PluginForHost {
     public BdsmlrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,10 +77,6 @@ public class BdsmlrCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private final int FREE_MAXDOWNLOADS    = 20;
-    private final int ACCOUNT_MAXDOWNLOADS = 20;
-
     @Override
     public String getLinkID(final DownloadLink link) {
         final String linkid = getFID(link);
@@ -103,11 +99,6 @@ public class BdsmlrCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-    }
-
-    @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
     }
 
     public void login(final Account account, final boolean force) throws Exception {
@@ -174,7 +165,6 @@ public class BdsmlrCom extends PluginForHost {
         login(account, true);
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
-        account.setMaxSimultanDownloads(ACCOUNT_MAXDOWNLOADS);
         return ai;
     }
 
@@ -184,13 +174,17 @@ public class BdsmlrCom extends PluginForHost {
     }
 
     @Override
+    public int getMaxSimultanFreeDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_MAXDOWNLOADS;
+        return this.getMaxSimultanFreeDownloadNum();
     }
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return false;
     }
-
 }

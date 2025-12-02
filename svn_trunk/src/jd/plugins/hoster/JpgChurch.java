@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51915 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -208,7 +209,8 @@ public class JpgChurch extends PluginForHost {
             final UrlQuery query = new UrlQuery();
             query.add("url", URLEncode.encodeURIComponent(contentURL));
             query.add("format", "json");
-            br.getPage("https://" + this.getHost() + "/oembed/?" + query.toString());
+            br.setCurrentURL(contentURL);
+            br.getPage("https://" + new URL(contentURL).getHost() + "/oembed/?" + query.toString());
             if (br.getHttpConnection().getResponseCode() == 403) {
                 /* Link is broken/invalid */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

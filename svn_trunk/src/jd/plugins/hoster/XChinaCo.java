@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.XChinaCoCrawler;
 
-@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51913 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XChinaCoCrawler.class })
 public class XChinaCo extends PluginForHost {
     public XChinaCo(PluginWrapper wrapper) {
@@ -91,11 +91,12 @@ public class XChinaCo extends PluginForHost {
     public static final String PROPERTY_TITLE = "title";
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".mp4";
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link) + ".mp4");
-        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -141,14 +142,6 @@ public class XChinaCo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

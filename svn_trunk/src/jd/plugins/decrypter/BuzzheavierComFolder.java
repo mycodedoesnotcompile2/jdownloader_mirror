@@ -21,9 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,7 +35,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BuzzheavierCom;
 
-@DecrypterPlugin(revision = "$Revision: 50354 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+
+@DecrypterPlugin(revision = "$Revision: 51915 $", interfaceVersion = 3, names = {}, urls = {})
 public class BuzzheavierComFolder extends PluginForDecrypt {
     public BuzzheavierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +55,7 @@ public class BuzzheavierComFolder extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "buzzheavier.com" });
+        ret.add(new String[] { "fuckingfast.net" });
         return ret;
     }
 

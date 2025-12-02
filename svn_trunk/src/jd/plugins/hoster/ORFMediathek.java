@@ -29,6 +29,7 @@ import org.jdownloader.downloader.hds.HDSDownloader;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hds.HDSContainer;
 import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -49,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 51326 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51911 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -107,6 +108,11 @@ public class ORFMediathek extends PluginForHost {
     }
 
     @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+    }
+
+    @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
@@ -115,7 +121,7 @@ public class ORFMediathek extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://orf.at";
+        return "https://" + getHost();
     }
 
     @Override
