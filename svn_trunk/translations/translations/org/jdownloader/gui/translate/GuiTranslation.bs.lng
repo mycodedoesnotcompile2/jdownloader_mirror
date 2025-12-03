@@ -422,6 +422,7 @@ EnabledAction_EnabledAction_empty=Omogući/Onemogući Link
 EnabledAction_EnabledAction_enable=Omogući
 EnabledAction_EnabledAction_mode=Modus
 EnabledDisabledColumn_EnabledDisabledColumn=Omogućeno / Onemogućeno
+EnabledFileCountColumn_EnabledFileCountColumn=Omogući brojanje dokumenata
 EndCaptchaSolver_gettypeName_=EndCaptcha.com
 ExceptionsRuleDialog_ExceptionsRuleDialog_title_=Pravilo za Izuzetak od Filtera
 ExceptionsRuleDialog_getIfText_=Dozvoli sve Linkove koji zadovoljavaju ove kriterije i ignoriši Filter Listu

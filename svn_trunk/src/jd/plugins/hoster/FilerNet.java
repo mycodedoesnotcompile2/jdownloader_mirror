@@ -23,6 +23,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -45,16 +54,7 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51915 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51919 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -94,9 +94,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
-                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
-                 * preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
+                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
+                 * this, http protocol would be used even if user preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -219,6 +219,11 @@ public class FilerNet extends PluginForHost {
         if (urls == null || urls.length == 0) {
             return false;
         }
+        /*
+         * 2025-12-02: Limit used to be 100, now it looks to be 5 which I guess is a bug(?) -> TODO: Report to filer.net support and
+         * re-adopt this internal limit if needed.
+         */
+        final int max_checkable_items_per_request = 5;
         try {
             final StringBuilder sb = new StringBuilder();
             final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
@@ -226,8 +231,8 @@ public class FilerNet extends PluginForHost {
             while (true) {
                 links.clear();
                 while (true) {
-                    /* Check up to 100 items with one request */
-                    if (index == urls.length || links.size() == 100) {
+                    /* Check up to X items with one request */
+                    if (index == urls.length || links.size() == max_checkable_items_per_request) {
                         break;
                     } else {
                         links.add(urls[index]);
@@ -237,8 +242,8 @@ public class FilerNet extends PluginForHost {
                 sb.delete(0, sb.capacity());
                 for (final DownloadLink link : links) {
                     if (sb.length() > 0) {
-                        /* Add separator */
-                        sb.append("|");
+                        /* Add separator | */
+                        sb.append("%7C");
                     }
                     sb.append(this.getFileID(link));
                 }
@@ -487,7 +492,11 @@ public class FilerNet extends PluginForHost {
              */
             final boolean allowFreeAccounts = false;
             if (!allowFreeAccounts) {
-                throw new AccountInvalidException("Free accounts are not supported");
+                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                    throw new AccountInvalidException("Kostenlose Accounts werden nicht unterstützt, da sie keine Vorteile gegenüber dem Herunterladen ohne Account bieten, z. B. höhere Geschwindigkeit oder kein Captcha.");
+                } else {
+                    throw new AccountInvalidException("Free accounts are not supported because they do not offer any benefits compared to downloading without an account, e.g. higher speed or no captcha.");
+                }
             }
         }
         final Object maxtrafficObject = data.get("maxtraffic");

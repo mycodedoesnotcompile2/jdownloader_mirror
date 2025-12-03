@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51899 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class VidhideCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null 4dignum reCaptchaV2, hcaptcha<br />
+     * captchatype-info: 2025-12-02: reCaptchaV2 <br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
@@ -215,6 +215,28 @@ public class VidhideCom extends XFileSharingProBasic {
             logger.info("[FilesizeMode] Trying to find official video downloads");
         } else {
             logger.info("[DownloadMode] Trying to find official video downloads");
+        }
+        final String fuid = this.getFUIDFromURL(link);
+        final Pattern official_video_download_pattern = Pattern.compile("(/(d|download)/" + fuid + ")");
+        if (br.getURL() == null || !new Regex(br.getURL(), official_video_download_pattern).patternFind()) {
+            if (this.isRefererBlocked_Vidhide(br)) {
+                logger.info("Trying to get around referer block");
+                this.getPage(br, "/download/" + fuid);
+                if (br.containsHTML(">\\s*Downloads disabled for this file")) {
+                    logger.info("Referer block workaround failed");
+                } else {
+                    logger.info("Referer block workaround looks to be successful");
+                }
+            } else if (PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment())) {
+                /* Allow extra step in download mode */
+                final String download_button_url = br.getRegex(official_video_download_pattern).getMatch(0);
+                if (download_button_url != null && !br.getURL().contains(download_button_url)) {
+                    logger.info("Accessing download page: " + download_button_url);
+                    this.getPage(br, download_button_url);
+                } else {
+                    logger.info("Looks like official video download has been disabled for this item");
+                }
+            }
         }
         final String[] videourls = br.getRegex("(/download/[a-z0-9]{12}_[a-z]{1})").getColumn(0);
         final String[][] videoresolutionsAndFilesizes = br.getRegex(">\\s*(\\d+x\\d+),? (\\d+(\\.\\d{1,2})?,? [A-Za-z]{1,5})").getMatches();
@@ -390,7 +412,7 @@ public class VidhideCom extends XFileSharingProBasic {
     @Override
     protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         super.checkErrors(br, html, link, account);
-        if (br.containsHTML("Video embed restricted for this domain")) {
+        if (isRefererBlocked_Vidhide(br)) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Video embed restricted for this domain");
         }
         final String errorsMisc2 = br.getRegex("<div class=\"text-danger text-center[^\"]*\"[^>]*>([^<]+)</div>").getMatch(0);
@@ -398,6 +420,16 @@ public class VidhideCom extends XFileSharingProBasic {
             /* E.g. error "Downloads disabled 620" */
             throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc2).trim());
         }
+    }
+
+    private boolean isRefererBlocked_Vidhide(final Browser br) {
+        // TODO: Use the code down below after next fullbuild
+        // if (br.containsHTML(">\\s*Video embed restricted for this domain")) {
+        // return true;
+        // }else {
+        // return super.isRefererBlocked(br);
+        // }
+        return br.containsHTML(">\\s*Video embed restricted for this domain");
     }
 
     @Override

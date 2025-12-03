@@ -332,11 +332,12 @@ public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferen
         public static final long CACHEVERSION = Math.abs(StringUtils.join(values(), "<->").hashCode()) + Math.abs(StringUtils.join(values(), ":").hashCode()) + Math.abs(StringUtils.join(values(), "<=>").hashCode());
 
         public boolean isSet(FEATURE[] features) {
-            if (features != null) {
-                for (final FEATURE feature : features) {
-                    if (this.equals(feature)) {
-                        return true;
-                    }
+            if (features == null) {
+                return false;
+            }
+            for (final FEATURE feature : features) {
+                if (this.equals(feature)) {
+                    return true;
                 }
             }
             return false;

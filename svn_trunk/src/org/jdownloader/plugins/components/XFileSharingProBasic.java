@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51910 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -995,7 +995,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /** Returns true if a special referer is needed to view/watch this item. */
-    private boolean isRefererBlocked(final Browser br) {
+    protected boolean isReferrerBlocked(final Browser br) {
         return br.containsHTML(">\\s*This video cannot be watched under this domain");
     }
 
@@ -1332,18 +1332,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 final boolean isChecked;
                 if (!isDownload) {
                     this.requestFileInformationVideoEmbedXFSNew(br, link, account, false, true);
-                    isChecked = isRefererRequired != null || !isRefererBlocked(br);
+                    isChecked = isRefererRequired != null || !isReferrerBlocked(br);
                 } else {
                     if (isRefererRequired != null) {
                         this.requestFileInformationVideoEmbedXFSNew(br, link, account, true, true);
                         isChecked = true;
                     } else {
                         this.requestFileInformationVideoEmbedXFSNew(br, link, account, false, true);
-                        isChecked = !isRefererBlocked(br);
+                        isChecked = !isReferrerBlocked(br);
                     }
                 }
                 if (!link.hasProperty(PROPERTY_REFERER_REQUIRED)) {
-                    link.setProperty(PROPERTY_REFERER_REQUIRED, isRefererBlocked(br));
+                    link.setProperty(PROPERTY_REFERER_REQUIRED, isReferrerBlocked(br));
                 }
                 if (trustAvailablecheckVideoEmbed() && isChecked && isRefererRequired != null) {
                     return AvailableStatus.TRUE;
@@ -1413,13 +1413,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, refererSaved);
         }
         getPage(br, url);
-        if (this.isRefererBlocked(br)) {
+        if (this.isReferrerBlocked(br)) {
             if (isDownload) {
                 final String referer = getUserInput("Enter referer-URL?", link);
                 br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
                 /* Reload page */
                 getPage(br.getURL());
-                if (!this.isRefererBlocked(br)) {
+                if (!this.isReferrerBlocked(br)) {
                     /* Success */
                     link.setDownloadPassword(referer);
                 } else {
@@ -5285,8 +5285,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* Open connection */
             try {
                 dl = new jd.plugins.BrowserAdapter().openDownload(br, link, req, resume, maxChunks);
-            } catch (InterruptedException e) {
-                throw e;
+            } catch (final InterruptedException ie) {
+                /* Always throw InterruptedException */
+                throw ie;
             } catch (Exception e) {
                 if (!throwConnectException && Exceptions.containsInstanceOf(e, SocketException.class, UnknownHostException.class)) {
                     // only special handling for SocketException and UnknownHostException
@@ -5307,7 +5308,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 this.correctBR(br);
                 if (dl.getConnection().getResponseCode() == 503) {
                     exception503ConnectionLimitReached();
-                    throwFinalConnectionException(br, dl.getConnection());// ensure thrown exception
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT); // This code should never be reached
                 } else if (flagList.contains(DOWNLOAD_ATTEMPT_FLAGS.DOWNLOAD_OR_EXCEPTION)) {
                     handleDownloadErrors(dl.getConnection(), link, account);
                     throwFinalConnectionException(br, dl.getConnection());// ensure thrown exception
@@ -5326,13 +5327,28 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     final URLConnectionAdapter con = br.getHttpConnection();
                     if (con.getResponseCode() == 503) {
                         exception503ConnectionLimitReached();
-                        throwFinalConnectionException(br, con);// ensure thrown exception
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT); // This code should never be reached
                     } else if (flagList.contains(DOWNLOAD_ATTEMPT_FLAGS.DOWNLOAD_OR_EXCEPTION)) {
                         handleDownloadErrors(con, link, account);
                         throwFinalConnectionException(br, con);// ensure thrown exception
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT); // This code should never be reached
                     }
                 }
                 return false;
+            } else {
+                /* Looks like downloadable file but check for handleDownloadErrors nevertheless */
+                try {
+                    handleDownloadErrors(dl.getConnection(), link, account);
+                } catch (final InterruptedException ie) {
+                    /* Always throw InterruptedException */
+                    throw ie;
+                } catch (final Exception e) {
+                    if (flagList.contains(DOWNLOAD_ATTEMPT_FLAGS.DOWNLOAD_OR_EXCEPTION)) {
+                        throw e;
+                    } else {
+                        return false;
+                    }
+                }
             }
         }
         if (hlsURL != null) {
@@ -5559,6 +5575,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         logger.warning("The final dllink seems not to be a file!");
         br.followConnection(true);
         correctBR(br);
+        runPostRequestTask(br);
         checkServerErrors(br, link, account);
         this.checkErrors(br, this.getCorrectBR(br), link, account);
         checkResponseCodeErrors(con);

@@ -26,6 +26,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,14 +55,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51864 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51919 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -128,7 +128,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     private String currentBoardPath = null;
 
     /**
-     * One function which can handle _any_ type of supported pinterest link (except for single PIN links). </br> WORK IN PROGRESS
+     * One function which can handle _any_ type of supported pinterest link (except for single PIN links). </br>
+     * WORK IN PROGRESS
      */
     private ArrayList<DownloadLink> crawlAllOtherItems(final String contenturl) throws Exception {
         /* Login whenever possible to be able to crawl private pinterest boards. */
@@ -406,8 +407,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         final Map<String, Object> postDataOptions = (Map<String, Object>) postData.get("options");
         final String boardID = (String) postDataOptions.get("board_id");
         /**
-         * A page size is not always given. It is controlled serverside via the "bookmark" parameter. </br> Any page can have any number of
-         * items.
+         * A page size is not always given. It is controlled serverside via the "bookmark" parameter. </br>
+         * Any page can have any number of items.
          */
         final Number page_sizeO = (Number) postDataOptions.get("page_size");
         final int maxItemsPerPage = page_sizeO != null ? page_sizeO.intValue() : -1;
@@ -479,8 +480,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         if (enable_crawl_alternative_URL) {
             /* The more complicated way (if wished by user). */
             /**
-             * 2021-03-02: PINs may redirect to other PINs in very rare cases -> Handle that </br> If that wasn't the case, we could rely on
-             * API-only!
+             * 2021-03-02: PINs may redirect to other PINs in very rare cases -> Handle that </br>
+             * If that wasn't the case, we could rely on API-only!
              */
             br.getPage(contenturl);
             checkSinglePINOffline(br);
@@ -678,14 +679,14 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String username = boardSectionRegex.getMatch(0);
-        final String boardname = boardSectionRegex.getMatch(1);
-        final String sectionname = boardSectionRegex.getMatch(2);
-        final FilePackage fp = getSectionFilePackage(username, boardname, sectionname, boardID, sectionID);
-        return this.crawlSection(br, url, boardID, sectionID, fp);
+        final String board_slug = boardSectionRegex.getMatch(1);
+        final String section_slug = boardSectionRegex.getMatch(2);
+        final FilePackage fp = getSectionFilePackage(username, board_slug, section_slug, boardID, sectionID);
+        return this.crawlSection(br, url, username, board_slug, section_slug, boardID, sectionID, fp);
     }
 
     /** 2025-03-18: This doesn't work anymore */
-    private ArrayList<DownloadLink> crawlSection(final Browser br, final String source_url, final String boardID, final String sectionID, final FilePackage fp) throws Exception {
+    private ArrayList<DownloadLink> crawlSection(final Browser br, final String source_url, final String username, final String board_slug, final String section_slug, final String boardID, final String sectionID, final FilePackage fp) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int processedPINCounter = 0;
         int pageCounter = 1;
@@ -705,7 +706,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         Map<String, Object> pinPaginationPostData = new HashMap<String, Object>();
         pinPaginationPostData.put("options", pinPaginationPostDataOptions);
         pinPaginationPostData.put("context", pinPaginationpostDataContext);
-        do {
+        pagination: do {
             String url = "/resource/BoardSectionPinsResource/get/?source_url=" + URLEncode.encodeURIComponent(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(pinPaginationPostData)) + "&_=" + System.currentTimeMillis();
             if (br.getRequest() == null) {
                 /* First request */
@@ -726,22 +727,21 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             processedPINCounter += pins.size();
             logger.info("Crawled section " + sectionID + " page: " + pageCounter + " | Processed items on this page: " + numberofNewItemsThisPage + " | Processed PINs so far: " + processedPINCounter);
             if (this.isAbort()) {
-                logger.info("Crawler aborted by user");
+                /* Aborted by user */
                 throw new InterruptedException();
             } else if (StringUtils.isEmpty(bookmarks) || bookmarks.equals("-end-") || bookmarksO == null) {
                 /* Looks as if we've reached the end */
                 logger.info("Stopping because: Reached end");
-                break;
+                break pagination;
             } else if (numberofNewItemsThisPage == 0) {
                 /* Fail safe */
                 logger.info("Stopping because: Current page did not contain any new items");
-                break;
-            } else {
-                /* Load next page */
-                pinPaginationPostDataOptions.put("bookmarks", bookmarksO);
-                pageCounter++;
+                break pagination;
             }
-        } while (true);
+            /* Continue to next page */
+            pinPaginationPostDataOptions.put("bookmarks", bookmarksO);
+            pageCounter++;
+        } while (!this.isAbort());
         logger.info("Number of PINs in current section: " + processedPINCounter);
         return ret;
     }
@@ -837,8 +837,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
 
     /**
      * @return: true: target section was found and only this will be crawler false: failed to find target section - in this case we should
-     *          crawl everything we find </br> This can return a lot of results e.g. a board contains 1000 sections, each section contains
-     *          1000 PINs...
+     *          crawl everything we find </br>
+     *          This can return a lot of results e.g. a board contains 1000 sections, each section contains 1000 PINs...
      */
     private ArrayList<DownloadLink> crawlSections(final String username, final String boardID, final String boardName, final Browser ajax, final String contenturl) throws Exception {
         if (username == null || boardID == null || boardName == null) {
@@ -873,7 +873,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 final FilePackage fp = FilePackage.getInstance();
                 fp.setName(username + " - " + boardName + " - " + Encoding.htmlDecode(section_title));
                 fp.setPackageKey("pinterest://board/" + boardID + "/section/" + sectionID);
-                ret.addAll(crawlSection(ajax, source_url, boardID, sectionID, fp));
+                // TODO: Add board_slug and section_slug
+                ret.addAll(crawlSection(ajax, source_url, username, null, null, boardID, sectionID, fp));
                 sectionCounter += 1;
                 if (this.isAbort()) {
                     throw new InterruptedException();
@@ -900,7 +901,11 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     private FilePackage getSectionFilePackage(final String username, final String boardname, final String sectionname, final String boardID, final String sectionID) {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username + " - " + boardname + " - " + sectionname);
-        fp.setPackageKey("pinterest://board/" + boardID + "/section/" + sectionID);
+        if (boardID != null && sectionID != null) {
+            fp.setPackageKey("pinterest://board/" + boardID + "/section/" + sectionID);
+        } else {
+            fp.setPackageKey("pinterest://board/" + username + "/section/" + sectionname);
+        }
         return fp;
     }
 

@@ -71,7 +71,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 51483 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -291,8 +291,8 @@ public class PremiumTo extends UseNet {
             final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
             additionalAccountStatus = String.format(" | Normal Traffic: %s Special Traffic: %s", SIZEUNIT.formatValue(maxSizeUnit, nT), SIZEUNIT.formatValue(maxSizeUnit, spT));
         }
-        final ArrayList<String> supported_hosts_regular = new ArrayList<String>();
-        final ArrayList<String> supported_hosts_storage = new ArrayList<String>();
+        final List<String> supported_hosts_regular = new ArrayList<String>();
+        final List<String> supported_hosts_storage = new ArrayList<String>();
         this.callAPI(API_BASE + "/hosts.php", account, AuthType.HEADER);
         final Map<String, Object> entries = this.handleErrorsAPI(null, account, false);
         final List<String> ressourcelist = (List<String>) entries.get("hosts");

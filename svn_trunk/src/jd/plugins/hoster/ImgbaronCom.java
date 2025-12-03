@@ -21,12 +21,15 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.URLConnectionAdapter;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgbaronCom extends XFileSharingProBasic {
     public ImgbaronCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,5 +120,14 @@ public class ImgbaronCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected void handleDownloadErrors(final URLConnectionAdapter con, final DownloadLink link, final Account account) throws Exception {
+        /* 2025-12-02: Special offline detection, example file-id: 9iim9sh4kw6f */
+        if (looksLikeDownloadableContent(con) && con.getCompleteContentLength() == 17716 && "image/jpeg".equalsIgnoreCase(con.getContentType())) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Image offline or broken: Got dummy image with text 'PICTURE DELETED'");
+        }
+        super.handleDownloadErrors(con, link, account);
     }
 }

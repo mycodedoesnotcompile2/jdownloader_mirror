@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -34,10 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BuzzheavierComFolder;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 51915 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51916 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BuzzheavierComFolder.class })
 public class BuzzheavierCom extends PluginForHost {
     public BuzzheavierCom(PluginWrapper wrapper) {
@@ -98,11 +98,12 @@ public class BuzzheavierCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -134,7 +135,6 @@ public class BuzzheavierCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
-        // final String directlinkproperty = "directurl";
         requestFileInformation(link);
         final String dllink = br.getURL() + "/download";
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
@@ -160,13 +160,5 @@ public class BuzzheavierCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
