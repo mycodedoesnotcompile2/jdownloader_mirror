@@ -2,6 +2,10 @@ package org.jdownloader.controlling.ffmpeg;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
+
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -12,9 +16,6 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 
 public abstract class FFprobe extends AbstractFFmpegBinary {
     public FFprobe(Browser br) {
@@ -41,6 +42,35 @@ public abstract class FFprobe extends AbstractFFmpegBinary {
         return super.isCompatible();
     }
 
+    protected String getStreamInfoURL(final String url) {
+        final HttpServer server = this.server;
+        if (server != null && server.isRunning()) {
+            final long currentProcessID = getCurrentProcessID();
+            if (StringUtils.endsWithCaseInsensitive(url, ".m3u8")) {
+                return "http://" + server.getServerAddress() + "/m3u8.m3u8?id=" + currentProcessID;
+            } else {
+                return "http://" + server.getServerAddress() + "/download.ts?id=" + currentProcessID + "&url=" + Encoding.urlEncode(url);
+            }
+        } else {
+            return url;
+        }
+    }
+
+    protected List<String> buildStreamInfoCommandLine(final List<String> commandLine, final String url) {
+        commandLine.add(getFullPath());
+        commandLine.add("-loglevel");
+        commandLine.add("48");
+        commandLine.add("-show_format");
+        commandLine.add("-show_streams");
+        commandLine.add("-analyzeduration");
+        commandLine.add("15000000");// 15 secs
+        commandLine.add("-of");
+        commandLine.add("json");
+        commandLine.add("-i");
+        commandLine.add(getStreamInfoURL(url));
+        return commandLine;
+    }
+
     public StreamInfo getStreamInfo(String url) {
         try {
             if (!isAvailable() || !isCompatible()) {
@@ -52,27 +82,7 @@ public abstract class FFprobe extends AbstractFFmpegBinary {
                     initPipe(null);
                 }
                 this.processID = new UniqueAlltimeID().getID();
-                final ArrayList<String> commandLine = new ArrayList<String>();
-                commandLine.add(getFullPath());
-                commandLine.add("-loglevel");
-                commandLine.add("48");
-                commandLine.add("-show_format");
-                commandLine.add("-show_streams");
-                commandLine.add("-analyzeduration");
-                commandLine.add("15000000");// 15 secs
-                commandLine.add("-of");
-                commandLine.add("json");
-                commandLine.add("-i");
-                final HttpServer server = this.server;
-                if (server != null && server.isRunning()) {
-                    if (StringUtils.endsWithCaseInsensitive(url, ".m3u8")) {
-                        commandLine.add("http://" + server.getServerAddress() + "/m3u8.m3u8?id=" + processID);
-                    } else {
-                        commandLine.add("http://" + server.getServerAddress() + "/download.ts?id=" + processID + "&url=" + Encoding.urlEncode(url));
-                    }
-                } else {
-                    commandLine.add(url);
-                }
+                final List<String> commandLine = buildStreamInfoCommandLine(new ArrayList<String>(), url);
                 final String ret = runCommand(null, commandLine);
                 final StreamInfo data = JSonStorage.restoreFromString(ret, new TypeRef<StreamInfo>() {
                 });

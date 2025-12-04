@@ -463,7 +463,11 @@ public abstract class AbstractFFmpegBinary {
         return commandLine;
     }
 
-    protected long processID;
+    protected volatile long processID;
+
+    protected long getCurrentProcessID() {
+        return processID;
+    }
 
     protected void closePipe() {
         final HttpServer server = this.server;
@@ -504,7 +508,7 @@ public abstract class AbstractFFmpegBinary {
                 final String id = request.getParameterbyKey("id");
                 if (id == null) {
                     return false;
-                } else if (processID != Long.parseLong(request.getParameterbyKey("id"))) {
+                } else if (getCurrentProcessID() != Long.parseLong(request.getParameterbyKey("id"))) {
                     return false;
                 } else {
                     return true;
@@ -573,7 +577,7 @@ public abstract class AbstractFFmpegBinary {
                                     if (sb.length() > 0) {
                                         sb.append("\n");
                                     }
-                                    sb.append("http://" + finalServer.getServerAddress() + "/download.ts?id=" + processID + "&ts_index=" + index);
+                                    sb.append("http://" + finalServer.getServerAddress() + "/download.ts?id=" + getCurrentProcessID() + "&ts_index=" + index);
                                 }
                                 lastSegmentDuration = -1;
                             } else {

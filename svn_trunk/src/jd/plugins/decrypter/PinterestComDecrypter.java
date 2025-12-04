@@ -17,11 +17,15 @@ package jd.plugins.decrypter;
 
 import java.io.IOException;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
@@ -55,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 
-@DecrypterPlugin(revision = "$Revision: 51919 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51922 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -94,7 +98,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:(?:www|[a-z]{2})\\.)?" + buildHostsPatternPart(domains) + "/.+");
+            ret.add("https?://(?:(?:www|[a-z]{2})\\.)?" + buildHostsPatternPart(domains) + "/(?!ideas/).+");
         }
         return ret.toArray(new String[0]);
     }
@@ -104,12 +108,18 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     private static final Pattern PATTERN_USER                 = Pattern.compile("https?://[^/]+/([^/]+)/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_BOARD                = Pattern.compile("https?://[^/]+/([^/]+)/([^/]+)/?", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_BOARD_SECTION        = Pattern.compile("https?://[^/]+/([^/]+)/([^/]+)/([^/]+)/?", Pattern.CASE_INSENSITIVE);
+    /* Dynamic global variables */
+    private String               currentUsername              = null;
+    private String               currentBoardSlug             = null;
+    private String               currentBoardPath             = null;
+    long                         lastCrawledItemTimestamp     = -1;
 
     @SuppressWarnings({ "deprecation" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         currentUsername = null;
         currentBoardSlug = null;
         currentBoardPath = null;
+        lastCrawledItemTimestamp = -1;
         final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
         enable_crawl_alternative_URL = hostPlugin.getPluginConfig().getBooleanProperty(PinterestCom.ENABLE_CRAWL_ALTERNATIVE_SOURCE_URLS, PinterestCom.defaultENABLE_CRAWL_ALTERNATIVE_SOURCE_URLS);
         final String url = param.getCryptedUrl();
@@ -122,10 +132,6 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             return crawlAllOtherItems(param.getCryptedUrl());
         }
     }
-
-    private String currentUsername  = null;
-    private String currentBoardSlug = null;
-    private String currentBoardPath = null;
 
     /**
      * One function which can handle _any_ type of supported pinterest link (except for single PIN links). </br>
@@ -668,16 +674,10 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             throw new IllegalArgumentException();
         }
         final DownloadLink sourceItem = param.getDownloadLink();
-        if (sourceItem == null) {
-            logger.info("Section URL without DownloadLink context");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        /* Obtain cached data */
-        final String boardID = sourceItem.getStringProperty("board_id");
-        final String sectionID = sourceItem.getStringProperty("section_id");
-        if (boardID == null || sectionID == null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
+        /* Obtain cached data, that can save one http request down below */
+        final String boardID = sourceItem != null ? sourceItem.getStringProperty("board_id") : null;
+        final String sectionID = sourceItem != null ? sourceItem.getStringProperty("section_id") : null;
+        /* Obtain other data from added URL */
         final String username = boardSectionRegex.getMatch(0);
         final String board_slug = boardSectionRegex.getMatch(1);
         final String section_slug = boardSectionRegex.getMatch(2);
@@ -685,23 +685,88 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         return this.crawlSection(br, url, username, board_slug, section_slug, boardID, sectionID, fp);
     }
 
-    /** 2025-03-18: This doesn't work anymore */
-    private ArrayList<DownloadLink> crawlSection(final Browser br, final String source_url, final String username, final String board_slug, final String section_slug, final String boardID, final String sectionID, final FilePackage fp) throws Exception {
+    private ArrayList<DownloadLink> crawlSection(final Browser br, final String source_url, final String username, final String board_slug, final String section_slug, String board_id, String section_id, final FilePackage fp) throws Exception {
+        if (br == null) {
+            throw new IllegalArgumentException();
+        } else if (source_url == null) {
+            throw new IllegalArgumentException();
+        } else if (username == null) {
+            throw new IllegalArgumentException();
+        } else if ((board_slug == null || section_slug == null) && (board_id == null || section_id == null)) {
+            throw new IllegalArgumentException();
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        int totalNumberofPins = -1;
+        if (board_id == null || section_id == null) {
+            /**
+             * Without board_id or section_id we need to load the section overview first. <br>
+             * This grants us access to: <br>
+             * - board_id and section_id <br>
+             * - a few "preview" PINs so if the section is small, we might get all elements immediately
+             */
+            logger.info("Fetching section info");
+            final Map<String, Object> options = new HashMap<String, Object>();
+            options.put("username", username);
+            options.put("board_slug", board_slug);
+            options.put("section_slug", section_slug);
+            final Map<String, Object> pinPaginationpostDataContext = new HashMap<String, Object>();
+            Map<String, Object> pinPaginationPostData = new HashMap<String, Object>();
+            pinPaginationPostData.put("options", options);
+            pinPaginationPostData.put("context", pinPaginationpostDataContext);
+            String url = "/resource/BoardSectionResource/get/?source_url=" + URLEncode.encodeURIComponent(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(pinPaginationPostData)) + "&_=" + System.currentTimeMillis();
+            if (br.getRequest() == null) {
+                /* First request */
+                url = "https://" + getHost() + url;
+            }
+            final GetRequest request = prepWebapiRequest(br.createGetRequest(url), "www/[username]/[slug]/[section_slug].js");
+            br.getPage(request);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> section = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp, "resource_response/data");
+            /**
+             * TODO: Check if it's worth the effort to fast-crawl the preview items: <br>
+             * For sections with only ~10 PINs, this may save us one http request.
+             */
+            // final List<Map<String, Object>> pins = (List<Map<String, Object>>)
+            // JavaScriptEngineFactory.walkJson("resource_response/data/preview_pins", "resource_response/data");
+            final Map<String, Object> board = (Map<String, Object>) section.get("board");
+            /* This information is crucial for pagination */
+            board_id = board.get("id").toString();
+            section_id = (String) section.get("id");
+            totalNumberofPins = ((Number) section.get("pin_count")).intValue();
+            if (totalNumberofPins == 0) {
+                /**
+                 * Section with zero elements -> Nothing to crawl <br>
+                 * Example: /apukkaresort/activities/summer-autumn-activities/
+                 */
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            }
+            /* Check for abort by user before doing next http request down below to keep plugin abort handling responsive */
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+        }
         int processedPINCounter = 0;
         int pageCounter = 1;
-        /* Single section pagination */
+        /* Pagination */
         // final String url_section = "https://www.pinterest.com/" + source_url + section_title + "/";
         final int maxPINsPerRequest = 25;
         final Map<String, Object> pinPaginationPostDataOptions = new HashMap<String, Object>();
-        pinPaginationPostDataOptions.put("isPrefetch", false);
-        pinPaginationPostDataOptions.put("currentFilter", -1);
-        pinPaginationPostDataOptions.put("field_set_key", "react_grid_pin");
-        pinPaginationPostDataOptions.put("is_own_profile_pins", false);
+        /*
+         * 2025-12-03: Commented out these parameters since without them, single PIN items are lacking the 'created_at' field and possibly
+         * other fields.
+         */
+        // pinPaginationPostDataOptions.put("isPrefetch", false);
+        // pinPaginationPostDataOptions.put("currentFilter", -1);
+        // pinPaginationPostDataOptions.put("field_set_key", "react_grid_pin");
+        // pinPaginationPostDataOptions.put("is_own_profile_pins", false);
+        // pinPaginationPostDataOptions.put("redux_normalize_feed", true);
+        // pinPaginationPostDataOptions.put("no_fetch_context_on_resource", false);
         pinPaginationPostDataOptions.put("page_size", maxPINsPerRequest);
-        pinPaginationPostDataOptions.put("redux_normalize_feed", true);
-        pinPaginationPostDataOptions.put("section_id", sectionID);
-        pinPaginationPostDataOptions.put("no_fetch_context_on_resource", false);
+        pinPaginationPostDataOptions.put("section_id", section_id);
+        pinPaginationPostDataOptions.put("prepend", false);
         final Map<String, Object> pinPaginationpostDataContext = new HashMap<String, Object>();
         Map<String, Object> pinPaginationPostData = new HashMap<String, Object>();
         pinPaginationPostData.put("options", pinPaginationPostDataOptions);
@@ -720,22 +785,26 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             final List<Map<String, Object>> pins = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(sectionPaginationInfo, "resource_response/data");
             int numberofNewItemsThisPage = 0;
             for (final Map<String, Object> pinmap : pins) {
-                final List<DownloadLink> thisRet = proccessMap(pinmap, boardID, fp, true);
+                final List<DownloadLink> thisRet = proccessMap(pinmap, board_id, fp, true);
                 ret.addAll(thisRet);
                 numberofNewItemsThisPage++;
             }
             processedPINCounter += pins.size();
-            logger.info("Crawled section " + sectionID + " page: " + pageCounter + " | Processed items on this page: " + numberofNewItemsThisPage + " | Processed PINs so far: " + processedPINCounter);
+            logger.info("Crawled section " + section_id + " | Page: " + pageCounter + " | Processed items on this page: " + numberofNewItemsThisPage + " | Processed PINs so far: " + processedPINCounter + "/" + totalNumberofPins);
             if (this.isAbort()) {
                 /* Aborted by user */
                 throw new InterruptedException();
-            } else if (StringUtils.isEmpty(bookmarks) || bookmarks.equals("-end-") || bookmarksO == null) {
+            }
+            if (StringUtils.isEmpty(bookmarks) || bookmarks.equals("-end-") || bookmarksO == null) {
                 /* Looks as if we've reached the end */
                 logger.info("Stopping because: Reached end");
                 break pagination;
             } else if (numberofNewItemsThisPage == 0) {
                 /* Fail safe */
                 logger.info("Stopping because: Current page did not contain any new items");
+                break pagination;
+            } else if (totalNumberofPins != -1 && ret.size() >= totalNumberofPins) {
+                logger.info("Stopping because: Found all items");
                 break pagination;
             }
             /* Continue to next page */
@@ -750,37 +819,48 @@ public class PinterestComDecrypter extends PluginForDecrypt {
      * Crawls single PIN from given Map.
      *
      * @throws IOException
+     * @throws ParseException
      */
-    private List<DownloadLink> proccessMap(final Map<String, Object> map, final String board_id, final FilePackage fp, final boolean distributeResults) throws PluginException, IOException {
+    private List<DownloadLink> proccessMap(final Map<String, Object> map, final String board_id, final FilePackage fp, final boolean distributeResults) throws PluginException, IOException, ParseException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String type = map.get("type").toString();
         if (type.equals("pin") || type.equals("interest")) {
             final Map<String, Object> user = (Map<String, Object>) map.get("pinner");
             final String pin_id = map.get("id").toString();
             final String username = user != null ? user.get("username").toString() : null;
-            final DownloadLink dl = this.createDownloadlink("https://www." + this.getHost() + "/pin/" + pin_id + "/");
+            final DownloadLink pin = this.createDownloadlink("https://www." + this.getHost() + "/pin/" + pin_id + "/");
             if (!StringUtils.isEmpty(board_id)) {
-                dl.setProperty("boardid", board_id);
+                pin.setProperty("boardid", board_id);
             }
             if (!StringUtils.isEmpty(username)) {
-                dl.setProperty("username", username);
+                pin.setProperty("username", username);
             }
-            setInfoOnDownloadLink(dl, map);
+            setInfoOnDownloadLink(pin, map);
             if (fp != null) {
-                dl._setFilePackage(fp);
+                pin._setFilePackage(fp);
             }
-            ret.add(dl);
+            ret.add(pin);
             String externalURL = null;
             if (this.enable_crawl_alternative_URL && (externalURL = getAlternativeExternalURLInPINMap(map)) != null) {
                 ret.add(this.createDownloadlink(externalURL));
+            }
+            /**
+             * Get and parse date so that outside handling may do an early return when a specific date threshold is crossed. <br>
+             * All PIN items have a 'created_at' date but it's not contained in every API response.
+             */
+            final String created_at = (String) map.get("created_at");
+            if (created_at != null) {
+                SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
+                Date date = sdf.parse(created_at);
+                this.lastCrawledItemTimestamp = date.getTime();
             }
         } else if (type.equals("board")) {
             final String boardID = map.get("id").toString();
             final String boardURL = map.get("url").toString();
             final String fullurl = br.getURL(boardURL).toExternalForm();
-            final DownloadLink dl = this.createDownloadlink(fullurl);
-            dl.setProperty("board_id", boardID);
-            ret.add(dl);
+            final DownloadLink board = this.createDownloadlink(fullurl);
+            board.setProperty("board_id", boardID);
+            ret.add(board);
         } else if (type.equals("board_section")) {
             if (currentBoardPath == null) {
                 /* Developer mistake */
@@ -888,11 +968,11 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 /* Fail safe */
                 logger.info("Stopping because: Current page contains less than " + maxSectionsPerPage + " items");
                 break sectionPagination;
-            } else {
-                postDataOptions.put("bookmarks", new String[] { sectionsNextBookmark });
-                request = prepWebapiRequest(ajax.createRequest("/resource/BoardSectionsResource/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis()), "www/[username]/[slug].js");
-                ajax.getPage(request);
             }
+            /* Continue to next page */
+            postDataOptions.put("bookmarks", new String[] { sectionsNextBookmark });
+            request = prepWebapiRequest(ajax.createRequest("/resource/BoardSectionsResource/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis()), "www/[username]/[slug].js");
+            ajax.getPage(request);
         } while (!this.isAbort());
         logger.info("Section crawler done");
         return ret;

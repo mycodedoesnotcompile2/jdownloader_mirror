@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -38,7 +34,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 51923 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -227,7 +227,7 @@ public class VidhideCom extends XFileSharingProBasic {
                 } else {
                     logger.info("Referer block workaround looks to be successful");
                 }
-            } else if (PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment())) {
+            } else if (PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
                 /* Allow extra step in download mode */
                 final String download_button_url = br.getRegex(official_video_download_pattern).getMatch(0);
                 if (download_button_url != null && !br.getURL().contains(download_button_url)) {

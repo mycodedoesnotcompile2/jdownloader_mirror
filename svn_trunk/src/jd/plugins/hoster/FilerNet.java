@@ -23,15 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -54,7 +45,16 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51919 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51923 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -94,9 +94,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
-                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
-                 * this, http protocol would be used even if user preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
+                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
+                 * preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -466,17 +466,19 @@ public class FilerNet extends PluginForHost {
         if (register_date != null) {
             ai.setCreateTime(register_date.longValue() * 1000);
         }
-        if (Boolean.TRUE.equals(data.get("premium")) || "premium".equalsIgnoreCase(StringUtils.valueOfOrNull(data.get("state")))) {
+        if (Boolean.TRUE.equals(data.get("premium"))) {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(10);
-            // final Long traffic = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
+            final Long trafficUsed = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
             final Long trafficLeft = (Long) ReflectionUtils.cast(data.get("traffic_left"), Long.class);
             if (trafficLeft != null) {
                 ai.setTrafficLeft(trafficLeft.longValue());
+                if (trafficUsed != null) {
+                    ai.setTrafficMax(trafficLeft.longValue() + trafficUsed.longValue());
+                }
             }
             final Long validUntil = (Long) ReflectionUtils.cast(data.get("until"), Long.class);
             if (validUntil != null) {
-                // old api no longer has this field?!
                 ai.setValidUntil(validUntil.longValue() * 1000, br);
             }
         } else {
@@ -499,11 +501,7 @@ public class FilerNet extends PluginForHost {
                 }
             }
         }
-        final Object maxtrafficObject = data.get("maxtraffic");
-        if (maxtrafficObject != null) {
-            final Long maxtrafficValue = (Long) ReflectionUtils.cast(maxtrafficObject, Long.class);
-            ai.setTrafficMax(maxtrafficValue.longValue());
-        } else {
+        if (ai.getTrafficMax() == -1) {
             /* fallback to hardcoded default */
             ai.setTrafficMax(134217728000l/* SizeFormatter.getSize("125gb") */);
         }
