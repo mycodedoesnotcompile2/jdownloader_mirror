@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51704 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51929 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -246,13 +246,13 @@ public class TwitterComCrawler extends PluginForDecrypt {
         final String contenturl = getContentURL(param);
         /* Some profiles can only be accessed if they accepted others as followers --> Login if the user has added his twitter account */
         final Account account = getUserLogin(false);
+        if (ACCOUNT_IS_ALWAYS_REQUIRED && account == null) {
+            throw new AccountRequiredException();
+        }
         if (account != null) {
             logger.info("Account available and we're logged in");
         } else {
             logger.info("No account available or login failed");
-            if (ACCOUNT_IS_ALWAYS_REQUIRED) {
-                throw new AccountRequiredException();
-            }
         }
         final Regex single_tweetVideoEmbed;
         final Regex single_tweetCard;

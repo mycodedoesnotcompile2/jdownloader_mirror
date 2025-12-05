@@ -31,6 +31,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.ffmpeg.json.Stream;
@@ -38,11 +39,12 @@ import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51435 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+@HostPlugin(revision = "$Revision: 51928 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
     public static final String PRESET_NAME_PROPERTY               = "preSetName";
     public static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
@@ -134,6 +136,14 @@ public class GenericM3u8 extends PluginForHost {
         }
         HLSDownloader downloader = null;
         try {
+            final String m3u8Source = link.getStringProperty("m3u8Source");
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && m3u8Source != null) {
+                final Browser brc = br.cloneBrowser();
+                brc.setFollowRedirects(true);
+                List<HlsContainer> hlsContainers = HlsContainer.getHlsQualities(brc, m3u8Source);
+                HlsContainer hlsContainer = HlsContainer.find(brc, hlsContainers, link);
+                System.out.println("found " + hlsContainer != null);
+            }
             downloader = new HLSDownloader(link, br, downloadurl);
             final StreamInfo streamInfo = downloader.getProbe();
             if (downloader.isEncrypted()) {

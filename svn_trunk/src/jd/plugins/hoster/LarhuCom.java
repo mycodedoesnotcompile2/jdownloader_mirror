@@ -17,16 +17,18 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51874 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51931 $", interfaceVersion = 3, names = {}, urls = {})
 public class LarhuCom extends XFileSharingProBasic {
     public LarhuCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,7 +59,17 @@ public class LarhuCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return LarhuCom.buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static final Pattern PATTERN_SPECIAL = Pattern.compile("/play\\.php\\?id=([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:(?:www|w)\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SPECIAL.pattern() + "|" + XFileSharingProBasic.PATTERN_EMBED_VIDEO.pattern() + "|" + XFileSharingProBasic.PATTERN_NORMAL.pattern() + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -103,5 +115,54 @@ public class LarhuCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean trustAvailablecheckVideoEmbed() {
+        /* 2025-12-04: Enabled as workaround, "trust me bro" RE forum 98150 */
+        return true;
+    }
+
+    @Override
+    public String getFUIDFromURL(final DownloadLink link) {
+        final Regex patternSpecial = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL);
+        if (patternSpecial.patternFind()) {
+            return patternSpecial.getMatch(0);
+        } else {
+            return super.getFUIDFromURL(link);
+        }
+    }
+
+    @Override
+    protected String buildURLPath(final DownloadLink link, final String fuid, final URL_TYPE type) {
+        return "/embed-" + fuid + ".html";
+    }
+
+    @Override
+    protected URL_TYPE getURLType(final String url) {
+        if (url == null) {
+            return null;
+        }
+        if (new Regex(url, PATTERN_SPECIAL).patternFind()) {
+            return URL_TYPE.EMBED_VIDEO;
+        } else {
+            return super.getURLType(url);
+        }
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        /* Typically on page "/play.php?..." */
+        final String betterFilename = new Regex(html, "<title>([^<]+)").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
+        }
+        return fileInfo;
+    }
+
+    @Override
+    protected boolean isVideohoster_enforce_video_filename() {
+        return true;
     }
 }

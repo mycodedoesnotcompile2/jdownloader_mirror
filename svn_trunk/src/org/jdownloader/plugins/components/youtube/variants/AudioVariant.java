@@ -125,7 +125,7 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
 
     @Override
     public String getFileNamePattern(final DownloadLink downloadLink) {
-        return PluginJsonConfig.get(YoutubeConfig.class).getAudioFilenamePattern();
+        return PluginJsonConfig.get(YoutubeConfig.class).getAudioFilenamePattern2();
     }
 
     private static final String TYPE_ID_PATTERN = PluginJsonConfig.get(YoutubeConfig.class).getVariantNamePatternAudio();

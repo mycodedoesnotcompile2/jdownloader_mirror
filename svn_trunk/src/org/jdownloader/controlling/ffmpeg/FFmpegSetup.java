@@ -1,7 +1,7 @@
 package org.jdownloader.controlling.ffmpeg;
 
 import java.io.File;
-import java.util.HashMap;
+import java.util.Map;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.ValidationException;
@@ -149,9 +149,9 @@ public interface FFmpegSetup extends ConfigInterface {
     void setDemuxGenericCommand(String[] command);
 
     @AboutConfig
-    HashMap<String, String> getExtensionToFormatMap();
+    Map<String, String> getExtensionToFormatMap();
 
-    void setExtensionToFormatMap(HashMap<String, String> map);
+    void setExtensionToFormatMap(Map<String, String> map);
 
     @AboutConfig
     @DefaultStringArrayValue({ "-i", "%video", "-i", "%audio", "-map", "0:0", "-c:v", "copy", "-map", "1:0", "-c:a", "copy", "-f", "webm", "%out", "-y" })

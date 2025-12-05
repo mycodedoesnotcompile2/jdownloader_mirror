@@ -56,17 +56,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51926 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
-    private static final String          PROTOCOL       = "https://";
-    /* Connection limits */
-    private static final int             ACCOUNT_MAXDLS = 8;
+    private static final String          PROTOCOL = "https://";
     /** This is the old project of proleech.link owner */
-    private static MultiHosterManagement mhm            = new MultiHosterManagement("dailyleech.com");
+    private static MultiHosterManagement mhm      = new MultiHosterManagement("dailyleech.com");
 
     public DailyleechCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(PROTOCOL + "dailyleech.com/payment/");
+        this.enablePremium(PROTOCOL + getHost() + "/payment/");
     }
 
     @Override
@@ -569,7 +567,7 @@ public class DailyleechCom extends PluginForHost {
         final Cookies cookies = account.loadCookies("");
         /* Re-use cookies to try to avoid login-captcha! */
         if (cookies != null) {
-            this.br.setCookies(cookies);
+            br.setCookies(cookies);
             /*
              * Even though login is forced first check if our cookies are still valid --> If not, force login!
              */
@@ -578,14 +576,17 @@ public class DailyleechCom extends PluginForHost {
                 logger.info("Login via cached cookies successful");
                 account.saveCookies(br.getCookies(br.getHost()), "");
                 return;
-            } else {
-                logger.info("Login via cached cookies failed");
-                br.clearCookies(null);
             }
+            logger.info("Login via cached cookies failed");
+            br.clearCookies(null);
         }
         logger.info("Performing full login");
         br.getPage(PROTOCOL + this.getHost() + "/cbox/login.php");
-        final Form loginform = br.getFormbyProperty("class", "omb_loginForm");
+        Form loginform = br.getFormbyProperty("class", "omb_loginForm");
+        if (loginform == null) {
+            /* 2025-12-04 */
+            loginform = br.getFormbyKey("Email");
+        }
         if (loginform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -594,8 +595,8 @@ public class DailyleechCom extends PluginForHost {
         /* Login-Captcha seems to be always required. */
         final String captchaimageurl = loginform.getRegex("(captcha_code_file\\.php\\?rand=\\d+)").getMatch(0);
         if (captchaimageurl != null) {
-            final DownloadLink dummyLink = new DownloadLink(this, "Account", getHost(), "https://" + getHost(), true);
-            String captcharesult = getCaptchaCode(captchaimageurl, dummyLink);
+            final DownloadLink dummy = new DownloadLink(this, "Account", getHost(), "https://" + getHost(), true);
+            String captcharesult = getCaptchaCode(captchaimageurl, dummy);
             if (captcharesult != null) {
                 captcharesult = captcharesult.trim();
             }
@@ -609,10 +610,10 @@ public class DailyleechCom extends PluginForHost {
          * logged in or not but let's check for invalid captcha status before.
          */
         br.submitForm(loginform);
-        if (!isLoggedIn(br) && br.containsHTML("(?i)>\\s*The captcha code does not match")) {
+        if (!isLoggedIn(br) && br.containsHTML(">\\s*The captcha code does not match")) {
             throw new PluginException(LinkStatus.ERROR_CAPTCHA);
         }
-        logger.info("Looks like correct login captcha has been entered -> Checking if we're logged in");
+        logger.info("Looks like correct login captcha has been entered -> Double-Checking if we're logged in");
         br.getPage("/cbox/cbox.php");
         if (!isLoggedIn(br)) {
             throw new AccountInvalidException();
@@ -626,11 +627,11 @@ public class DailyleechCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return ACCOUNT_MAXDLS;
+        return getMaxSimultanPremiumDownloadNum();
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_MAXDLS;
+        return 8;
     }
 }

@@ -124,16 +124,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
 public class YoutubeHelper {
-    static {
-        final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
-        String filepattern = cfg.getFilenamePattern();
-        if (filepattern != null && !"*videoname* (*quality*).*ext*".equals(filepattern)) {
-            // convert old format
-            cfg.setVideoFilenamePattern(filepattern);
-            cfg.setAudioFilenamePattern(filepattern);
-            cfg.setFilenamePattern(null);
-        }
-    }
     private static final String REGEX_DASHMPD_FROM_JSPLAYER_SETUP          = "\"dashmpd\"\\s*:\\s*(\".*?\")";
     private static final String REGEX_ADAPTIVE_FMTS_FROM_JSPLAYER_SETUP    = "\"adaptive_fmts\"\\s*:\\s*(\".*?\")";
     private static final String REGEX_FMT_MAP_FROM_JSPLAYER_SETUP          = "\"url_encoded_fmt_stream_map\"\\s*:\\s*(\".*?\")";
@@ -3416,7 +3406,7 @@ public class YoutubeHelper {
     }
 
     private void doUserAPIScan() throws Exception {
-        String checkName = cfg.getPackagePattern() + cfg.getVideoFilenamePattern() + cfg.getAudioFilenamePattern() + cfg.getSubtitleFilenamePattern() + cfg.getImageFilenamePattern() + cfg.getDescriptionFilenamePattern();
+        String checkName = cfg.getPackagePattern() + cfg.getVideoFilenamePattern2() + cfg.getAudioFilenamePattern2() + cfg.getSubtitleFilenamePattern2() + cfg.getImageFilenamePattern() + cfg.getDescriptionFilenamePattern();
         boolean extended = false;
         // only load extra page, if we need the properties
         for (YoutubeReplacer r : REPLACER) {
@@ -3454,7 +3444,7 @@ public class YoutubeHelper {
         if (true) {
             return;
         }
-        String checkName = cfg.getFilenamePattern() + cfg.getPackagePattern() + cfg.getVideoFilenamePattern() + cfg.getAudioFilenamePattern() + cfg.getSubtitleFilenamePattern() + cfg.getImageFilenamePattern();
+        String checkName = "old_cfg.getFilenamePattern2()" + cfg.getPackagePattern() + cfg.getVideoFilenamePattern2() + cfg.getAudioFilenamePattern2() + cfg.getSubtitleFilenamePattern2() + cfg.getImageFilenamePattern();
         boolean extended = false;
         // only load extra page, if we need the properties
         for (YoutubeReplacer r : REPLACER) {

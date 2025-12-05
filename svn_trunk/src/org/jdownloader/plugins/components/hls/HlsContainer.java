@@ -3,12 +3,15 @@ package org.jdownloader.plugins.components.hls;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.hoster.GenericM3u8;
 
 import org.appwork.utils.DebugMode;
@@ -195,6 +198,61 @@ public class HlsContainer {
             return ret.get(0);
         } else {
             return null;
+        }
+    }
+
+    public static HlsContainer find(final Browser br, final List<HlsContainer> hlsContainer, DownloadLink link) throws IOException, PluginException {
+        final List<HlsContainer> search = new ArrayList<HlsContainer>(hlsContainer);
+        final Iterator<HlsContainer> it = search.iterator();
+        while (it.hasNext()) {
+            final HlsContainer next = it.next();
+            final int width = link.getIntegerProperty(GenericM3u8.PROPERTY_WIDTH, -1);
+            if (width > 0 && next.getWidth() != width) {
+                it.remove();
+                continue;
+            }
+            final int height = link.getIntegerProperty(GenericM3u8.PROPERTY_HEIGHT, -1);
+            if (height > 0 && next.getHeight() != height) {
+                it.remove();
+                continue;
+            }
+            final int frameRate = link.getIntegerProperty(GenericM3u8.PROPERTY_FRAME_RATE, -1);
+            if (frameRate > 0 && next.getFramerate() != frameRate) {
+                it.remove();
+                continue;
+            }
+            final int bandWidth = link.getIntegerProperty(GenericM3u8.PROPERTY_BANDWIDTH, -1);
+            if (bandWidth > 0 && next.getBandwidth() != bandWidth) {
+                it.remove();
+                continue;
+            }
+            final String audioGroup = link.getStringProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_GROUP);
+            if (audioGroup != null && !StringUtils.equals(audioGroup, next.getAudioGroupID())) {
+                it.remove();
+                continue;
+            }
+            searchAudioMedia: {
+                final String audioLng = link.getStringProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_LNG);
+                final String audioName = link.getStringProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_NAME);
+                for (MEDIA media : next.getMedia(TYPE.AUDIO, audioGroup)) {
+                    if (!StringUtils.equals(audioLng, media.getLanguage())) {
+                        continue;
+                    }
+                    if (!StringUtils.equals(audioName, media.getName())) {
+                        continue;
+                    }
+                    break searchAudioMedia;
+                }
+                it.remove();
+                continue;
+            }
+        }
+        if (search.size() == 0) {
+            return null;
+        } else if (search.size() == 1) {
+            return search.get(0);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
     }
 
@@ -718,6 +776,10 @@ public class HlsContainer {
     }
 
     public void setPropertiesOnDownloadLink(final DownloadLink link) {
+        setPropertiesOnDownloadLink(link, new HlsContainer.MEDIA[0]);
+    }
+
+    public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... medias) {
         if (this.getWidth() > 0) {
             link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
         }
@@ -736,6 +798,15 @@ public class HlsContainer {
         link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
         link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
         link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_GROUP, getAudioGroupID());
-        // TODO: Set type of content e.g. audio, video, subtitle
+        for (HlsContainer.MEDIA media : medias) {
+            switch (media.getType()) {
+            case AUDIO:
+                link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_LNG, media.getLanguage());
+                link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_NAME, media.getName());
+                break;
+            default:
+                break;
+            }
+        }
     }
 }

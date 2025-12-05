@@ -91,14 +91,24 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51931 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium(super.getPurchasePremiumURL());
     }
 
-    public static final String CAPTCHA_METHOD_ID_XFS_DEFAULT = "xfilesharingprobasic";
+    public static final String  CAPTCHA_METHOD_ID_XFS_DEFAULT   = "xfilesharingprobasic";
+    /* Collection of default path-patterns, see enum class URL_TYPE */
+    // TODO: Use these patterns in default regex down below
+    public static final Pattern PATTERN_NORMAL                  = Pattern.compile("/([a-z0-9]{12})(/([^/]+)(?:\\.html))?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_FILE                    = Pattern.compile("/file/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_EMBED_VIDEO             = Pattern.compile("/embed-([a-z0-9]{12})\\.html", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_EMBED_VIDEO_2           = Pattern.compile("/e/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SHORT                   = Pattern.compile("/d/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_OFFICIAL_VIDEO_DOWNLOAD = Pattern.compile("/d/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    /* Rarely used image thumbnail pattern */
+    public static final Pattern PATTERN_IMAGE                   = Pattern.compile("/(?:th|i)/\\d+/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -134,11 +144,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return "/(d/[A-Za-z0-9]+|(d|e)/[a-z0-9]{12}|embed-[a-z0-9]{12}\\.html|[a-z0-9]{12}(/[^/]+(?:\\.html)?)?)";
     }
 
-    @Override
-    protected String getDefaultFileName(final DownloadLink link) {
-        return this.getFallbackFilename(link, br);
-    }
-
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
@@ -153,6 +158,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected List<String> getDeadDomains() {
         return null;
+    }
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFallbackFilename(link, br);
     }
 
     /* Used variables */
@@ -1519,13 +1529,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return link != null ? getURLType(link.getPluginPatternMatcher()) : null;
     }
 
-    private static final Pattern PATTERN_SHORTURL = Pattern.compile("/d/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-
     protected URL_TYPE getURLType(final String url) {
         if (url == null) {
             return null;
         }
-        final String shorturlID = this.supportsShortURLs() ? new Regex(url, PATTERN_SHORTURL).getMatch(0) : null;
+        final String shorturlID = this.supportsShortURLs() ? new Regex(url, PATTERN_SHORT).getMatch(0) : null;
         if (isImagehoster() && url.matches("(?i)^https?://[^/]+/(?:th|i)/\\d+/([a-z0-9]{12}).*")) {
             return URL_TYPE.IMAGE;
         } else if (shorturlID != null && (shorturlID.length() < 12)) {
@@ -1555,7 +1563,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             switch (type) {
             case IMAGE:
                 if (isImagehoster()) {
-                    return new Regex(path, "/(?:th|i)/\\d+/([a-z0-9]{12})").getMatch(0);
+                    return new Regex(path, PATTERN_IMAGE).getMatch(0);
                 } else {
                     throw new IllegalArgumentException("Unsupported type:" + type + "|" + url);
                 }
@@ -1566,7 +1574,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             case FILE:
                 return new Regex(path, "(?i)/file/([a-z0-9]{12})").getMatch(0);
             case SHORT:
-                return new Regex(path, PATTERN_SHORTURL).getMatch(0);
+                return new Regex(path, PATTERN_SHORT).getMatch(0);
             case OFFICIAL_VIDEO_DOWNLOAD:
                 return new Regex(path, "(?i)/d/([a-z0-9]{12})").getMatch(0);
             case NORMAL:
@@ -5523,17 +5531,22 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         this.tryDownload(br, link, account, br.createGetRequest(finalDownloadlink), DOWNLOAD_ATTEMPT_FLAGS.DOWNLOAD_OR_EXCEPTION);
     }
 
-    protected String handleQualitySelectionHLS(final Browser br, final String hlsMaster) throws Exception {
-        if (hlsMaster == null) {
+    protected String handleQualitySelectionHLS(final Browser br, final String hlsUrl) throws Exception {
+        if (hlsUrl == null) {
             /* This should never happen */
             throw new IllegalArgumentException();
         }
         /* Access URL if it hasn't been accessed already. */
-        if (!StringUtils.equals(br.getURL(), hlsMaster)) {
-            this.getPage(br, hlsMaster);
+        if (!StringUtils.equals(br.getURL(), hlsUrl)) {
+            this.getPage(br, hlsUrl);
         }
         final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(br);
         if (hlsQualities == null || hlsQualities.isEmpty()) {
+            // TODO: Maybe use a better parser to determine single quality HLS streams
+            if (br.containsHTML("#EXT-X-PLAYLIST-TYPE")) {
+                logger.info("Looks like single HLS quality");
+                return br.getURL();
+            }
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "HLS stream broken?");
         }
         HlsContainer hlsSelected = null;

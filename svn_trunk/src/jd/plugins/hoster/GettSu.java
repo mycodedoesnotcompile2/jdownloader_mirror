@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
@@ -31,7 +32,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51276 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51931 $", interfaceVersion = 3, names = {}, urls = {})
 public class GettSu extends XFileSharingProBasic {
     public GettSu(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,10 +62,12 @@ public class GettSu extends XFileSharingProBasic {
         return buildSupportedNames(getPluginDomains());
     }
 
+    public static final Pattern PATTERN_SPECIAL = Pattern.compile("/file/([a-z0-9]{12})/.+", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?::\\d+)?(" + XFileSharingProBasic.getDefaultAnnotationPatternPart() + "|/file/[a-z0-9]{12}/.+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?::\\d+)?(" + XFileSharingProBasic.getDefaultAnnotationPatternPart() + "|" + PATTERN_SPECIAL.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -116,7 +119,7 @@ public class GettSu extends XFileSharingProBasic {
 
     @Override
     public String getFUIDFromURL(final DownloadLink link) {
-        final Regex patternSpecial = new Regex(link.getPluginPatternMatcher(), "https://[^/]+/file/([a-z0-9]{12})/.+");
+        final Regex patternSpecial = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL);
         if (patternSpecial.patternFind()) {
             return patternSpecial.getMatch(0);
         } else {

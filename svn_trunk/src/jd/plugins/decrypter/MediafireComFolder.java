@@ -21,9 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -42,7 +39,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediafireCom;
 
-@DecrypterPlugin(revision = "$Revision: 49962 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 51928 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,19 +128,30 @@ public class MediafireComFolder extends PluginForDecrypt {
     public static String getFileIDFRomURL(final String url) throws MalformedURLException {
         final UrlQuery query = UrlQuery.parse(url);
         String fid = query.get("quickkey");
-        if (fid == null) {
-            fid = new Regex(url, "(?i)https?://[^/]+/(?:download|file|file_premium|listen|watch|view)/(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-            if (fid == null) {
-                fid = new Regex(url, "(?i)https?://[^/]+/i\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-                if (fid == null) {
-                    fid = new Regex(url, "(?i)https?://[^/]+/\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-                    if (fid == null) {
-                        fid = new Regex(url, TYPE_DIRECT).getMatch(0);
-                    }
-                }
-            }
+        if (fid != null) {
+            return fid;
         }
-        return fid;
+        fid = new Regex(url, "(?i)https?://[^/]+/(?:download|file|file_premium|listen|watch|view)/(" + PATTERN_CONTENT_ID + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)https?://[^/]+/download\\.php\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)https?://[^/]+/i\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)https?://[^/]+/\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, TYPE_DIRECT).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        return null;
     }
 
     private ArrayList<DownloadLink> crawlFolder(final CryptedLink param) throws Exception {

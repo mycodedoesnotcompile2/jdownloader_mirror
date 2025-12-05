@@ -245,7 +245,7 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
 
     @Override
     public String getFileNamePattern(final DownloadLink downloadLink) {
-        return PluginJsonConfig.get(YoutubeConfig.class).getVideoFilenamePattern();
+        return PluginJsonConfig.get(YoutubeConfig.class).getVideoFilenamePattern2();
     }
 
     @Override

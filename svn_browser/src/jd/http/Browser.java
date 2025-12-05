@@ -2017,7 +2017,7 @@ public class Browser {
             }
             nextRequest.setConnectTimeout(this.getConnectTimeout());
             nextRequest.setReadTimeout(this.getReadTimeout());
-            final String requestReferrer = this.getRefererURL();
+            final String requestReferrer = this.getRefererURL(nextRequest);
             this.setReferrer(this.getNextRequestReferrerPolicy(), requestReferrer, nextRequest);
             this.mergeHeaders(nextRequest);
             this.autoCompleteHeaders(nextRequest);
@@ -2651,22 +2651,33 @@ public class Browser {
      *
      * @return
      */
-    private String getRefererURL() {
-        final HTTPHeader referer = this.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
+    private String getRefererURL(Request nextRequest) {
+        HTTPHeader referer = this.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
         final String refererURLHeader = referer != null ? referer.getValue() : null;
-        if (refererURLHeader == null) {
-            final Object lCurrentURL = this.currentURL;
-            if (lCurrentURL != null && lCurrentURL instanceof String) {
-                return (String) lCurrentURL;
-            } else if (lCurrentURL != null && lCurrentURL instanceof Request) {
-                return ((Request) lCurrentURL).getUrl();
-            } else {
-                final Request baseRequest = this.getBaseRequest();
-                return baseRequest == null ? null : baseRequest.getUrl(false);
-            }
-        } else {
+        if (refererURLHeader != null) {
             return refererURLHeader;
         }
+        final Object lCurrentURL = this.currentURL;
+        if (lCurrentURL instanceof String) {
+            return (String) lCurrentURL;
+        } else if (lCurrentURL instanceof Request) {
+            return ((Request) lCurrentURL).getUrl();
+        }
+        final Request baseRequest = this.getBaseRequest();
+        if (baseRequest != null) {
+            return baseRequest.getUrl(true);
+        }
+        if (nextRequest != null) {
+            final String nextRequestReferer = nextRequest.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER);
+            if (nextRequestReferer != null) {
+                return nextRequestReferer;
+            }
+            final Request redirectOrigin = nextRequest.getRedirectOrigin();
+            if (redirectOrigin != null) {
+                return this.getRefererURL(redirectOrigin);
+            }
+        }
+        return null;
     }
 
     public void setCustomCharset(final String charset) {

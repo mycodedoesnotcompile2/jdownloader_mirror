@@ -36,8 +36,7 @@ public class CFG_YOUTUBE {
     public static final ObjectKeyHandler              SUBTITLE_WHITE_LIST                                       = SH.getKeyHandler("SubtitleWhiteList", ObjectKeyHandler.class);
     public static final StringKeyHandler              DESCRIPTION_FILENAME_PATTERN                              = SH.getKeyHandler("DescriptionFilenamePattern", StringKeyHandler.class);
     public static final EnumKeyHandler                LINK_IS_VIDEO_AND_PLAYLIST_URL_ACTION                     = SH.getKeyHandler("LinkIsVideoAndPlaylistUrlAction", EnumKeyHandler.class);
-    public static final StringKeyHandler              AUDIO_FILENAME_PATTERN                                    = SH.getKeyHandler("AudioFilenamePattern", StringKeyHandler.class);
-    public static final StringKeyHandler              FILENAME_PATTERN                                          = SH.getKeyHandler("FilenamePattern", StringKeyHandler.class);
+    public static final StringKeyHandler              AUDIO_FILENAME_PATTERN                                    = SH.getKeyHandler("AudioFilenamePattern2", StringKeyHandler.class);
     public static final ObjectKeyHandler              BLACKLISTED_PROJECTIONS                                   = SH.getKeyHandler("BlacklistedProjections", ObjectKeyHandler.class);
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_RESOLUTIONS             = SH.getKeyHandler("ChooseVariantDialogBlacklistedResolutions", ObjectKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_FILETYPE                    = SH.getKeyHandler("QualitySortIdentifierOrderFiletype", StringListHandler.class);
@@ -65,7 +64,7 @@ public class CFG_YOUTUBE {
      * ID Pattern for dupe filtering. Tags: *CONTAINER**AUDIO_BITRATE**AUDIO_CODEC**DEMUX**SPATIAL*
      **/
     public static final StringKeyHandler              VARIANT_NAME_PATTERN_AUDIO                                = SH.getKeyHandler("VariantNamePatternAudio", StringKeyHandler.class);
-    public static final StringKeyHandler              VIDEO_FILENAME_PATTERN                                    = SH.getKeyHandler("VideoFilenamePattern", StringKeyHandler.class);
+    public static final StringKeyHandler              VIDEO_FILENAME_PATTERN                                    = SH.getKeyHandler("VideoFilenamePattern2", StringKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_VIDEO_CODEC                 = SH.getKeyHandler("QualitySortIdentifierOrderVideoCodec", StringListHandler.class);
     public static final EnumKeyHandler                LINK_IS_PLAYLIST_URL_ACTION                               = SH.getKeyHandler("LinkIsPlaylistUrlAction", EnumKeyHandler.class);
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_VIDEO_FRAMERATES        = SH.getKeyHandler("ChooseVariantDialogBlacklistedVideoFramerates", ObjectKeyHandler.class);
@@ -74,7 +73,7 @@ public class CFG_YOUTUBE {
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_CODEC                 = SH.getKeyHandler("QualitySortIdentifierOrderAudioCodec", StringListHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_TYPE                  = SH.getKeyHandler("QualitySortIdentifierOrderAudioType", StringListHandler.class);
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_FILE_CONTAINERS         = SH.getKeyHandler("ChooseVariantDialogBlacklistedFileContainers", ObjectKeyHandler.class);
-    public static final StringKeyHandler              SUBTITLE_FILENAME_PATTERN                                 = SH.getKeyHandler("SubtitleFilenamePattern", StringKeyHandler.class);
+    public static final StringKeyHandler              SUBTITLE_FILENAME_PATTERN                                 = SH.getKeyHandler("SubtitleFilenamePattern2", StringKeyHandler.class);
     public static final BooleanKeyHandler             CHOOSE_ALTERNATIVE_FOR_MASS_CHANGE_OR_ADD_DIALOG          = SH.getKeyHandler("ChooseAlternativeForMassChangeOrAddDialog", BooleanKeyHandler.class);
     public static final ObjectKeyHandler              BLACKLISTED_FILE_CONTAINERS                               = SH.getKeyHandler("BlacklistedFileContainers", ObjectKeyHandler.class);
     public static final StringListHandler             PREFERED_SUBTITLE_LANGUAGES                               = SH.getKeyHandler("PreferedSubtitleLanguages", StringListHandler.class);

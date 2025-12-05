@@ -34,6 +34,8 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -59,7 +61,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 
-@DecrypterPlugin(revision = "$Revision: 51922 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51930 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -104,15 +106,17 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     }
 
     private boolean              enable_crawl_alternative_URL = false;
-    public static final Pattern  PATTERN_PIN                  = Pattern.compile("https?://[^/]+/pin/([A-Za-z0-9\\-_]+)/?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_USER                 = Pattern.compile("https?://[^/]+/([^/]+)/?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_BOARD                = Pattern.compile("https?://[^/]+/([^/]+)/([^/]+)/?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_BOARD_SECTION        = Pattern.compile("https?://[^/]+/([^/]+)/([^/]+)/([^/]+)/?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern  PATTERN_PIN                  = Pattern.compile("https?://[^/]+/pin/([A-Za-z0-9\\-_]+)/?.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USER                 = Pattern.compile("https?://[^/]+/([^/]+)/?(\\?.*)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_BOARD                = Pattern.compile("https?://[^/]+/([^/]+)/([^/]+)/?.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_BOARD_SECTION        = Pattern.compile("https?://[^/]+/([^/]+)/([^/]+)/([^/]+)/?.*", Pattern.CASE_INSENSITIVE);
     /* Dynamic global variables */
     private String               currentUsername              = null;
     private String               currentBoardSlug             = null;
     private String               currentBoardPath             = null;
     long                         lastCrawledItemTimestamp     = -1;
+    private int                  crawlLimitMaxItems           = -1;
+    private long                 crawlLimitMaxTimestamp       = -1;
 
     @SuppressWarnings({ "deprecation" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -120,6 +124,23 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         currentBoardSlug = null;
         currentBoardPath = null;
         lastCrawledItemTimestamp = -1;
+        /* Parse some special URL params which are relevant for crawl process abort handling later. */
+        final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
+        try {
+            final int maxItemsToCrawlTmp = Integer.parseInt(query.get("maxitems"));
+            crawlLimitMaxItems = Math.max(1, maxItemsToCrawlTmp);
+        } catch (final Throwable ignore) {
+        }
+        final String maxTweetDateStrTmp = query.get("max_date");
+        if (maxTweetDateStrTmp != null) {
+            try {
+                final long crawlLimitMaxTimestamp = TimeFormatter.getMilliSeconds(maxTweetDateStrTmp, "yyyy-MM-dd", Locale.ENGLISH);
+                /* Date has been validated --> Put into public var */
+                this.crawlLimitMaxTimestamp = crawlLimitMaxTimestamp;
+            } catch (final Throwable ignore) {
+                logger.info("Ignoring user defined 'max_date' parameter because of invalid input format: " + maxTweetDateStrTmp);
+            }
+        }
         final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
         enable_crawl_alternative_URL = hostPlugin.getPluginConfig().getBooleanProperty(PinterestCom.ENABLE_CRAWL_ALTERNATIVE_SOURCE_URLS, PinterestCom.defaultENABLE_CRAWL_ALTERNATIVE_SOURCE_URLS);
         final String url = param.getCryptedUrl();
@@ -233,6 +254,13 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                                 }
                                 temp_boardSectionsPIN_results.add(result);
                             }
+                            if (this.crawlLimitMaxItems != -1 && ret.size() >= this.crawlLimitMaxItems) {
+                                logger.info("Stopping because: Reached user defined max items limit of " + this.crawlLimitMaxItems);
+                                return ret;
+                            } else if (this.crawlLimitMaxTimestamp != -1 && this.lastCrawledItemTimestamp < this.crawlLimitMaxTimestamp) {
+                                logger.info("Stopping because: Reached user defined max_date limit");
+                                return ret;
+                            }
                         }
                     }
                     logger.info("Successfully crawled all section PINs from preview data");
@@ -252,7 +280,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                     postData.put("options", postDataOptions);
                     postData.put("context", new HashMap<String, Object>());
                     final Map<String, Object> resourcesBoardSectionsResource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resources, "BoardSectionsResource/{0}");
-                    ret.addAll(this.crawlPaginationGeneric("BoardSectionsResource", resourcesBoardSectionsResource, postData, boardSectionCount, null, true));
+                    this.crawlPaginationGeneric(ret, "BoardSectionsResource", resourcesBoardSectionsResource, postData, boardSectionCount, null, true);
                 } else {
                     /*
                      * The hard way: First crawl all PINs in sections so that we can ignore those when crawling all sectionless board PINs
@@ -299,7 +327,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 fp.setPackageKey("pinterest://board/" + boardID);
                 /* Grab prefetched data which isn't always available (e.g. unavailable when logged in). */
                 final Map<String, Object> resourcesBoardFeedResource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resources, "BoardFeedResource/{0}");
-                ret.addAll(this.crawlPaginationGeneric("BoardFeedResource", resourcesBoardFeedResource, postData, boardTotalPinCount, fp, true));
+                this.crawlPaginationGeneric(ret, "BoardFeedResource", resourcesBoardFeedResource, postData, boardTotalPinCount, fp, true);
             } else {
                 logger.info("Skipping board " + boardName + " because it does not contain any [sectionless] items.");
             }
@@ -347,7 +375,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                         fp.setComment(description);
                     }
                     fp.setPackageKey("pinterest://profile_sectionless_pins/" + username);
-                    ret.addAll(this.crawlPaginationGeneric("UserPinsResource", resourcesUserPinsResource, postData, userPinCount, fp, true));
+                    this.crawlPaginationGeneric(ret, "UserPinsResource", resourcesUserPinsResource, postData, userPinCount, fp, true);
                 } else {
                     logger.info("Skipping profile " + username + " PINs because this profile does not contain any items.");
                 }
@@ -366,7 +394,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                     final Map<String, Object> postData = new HashMap<String, Object>();
                     postData.put("options", postDataOptions);
                     postData.put("context", new HashMap<String, Object>());
-                    ret.addAll(this.crawlPaginationGeneric("BoardsFeedResource", resourcesBoardsFeedResource, postData, userBoardCount, null, true));
+                    this.crawlPaginationGeneric(ret, "BoardsFeedResource", resourcesBoardsFeedResource, postData, userBoardCount, null, true);
                 }
             } else {
                 /*
@@ -387,7 +415,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 final FilePackage fp = FilePackage.getInstance();
                 fp.setName(username);
                 fp.setPackageKey("pinterest://profile_sectionless_pins/" + username);
-                ret.addAll(this.crawlPaginationGeneric("UserPinsResource", resourcesUserPinsResource, postData, -1, fp, true));
+                this.crawlPaginationGeneric(ret, "UserPinsResource", resourcesUserPinsResource, postData, -1, fp, true);
             }
         }
         if (ret.size() == 0 && expectedNumberofItems == 0) {
@@ -397,9 +425,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlPaginationGeneric(final String resourceType, final Map<String, Object> startMap, final Map<String, Object> postData, final int expectedNumberofItems, final FilePackage fp, final boolean distributeResults) throws Exception {
+    private void crawlPaginationGeneric(final ArrayList<DownloadLink> ret, final String resourceType, final Map<String, Object> startMap, final Map<String, Object> postData, final int expectedNumberofItems, final FilePackage fp, final boolean distributeResults) throws Exception {
         final String source_url = br._getURL().getPath();
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String nextbookmark = null;
         List<Map<String, Object>> itemsList = null;
         if (startMap != null) {
@@ -442,6 +469,14 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             for (final Map<String, Object> item : itemsList) {
                 final List<DownloadLink> results = proccessMap(item, boardID, fp, distributeResults);
                 ret.addAll(results);
+                if (this.crawlLimitMaxItems != -1 && ret.size() >= this.crawlLimitMaxItems) {
+                    logger.info("Stopping because: Reached user defined max items limit of " + this.crawlLimitMaxItems);
+                    return;
+                }
+                if (this.crawlLimitMaxTimestamp != -1 && this.lastCrawledItemTimestamp < this.crawlLimitMaxTimestamp) {
+                    logger.info("Stopping because: Reached user defined max_date limit");
+                    return;
+                }
             }
             crawledItems += itemsList.size();
             logger.info("Crawled page: " + page + " | " + crawledItems + "/" + expectedNumberofItems + " items crawled | retSize=" + ret.size() + " | nextbookmark= " + nextbookmark);
@@ -472,16 +507,16 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             }
             this.displayBubbleNotification("Missing PINs in package " + fp.getName(), msg);
         }
-        return ret;
     }
 
     private ArrayList<DownloadLink> crawlSinglePIN(final String pinID) throws Exception {
-        if (pinID == null) {
-            /* Developer mistake */
+        if (StringUtils.isEmpty(pinID)) {
+            throw new IllegalArgumentException();
+        } else if (!pinID.matches("\\d+")) {
             throw new IllegalArgumentException();
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contenturl = "https://www." + this.getHost() + "/pin/" + pinID + "/";
+        final String contenturl = generatePINUrl(pinID);
         final DownloadLink singlePIN = this.createDownloadlink(contenturl);
         if (enable_crawl_alternative_URL) {
             /* The more complicated way (if wished by user). */
@@ -725,12 +760,6 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             }
             final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> section = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp, "resource_response/data");
-            /**
-             * TODO: Check if it's worth the effort to fast-crawl the preview items: <br>
-             * For sections with only ~10 PINs, this may save us one http request.
-             */
-            // final List<Map<String, Object>> pins = (List<Map<String, Object>>)
-            // JavaScriptEngineFactory.walkJson("resource_response/data/preview_pins", "resource_response/data");
             final Map<String, Object> board = (Map<String, Object>) section.get("board");
             /* This information is crucial for pagination */
             board_id = board.get("id").toString();
@@ -742,6 +771,31 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                  * Example: /apukkaresort/activities/summer-autumn-activities/
                  */
                 throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            }
+            final List<Map<String, Object>> preview_pins = (List<Map<String, Object>>) section.get("preview_pins");
+            if (preview_pins != null && (preview_pins.size() >= totalNumberofPins) || (preview_pins.size() <= this.crawlLimitMaxItems)) {
+                logger.info("Crawling preview PINs ONLY which saves us one http request");
+                for (final Map<String, Object> preview_pin_map : preview_pins) {
+                    final String node_id = preview_pin_map.get("node_id").toString();
+                    final String node_id_decoded = Encoding.Base64Decode(node_id);
+                    final String pin_id = new Regex(node_id_decoded, "(?i)Pin:(\\d+)").getMatch(0);
+                    if (pin_id == null) {
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    }
+                    final String pin_url = this.generatePINUrl(pin_id);
+                    final DownloadLink pin = this.createDownloadlink(pin_url);
+                    /* Set temporary filename */
+                    pin.setName(pin_id + ".jpg");
+                    pin.setAvailable(true);
+                    pin._setFilePackage(fp);
+                    ret.add(pin);
+                    distribute(pin);
+                    if (ret.size() == this.crawlLimitMaxItems) {
+                        logger.info("Stopping because: Reached user defined max items limit of " + this.crawlLimitMaxItems);
+                        return ret;
+                    }
+                }
+                return ret;
             }
             /* Check for abort by user before doing next http request down below to keep plugin abort handling responsive */
             if (this.isAbort()) {
@@ -788,6 +842,13 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 final List<DownloadLink> thisRet = proccessMap(pinmap, board_id, fp, true);
                 ret.addAll(thisRet);
                 numberofNewItemsThisPage++;
+                if (this.crawlLimitMaxItems != -1 && ret.size() >= this.crawlLimitMaxItems) {
+                    logger.info("Stopping because: Reached user defined max items limit of " + this.crawlLimitMaxItems);
+                    return ret;
+                } else if (this.crawlLimitMaxTimestamp != -1 && this.lastCrawledItemTimestamp < this.crawlLimitMaxTimestamp) {
+                    logger.info("Stopping because: Reached user defined max_date limit");
+                    return ret;
+                }
             }
             processedPINCounter += pins.size();
             logger.info("Crawled section " + section_id + " | Page: " + pageCounter + " | Processed items on this page: " + numberofNewItemsThisPage + " | Processed PINs so far: " + processedPINCounter + "/" + totalNumberofPins);
@@ -828,7 +889,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             final Map<String, Object> user = (Map<String, Object>) map.get("pinner");
             final String pin_id = map.get("id").toString();
             final String username = user != null ? user.get("username").toString() : null;
-            final DownloadLink pin = this.createDownloadlink("https://www." + this.getHost() + "/pin/" + pin_id + "/");
+            final DownloadLink pin = this.createDownloadlink(generatePINUrl(pin_id));
             if (!StringUtils.isEmpty(board_id)) {
                 pin.setProperty("boardid", board_id);
             }
@@ -923,6 +984,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlSections(final String username, final String boardID, final String boardName, final Browser ajax, final String contenturl) throws Exception {
         if (username == null || boardID == null || boardName == null) {
             throw new IllegalArgumentException();
+        } else if (!boardID.matches("\\d+")) {
+            throw new IllegalArgumentException();
         }
         final Map<String, Object> postDataOptions = new HashMap<String, Object>();
         final String source_url = new URL(contenturl).getPath();
@@ -953,11 +1016,17 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 final FilePackage fp = FilePackage.getInstance();
                 fp.setName(username + " - " + boardName + " - " + Encoding.htmlDecode(section_title));
                 fp.setPackageKey("pinterest://board/" + boardID + "/section/" + sectionID);
-                // TODO: Add board_slug and section_slug
                 ret.addAll(crawlSection(ajax, source_url, username, null, null, boardID, sectionID, fp));
                 sectionCounter += 1;
                 if (this.isAbort()) {
                     throw new InterruptedException();
+                }
+                if (this.crawlLimitMaxItems != -1 && ret.size() >= this.crawlLimitMaxItems) {
+                    logger.info("Stopping because: Reached user defined max items limit of " + this.crawlLimitMaxItems);
+                    return ret;
+                } else if (this.crawlLimitMaxTimestamp != -1 && this.lastCrawledItemTimestamp < this.crawlLimitMaxTimestamp) {
+                    logger.info("Stopping because: Reached user defined max_date limit");
+                    return ret;
                 }
             }
             final String sectionsNextBookmark = (String) JavaScriptEngineFactory.walkJson(sectionsData, "resource_response/bookmark");
@@ -998,5 +1067,9 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         // br.getHeaders().put("x-pinterest-source-url", "/username/boardname/");
         request.getHeaders().put("x-requested-with", "XMLHttpRequest");
         return request;
+    }
+
+    private String generatePINUrl(final String pin_id) {
+        return "https://www." + this.getHost() + "/pin/" + pin_id + "/";
     }
 }

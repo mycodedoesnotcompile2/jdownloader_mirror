@@ -71,6 +71,7 @@ import org.appwork.storage.config.events.ConfigEvent;
 import org.appwork.storage.config.events.ConfigEvent.Types;
 import org.appwork.storage.config.events.ConfigEventSender;
 import org.appwork.storage.simplejson.mapper.ClassCache;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.ReflectionUtils;
@@ -166,15 +167,14 @@ public abstract class KeyHandler<RawClass> {
         if (this.getAnnotation(DefaultFactory.class) != null) {
             checker++;
         }
-        if (checker > 1) {
-            throw new InterfaceParseException("Make sure that you use only one  of getDefaultAnnotation,DefaultObjectValue or DefaultValue ");
-        } else {
-            if (getMethod != null) {
-                this.checkBadAnnotations(getMethod, class1);
-            }
-            if (setMethod != null) {
-                this.checkBadAnnotations(setMethod, class1);
-            }
+        if (checker > 1 && !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            throw new InterfaceParseException("Make sure that you use only one of getDefaultAnnotation, DefaultObjectValue, DefaultValue or a DefaultFactory");
+        }
+        if (getMethod != null) {
+            this.checkBadAnnotations(getMethod, class1);
+        }
+        if (setMethod != null) {
+            this.checkBadAnnotations(setMethod, class1);
         }
     }
 
@@ -311,6 +311,10 @@ public abstract class KeyHandler<RawClass> {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * default "default value" order is DefaultFactory -> custom "default value" -> DefaultJsonObject -> DefaultAnnotation -> default "default value"
+     * @return
+     */
     public RawClass getDefaultValue() {
         try {
             final DefaultFactory df = getDefaultFactoryAnnotation();

@@ -296,20 +296,36 @@ public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferen
                 return false;
             }
         },
-        REQUIRES_FFMPEG {
+        REQUIRES_HLS_DOWNLOADS_ONLY {
             @Override
             public String getLabel() {
-                return "This plugin requires FFmpeg";
+                return "This plugin performs only HLS downloads";
             }
 
             @Override
             public String getTooltip() {
-                return "This plugin requires FFmpeg";
+                return "This plugin performs only HLS downloads";
             }
 
             @Override
             public boolean isInternal() {
-                return false;
+                return true;
+            }
+        },
+        REQUIRES_HLS_DOWNLOADS {
+            @Override
+            public String getLabel() {
+                return "This plugin performs HLS downloads and other downloads";
+            }
+
+            @Override
+            public String getTooltip() {
+                return "This plugin performs HLS downloads and other downloads";
+            }
+
+            @Override
+            public boolean isInternal() {
+                return true;
             }
         },
         BUBBLE_NOTIFICATION {

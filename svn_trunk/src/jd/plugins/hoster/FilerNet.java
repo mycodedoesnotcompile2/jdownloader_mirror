@@ -20,8 +20,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -30,6 +32,7 @@ import jd.http.BasicAuthentication;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -54,7 +57,7 @@ import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51923 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51928 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -219,13 +222,8 @@ public class FilerNet extends PluginForHost {
         if (urls == null || urls.length == 0) {
             return false;
         }
-        /*
-         * 2025-12-02: Limit used to be 100, now it looks to be 5 which I guess is a bug(?) -> TODO: Report to filer.net support and
-         * re-adopt this internal limit if needed.
-         */
-        final int max_checkable_items_per_request = 5;
+        final int max_checkable_items_per_request = 100;
         try {
-            final StringBuilder sb = new StringBuilder();
             final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
             while (true) {
@@ -239,15 +237,14 @@ public class FilerNet extends PluginForHost {
                         index++;
                     }
                 }
-                sb.delete(0, sb.capacity());
+                final Set<String> hashes = new HashSet<String>();
                 for (final DownloadLink link : links) {
-                    if (sb.length() > 0) {
-                        /* Add separator | */
-                        sb.append("%7C");
-                    }
-                    sb.append(this.getFileID(link));
+                    hashes.add(this.getFileID(link));
                 }
-                final Map<String, Object> entries = (Map<String, Object>) this.callAPI(getAPI_BASE() + "/multi_status/" + sb.toString() + ".json");
+                final Map<String, Object> postData = new HashMap<String, Object>();
+                postData.put("hashes", hashes);
+                final PostRequest request = br.createJSonPostRequest(getAPI_BASE() + "/multi_status.json", postData);
+                final Map<String, Object> entries = (Map<String, Object>) this.callAPI(null, request);
                 final Map<String, Object> data = (Map<String, Object>) entries.get("data");
                 for (final DownloadLink link : links) {
                     final String fid = this.getFileID(link);

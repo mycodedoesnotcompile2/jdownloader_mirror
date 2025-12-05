@@ -29,23 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
-import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary.FLAG;
-import org.jdownloader.controlling.ffmpeg.FFmpeg;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -71,7 +55,24 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51614 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
+import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary.FLAG;
+import org.jdownloader.controlling.ffmpeg.FFmpeg;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51928 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -315,9 +316,9 @@ public class SoundcloudCom extends PluginForHost {
             final boolean looksLikeOfficiallyDownloadable = looksLikeOfficiallyDownloadable(response);
             if (songPolicy != null && songPolicy.equalsIgnoreCase("SNIP")) {
                 /**
-                 * Typically previews will also have a duration value of only "30000" --> 30 seconds </br>
-                 * When logged in with a Soundcloud premium account, songs for which before only previews were available may change to
-                 * "POLICY":"MONETIZE" --> Can be fully streamed by the user.
+                 * Typically previews will also have a duration value of only "30000" --> 30 seconds </br> When logged in with a Soundcloud
+                 * premium account, songs for which before only previews were available may change to "POLICY":"MONETIZE" --> Can be fully
+                 * streamed by the user.
                  */
                 isOnlyPreviewDownloadable = true;
             }
@@ -375,20 +376,7 @@ public class SoundcloudCom extends PluginForHost {
         }
         if (dllink.contains("/playlist.m3u8")) {
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, dllink) {
-                @Override
-                protected String getSegmentExtension(AbstractFFmpegBinary ffmpeg, M3U8Segment segment) throws Exception {
-                    final String format = getFFmpegFormat(ffmpeg);
-                    if (format != null) {
-                        if (format.matches("(?i)^opus$")) {
-                            return "opus";
-                        } else if (format.matches("(?i)^ogg$")) {
-                            return "ogg";
-                        }
-                    }
-                    return super.getSegmentExtension(ffmpeg, segment);
-                }
-            };
+            dl = new HLSDownloader(link, br, dllink);
             dl.startDownload();
         } else {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, true, 1);
@@ -457,9 +445,8 @@ public class SoundcloudCom extends PluginForHost {
         if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload()) {
             /* File is officially downloadable */
             /**
-             * Only set calculated filesize if wanted by user. </br>
-             * Officially downloadable files could come in any bitrate thus we do by default not calculate the filesize for such items based
-             * on an assumed bitrate.
+             * Only set calculated filesize if wanted by user. </br> Officially downloadable files could come in any bitrate thus we do by
+             * default not calculate the filesize for such items based on an assumed bitrate.
              */
             if (userEnforcesFilesizeEstimationEvenForNonStreamDownloads()) {
                 link.setDownloadSize(calculateFilesize(link));
@@ -920,6 +907,11 @@ public class SoundcloudCom extends PluginForHost {
     public static String getFormattedFilename(final DownloadLink link) throws ParseException {
         final String url_username = link.getStringProperty(PROPERTY_url_username);
         String songTitle = link.getStringProperty(PROPERTY_title);
+        final String titleExtension = getFileNameExtensionFromString(songTitle);
+        if (CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(titleExtension))) {
+            // remove audio extension from song title
+            songTitle = songTitle.replaceFirst(Pattern.quote(titleExtension) + "$", "");
+        }
         final SubConfiguration cfg = SubConfiguration.getConfig("soundcloud.com");
         String formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME_2, defaultCustomFilename);
         if (formattedFilename == null || formattedFilename.equals("")) {

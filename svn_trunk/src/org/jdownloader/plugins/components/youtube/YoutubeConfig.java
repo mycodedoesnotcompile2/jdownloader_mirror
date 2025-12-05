@@ -77,6 +77,87 @@ public interface YoutubeConfig extends PluginConfigInterface {
         }
     }
 
+    class DefaultAudioFilenamePattern extends AbstractDefaultFactory<String> {
+        @Override
+        public String getDefaultValue(KeyHandler<String> keyHandler) {
+            final String currentDefault = "*VIDEO_NAME* (*AUDIO_BITRATE*kbit_*AUDIO_CODEC**-LNG[DISPLAY]*).*EXT*";
+            final Storage storage;
+            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
+                final String oldKey = "audiofilenamepattern";
+                final Object oldValue = storage.get(oldKey, null);
+                if (!(oldValue instanceof String)) {
+                    /* Old value is null or of unexpected type -> Ignore it */
+                    return currentDefault;
+                }
+                /* Old value exists and is of expected type (String) */
+                /* Remove old default to complete "conversion". */
+                storage.remove(oldKey);
+                if (StringUtils.equalsIgnoreCase("*VIDEO_NAME* (*AUDIO_BITRATE*kbit_*AUDIO_CODEC*).*EXT*", oldValue.toString())) {
+                    /* Old value equals old default -> Return new default and delete old item. */
+                    return currentDefault;
+                } else {
+                    /* Return old value which will be written into new/current config key */
+                    return oldValue.toString();
+                }
+            }
+            return currentDefault;
+        }
+    }
+
+    class DefaultVideoFilenamePattern extends AbstractDefaultFactory<String> {
+        @Override
+        public String getDefaultValue(KeyHandler<String> keyHandler) {
+            final String currentDefault = "*3D* *360* *VIDEO_NAME* (*H*p_*FPS*fps_*VIDEO_CODEC*-*AUDIO_BITRATE*kbit_*AUDIO_CODEC**-LNG[DISPLAY]*).*EXT*";
+            final Storage storage;
+            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
+                final String oldKey = "videofilenamepattern";
+                final Object oldValue = storage.get(oldKey, null);
+                if (!(oldValue instanceof String)) {
+                    /* Old value is null or of unexpected type -> Ignore it */
+                    return currentDefault;
+                }
+                /* Old value exists and is of expected type (String) */
+                /* Remove old default to complete "conversion". */
+                storage.remove(oldKey);
+                if (StringUtils.equalsIgnoreCase("*3D* *360* *VIDEO_NAME* (*H*p_*FPS*fps_*VIDEO_CODEC*-*AUDIO_BITRATE*kbit_*AUDIO_CODEC*).*EXT*", oldValue.toString())) {
+                    /* Old value equals old default -> Return new default and delete old item. */
+                    return currentDefault;
+                } else {
+                    /* Return old value which will be written into new/current config key */
+                    return oldValue.toString();
+                }
+            }
+            return currentDefault;
+        }
+    }
+
+    class DefaultSubtitleFilenamePattern extends AbstractDefaultFactory<String> {
+        @Override
+        public String getDefaultValue(KeyHandler<String> keyHandler) {
+            final String currentDefault = "*VIDEO_NAME** (LNG[DISPLAY])*.*EXT*";
+            final Storage storage;
+            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
+                final String oldKey = "subtitlefilenamepattern";
+                final Object oldValue = storage.get(oldKey, null);
+                if (!(oldValue instanceof String)) {
+                    /* Old value is null or of unexpected type -> Ignore it */
+                    return currentDefault;
+                }
+                /* Old value exists and is of expected type (String) */
+                /* Remove old default to complete "conversion". */
+                storage.remove(oldKey);
+                if (StringUtils.equalsIgnoreCase("*VIDEO_NAME* (*LNG[DISPLAY]*).*EXT*", oldValue.toString())) {
+                    /* Old value equals old default -> Return new default and delete old item. */
+                    return currentDefault;
+                } else {
+                    /* Return old value which will be written into new/current config key */
+                    return oldValue.toString();
+                }
+            }
+            return currentDefault;
+        }
+    }
+
     public static enum SubtitleVariantMode {
         DISABLED,
         COPY_AND_KEEP,
@@ -198,9 +279,9 @@ public interface YoutubeConfig extends PluginConfigInterface {
     static Object              NOTHING          = YoutubeCompatibility.moveJSonFiles("youtube/Youtube");
 
     @AboutConfig
-    @DefaultStringValue(value = "*VIDEO_NAME* (*AUDIO_BITRATE*kbit_*AUDIO_CODEC**-LNG[DISPLAY]*).*EXT*")
+    @DefaultFactory(DefaultAudioFilenamePattern.class)
     @DefaultOnNull
-    String getAudioFilenamePattern();
+    String getAudioFilenamePattern2();
 
     @AboutConfig
     @DefaultJsonObject("[]")
@@ -295,10 +376,6 @@ public interface YoutubeConfig extends PluginConfigInterface {
     @AboutConfig
     @DescriptionForConfigEntry("Use this if you want to get auto translated subtitles. [\"de\", \"en\", \"ar\", \"zh-HK\", \"ru\", \"tr\"]")
     List<String> getAutoTranslatedSubtitles();
-
-    @AboutConfig
-    @Deprecated
-    String getFilenamePattern();
 
     @DefaultOnNull
     @AboutConfig
@@ -496,8 +573,8 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultOnNull
-    @DefaultStringValue("*VIDEO_NAME** (LNG[DISPLAY])*.*EXT*")
-    String getSubtitleFilenamePattern();
+    @DefaultFactory(DefaultSubtitleFilenamePattern.class)
+    String getSubtitleFilenamePattern2();
 
     @AboutConfig
     ArrayList<String> getSubtitleWhiteList();
@@ -518,8 +595,8 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultOnNull
-    @DefaultStringValue("*3D* *360* *VIDEO_NAME* (*H*p_*FPS*fps_*VIDEO_CODEC*-*AUDIO_BITRATE*kbit_*AUDIO_CODEC**-LNG[DISPLAY]*).*EXT*")
-    String getVideoFilenamePattern();
+    @DefaultFactory(DefaultVideoFilenamePattern.class)
+    String getVideoFilenamePattern2();
 
     @AboutConfig
     @DefaultBooleanValue(false)
@@ -559,7 +636,7 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setAndroidSupportEnabled(boolean b);
 
-    void setAudioFilenamePattern(String name);
+    void setAudioFilenamePattern2(String name);
 
     void setBlacklistedAudioBitrates(List<AudioBitrate> v);
 
@@ -612,9 +689,6 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setAutoTranslatedSubtitles(List<String> list);
 
-    @Deprecated
-    void setFilenamePattern(String name);
-
     void setImageFilenamePattern(String name);
 
     void setLinkIsPlaylistUrlAction(YoutubeConfig.IfUrlisAPlaylistAction action);
@@ -641,7 +715,7 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setEnableIncludeVariantStringInContentURLs(boolean b);
 
-    void setSubtitleFilenamePattern(String name);
+    void setSubtitleFilenamePattern2(String name);
 
     void setSubtitleWhiteList(ArrayList<String> list);
 
@@ -649,7 +723,7 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setVariantNamePatternVideo(String type);
 
-    void setVideoFilenamePattern(String name);
+    void setVideoFilenamePattern2(String name);
 
     @AboutConfig
     @DescriptionForConfigEntry("If enabled, playlist position will be added to the beginning of all filenames regardless of the customizes filename patterns.")

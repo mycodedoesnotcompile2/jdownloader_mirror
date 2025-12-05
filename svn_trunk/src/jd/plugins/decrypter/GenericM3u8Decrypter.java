@@ -20,20 +20,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig.CrawlSpeedMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -54,7 +40,21 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51674 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig.CrawlSpeedMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@DecrypterPlugin(revision = "$Revision: 51928 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -177,10 +177,6 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                     link.setProperty("m3u8Source", m3u8URL);
                     link.setReferrerUrl(referer);
                     link.setProperty("cookies", cookiesString);
-                    if (audioEntry != null) {
-                        link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_LNG, audioEntry.getLanguage());
-                        link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_NAME, audioEntry.getName());
-                    }
                     if (StringUtils.isNotEmpty(preSetTitle)) {
                         link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, preSetTitle);
                     } else if (StringUtils.isNotEmpty(sessionDataTitle)) {
@@ -207,7 +203,7 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                     }
                     final boolean isAudioOnly = Boolean.FALSE.equals(hasVideo) && Boolean.TRUE.equals(hasAudio);
                     final boolean isVideo = Boolean.TRUE.equals(hasVideo);
-                    hls.setPropertiesOnDownloadLink(link);
+                    hls.setPropertiesOnDownloadLink(link, audioEntry);
                     if (mode == CrawlSpeedMode.FAST || (mode == CrawlSpeedMode.AUTOMATIC_FAST && (isAudioOnly || isVideo && hls.getHeight() > 0))) {
                         link.setAvailable(true);
                         if (hls.getAverageBandwidth() > 0 || hls.getBandwidth() > 0) {
