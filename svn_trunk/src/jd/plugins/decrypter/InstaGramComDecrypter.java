@@ -32,6 +32,26 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.InstagramConfig;
+import org.jdownloader.plugins.components.config.InstagramConfig.ActionOnRateLimitReached;
+import org.jdownloader.plugins.components.config.InstagramConfig.FilenameType;
+import org.jdownloader.plugins.components.config.InstagramConfig.SinglePostPackagenameSchemeType;
+import org.jdownloader.plugins.components.config.InstagramConfig.StoriesHighlightsPackagenameSchemeType;
+import org.jdownloader.plugins.components.config.InstagramConfig.StoryPackagenameSchemeType;
+import org.jdownloader.plugins.components.instagram.Qdb;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -58,27 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.InstagramConfig;
-import org.jdownloader.plugins.components.config.InstagramConfig.ActionOnRateLimitReached;
-import org.jdownloader.plugins.components.config.InstagramConfig.FilenameType;
-import org.jdownloader.plugins.components.config.InstagramConfig.SinglePostPackagenameSchemeType;
-import org.jdownloader.plugins.components.config.InstagramConfig.StoriesHighlightsPackagenameSchemeType;
-import org.jdownloader.plugins.components.config.InstagramConfig.StoryPackagenameSchemeType;
-import org.jdownloader.plugins.components.instagram.Qdb;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51933 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -409,8 +409,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Returns userID for given username. </br> Uses website to find userID. </br> Throws Exception if it is unable to find userID in HTML
-     * code --> Profile is most likely offline then!
+     * Returns userID for given username. </br>
+     * Uses website to find userID. </br>
+     * Throws Exception if it is unable to find userID in HTML code --> Profile is most likely offline then!
      */
     private String findUserID(final CryptedLink param, final Account account, final AtomicBoolean loggedIN, final String username) throws Exception {
         if (StringUtils.isEmpty(username)) {
@@ -442,12 +443,20 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             getPageAutoLogin(account, loggedIN, req.getUrl(), param, br, req, null, null);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+            // if (account == null && data == null && "ok".equals(entries.get("status"))) {
+            // /**
+            // * Private profile or profile with mature content <br>
+            // * In my tests, this was a profile with mature content -> Browser displayed this as information message along with the login
+            // * page.
+            // */
+            // throw new AccountRequiredException("Mature content or private profile: Account required to crawl this profile");
+            // }
             final Map<String, Object> user = (Map<String, Object>) data.get("user");
             userID = user.get("id").toString();
             if (userID != null) {
                 final String profile_pic_url_hd = (String) user.get("profile_pic_url_hd");
                 if (profile_pic_url_hd != null) {
-                    this.lazy_cache.put(userID + "_profile_pic_url_hd", "");
+                    this.lazy_cache.put(userID + "_profile_pic_url_hd", profile_pic_url_hd);
                 }
             }
         }
@@ -632,8 +641,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             }
             if (accountRequired != null || (urlCheck != null && !br.getURL().contains(urlCheck))) {
                 /*
-                 * E.g. private gallery and we're not logged in or we're not logged in with an account with the required permissions ->
-                 * Redirect to main page or URL of the profile which uploaded the gallery.
+                 * E.g. private gallery/account and we're not logged in or we're not logged in with an account with the required permissions
+                 * -> Redirect to main page or URL of the profile which uploaded the gallery.
                  */
                 if (account == null) {
                     // fail fast
@@ -663,8 +672,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Gallery == post. Can contain single or multiple media items (image/video). </br> If multiple media is present, insividual pictures
-     * cannot be linked individually.
+     * Gallery == post. Can contain single or multiple media items (image/video). </br>
+     * If multiple media is present, insividual pictures cannot be linked individually.
      */
     private ArrayList<DownloadLink> crawlGallery(final CryptedLink param, final Account account, final AtomicBoolean loggedIN, final String galleryID) throws Exception {
         if (StringUtils.isEmpty(galleryID)) {
@@ -701,7 +710,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             }
             if (resource_data_list != null) {
                 /**
-                 * Old code </br> TODO: Delete this
+                 * Old code </br>
+                 * TODO: Delete this
                  */
                 for (final Map<String, Object> entry : resource_data_list) {
                     final Map<String, Object> mediaSource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entry, "graphql/shortcode_media");
@@ -945,7 +955,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Crawl all posts of a user. </br> Sometimes Instagram requires user to be logged in to see any or more than X items. <br>
+     * Crawl all posts of a user. </br>
+     * Sometimes Instagram requires user to be logged in to see any or more than X items. <br>
      * Only use this when you're not logged in!
      */
     @Deprecated
@@ -1240,7 +1251,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Crawls all saved media items of the currently logged in user. </br> Obviously this will only work when logged in.
+     * Crawls all saved media items of the currently logged in user. </br>
+     * Obviously this will only work when logged in.
      */
     private ArrayList<DownloadLink> crawlUserSavedObjectsWebsite(final CryptedLink param, final Account account, final AtomicBoolean loggedIN) throws UnsupportedEncodingException, Exception {
         /* Login is mandatory! */
@@ -2057,8 +2069,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
      * Methods using alternative API below. All of these require the user to be logged in!
      ***************************************************/
     /**
-     * Crawls all saved items of currently logged-in account: https://www.instagram.com/username/saved/ </br> Users can save any post: Their
-     * own ones or even posts of other users.
+     * Crawls all saved items of currently logged-in account: https://www.instagram.com/username/saved/ </br>
+     * Users can save any post: Their own ones or even posts of other users.
      */
     private ArrayList<DownloadLink> crawlUserSavedObjectsFeedAltAPI(final CryptedLink param, final Account account, final AtomicBoolean loggedIN) throws UnsupportedEncodingException, Exception {
         final String usernameOwnerOfSavedItems = new Regex(param.getCryptedUrl(), TYPE_PROFILE_SAVED_OBJECTS).getMatch(0);
@@ -2362,8 +2374,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
      * Crawls current story of given username. </br>
      *
      * @param handleErrors
-     *            true = throw exception on error e.g. if no account is given and add dummy item if user has no story. </br> false = return
-     *            empty array on error
+     *            true = throw exception on error e.g. if no account is given and add dummy item if user has no story. </br>
+     *            false = return empty array on error
      */
     private ArrayList<DownloadLink> crawlStory(final CryptedLink param, final Account account, final AtomicBoolean loggedIN, final String username, final boolean handleErrors) throws UnsupportedEncodingException, Exception {
         if (StringUtils.isEmpty(username)) {
@@ -2408,8 +2420,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
      * Crawls all highlight stories of given username. </br>
      *
      * @param handleErrors
-     *            true = throw exception on error e.g. if no account is given and add dummy item if user has no story. </br> false = return
-     *            empty array on error
+     *            true = throw exception on error e.g. if no account is given and add dummy item if user has no story. </br>
+     *            false = return empty array on error
      */
     private ArrayList<DownloadLink> crawlAllHighlightStories(final String username, final Account account, final AtomicBoolean loggedIN, final boolean handleErrors) throws UnsupportedEncodingException, Exception {
         if (username == null) {

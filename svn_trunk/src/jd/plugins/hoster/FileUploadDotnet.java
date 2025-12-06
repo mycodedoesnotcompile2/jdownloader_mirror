@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = { "file-upload.net" }, urls = { "https?://(www\\.|en\\.)?file\\-upload\\.net/((member/){0,1}download\\-\\d+/(.*?)\\.html|view\\-\\d+/(.*?)\\.html|member/view_\\d+_(.*?)\\.html|member/data3\\.php\\?user=(.*?)\\&name=(.*))" })
+@HostPlugin(revision = "$Revision: 51934 $", interfaceVersion = 2, names = { "file-upload.net" }, urls = { "https?://(www\\.|en\\.)?file\\-upload\\.net/((member/){0,1}download\\-\\d+/(.*?)\\.html|view\\-\\d+/(.*?)\\.html|member/view_\\d+_(.*?)\\.html|member/data3\\.php\\?user=(.*?)\\&name=(.*))" })
 public class FileUploadDotnet extends antiDDoSForHost {
     private final Pattern PAT_Download = Pattern.compile("https?://[\\w\\.]*?file-upload\\.net/(member/){0,1}download-\\d+/(.*?).html", Pattern.CASE_INSENSITIVE);
     private final Pattern PAT_VIEW     = Pattern.compile("https?://[\\w\\.]*?file-upload\\.net/(view-\\d+/(.*?).html|member/view_\\d+_(.*?).html)", Pattern.CASE_INSENSITIVE);
@@ -55,52 +55,47 @@ public class FileUploadDotnet extends antiDDoSForHost {
         return Integer.MAX_VALUE;
     }
 
-    public AvailableStatus requestFileInformation(DownloadLink downloadLink) throws PluginException {
-        br = new Browser();
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         br.setFollowRedirects(true);
-        try {
-            if (new Regex(downloadLink.getDownloadURL(), Pattern.compile(PAT_Download.pattern() + "|" + PAT_Member.pattern(), Pattern.CASE_INSENSITIVE)).matches()) {
-                /* LinkCheck für DownloadFiles */
-                String downloadurl = downloadLink.getDownloadURL();
-                getPage(downloadurl);
-                if (!br.containsHTML(">Datei existiert nicht")) {
-                    // Get complete name
-                    String filename = br.getRegex("<title>File\\-Upload\\.net \\- ([^<>\"]*?)</title>").getMatch(0);
-                    // This name might be cut
-                    if (filename == null) {
-                        filename = br.getRegex("<h1 class=\\'dateiname\\'>([^<>\"]*?)</h1>").getMatch(0);
-                    }
-                    String filesize = br.getRegex("label>Dateigröße:</label><span>([^<>\"]+)").getMatch(0);
-                    if (filesize == null) {
-                        filesize = br.getRegex("(\\d+(\\.\\d+)? ?(B(ytes)?|KB|MB|GB))").getMatch(0);
-                    }
-                    if (filesize != null) {
-                        downloadLink.setDownloadSize(SizeFormatter.getSize(filesize));
-                    }
-                    downloadLink.setName(Encoding.htmlDecode(filename));
-                    return AvailableStatus.TRUE;
-                }
-            } else if (new Regex(downloadLink.getDownloadURL(), PAT_VIEW).matches()) {
-                /* LinkCheck für DownloadFiles */
-                String downloadurl = downloadLink.getDownloadURL();
-                getPage(downloadurl);
-                if (!br.getURL().contains("view")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                if (!br.containsHTML("Datei existiert nicht auf unserem Server")) {
-                    String filename = br.getRegex("<h1>Bildeigenschaften von \"(.*?)\"</h1>").getMatch(0);
-                    String filesize;
-                    if ((filesize = br.getRegex("e:</b>\\s*(.*?)\\s*Kbyte").getMatch(0)) != null) {
-                        downloadLink.setDownloadSize((int) Math.round(Double.parseDouble(filesize.trim())) * 1024);
-                    }
-                    downloadLink.setName(filename);
-                    return AvailableStatus.TRUE;
-                }
+        final String contenturl = link.getDownloadURL();
+        if (new Regex(contenturl, Pattern.compile(PAT_Download.pattern() + "|" + PAT_Member.pattern(), Pattern.CASE_INSENSITIVE)).patternFind()) {
+            /* LinkCheck für DownloadFiles */
+            getPage(contenturl);
+            if (br.containsHTML(">\\s*Datei existiert nicht")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-        } catch (Exception e) {
-            logger.log(e);
+            // Get complete name
+            String filename = br.getRegex("<title>File\\-Upload\\.net \\- ([^<>\"]*?)</title>").getMatch(0);
+            // This name might be cut
+            if (filename == null) {
+                filename = br.getRegex("<h1 class=\\'dateiname\\'>([^<>\"]*?)</h1>").getMatch(0);
+            }
+            String filesize = br.getRegex("label>Dateigröße:</label><span>([^<>\"]+)").getMatch(0);
+            if (filesize == null) {
+                filesize = br.getRegex("(\\d+(\\.\\d+)? ?(B(ytes)?|KB|MB|GB))").getMatch(0);
+            }
+            if (filesize != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesize));
+            }
+            link.setName(Encoding.htmlDecode(filename));
+        } else if (new Regex(link.getDownloadURL(), PAT_VIEW).matches()) {
+            /* LinkCheck für DownloadFiles */
+            getPage(contenturl);
+            if (!br.getURL().contains("view")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (br.containsHTML("Datei existiert nicht auf unserem Server")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            String filename = br.getRegex("<h1>Bildeigenschaften von \"(.*?)\"</h1>").getMatch(0);
+            String filesize;
+            if ((filesize = br.getRegex("e:</b>\\s*(.*?)\\s*Kbyte").getMatch(0)) != null) {
+                link.setDownloadSize((int) Math.round(Double.parseDouble(filesize.trim())) * 1024);
+            }
+            link.setName(filename);
         }
-        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        return AvailableStatus.TRUE;
     }
 
     @SuppressWarnings("deprecation")
@@ -145,14 +140,5 @@ public class FileUploadDotnet extends antiDDoSForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
-    }
-
-    public void reset() {
-    }
-
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    public void resetPluginGlobals() {
     }
 }

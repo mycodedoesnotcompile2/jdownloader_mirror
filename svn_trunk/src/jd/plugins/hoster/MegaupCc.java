@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51626 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51935 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaupCc extends PluginForHost {
     public MegaupCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,12 +104,13 @@ public class MegaupCc extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         download_token = null;
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {

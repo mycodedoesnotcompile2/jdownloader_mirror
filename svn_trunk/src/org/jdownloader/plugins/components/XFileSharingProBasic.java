@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51931 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51934 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1533,21 +1533,29 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (url == null) {
             return null;
         }
-        final String shorturlID = this.supportsShortURLs() ? new Regex(url, PATTERN_SHORT).getMatch(0) : null;
-        if (isImagehoster() && url.matches("(?i)^https?://[^/]+/(?:th|i)/\\d+/([a-z0-9]{12}).*")) {
-            return URL_TYPE.IMAGE;
-        } else if (shorturlID != null && (shorturlID.length() < 12)) {
+        final String path;
+        try {
+            path = new URL(url).getPath();
+        } catch (final MalformedURLException e) {
+            logger.log(e);
+            logger.info("Unknown URL_TYPE: " + url);
+            return null;
+        }
+        final String shorturlID = this.supportsShortURLs() ? new Regex(path, PATTERN_SHORT).getMatch(0) : null;
+        if (shorturlID != null && (shorturlID.length() < 12)) {
             return URL_TYPE.SHORT;
-        } else if (url.matches("(?i)^https?://[^/]+/d/([a-z0-9]{12}).*")) {
+        } else if (new Regex(path, PATTERN_OFFICIAL_VIDEO_DOWNLOAD).patternFind()) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
-        } else if (url.matches("(?i)^https?://[^/]+/([a-z0-9]{12}).*")) {
+        } else if (new Regex(path, PATTERN_NORMAL).patternFind()) {
             return URL_TYPE.NORMAL;
-        } else if (url.matches("(?i)^https?://[^/]+/file/([a-z0-9]{12}).*")) {
-            return URL_TYPE.FILE;
-        } else if (url.matches("(?i)^https?://[A-Za-z0-9\\-\\.:]+/embed-([a-z0-9]{12}).*")) {
+        } else if (new Regex(path, PATTERN_EMBED_VIDEO).patternFind()) {
             return URL_TYPE.EMBED_VIDEO;
-        } else if (url.matches("(?i)^https?://[A-Za-z0-9\\-\\.:]+/e/([a-z0-9]{12}).*")) {
+        } else if (new Regex(path, PATTERN_EMBED_VIDEO_2).patternFind()) {
             return URL_TYPE.EMBED_VIDEO_2;
+        } else if (new Regex(path, PATTERN_FILE).patternFind()) {
+            return URL_TYPE.FILE;
+        } else if (isImagehoster() && new Regex(path, PATTERN_IMAGE).patternFind()) {
+            return URL_TYPE.IMAGE;
         } else {
             logger.info("Unknown URL_TYPE: " + url);
             return null;
@@ -1558,34 +1566,36 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (url == null || type == null) {
             return null;
         }
+        final String path;
         try {
-            final String path = new URL(url).getPath();
-            switch (type) {
-            case IMAGE:
-                if (isImagehoster()) {
-                    return new Regex(path, PATTERN_IMAGE).getMatch(0);
-                } else {
-                    throw new IllegalArgumentException("Unsupported type:" + type + "|" + url);
-                }
-            case EMBED_VIDEO:
-                return new Regex(path, "(?i)/embed-([a-z0-9]{12})").getMatch(0);
-            case EMBED_VIDEO_2:
-                return new Regex(path, "(?i)/e/([a-z0-9]{12})").getMatch(0);
-            case FILE:
-                return new Regex(path, "(?i)/file/([a-z0-9]{12})").getMatch(0);
-            case SHORT:
-                return new Regex(path, PATTERN_SHORT).getMatch(0);
-            case OFFICIAL_VIDEO_DOWNLOAD:
-                return new Regex(path, "(?i)/d/([a-z0-9]{12})").getMatch(0);
-            case NORMAL:
-                return new Regex(path, "/([a-z0-9]{12})").getMatch(0);
-            default:
+            path = new URL(url).getPath();
+        } catch (final MalformedURLException e) {
+            logger.log(e);
+            logger.info("Unknown URL_TYPE: " + url);
+            return null;
+        }
+        switch (type) {
+        case IMAGE:
+            if (isImagehoster()) {
+                return new Regex(path, PATTERN_IMAGE).getMatch(0);
+            } else {
                 throw new IllegalArgumentException("Unsupported type:" + type + "|" + url);
             }
-        } catch (MalformedURLException e) {
-            logger.log(e);
+        case EMBED_VIDEO:
+            return new Regex(path, PATTERN_EMBED_VIDEO).getMatch(0);
+        case EMBED_VIDEO_2:
+            return new Regex(path, PATTERN_EMBED_VIDEO_2).getMatch(0);
+        case FILE:
+            return new Regex(path, PATTERN_FILE).getMatch(0);
+        case SHORT:
+            return new Regex(path, PATTERN_SHORT).getMatch(0);
+        case OFFICIAL_VIDEO_DOWNLOAD:
+            return new Regex(path, PATTERN_OFFICIAL_VIDEO_DOWNLOAD).getMatch(0);
+        case NORMAL:
+            return new Regex(path, PATTERN_NORMAL).getMatch(0);
+        default:
+            throw new IllegalArgumentException("Unsupported type:" + type + "|" + url);
         }
-        return null;
     }
 
     protected String getFUID(final DownloadLink link, final URL_TYPE type) {

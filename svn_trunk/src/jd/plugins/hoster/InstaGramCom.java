@@ -21,6 +21,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.InstagramConfig;
+import org.jdownloader.plugins.components.config.InstagramConfig.MediaQualityDownloadMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -51,25 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.InstagramConfig;
-import org.jdownloader.plugins.components.config.InstagramConfig.MediaQualityDownloadMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51645 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51933 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -150,7 +150,7 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_internal_media_id                  = "internal_media_id";
     public static final String   PROPERTY_orderid                            = "orderid";
     public static final String   PROPERTY_orderid_raw                        = "orderid_raw";
-    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                   // number of items
+    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                    // number of items
     // inside
     // post/story
     public static final String   PROPERTY_shortcode                          = "shortcode";
@@ -164,10 +164,10 @@ public class InstaGramCom extends PluginForHost {
     // multiple authors
     public static final String   PROPERTY_json_usertags                      = "json_usertags";
     @Deprecated
-    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                 // used until crawler
+    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                  // used until crawler
     // rev
     // 45795
-    public static final String   PROPERTY_main_content_id                    = "main_content_id";                   // e.g.
+    public static final String   PROPERTY_main_content_id                    = "main_content_id";                    // e.g.
     // instagram.com/p/<main_content_id>/
     public static final String   PROPERTY_forced_packagename                 = "forced_packagename";
     public static final String   PROPERTY_is_private                         = "is_private";
@@ -363,8 +363,8 @@ public class InstaGramCom extends PluginForHost {
     }
 
     /**
-     * Login required to be able to use this!! </br> removePictureEffects true = grab best quality & original, removePictureEffects false =
-     * grab best quality but keep effects/filters.
+     * Login required to be able to use this!! </br>
+     * removePictureEffects true = grab best quality & original, removePictureEffects false = grab best quality but keep effects/filters.
      *
      * @throws Exception
      */
@@ -447,8 +447,8 @@ public class InstaGramCom extends PluginForHost {
                 /*
                  * {"message":"feedback_required","is_spam":true,"feedback_title":"Versuche es später noch einmal","feedback_message":
                  * "Wir schränken die Häufigkeit mancher Handlungen auf Instagram ein, um unsere Community zu schützen. Sag uns, wenn wir deiner Meinung nach einen Fehler gemacht haben."
-                 * ,
-                 * "feedback_url":"/","feedback_appeal_label":"Feedback geben","feedback_ignore_label":"OK","feedback_action":"report_problem"
+                 * , "feedback_url":"/","feedback_appeal_label":"Feedback geben","feedback_ignore_label":"OK","feedback_action":
+                 * "report_problem"
                  * ,"feedback_required":true,"category"...."dialogue_type":"0","sentry_block_restriction_dialogue_unification_enabled":true,
                  * "status":"fail"}
                  */
@@ -461,7 +461,8 @@ public class InstaGramCom extends PluginForHost {
             } else if ("challenge_required".equals(message) || map.get("challenge") != null) {
                 /* Either the request we made was plain wrong or we were (partly) logged out */
                 /*
-                 * {"message":"challenge_required","challenge":{"url":"https://i.instagram.com/challenge/?next=/api/v1/feed/user/...","api_path"
+                 * {"message":"challenge_required","challenge":{"url":"https://i.instagram.com/challenge/?next=/api/v1/feed/user/...",
+                 * "api_path"
                  * :"/challenge/","hide_webview_header":true,"lock":true,"logout":false,"native_flow":true,"flow_render_type":0},"status":
                  * "fail"}
                  */
@@ -469,9 +470,11 @@ public class InstaGramCom extends PluginForHost {
             } else if (StringUtils.equalsIgnoreCase(message, "Not authorized to view user")) {
                 /* E.g. private Instagram account/content and current user is not allowed to view it. */
                 throw new AccountRequiredException();
+            } else if (map.size() == 1 && "ok".equals(map.get("status"))) {
+                /* 2025-12-05: answer for request "/users/web_profile_info" */
+                throw new AccountRequiredException("Mature content or private profile: Account required to access this profile");
             }
         }
-
         handle_responseCode: {
             if (br.getHttpConnection().getResponseCode() == 429) {
                 if (account != null) {

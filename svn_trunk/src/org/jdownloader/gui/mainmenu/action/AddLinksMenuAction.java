@@ -1,6 +1,7 @@
 package org.jdownloader.gui.mainmenu.action;
 
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
 import org.jdownloader.gui.IconKey;
@@ -17,6 +18,7 @@ public class AddLinksMenuAction extends CustomizableAppAction {
     public AddLinksMenuAction() {
         setName(_GUI.T.AddOptionsAction_actionPerformed_addlinks());
         setIconKey(IconKey.ICON_ADD);
+        setAccelerator(KeyEvent.VK_L);
 
     }
 

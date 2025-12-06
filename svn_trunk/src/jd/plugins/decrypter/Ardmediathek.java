@@ -28,27 +28,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginBrowser;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.MediathekHelper;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.hoster.ARDMediathek;
-
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
@@ -73,7 +52,28 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginBrowser;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.MediathekHelper;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.ARDMediathek;
+
+@DecrypterPlugin(revision = "$Revision: 51933 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -83,6 +83,7 @@ public class Ardmediathek extends PluginForDecrypt {
     private boolean              grabHLS                                = false;
     private boolean              checkPluginSettingsFlag                = false;
     private ArdConfigInterface   cfg                                    = null;
+    private String[]             audioStringPrioList                    = null;
     private static final boolean FILESIZE_NEEDED_FOR_QUALITY_COMPARISON = false;
     private final String         PROPERTY_INTERNAL_IS_SINGLE_VIDEO      = "internal_is_single_video";
 
@@ -204,6 +205,45 @@ public class Ardmediathek extends PluginForDecrypt {
         }
     }
 
+    private void initAudioLanguageSelection() {
+        String audioLanguagePrioString = cfg.getAudioLanguagePriorityString();
+        if (audioLanguagePrioString == null) {
+            audioLanguagePrioString = "";
+        }
+        audioStringPrioList = audioLanguagePrioString.toLowerCase(Locale.ENGLISH).replace(" ", "").split(",");
+        /* Build correction map */
+        final Map<String, String> audioPrioStringCorrectionMap = new HashMap<String, String>();
+        audioPrioStringCorrectionMap.put("de", "deu");
+        audioPrioStringCorrectionMap.put("ger", "deu");
+        audioPrioStringCorrectionMap.put("deutsch", "deu");
+        audioPrioStringCorrectionMap.put("en", "eng");
+        audioPrioStringCorrectionMap.put("english", "eng");
+        audioPrioStringCorrectionMap.put("englisch", "eng");
+        audioPrioStringCorrectionMap.put("original", "ov");
+        audioPrioStringCorrectionMap.put("orig", "ov");
+        /* Apply corrections */
+        List<String> stringList = new ArrayList<String>();
+        for (int i = 0; i < audioStringPrioList.length; i++) {
+            String v = audioStringPrioList[i];
+            String corrected = audioPrioStringCorrectionMap.get(v);
+            if (corrected == null) {
+                corrected = v; // no correction available
+            }
+            if (!stringList.contains(corrected)) {
+                stringList.add(corrected);
+            }
+        }
+        /* Add fallback values to end of list */
+        final String[] fallbackValues = new String[] { "deu", "ov" };
+        for (final String fallbackValue : fallbackValues) {
+            if (!stringList.contains(fallbackValue)) {
+                stringList.add(fallbackValue);
+            }
+        }
+        /* Back to array. This array will be used for final language priority selection. */
+        audioStringPrioList = stringList.toArray(new String[stringList.size()]);
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
@@ -211,6 +251,7 @@ public class Ardmediathek extends PluginForDecrypt {
         cfg = PluginJsonConfig.get(getConfigInterface());
         initSelectedQualities();
         initKnownQualities();
+        initAudioLanguageSelection();
         /*
          * 2018-02-22: Important: So far there is only one OLD website, not compatible with the "decryptMediathek" function! Keep this in
          * mind when changing things!
@@ -514,6 +555,7 @@ public class Ardmediathek extends PluginForDecrypt {
         /* For http stream quality identifiers which have been created by the hls --> http URLs converter */
         String exampleHTTPURL = null;
         String hlsMaster = null;
+        final Map<String, String> audioLangToHlsMasterURL = new HashMap<String, String>();
         int maxHeightHls = -1;
         int maxHeightProgressive = -1;
         final Map<String, Object> map = (Map<String, Object>) JavaScriptEngineFactory.walkJson(mediaCollection, "widgets/{0}/mediaCollection/embedded");
@@ -547,7 +589,7 @@ public class Ardmediathek extends PluginForDecrypt {
                 logger.info("Video is only available as audio-description version");
             }
             for (final Map<String, Object> mediaStream : media) {
-                // list is sorted from best to lowest quality, first one is m3u8
+                /* list is sorted from best to lowest quality, first one is m3u8 */
                 final String url = mediaStream.get("url").toString();
                 final String mimeType = mediaStream.get("mimeType").toString();
                 final Number widthO = (Number) mediaStream.get("maxHResolutionPx");
@@ -573,7 +615,8 @@ public class Ardmediathek extends PluginForDecrypt {
                     logger.info("Skipping NON-audio-description stream: " + url);
                     continue;
                 } else if (mimeType.equalsIgnoreCase("application/vnd.apple.mpegurl")) {
-                    /* E.g. skip quality "auto" (HLS), handle it later. */
+                    /* E.g. skip HLS items here and handle them later: Only collect HLS master URLs here */
+                    audioLangToHlsMasterURL.put(audioLanguageCode, url);
                     hlsMaster = url;
                     if (heightO != null && heightO.intValue() > maxHeightHls) {
                         maxHeightHls = heightO.intValue();
@@ -628,6 +671,18 @@ public class Ardmediathek extends PluginForDecrypt {
             }
         }
         if (hlsMaster != null && this.grabHLS) {
+            /*
+             * hlsMaster string is now filled with the first value possible but this might not be the users' preferred language -> Let's
+             * change this here
+             */
+            for (final String audioStr : this.audioStringPrioList) {
+                final String preferredHlsMaster = audioLangToHlsMasterURL.get(audioStr);
+                if (preferredHlsMaster != null) {
+                    logger.info("Found preferred HLS master URL for lang " + audioStr + ": " + preferredHlsMaster);
+                    hlsMaster = preferredHlsMaster;
+                    break;
+                }
+            }
             final ArrayList<DownloadLink> hlsResults = addHLS(param, metadata, br, hlsMaster, false);
             results.addAll(hlsResults);
         }
@@ -673,43 +728,15 @@ public class Ardmediathek extends PluginForDecrypt {
          * Add selected items for each selected language. </br> 2024-07-29: Currently the user can only select one "preferred" language.
          */
         String targetAudioLanguageCode = null;
-        String languagePrioString = cfg.getAudioLanguagePriorityString();
-        if (languagePrioString == null) {
-            languagePrioString = "deu";
-        }
-        final String[] audioPrioList = languagePrioString.toLowerCase(Locale.ENGLISH).replace(" ", "").split(",");
-        final Map<String, String> audioStringCorrectionMap = new HashMap<String, String>();
-        audioStringCorrectionMap.put("de", "deu");
-        audioStringCorrectionMap.put("ger", "deu");
-        audioStringCorrectionMap.put("deutsch", "deu");
-        audioStringCorrectionMap.put("en", "eng");
-        audioStringCorrectionMap.put("english", "eng");
-        audioStringCorrectionMap.put("englisch", "eng");
-        audioStringCorrectionMap.put("original", "ov");
-        audioStringCorrectionMap.put("orig", "ov");
-        for (String audioPrioString : audioPrioList) {
-            /* Correct user input to allow for more variations */
-            final String audioPrioStringCorrected = audioStringCorrectionMap.get(languagePrioString);
-            if (audioPrioStringCorrected != null) {
-                audioPrioString = audioPrioStringCorrected;
-            }
+        for (String audioPrioString : audioStringPrioList) {
             if (audioLanguages.containsKey(audioPrioString)) {
                 targetAudioLanguageCode = audioPrioString;
                 break;
             }
         }
         if (targetAudioLanguageCode == null) {
-            /* Fallback to german */
-            if (audioLanguages.containsKey("deu")) {
-                /* Fallback to german */
-                targetAudioLanguageCode = "deu";
-            } else if (audioLanguages.containsKey("ov")) {
-                /* Fallback to original language version */
-                targetAudioLanguageCode = "ov";
-            } else {
-                /* Fallback to first/random languageCode */
-                targetAudioLanguageCode = audioLanguages.keySet().iterator().next();
-            }
+            /* Fallback to first/random languageCode */
+            targetAudioLanguageCode = audioLanguages.keySet().iterator().next();
         }
         final Map<String, DownloadLink> languageQualityMap = audioLanguages.get(targetAudioLanguageCode);
         return this.handleUserQualitySelection(metadata, languageQualityMap);
@@ -867,9 +894,10 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in ardmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
-     * hosted on their other website on ardmediathek instead as ardmediathek is providing a fairly stable API while other websites hosting
-     * the same content such as sportschau.de can be complicated to parse. </br> This does not (yet) support pagination!
+     * Searches for videos in ardmediathek that match the given search term. </br>
+     * This is mostly used as a workaround to find stuff that is hosted on their other website on ardmediathek instead as ardmediathek is
+     * providing a fairly stable API while other websites hosting the same content such as sportschau.de can be complicated to parse. </br>
+     * This does not (yet) support pagination!
      */
     private ArrayList<DownloadLink> crawlARDMediathekSearchResultsVOD(final String searchTerm, final int maxResults) throws Exception {
         if (StringUtils.isEmpty(searchTerm)) {
@@ -956,27 +984,6 @@ public class Ardmediathek extends PluginForDecrypt {
         return crawlWdrMediaObject(param, root);
     }
 
-    private ArrayList<DownloadLink> crawlArdMediaObject(final CryptedLink param) throws Exception {
-        br.getPage(param.getCryptedUrl());
-        final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
-        final Map<String, Object> _info = (Map<String, Object>) root.get("_info");
-        final String date = (String) _info.get("clipDate");
-        final String description = (String) _info.get("clipDescription");
-        final ArdMetadata metadata = new ArdMetadata(_info.get("clipTitle").toString());
-        metadata.setSubtitle(_info.get("seriesTitle").toString());
-        if (date != null) {
-            metadata.setDateTimestamp(getDateMilliseconds(date));
-        }
-        metadata.setChannel(_info.get("channelTitle").toString());
-        if (!StringUtils.isEmpty(description)) {
-            metadata.setDescription(description);
-        }
-        /* Fallback as they do not provide contentIDs... */
-        metadata.setContentID(br.getURL());
-        final HashMap<String, DownloadLink> foundQualitiesMap = crawlARDJson(param, metadata, root);
-        return this.handleUserQualitySelection(metadata, foundQualitiesMap);
-    }
-
     private ArrayList<DownloadLink> crawlWdrMediaObject(final CryptedLink param, final Map<String, Object> wdrMediaObject) throws Exception {
         final Map<String, Object> trackerData = (Map<String, Object>) wdrMediaObject.get("trackerData");
         final String date = (String) trackerData.get("trackerClipAirTime");
@@ -987,8 +994,8 @@ public class Ardmediathek extends PluginForDecrypt {
         }
         metadata.setChannel(trackerData.get("trackerClipCategory").toString());
         /**
-         * 2022-03-10: Do not use trackerClipId as unique ID as there can be different IDs for the same streams. </br> Let the handling go
-         * into fallback and use the final downloadurls as unique trait!
+         * 2022-03-10: Do not use trackerClipId as unique ID as there can be different IDs for the same streams. </br>
+         * Let the handling go into fallback and use the final downloadurls as unique trait!
          */
         // metadata.setContentID(trackerData.get("trackerClipId").toString());
         metadata.setRequiresContentIDToBeSet(false);
@@ -997,7 +1004,7 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     private HashMap<String, DownloadLink> crawlARDJson(final CryptedLink param, final ArdMetadata metadata, final Object mediaCollection) throws Exception {
-        /* We know how their http urls look - this way we can avoid HDS/HLS/RTMP */
+        /* We know how their http urls look - this way we can avoid HDS/HLS */
         /*
          * http://adaptiv.wdr.de/z/medp/ww/fsk0/104/1046579/,1046579_11834667,1046579_11834665,1046579_11834669,.mp4.csmil/manifest.f4
          */
@@ -1239,7 +1246,7 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     /**
-     * Handling for older ARD websites. </br> INFORMATION: network = akamai or limelight == RTMP </br>
+     * Handling for older ARD websites.
      */
     private ArrayList<DownloadLink> crawlDasersteVideo(final CryptedLink param) throws Exception {
         br.getPage(param.getCryptedUrl());
@@ -1611,51 +1618,6 @@ public class Ardmediathek extends PluginForDecrypt {
             }
         }
         return ret;
-    }
-
-    /** Crawls extended version of ardjson which also contains video metadata. */
-    @Deprecated
-    private ArrayList<DownloadLink> crawlARDJsonExtended(final CryptedLink param, final Map<String, Object> mc) throws Exception {
-        final ArdMetadata metadata = new ArdMetadata();
-        final Map<String, Object> _info = (Map<String, Object>) mc.get("_info");
-        final Map<String, Object> _download = (Map<String, Object>) mc.get("_download");
-        if (_info != null) {
-            metadata.setTitle((String) _info.get("clipTitle"));
-            final String clipDate = _info.get("clipDate").toString();
-            if (clipDate != null) {
-                final long timestamp = TimeFormatter.getMilliSeconds(clipDate, "dd.MM.yyyy HH:mm", Locale.GERMANY);
-                metadata.setDateTimestamp(timestamp);
-            }
-            metadata.setChannel(_info.get("channelTitle").toString());
-            final String description = (String) _info.get("clipDescription");
-            if (!StringUtils.isEmpty(description)) {
-                metadata.setDescription(description);
-            }
-        }
-        if (_download != null) {
-            /* Kind of our fallback as '_info' doesn't always exist */
-            if (metadata.getTitle() == null) {
-                metadata.setTitle((String) _download.get("title"));
-            }
-            final String dateStr = (String) _download.get("date");
-            if (metadata.getChannel() == null) {
-                metadata.setChannel(_download.get("channel").toString());
-            }
-            if (metadata.getDateTimestamp() == -1 && !StringUtils.isEmpty(dateStr)) {
-                final long timestamp = TimeFormatter.getMilliSeconds(dateStr, "EEE MMM dd HH:mm:ss ZZZ yyyy", Locale.ENGLISH);
-                metadata.setDateTimestamp(timestamp);
-            }
-            final String downloadurl = (String) _download.get("url");
-            if (downloadurl != null) {
-                /* No contentID given in json -> Extract from URL */
-                final String contentID = new Regex(downloadurl, "(\\d{4}/\\d{4}/TV-\\d{8}-\\d+-\\d+)").getMatch(0);
-                if (contentID != null) {
-                    metadata.setContentID(contentID);
-                }
-            }
-        }
-        final HashMap<String, DownloadLink> foundQualitiesMap = this.crawlARDJson(param, metadata, mc);
-        return this.handleUserQualitySelection(metadata, foundQualitiesMap);
     }
 
     private ArrayList<DownloadLink> crawlNdrJson(final CryptedLink param, final Browser br, final Map<String, Object> root) throws Exception {

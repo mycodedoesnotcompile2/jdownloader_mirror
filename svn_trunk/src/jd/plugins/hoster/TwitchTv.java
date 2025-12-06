@@ -23,19 +23,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.controlling.ffmpeg.FFmpegMetaData;
-import org.jdownloader.controlling.ffmpeg.json.Stream;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -62,7 +51,17 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.raf.FileBytesMap;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50515 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.controlling.ffmpeg.FFmpegMetaData;
+import org.jdownloader.controlling.ffmpeg.json.Stream;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
+
+@HostPlugin(revision = "$Revision: 51938 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
 public class TwitchTv extends PluginForHost {
     public TwitchTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -278,20 +277,6 @@ public class TwitchTv extends PluginForHost {
                     config.setProperty("expspeed", false);
                 }
                 return super.onSegmentConnectException(connection, e, fileBytesMap, retry, retryMap, logger);
-            }
-
-            @Override
-            protected List<M3U8Playlist> getM3U8Playlists() throws Exception {
-                final List<M3U8Playlist> ret = super.getM3U8Playlists();
-                for (final M3U8Playlist playList : ret) {
-                    for (int index = playList.size() - 1; index >= 0; index--) {
-                        final M3U8Segment segment = playList.getSegment(index);
-                        if (segment != null && StringUtils.endsWithCaseInsensitive(segment.getUrl(), "end_offset=-1")) {
-                            playList.removeSegment(index);
-                        }
-                    }
-                }
-                return ret;
             }
 
             /*

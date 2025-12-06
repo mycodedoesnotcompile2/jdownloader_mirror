@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -37,6 +38,7 @@ import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -74,7 +76,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51937 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -608,7 +610,8 @@ public class XHamsterCom extends PluginForHost {
         /* 2020-01-31: Do not check filesize if we're currently in download mode as directurl may expire then. */
         if (!StringUtils.isEmpty(dllink) && !link.isSizeSet() && !StringUtils.containsIgnoreCase(dllink, ".m3u8") && !isDownload) {
             final Browser brc = br.cloneBrowser();
-            this.basicLinkCheck(brc, br.createHeadRequest(this.dllink), link, filename, extDefault);
+            final Request request = brc.createHeadRequest(this.dllink);
+            this.basicLinkCheck(brc, request, link, filename, extDefault);
         }
         return AvailableStatus.TRUE;
     }
@@ -958,6 +961,16 @@ public class XHamsterCom extends PluginForHost {
             if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+        } else {
+            final String maybeCrypted = new Regex(url, "\\.[a-z]+/([a-f0-9]+)(,(end=)?\\d+(/|,)|/)").getMatch(0);
+            if (maybeCrypted != null) {
+                try {
+                    final String decrypted = new Decoder().decode(HexFormatter.hexToByteArray(maybeCrypted));
+                    url = url.replaceFirst(Pattern.quote(maybeCrypted), Matcher.quoteReplacement(decrypted));
+                } catch (Exception e) {
+                    logger.log(e);
+                }
+            }
         }
         return url;
     }
@@ -1201,21 +1214,25 @@ public class XHamsterCom extends PluginForHost {
             }
             /* 2025-07-03: There is also "xplayerSettings2" which looks to be the same as "xplayerSettings". */
             List<Map<String, Object>> video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/mp4");
-            if (video_sources == null) {
-                /* 2023-07-31: VR */
-                video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/h264");
-                if (video_sources == null) {
-                    video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/av1");
-                }
-            }
-            if (video_sources == null) {
-                /* 2023-07-31: VR via xplayerSettings2 e.g. /videos/czech-vr-eightsome-to-celebrate-1000th-video-xhCy4Kj */
+            video_sources: if (video_sources == null) {
                 video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings2/sources/standard/h264");
-                if (video_sources == null) {
-                    /* 2023-07-31: VR */
-                    video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings2/sources/standard/h264");
+                if (video_sources != null) {
+                    break video_sources;
+                }
+                video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings2/sources/standard/av1");
+                if (video_sources != null) {
+                    break video_sources;
+                }
+                video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/h264");
+                if (video_sources != null) {
+                    break video_sources;
+                }
+                video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/av1");
+                if (video_sources != null) {
+                    break video_sources;
                 }
             }
+
             if (video_sources != null) {
                 for (final Map<String, Object> source : video_sources) {
                     final String qualityStr = (String) source.get("quality");
