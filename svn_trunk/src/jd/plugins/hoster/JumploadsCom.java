@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51124 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51939 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -245,6 +245,9 @@ public class JumploadsCom extends PluginForHost {
             directDownloadEnabled = false;
             br.followConnection(true);
             /* 2020-04-07: E.g. premium account with disabled direct download */
+            if (br.containsHTML(">\\s*Max Filesize Limit Reached\\s*<")) {
+                throw new AccountRequiredException("Max Filesize Limit Reached. To remove this limit, upgrade your account to Premium");
+            }
             dllink = br.getRegex("href=\"((https?://[^/]+)?/dl/[^\"]+)\"").getMatch(0);
             if (dllink == null) {
                 br.getHeaders().put("x-requested-with", "XMLHttpRequest");
@@ -278,6 +281,9 @@ public class JumploadsCom extends PluginForHost {
                 }
                 String free_server = br.getRegex("(?:freeaccess|data-srv)\\s*=\\s*\"([^\"]+)\"").getMatch(0);
                 final String freetoken = br.getRegex("(?:freetoken|data-dl)\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+                if ("dlsize".equals(free_server) || "dlsize".equals(free_server)) {
+                    throw new AccountRequiredException("Max Filesize Limit Reached. To remove this limit, upgrade your account to Premium");
+                }
                 if (freetoken == null || free_server == null) {
                     handleErrors(br);
                     if (account != null && account.getType() == AccountType.PREMIUM) {

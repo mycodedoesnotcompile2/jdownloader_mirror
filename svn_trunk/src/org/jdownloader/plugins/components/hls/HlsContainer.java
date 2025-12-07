@@ -8,17 +8,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.hoster.GenericM3u8;
-
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
+
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.hoster.GenericM3u8;
 
 public class HlsContainer {
     public static class MEDIA {
@@ -301,10 +301,10 @@ public class HlsContainer {
     }
 
     private static List<MEDIA> filterMedia(List<MEDIA> media, TYPE type, final String groupID) {
-        if (media == null || media.size() == 0) {
-            return media;
-        }
         final List<MEDIA> ret = new ArrayList<MEDIA>();
+        if (media == null || media.size() == 0) {
+            return ret;
+        }
         for (MEDIA entry : media) {
             if (type != null && !type.equals(entry.getType())) {
                 continue;
@@ -799,6 +799,9 @@ public class HlsContainer {
         link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
         link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_GROUP, getAudioGroupID());
         for (HlsContainer.MEDIA media : medias) {
+            if (media == null) {
+                continue;
+            }
             switch (media.getType()) {
             case AUDIO:
                 link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_LNG, media.getLanguage());
