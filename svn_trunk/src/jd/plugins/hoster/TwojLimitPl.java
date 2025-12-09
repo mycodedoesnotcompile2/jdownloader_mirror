@@ -27,6 +27,7 @@ import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -35,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
 public class TwojLimitPl extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private String                                         Info               = null;
@@ -127,12 +128,12 @@ public class TwojLimitPl extends PluginForHost {
         }
         if (expired) {
             ai.setExpired(true);
-            ai.setValidUntil(0);
+            account.setType(AccountType.FREE);
         } else {
-            ai.setExpired(false);
             if (validUntil != null && !validUntil.trim().equals("expire=00")) {
                 ai.setValidUntil(TimeFormatter.getMilliSeconds(validUntil));
             }
+            account.setType(AccountType.PREMIUM);
         }
         ai.setMultiHostSupport(this, supportedhosts);
         return ai;

@@ -54,8 +54,6 @@ import java.util.StringTokenizer;
 import java.util.TimeZone;
 import java.util.WeakHashMap;
 
-import jd.plugins.Plugin;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -73,6 +71,8 @@ import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
+
+import jd.plugins.Plugin;
 
 /**
  * SimpleFTP is a simple package that implements a Java FTP client. With SimpleFTP, you can connect to an FTP server and upload multiple
@@ -1456,9 +1456,9 @@ public abstract class SimpleFTP {
         final List<Login> logins = new ArrayList<Login>();
         Login noPassword = null;
         if (url.getUserInfo() != null) {
-            final String[] auth = url.getUserInfo().split(":");
-            final boolean hasUsername = auth.length > 0 && StringUtils.isNotEmpty(auth[0]);
-            final boolean hasPassword = auth.length == 2 && StringUtils.isNotEmpty(auth[1]);
+            final String[] auth = URLHelper.getUserInfo(url);
+            final boolean hasUsername = auth[0] != null;
+            final boolean hasPassword = auth[1] != null;
             final String username = hasUsername ? auth[0] : (isAnonymousLoginSupported(url) ? FTP_ANONYMOUS_LOGIN : null);
             final String password = hasPassword ? auth[1] : (isAnonymousLoginSupported(url) ? FTP_ANONYMOUS_LOGIN : null);
             if (username != null && password != null) {

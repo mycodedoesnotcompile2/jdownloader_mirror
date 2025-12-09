@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51941 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -111,7 +111,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             query.appendEncoded("password", link.getDownloadPassword());
         }
         final Map<String, Object> dlresponse = (Map<String, Object>) this.accessAPI(account, link, "/generate_link_by_api", query);
-        int chunks = ((Number) dlresponse.get("maxchunks")).intValue();
         final Object delayedID = dlresponse.get("delayed");
         String dllink = null;
         if (delayedID != null) {
@@ -132,22 +131,35 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         } else {
             dllink = dlresponse.get("link").toString();
         }
-        if (chunks > 1) {
-            /* That means "up to X chunks" */
-            chunks = -chunks;
-        }
         if (StringUtils.isEmpty(dllink)) {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadurl", 10 * 1000l);
         }
         if (passCode != null && !StringUtils.equals(link.getDownloadPassword(), passCode)) {
+            /* Store valid download password for next attempt. */
             logger.info("User entered valid download password: " + passCode);
             link.setDownloadPassword(passCode);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), 0);
+        boolean resume = true;
+        final Object resumeO = dlresponse.get("resumable");
+        if (resumeO instanceof Boolean) {
+            resume = ((Boolean) resumeO).booleanValue();
+        }
+        int chunks = 0;
+        final Number chunksO = (Number) dlresponse.get("maxchunks");
+        if (chunksO != null) {
+            chunks = chunksO.intValue();
+            if (chunks > 1) {
+                /* That means "up to X chunks" */
+                chunks = -chunks;
+            }
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, chunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             mhm.handleErrorGeneric(account, link, "Unknown download error", 10, 5 * 60 * 1000l);
+            /* This should never be reached. */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
     }

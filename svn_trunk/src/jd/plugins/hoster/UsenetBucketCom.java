@@ -15,12 +15,13 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "usenetbucket.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "usenetbucket.com" }, urls = { "" })
 public class UsenetBucketCom extends UseNet {
     public UsenetBucketCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,80 +60,75 @@ public class UsenetBucketCom extends UseNet {
         final AccountInfo ai = new AccountInfo();
         br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
-        try {
-            Form login = null;
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-                br.getPage("https://member.usenetbucket.com/");
-                login = br.getForm(0);
-                if (login != null && login.containsHTML("name=\"email\"") && login.containsHTML("name=\"password\"")) {
-                    br.getCookies(getHost()).clear();
-                } else if (br.getHostCookie("laravel_session", Cookies.NOTDELETEDPATTERN) == null) {
-                    br.getCookies(getHost()).clear();
-                }
+        Form login = null;
+        if (cookies != null) {
+            br.setCookies(getHost(), cookies);
+            br.getPage("https://member.usenetbucket.com/");
+            login = br.getForm(0);
+            if (login != null && login.containsHTML("name=\"email\"") && login.containsHTML("name=\"password\"")) {
+                br.getCookies(getHost()).clear();
+            } else if (br.getHostCookie("laravel_session", Cookies.NOTDELETEDPATTERN) == null) {
+                br.getCookies(getHost()).clear();
             }
-            if (br.getCookie(getHost(), "laravel_session", Cookies.NOTDELETEDPATTERN) == null) {
-                account.clearCookies("");
-                final String userName = account.getUser();
-                if (userName == null || !userName.matches("^.+?@.+?\\.[^\\.]+")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter your e-mail/password for usenetbucket.com website!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                br.getPage("https://member.usenetbucket.com/login");
-                login = br.getForm(0);
-                if (login == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                login.put("email", Encoding.urlEncode(userName));
-                login.put("password", Encoding.urlEncode(account.getPass()));
-                br.submitForm(login);
-                login = br.getForm(0);
-                if (login != null && login.containsHTML("name=\"email\"") && login.containsHTML("name=\"password\"")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                if (br.getHostCookie("laravel_session", Cookies.NOTDELETEDPATTERN) == null) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+        }
+        if (br.getCookie(getHost(), "laravel_session", Cookies.NOTDELETEDPATTERN) == null) {
+            account.clearCookies("");
+            final String userName = account.getUser();
+            if (userName == null || !userName.matches("^.+?@.+?\\.[^\\.]+")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter your e-mail/password for usenetbucket.com website!", PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            if (!StringUtils.equalsIgnoreCase(br.getURL(), "https://member.usenetbucket.com/")) {
-                br.getPage("https://member.usenetbucket.com/");
-            }
-            account.saveCookies(br.getCookies(getHost()), "");
-            final String userName = br.getRegex("<div>\\s*(?:Username|Gebruikersnaam)\\s*:\\s*(.*?)\\s*<").getMatch(0);
-            final String passWord = br.getRegex("<div>\\s*(?:Password|Wachtwoord)\\s*:\\s*(.*?)\\s*<").getMatch(0);
-            if (StringUtils.isEmpty(userName) || StringUtils.isEmpty(passWord)) {
+            br.getPage("https://member.usenetbucket.com/login");
+            login = br.getForm(0);
+            if (login == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                account.setProperty(USENET_USERNAME, userName);
-                account.setProperty(USENET_PASSWORD, passWord);
             }
-            final String connections = br.getRegex("<div>\\s*Connections\\s*:\\s*(.*?)</div>").getMatch(0);
-            if (connections != null) {
-                account.setMaxSimultanDownloads(Integer.parseInt(connections));
-            } else {
-                account.setMaxSimultanDownloads(25);
+            login.put("email", Encoding.urlEncode(userName));
+            login.put("password", Encoding.urlEncode(account.getPass()));
+            br.submitForm(login);
+            login = br.getForm(0);
+            if (login != null && login.containsHTML("name=\"email\"") && login.containsHTML("name=\"password\"")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            final String validUntil = br.getRegex("<div>\\s*(?:Valid until|Geldig tot)\\s*:\\s*(.*?)</div>").getMatch(0);
-            final String daysRemaining = br.getRegex("(\\d+) (?:days remaining|dagen resterend)").getMatch(0);
-            final String bucketType = br.getRegex("\\s*((Basic|Comfort|Ultimate|Free) Bucket)").getMatch(0);
-            if (bucketType != null) {
-                ai.setStatus(bucketType);
-            } else {
-                ai.setStatus("Unknown Bucket");
+            if (br.getHostCookie("laravel_session", Cookies.NOTDELETEDPATTERN) == null) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            if (daysRemaining != null) {
-                ai.setValidUntil(System.currentTimeMillis() + (Integer.parseInt(daysRemaining) * (24 * 60 * 60 * 1000l)));
+        }
+        if (!StringUtils.equalsIgnoreCase(br.getURL(), "https://member.usenetbucket.com/")) {
+            br.getPage("https://member.usenetbucket.com/");
+        }
+        account.saveCookies(br.getCookies(getHost()), "");
+        final String userName = br.getRegex("<div>\\s*(?:Username|Gebruikersnaam)\\s*:\\s*(.*?)\\s*<").getMatch(0);
+        final String passWord = br.getRegex("<div>\\s*(?:Password|Wachtwoord)\\s*:\\s*(.*?)\\s*<").getMatch(0);
+        if (StringUtils.isEmpty(userName) || StringUtils.isEmpty(passWord)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        account.setProperty(USENET_USERNAME, userName);
+        account.setProperty(USENET_PASSWORD, passWord);
+        final String connections = br.getRegex("<div>\\s*Connections\\s*:\\s*(.*?)</div>").getMatch(0);
+        if (connections != null) {
+            account.setMaxSimultanDownloads(Integer.parseInt(connections));
+        } else {
+            account.setMaxSimultanDownloads(25);
+        }
+        final String validUntil = br.getRegex("<div>\\s*(?:Valid until|Geldig tot)\\s*:\\s*(.*?)</div>").getMatch(0);
+        final String daysRemaining = br.getRegex("(\\d+) (?:days remaining|dagen resterend)").getMatch(0);
+        final String bucketType = br.getRegex("\\s*((Basic|Comfort|Ultimate|Free) Bucket)").getMatch(0);
+        if (bucketType != null) {
+            ai.setStatus(bucketType);
+        } else {
+            ai.setStatus("Unknown Bucket");
+        }
+        if (validUntil != null) {
+            final long until = TimeFormatter.getMilliSeconds(validUntil, "dd' 'MMM' 'yyyy', at'HH:mm:ss", null);
+            if (until > 0) {
+                ai.setValidUntil(until);
             }
-            if (validUntil != null) {
-                final long until = TimeFormatter.getMilliSeconds(validUntil, "dd' 'MMM' 'yyyy', at'HH:mm:ss", null);
-                if (until > 0) {
-                    ai.setValidUntil(until);
-                }
-            }
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                account.clearCookies("");
-            }
-            throw e;
+            account.setType(AccountType.PREMIUM);
+        } else if (daysRemaining != null) {
+            ai.setValidUntil(System.currentTimeMillis() + (Integer.parseInt(daysRemaining) * (24 * 60 * 60 * 1000l)));
+            account.setType(AccountType.PREMIUM);
+        } else {
+            account.setType(AccountType.FREE);
         }
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;

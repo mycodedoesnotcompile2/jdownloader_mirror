@@ -9,6 +9,7 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
@@ -19,7 +20,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = { "oracle.com" }, urls = { "(https?://updates\\.oracle\\.com/Orion/Services/download/.*?\\?aru=\\d+&patch_file=(.+)|https?://.*?oracle\\.com/.*?download\\?fileName=.*?&token=.+)" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "oracle.com" }, urls = { "(https?://updates\\.oracle\\.com/Orion/Services/download/.*?\\?aru=\\d+&patch_file=(.+)|https?://.*?oracle\\.com/.*?download\\?fileName=.*?&token=.+)" })
 public class OracleCom extends PluginForHost {
     public OracleCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -35,50 +36,43 @@ public class OracleCom extends PluginForHost {
         synchronized (account) {
             br.setFollowRedirects(true);
             final Cookies cookies = account.loadCookies("");
-            try {
-                if (cookies != null) {
-                    br.setCookies(getHost(), cookies);
-                    if (!verifyCookies) {
-                        logger.info("Trust cookies without check");
-                    }
-                    br.getPage("https://www.oracle.com/index.html");
-                    if (br.containsHTML(">Sign Out<")) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(null);
-                    }
+            if (cookies != null) {
+                br.setCookies(getHost(), cookies);
+                if (!verifyCookies) {
+                    logger.info("Trust cookies without check");
                 }
-                logger.info("Performing full login");
-                account.clearCookies("");
                 br.getPage("https://www.oracle.com/index.html");
-                br.getPage("http://www.oracle.com/webapps/redirect/signon?nexturl=https://www.oracle.com/index.html");
-                Form form = br.getForm(0);
-                if (form == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (br.containsHTML(">Sign Out<")) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(getHost()), "");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
                 }
-                br.submitForm(form);
-                form = br.getForm(0);
-                if (form == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                form.put("ssousername", Encoding.urlEncode(account.getUser()));
-                form.put("password", Encoding.urlEncode(account.getPass()));
-                br.submitForm(form);
-                if (br.containsHTML("readerpwderrormsg")) {
-                    throw new AccountInvalidException();
-                } else if (!br.getURL().matches("https?://www.oracle.com/index.html")) {
-                    throw new AccountInvalidException();
-                }
-                account.saveCookies(br.getCookies(getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Performing full login");
+            account.clearCookies("");
+            br.getPage("https://www.oracle.com/index.html");
+            br.getPage("http://www.oracle.com/webapps/redirect/signon?nexturl=https://www.oracle.com/index.html");
+            Form form = br.getForm(0);
+            if (form == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.submitForm(form);
+            form = br.getForm(0);
+            if (form == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            form.put("ssousername", Encoding.urlEncode(account.getUser()));
+            form.put("password", Encoding.urlEncode(account.getPass()));
+            br.submitForm(form);
+            if (br.containsHTML("readerpwderrormsg")) {
+                throw new AccountInvalidException();
+            } else if (!br.getURL().matches("https?://www.oracle.com/index.html")) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(br.getCookies(getHost()), "");
         }
     }
 
@@ -86,6 +80,7 @@ public class OracleCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         setBrowserExclusive();
         login(account, true);
+        account.setType(AccountType.FREE);
         return new AccountInfo();
     }
 
@@ -138,13 +133,5 @@ public class OracleCom extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception {
         /* Download without account is not possible. */
         throw new AccountRequiredException();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

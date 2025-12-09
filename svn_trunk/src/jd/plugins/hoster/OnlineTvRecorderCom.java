@@ -30,13 +30,13 @@ import java.util.TimeZone;
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
-import jd.config.Property;
 import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -45,7 +45,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 45507 $", interfaceVersion = 2, names = { "onlinetvrecorder.com" }, urls = { "http://(www\\.)?81\\.95\\.11\\.\\d{1,2}/download/\\d+/\\d+/\\d+/[a-f0-9]{32}/de/[^<>\"/]+" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 2, names = { "onlinetvrecorder.com" }, urls = { "http://(www\\.)?81\\.95\\.11\\.\\d{1,2}/download/\\d+/\\d+/\\d+/[a-f0-9]{32}/de/[^<>\"/]+" })
 public class OnlineTvRecorderCom extends PluginForHost {
     public OnlineTvRecorderCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,68 +164,56 @@ public class OnlineTvRecorderCom extends PluginForHost {
     }
 
     private static final String MAINPAGE = "http://onlinetvrecorder.com";
-    private static Object       LOCK     = new Object();
 
     @SuppressWarnings("unchecked")
     private void login(final Account account, final boolean force) throws Exception {
-        synchronized (LOCK) {
-            try {
-                // Load cookies
-                br.setCookiesExclusive(true);
-                final Object ret = account.getProperty("cookies", null);
-                boolean acmatch = Encoding.urlEncode(account.getUser()).equals(account.getStringProperty("name", Encoding.urlEncode(account.getUser())));
-                if (acmatch) {
-                    acmatch = Encoding.urlEncode(account.getPass()).equals(account.getStringProperty("pass", Encoding.urlEncode(account.getPass())));
-                }
-                if (acmatch && ret != null && ret instanceof Map<?, ?> && !force) {
-                    final Map<String, String> cookies = (Map<String, String>) ret;
-                    if (account.isValid()) {
-                        for (final Map.Entry<String, String> cookieEntry : cookies.entrySet()) {
-                            final String key = cookieEntry.getKey();
-                            final String value = cookieEntry.getValue();
-                            this.br.setCookie(MAINPAGE, key, value);
-                        }
-                        return;
-                    }
-                }
-                br.setFollowRedirects(true);
-                // br.getPage("");
-                br.setCookie(MAINPAGE, "OTRCOUNTRY", "DE");
-                br.postPage("https://www.onlinetvrecorder.com/v2/?go=login", "rememberlogin=on&btn_login=+Anmelden+&backto=%3F&email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
-                if (br.containsHTML("Diese E-Mail\\-Adresse ist uns nicht bekannt")) {
-                    logger.info("Invalid mail-adress!");
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                if (br.containsHTML("Das Passwort ist nicht korrekt")) {
-                    logger.info("Invalid password!");
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                // Save cookies
-                final HashMap<String, String> cookies = new HashMap<String, String>();
-                final Cookies add = this.br.getCookies(MAINPAGE);
-                for (final Cookie c : add.getCookies()) {
-                    cookies.put(c.getKey(), c.getValue());
-                }
-                account.setProperty("name", Encoding.urlEncode(account.getUser()));
-                account.setProperty("pass", Encoding.urlEncode(account.getPass()));
-                account.setProperty("cookies", cookies);
-            } catch (final PluginException e) {
-                account.setProperty("cookies", Property.NULL);
-                throw e;
+        synchronized (account) {
+            // Load cookies
+            br.setCookiesExclusive(true);
+            final Object ret = account.getProperty("cookies", null);
+            boolean acmatch = Encoding.urlEncode(account.getUser()).equals(account.getStringProperty("name", Encoding.urlEncode(account.getUser())));
+            if (acmatch) {
+                acmatch = Encoding.urlEncode(account.getPass()).equals(account.getStringProperty("pass", Encoding.urlEncode(account.getPass())));
             }
+            if (acmatch && ret != null && ret instanceof Map<?, ?> && !force) {
+                final Map<String, String> cookies = (Map<String, String>) ret;
+                if (account.isValid()) {
+                    for (final Map.Entry<String, String> cookieEntry : cookies.entrySet()) {
+                        final String key = cookieEntry.getKey();
+                        final String value = cookieEntry.getValue();
+                        this.br.setCookie(MAINPAGE, key, value);
+                    }
+                    return;
+                }
+            }
+            br.setFollowRedirects(true);
+            // br.getPage("");
+            br.setCookie(MAINPAGE, "OTRCOUNTRY", "DE");
+            br.postPage("https://www.onlinetvrecorder.com/v2/?go=login", "rememberlogin=on&btn_login=+Anmelden+&backto=%3F&email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
+            if (br.containsHTML("Diese E-Mail\\-Adresse ist uns nicht bekannt")) {
+                logger.info("Invalid mail-adress!");
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            if (br.containsHTML("Das Passwort ist nicht korrekt")) {
+                logger.info("Invalid password!");
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            // Save cookies
+            final HashMap<String, String> cookies = new HashMap<String, String>();
+            final Cookies add = this.br.getCookies(MAINPAGE);
+            for (final Cookie c : add.getCookies()) {
+                cookies.put(c.getKey(), c.getValue());
+            }
+            account.setProperty("name", Encoding.urlEncode(account.getUser()));
+            account.setProperty("pass", Encoding.urlEncode(account.getPass()));
+            account.setProperty("cookies", cookies);
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         AccountInfo ai = new AccountInfo();
-        try {
-            login(account, true);
-        } catch (PluginException e) {
-            account.setValid(false);
-            return ai;
-        }
+        login(account, true);
         br.getPage(MAINPAGE);
         final String points = br.getRegex("<td align=\"right\"><a href=\"\\?aktion=gwp\">(\\d+(\\.\\d+)?)</a>").getMatch(0);
         if (points != null) {
@@ -234,7 +222,7 @@ public class OnlineTvRecorderCom extends PluginForHost {
             ai.setStatus("Registered User");
         }
         ai.setUnlimitedTraffic();
-        account.setValid(true);
+        account.setType(AccountType.FREE);
         return ai;
     }
 

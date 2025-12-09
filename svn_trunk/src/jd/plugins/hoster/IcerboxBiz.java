@@ -23,12 +23,21 @@ import java.net.URL;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
@@ -38,31 +47,21 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
-@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = { "icerbox.biz" }, urls = { "https?://(?:www\\.)?(?:nitrobit\\.net|icerbox\\.biz)/(?:view|watch)/([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51944 $", interfaceVersion = 3, names = { "icerbox.biz" }, urls = { "https?://(?:www\\.)?(?:nitrobit\\.net|icerbox\\.biz)/(?:view|watch)/([A-Z0-9]+)" })
 public class IcerboxBiz extends antiDDoSForHost {
     public IcerboxBiz(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.icerbox.biz/payment");
+        this.enablePremium("https://www." + getHost() + "/payment");
     }
 
     @Override
     public String getAGBLink() {
-        return "http://www.icerbox.biz/tos";
+        return "http://www." + getHost() + "/tos";
     }
 
     /* Connection stuff */
-    private static final int     FREE_MAXDOWNLOADS            = 20;
-    private static final boolean ACCOUNT_PREMIUM_RESUME       = true;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS    = 0;
-    private static final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
+    private static final boolean ACCOUNT_PREMIUM_RESUME    = true;
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = 0;
 
     @Override
     public String rewriteHost(String host) {
@@ -165,13 +164,13 @@ public class IcerboxBiz extends antiDDoSForHost {
     }
 
     @Override
-    public void handlePremium(final DownloadLink link, final Account acc) throws Exception, PluginException {
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link);
         String dllink = checkDirectLink(link, "directlink_account_premium");
         if (dllink == null) {
             final String fuid = this.getFID(link);
             this.br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            getPage(br, "https://www." + this.getHost() + "/ajax/unlock.php?password=" + Encoding.urlEncode(acc.getPass()) + "&file=" + fuid + "&keep=false&_=" + System.currentTimeMillis());
+            getPage(br, "https://www." + this.getHost() + "/ajax/unlock.php?password=" + Encoding.urlEncode(account.getPass()) + "&file=" + fuid + "&keep=false&_=" + System.currentTimeMillis());
             /**
              * TODO: Find out if maybe this contains the expire date of the account and set it: <b>לקוח יקר: </b><br />
              * תוקף קוד הגישה שלך יפוג בעוד <b style="color:red">1 ימים, 18 שעות, 53 דקות.</b><br
@@ -195,6 +194,8 @@ public class IcerboxBiz extends antiDDoSForHost {
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            /* Assume that we got a valid premium account. */
+            account.setType(AccountType.PREMIUM);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -212,6 +213,13 @@ public class IcerboxBiz extends antiDDoSForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         ai.setStatus("Unchecked account");
+        final AccountType oldAccountType = account.getType();
+        if (oldAccountType != null && oldAccountType != AccountType.UNKNOWN) {
+            /* Set last known account type since we cannot determine a type here. */
+            account.setType(oldAccountType);
+        } else {
+            account.setType(AccountType.UNKNOWN);
+        }
         return ai;
     }
 
@@ -296,20 +304,12 @@ public class IcerboxBiz extends antiDDoSForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

@@ -13,12 +13,13 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "newsdemon.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "newsdemon.com" }, urls = { "" })
 public class NewsDemonCom extends UseNet {
     public NewsDemonCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -39,83 +40,77 @@ public class NewsDemonCom extends UseNet {
         final AccountInfo ai = new AccountInfo();
         br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
-        try {
-            Form login = null;
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-                br.getPage("https://members." + this.getHost() + "/members/index.php");
-                login = br.getFormbyActionRegex("/login.php");
-                if (login != null) {
-                    br.getCookies(getHost()).clear();
-                } else if (!br.containsHTML("/logout.php")) {
-                    br.getCookies(getHost()).clear();
-                }
+        Form login = null;
+        if (cookies != null) {
+            br.setCookies(getHost(), cookies);
+            br.getPage("https://members." + this.getHost() + "/members/index.php");
+            login = br.getFormbyActionRegex("/login.php");
+            if (login != null) {
+                br.getCookies(getHost()).clear();
+            } else if (!br.containsHTML("/logout.php")) {
+                br.getCookies(getHost()).clear();
             }
-            if (!br.containsHTML("/logout\\.php")) {
-                account.clearCookies("");
-                final String userName = account.getUser();
-                br.getPage("https://members." + this.getHost() + "/members/memlogin.php");
-                login = br.getFormbyActionRegex("/login\\.php");
-                if (login == null) {
+        }
+        if (!br.containsHTML("/logout\\.php")) {
+            account.clearCookies("");
+            final String userName = account.getUser();
+            br.getPage("https://members." + this.getHost() + "/members/memlogin.php");
+            login = br.getFormbyActionRegex("/login\\.php");
+            if (login == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            login.put("memberid", Encoding.urlEncode(userName));
+            login.put("password", Encoding.urlEncode(account.getPass()));
+            if (login.hasInputFieldByName("captcha_code")) {
+                final String captchaCalculation[] = br.getRegex("(\\d+)\\s*(\\+|-|/|\\*)\\s*(\\d+)\\s*=").getRow(0);
+                if (captchaCalculation == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                login.put("memberid", Encoding.urlEncode(userName));
-                login.put("password", Encoding.urlEncode(account.getPass()));
-                if (login.hasInputFieldByName("captcha_code")) {
-                    final String captchaCalculation[] = br.getRegex("(\\d+)\\s*(\\+|-|/|\\*)\\s*(\\d+)\\s*=").getRow(0);
-                    if (captchaCalculation == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    final int result;
-                    if ("+".equals(captchaCalculation[1])) {
-                        result = Integer.parseInt(captchaCalculation[0]) + Integer.parseInt(captchaCalculation[2]);
-                    } else if ("-".equals(captchaCalculation[1])) {
-                        result = Integer.parseInt(captchaCalculation[0]) - Integer.parseInt(captchaCalculation[2]);
-                    } else if ("/".equals(captchaCalculation[1])) {
-                        result = Integer.parseInt(captchaCalculation[0]) / Integer.parseInt(captchaCalculation[2]);
-                    } else if ("*".equals(captchaCalculation[1])) {
-                        result = Integer.parseInt(captchaCalculation[0]) * Integer.parseInt(captchaCalculation[2]);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    login.put("captcha_code", String.valueOf(result));
+                final int result;
+                if ("+".equals(captchaCalculation[1])) {
+                    result = Integer.parseInt(captchaCalculation[0]) + Integer.parseInt(captchaCalculation[2]);
+                } else if ("-".equals(captchaCalculation[1])) {
+                    result = Integer.parseInt(captchaCalculation[0]) - Integer.parseInt(captchaCalculation[2]);
+                } else if ("/".equals(captchaCalculation[1])) {
+                    result = Integer.parseInt(captchaCalculation[0]) / Integer.parseInt(captchaCalculation[2]);
+                } else if ("*".equals(captchaCalculation[1])) {
+                    result = Integer.parseInt(captchaCalculation[0]) * Integer.parseInt(captchaCalculation[2]);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                br.submitForm(login);
-                login = br.getFormbyActionRegex("/login.php");
-                if (login != null) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                br.getPage("/members/index.php");
-                login = br.getFormbyActionRegex("/login.php");
-                if (login != null) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                if (!br.containsHTML("members/logout.php")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+                login.put("captcha_code", String.valueOf(result));
             }
-            account.saveCookies(br.getCookies(getHost()), "");
-            final String trafficUsed = br.getRegex("Used:.*?>([0-9\\.]+)</span>\\s*GB").getMatch(0);
-            final String trafficAvailable = br.getRegex("Remaining:.*?>([0-9\\.]+)</span>\\s*GB").getMatch(0);
-            if (trafficUsed != null && trafficAvailable != null) {
-                final long available = SizeFormatter.getSize(trafficAvailable + " GB");
-                final long max = available + SizeFormatter.getSize(trafficUsed + " GB");
-                ai.setTrafficMax(max);
-                ai.setTrafficLeft(available);
+            br.submitForm(login);
+            login = br.getFormbyActionRegex("/login.php");
+            if (login != null) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            final String status = br.getRegex("Status:</li>.*?span class=.*?>(.*?)</span").getMatch(0);
-            if (!"Active".equals(status)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Status:" + status, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            br.getPage("/members/index.php");
+            login = br.getFormbyActionRegex("/login.php");
+            if (login != null) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            account.setMaxSimultanDownloads(50);
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                account.clearCookies("");
+            if (!br.containsHTML("members/logout.php")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            throw e;
         }
+        account.saveCookies(br.getCookies(getHost()), "");
+        final String trafficUsed = br.getRegex("Used:.*?>([0-9\\.]+)</span>\\s*GB").getMatch(0);
+        final String trafficAvailable = br.getRegex("Remaining:.*?>([0-9\\.]+)</span>\\s*GB").getMatch(0);
+        if (trafficUsed != null && trafficAvailable != null) {
+            final long available = SizeFormatter.getSize(trafficAvailable + " GB");
+            final long max = available + SizeFormatter.getSize(trafficUsed + " GB");
+            ai.setTrafficMax(max);
+            ai.setTrafficLeft(available);
+        }
+        final String status = br.getRegex("Status:</li>.*?span class=.*?>(.*?)</span").getMatch(0);
+        if (!"Active".equals(status)) {
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Status:" + status, PluginException.VALUE_ID_PREMIUM_DISABLE);
+        }
+        account.setMaxSimultanDownloads(50);
         account.setRefreshTimeout(2 * 60 * 60 * 1000l);
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
+        account.setType(AccountType.PREMIUM);
         return ai;
     }
 

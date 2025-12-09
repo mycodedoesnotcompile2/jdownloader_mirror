@@ -16,12 +16,13 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51944 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
 public class FiveEuroUseNetCom extends UseNet {
     public FiveEuroUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,6 +99,7 @@ public class FiveEuroUseNetCom extends UseNet {
         }
         account.setMaxSimultanDownloads(20);
         account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+        account.setType(AccountType.PREMIUM);
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }

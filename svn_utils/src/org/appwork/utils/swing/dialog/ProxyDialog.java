@@ -66,6 +66,7 @@ import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.locale._AWU;
+import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.HTTPProxy.TYPE;
 import org.appwork.utils.swing.EDTHelper;
@@ -135,26 +136,24 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
 
     /**
      * Checks if a window is currently blocked by a modal dialog.
-     * 
-     * @param window The window to check
+     *
+     * @param window
+     *            The window to check
      * @return true if the window is blocked by a modal dialog, false otherwise
      */
     private boolean isWindowBlockedByModalDialog(java.awt.Window window) {
         if (window == null || !window.isVisible()) {
             return false;
         }
-        
         // Check all windows to find modal dialogs that could block the owner
         for (java.awt.Window w : java.awt.Window.getWindows()) {
             if (w instanceof java.awt.Dialog && w.isVisible()) {
                 java.awt.Dialog dialog = (java.awt.Dialog) w;
                 java.awt.Dialog.ModalityType modality = dialog.getModalityType();
-                
                 // APPLICATION_MODAL dialogs block all windows in the application
                 if (modality == java.awt.Dialog.ModalityType.APPLICATION_MODAL) {
                     return true;
                 }
-                
                 // DOCUMENT_MODAL dialogs block the owner and its children
                 if (modality == java.awt.Dialog.ModalityType.DOCUMENT_MODAL) {
                     java.awt.Window dialogOwner = dialog.getOwner();
@@ -164,22 +163,22 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
                 }
             }
         }
-        
         return false;
     }
-    
+
     /**
      * Checks if a window is a descendant of another window in the owner hierarchy.
-     * 
-     * @param descendant The potential descendant window
-     * @param ancestor The potential ancestor window
+     *
+     * @param descendant
+     *            The potential descendant window
+     * @param ancestor
+     *            The potential ancestor window
      * @return true if descendant is a descendant of ancestor, false otherwise
      */
     private boolean isDescendantOf(java.awt.Window descendant, java.awt.Window ancestor) {
         if (descendant == null || ancestor == null) {
             return false;
         }
-        
         java.awt.Window current = descendant;
         while (current != null) {
             if (current == ancestor) {
@@ -187,31 +186,27 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
             }
             current = current.getOwner();
         }
-        
         return false;
     }
 
     /**
-     * Overrides getOwner() to return null if the owner is blocked by a modal dialog,
-     * otherwise returns the normal owner. This ensures the ProxyDialog can appear
-     * even when the EDT is blocked by a modal dialog.
+     * Overrides getOwner() to return null if the owner is blocked by a modal dialog, otherwise returns the normal owner. This ensures the
+     * ProxyDialog can appear even when the EDT is blocked by a modal dialog.
      */
     @Override
     public java.awt.Window getOwner() {
         // Get the normal owner first
         java.awt.Window owner = super.getOwner();
-        
         // If owner is blocked by a modal dialog, return null to make the dialog independent
         if (owner != null && isWindowBlockedByModalDialog(owner)) {
             return null;
         }
-        
         return owner;
     }
 
     /**
-     * Overrides layoutDialog() to set the ModalExclusionType.
-     * This allows the ProxyDialog to appear even when the EDT is blocked by a modal dialog.
+     * Overrides layoutDialog() to set the ModalExclusionType. This allows the ProxyDialog to appear even when the EDT is blocked by a modal
+     * dialog.
      */
     @Override
     protected void layoutDialog() {
@@ -447,7 +442,7 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
     /**
      * @return
      */
-    public String getHost() {        
+    public String getHost() {
         return txtHost.getText();
     }
 
@@ -497,7 +492,7 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
     /**
      * @return
      */
-    public String getUser() {        
+    public String getUser() {
         return txtUser.getText();
     }
 
@@ -631,7 +626,7 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
             }
 
             @Override
-            public void focusLost(final FocusEvent e) {                
+            public void focusLost(final FocusEvent e) {
             }
         });
     }
@@ -700,15 +695,10 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
                 if (url.getPort() > 0) {
                     txtPort.setText(url.getPort() + "");
                 }
-                final String userInfo = url.getUserInfo();
+                final String userInfo[] = URLHelper.getUserInfo(url);
                 if (userInfo != null) {
-                    final int in = userInfo.indexOf(":");
-                    if (in >= 0) {
-                        txtUser.setText(userInfo.substring(0, in));
-                        txtPass.setText(userInfo.substring(in + 1));
-                    } else {
-                        txtUser.setText(userInfo);
-                    }
+                    txtUser.setText(StringUtils.valueOrEmpty(userInfo[0]));
+                    txtUser.setText(StringUtils.valueOrEmpty(userInfo[1]));
                 }
                 return;
             } catch (final MalformedURLException e) {

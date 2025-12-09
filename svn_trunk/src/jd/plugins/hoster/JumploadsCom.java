@@ -49,12 +49,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51941 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/premium");
     }
+
+    private static final String ERROR_MESSAGE_PREMIUMONLY_FILESIZE_TOO_BIG = "Max Filesize Limit Reached. To remove this limit, upgrade your account to Premium";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -180,14 +182,16 @@ public class JumploadsCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFallbackFilename(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        if (!link.isNameSet()) {
-            link.setName(this.getFallbackFilename(link));
-        }
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*?The file you are trying to download is no longer available|>\\s*?This could be due to the following reasons>\\s*?The file has been removed because of")) {
+        } else if (br.containsHTML(">\\s*?The file you are trying to download is no longer available|>\\s*?This could be due to the following reasons>\\s*?The file has been removed because of")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("filename[^\"]+\"[^>]*>([^<]+)</h2>").getMatch(0);
@@ -208,7 +212,7 @@ public class JumploadsCom extends PluginForHost {
     }
 
     private boolean isPrivateContent(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*?Content you have requested is Private")) {
+        if (br.containsHTML(">\\s*?Content you have requested is Private")) {
             return true;
         } else {
             return false;
@@ -244,10 +248,6 @@ public class JumploadsCom extends PluginForHost {
             }
             directDownloadEnabled = false;
             br.followConnection(true);
-            /* 2020-04-07: E.g. premium account with disabled direct download */
-            if (br.containsHTML(">\\s*Max Filesize Limit Reached\\s*<")) {
-                throw new AccountRequiredException("Max Filesize Limit Reached. To remove this limit, upgrade your account to Premium");
-            }
             dllink = br.getRegex("href=\"((https?://[^/]+)?/dl/[^\"]+)\"").getMatch(0);
             if (dllink == null) {
                 br.getHeaders().put("x-requested-with", "XMLHttpRequest");
@@ -276,13 +276,13 @@ public class JumploadsCom extends PluginForHost {
                         link.setDownloadPassword(null);
                         throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password");
                     }
-                    /* Store valid downloadpassword for previous download-attempts */
+                    /* Store valid download password for previous download-attempts */
                     link.setDownloadPassword(passCode);
                 }
                 String free_server = br.getRegex("(?:freeaccess|data-srv)\\s*=\\s*\"([^\"]+)\"").getMatch(0);
                 final String freetoken = br.getRegex("(?:freetoken|data-dl)\\s*=\\s*\"([^\"]+)\"").getMatch(0);
-                if ("dlsize".equals(free_server) || "dlsize".equals(free_server)) {
-                    throw new AccountRequiredException("Max Filesize Limit Reached. To remove this limit, upgrade your account to Premium");
+                if ("dlsize".equalsIgnoreCase(free_server) || "dlsize".equalsIgnoreCase(free_server)) {
+                    throw new AccountRequiredException(ERROR_MESSAGE_PREMIUMONLY_FILESIZE_TOO_BIG);
                 }
                 if (freetoken == null || free_server == null) {
                     handleErrors(br);
@@ -347,7 +347,7 @@ public class JumploadsCom extends PluginForHost {
 
     /** 2020-04-07: With this disabled, downloads will fail quite often thus users should enable direct downloads! */
     private void errorEnableDirectDownload() throws PluginException {
-        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Enable 'Direct Download' in account settings");
+        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Enable 'Direct Download' in account settings and try again");
     }
 
     protected void waitTime(final DownloadLink link, final long timeBefore) throws PluginException {
@@ -392,17 +392,21 @@ public class JumploadsCom extends PluginForHost {
         }
     }
 
+    /* Checks for html based errors */
     private void handleErrors(final Browser br) throws PluginException {
         final String premiumonlyText = br.getRegex(">\\s*(As a Free user you can download file up[^<]+)</h2>").getMatch(0);
         if (premiumonlyText != null) {
             throw new AccountRequiredException(premiumonlyText);
+        }
+        if (br.containsHTML(">\\s*Max Filesize Limit Reached\\s*<")) {
+            throw new AccountRequiredException(ERROR_MESSAGE_PREMIUMONLY_FILESIZE_TOO_BIG);
         } else if (br.containsHTML(">\\s*?This link only for premium user")) {
             /* 2019-08-13: It seems like basically all files are premiumonly(?) */
             throw new AccountRequiredException();
         } else if (br.containsHTML(">\\s*This link is for premium only user")) {
             throw new AccountRequiredException();
         } else if (isPrivateContent(br)) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Private content, only downloadable by owner");
+            throw new AccountRequiredException("Private content, only downloadable by owner");
         }
     }
 
@@ -472,7 +476,7 @@ public class JumploadsCom extends PluginForHost {
             brc.postPageRaw("/app/user/signin?_tm=" + ts, JSonStorage.serializeToJson(postdata));
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             if (Boolean.TRUE.equals(entries.get("error"))) {
-                throw new AccountInvalidException(entries.get("message").toString());
+                throw new AccountInvalidException((String) entries.get("message"));
             }
             /* Set values from json as cookies which should grant us logged-in state. */
             final String[] login_cookie_keys = new String[] { "uid", "ut", "ud", "si" };
@@ -624,13 +628,5 @@ public class JumploadsCom extends PluginForHost {
             /* Premium accounts do not have captchas */
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

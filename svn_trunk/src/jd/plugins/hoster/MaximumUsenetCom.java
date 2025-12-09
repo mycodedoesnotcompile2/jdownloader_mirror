@@ -21,13 +21,14 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "maximumusenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "maximumusenet.com" }, urls = { "" })
 public class MaximumUsenetCom extends UseNet {
     public MaximumUsenetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,104 +62,98 @@ public class MaximumUsenetCom extends UseNet {
         final AccountInfo ai = new AccountInfo();
         br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
-        try {
-            Form login = null;
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-                br.getPage("https://www.maximumusenet.com/members/");
-                if (br.containsHTML(">Logging in...<")) {
-                    Thread.sleep(2000);
-                    br.getPage("https://www.maximumusenet.com/members/index.php");
-                }
-                login = br.getFormbyActionRegex(".*members/login.php");
-                if (login != null && login.containsHTML("memberid") && login.containsHTML("password")) {
-                    br.clearCookies(getHost());
-                } else if (br.containsHTML("Invalid User ID/Password!")) {
-                    br.clearCookies(getHost());
-                } else if (!br.containsHTML("members/logout.php")) {
-                    br.clearCookies(getHost());
-                }
+        Form login = null;
+        if (cookies != null) {
+            br.setCookies(getHost(), cookies);
+            br.getPage("https://www.maximumusenet.com/members/");
+            if (br.containsHTML(">Logging in...<")) {
+                Thread.sleep(2000);
+                br.getPage("https://www.maximumusenet.com/members/index.php");
             }
-            if (br.getCookie(getHost(), "PHPSESSID") == null) {
-                account.clearCookies("");
-                final String userName = account.getUser();
-                br.getPage("https://www.maximumusenet.com/members/members_login.php");
-                login = br.getFormbyActionRegex(".*members/login.php");
-                login.put("memberid", Encoding.urlEncode(userName));
-                login.put("password", Encoding.urlEncode(account.getPass()));
-                final String equation[] = login.getRegex(">\\s*(\\d+)\\s*(\\+|-|\\*|/)\\s*(\\d+)\\s*=").getRow(0);
-                if (equation == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final Integer result;
-                if ("+".equals(equation[1])) {
-                    result = Integer.parseInt(equation[0]) + Integer.parseInt(equation[2]);
-                } else if ("*".equals(equation[1])) {
-                    result = Integer.parseInt(equation[0]) * Integer.parseInt(equation[2]);
-                } else if ("/".equals(equation[1])) {
-                    result = Integer.parseInt(equation[0]) / Integer.parseInt(equation[2]);
-                } else {
-                    result = Integer.parseInt(equation[0]) - Integer.parseInt(equation[2]);
-                }
-                login.put("captcha_code", result.toString());
-                br.submitForm(login);
-                if (br.containsHTML(">Logging in...<")) {
-                    Thread.sleep(2000);
-                    br.getPage("https://www.maximumusenet.com/members/index.php");
-                }
-                login = br.getFormbyActionRegex(".*members/login.php");
-                if (login != null && login.containsHTML("memberid") && login.containsHTML("password")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (br.containsHTML("Invalid User ID/Password!") || !br.containsHTML("members/logout.php")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+            login = br.getFormbyActionRegex(".*members/login.php");
+            if (login != null && login.containsHTML("memberid") && login.containsHTML("password")) {
+                br.clearCookies(getHost());
+            } else if (br.containsHTML("Invalid User ID/Password!")) {
+                br.clearCookies(getHost());
+            } else if (!br.containsHTML("members/logout.php")) {
+                br.clearCookies(getHost());
             }
-            account.saveCookies(br.getCookies(getHost()), "");
-            final String memberID = br.getRegex("Member Id:\\s*</span>\\s*<span\\s*class=\".*?\">(.*?)<").getMatch(0);
-            if (StringUtils.isEmpty(memberID)) {
+        }
+        if (br.getCookie(getHost(), "PHPSESSID") == null) {
+            account.clearCookies("");
+            final String userName = account.getUser();
+            br.getPage("https://www.maximumusenet.com/members/members_login.php");
+            login = br.getFormbyActionRegex(".*members/login.php");
+            login.put("memberid", Encoding.urlEncode(userName));
+            login.put("password", Encoding.urlEncode(account.getPass()));
+            final String equation[] = login.getRegex(">\\s*(\\d+)\\s*(\\+|-|\\*|/)\\s*(\\d+)\\s*=").getRow(0);
+            if (equation == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final Integer result;
+            if ("+".equals(equation[1])) {
+                result = Integer.parseInt(equation[0]) + Integer.parseInt(equation[2]);
+            } else if ("*".equals(equation[1])) {
+                result = Integer.parseInt(equation[0]) * Integer.parseInt(equation[2]);
+            } else if ("/".equals(equation[1])) {
+                result = Integer.parseInt(equation[0]) / Integer.parseInt(equation[2]);
             } else {
-                account.setProperty(USENET_USERNAME, memberID.trim());
+                result = Integer.parseInt(equation[0]) - Integer.parseInt(equation[2]);
             }
-            final String status = br.getRegex("Status:\\s*</span>\\s*<span\\s*class=\".*?\">(.*?)<").getMatch(0);
-            if (!"active".equalsIgnoreCase(status)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account not active!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            login.put("captcha_code", result.toString());
+            br.submitForm(login);
+            if (br.containsHTML(">Logging in...<")) {
+                Thread.sleep(2000);
+                br.getPage("https://www.maximumusenet.com/members/index.php");
             }
-            final String nextBillingDate = br.getRegex("Next Billing Date:\\s*</span>\\s*<span\\s*class=\".*?\">(\\d+-\\d+-\\d+)").getMatch(0);
-            if (nextBillingDate != null) {
-                ai.setValidUntil(TimeFormatter.getMilliSeconds(nextBillingDate, "yyyy'-'MM'-'dd", Locale.ENGLISH) + (24 * 60 * 60 * 1000l));
+            login = br.getFormbyActionRegex(".*members/login.php");
+            if (login != null && login.containsHTML("memberid") && login.containsHTML("password")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            } else if (br.containsHTML("Invalid User ID/Password!") || !br.containsHTML("members/logout.php")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-            account.setMaxSimultanDownloads(50);
-            ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
+        }
+        account.saveCookies(br.getCookies(getHost()), "");
+        final String memberID = br.getRegex("Member Id:\\s*</span>\\s*<span\\s*class=\".*?\">(.*?)<").getMatch(0);
+        if (StringUtils.isEmpty(memberID)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else {
+            account.setProperty(USENET_USERNAME, memberID.trim());
+        }
+        final String status = br.getRegex("Status:\\s*</span>\\s*<span\\s*class=\".*?\">(.*?)<").getMatch(0);
+        if (!"active".equalsIgnoreCase(status)) {
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account not active!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+        }
+        final String nextBillingDate = br.getRegex("Next Billing Date:\\s*</span>\\s*<span\\s*class=\".*?\">(\\d+-\\d+-\\d+)").getMatch(0);
+        if (nextBillingDate != null) {
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(nextBillingDate, "yyyy'-'MM'-'dd", Locale.ENGLISH) + (24 * 60 * 60 * 1000l));
+        }
+        account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+        account.setMaxSimultanDownloads(50);
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
+        try {
+            verifyUseNetLogins(account);
+        } catch (final InvalidAuthException e) {
+            logger.log(e);
+            final DownloadLink dummyLink = new DownloadLink(this, "Account:" + getUseNetUsername(account), getHost(), "https://www." + getHost(), true);
+            final AskDownloadPasswordDialogInterface handle = UIOManager.I().show(AskDownloadPasswordDialogInterface.class, new AskForDownloadLinkDialog(_GUI.T.AskForPasswordDialog_AskForPasswordDialog_title_(), "Please enter your MaximumUsenet Usenet Password", dummyLink));
+            if (handle.getCloseReason() != CloseReason.OK) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, null, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            final String password = handle.getText();
+            if (StringUtils.isEmpty(password)) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, null, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            account.setProperty(USENET_PASSWORD, password);
             try {
                 verifyUseNetLogins(account);
-                return ai;
-            } catch (final InvalidAuthException e) {
-                logger.log(e);
-                final DownloadLink dummyLink = new DownloadLink(this, "Account:" + getUseNetUsername(account), getHost(), "https://www.maximumusenet.com", true);
-                final AskDownloadPasswordDialogInterface handle = UIOManager.I().show(AskDownloadPasswordDialogInterface.class, new AskForDownloadLinkDialog(_GUI.T.AskForPasswordDialog_AskForPasswordDialog_title_(), "Please enter your MaximumUsenet Usenet Password", dummyLink));
-                if (handle.getCloseReason() == CloseReason.OK) {
-                    final String password = handle.getText();
-                    if (StringUtils.isNotEmpty(password)) {
-                        account.setProperty(USENET_PASSWORD, password);
-                        try {
-                            verifyUseNetLogins(account);
-                            return ai;
-                        } catch (InvalidAuthException e2) {
-                            logger.log(e2);
-                        }
-                    }
-                }
+            } catch (InvalidAuthException e2) {
+                logger.log(e2);
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, null, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, null, PluginException.VALUE_ID_PREMIUM_DISABLE);
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                account.clearCookies("");
-                account.removeProperty(USENET_PASSWORD);
-            }
-            throw e;
         }
+        account.setType(AccountType.PREMIUM);
+        return ai;
     }
 
     @Override

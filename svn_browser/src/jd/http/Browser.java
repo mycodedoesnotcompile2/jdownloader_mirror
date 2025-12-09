@@ -2665,7 +2665,7 @@ public class Browser {
         }
         final Request baseRequest = this.getBaseRequest();
         if (baseRequest != null) {
-            return baseRequest.getUrl(true);
+            return baseRequest.getUrl(false);
         }
         if (nextRequest != null) {
             final String nextRequestReferer = nextRequest.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER);

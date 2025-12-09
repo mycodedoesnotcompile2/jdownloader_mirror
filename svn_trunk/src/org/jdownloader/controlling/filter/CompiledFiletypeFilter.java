@@ -736,6 +736,7 @@ public class CompiledFiletypeFilter {
             }
         },
         M4b, // mpeg 4 audiobook
+        M4s, // MPEG-DASH segment
         M4P,
         MKA,
         MP1,

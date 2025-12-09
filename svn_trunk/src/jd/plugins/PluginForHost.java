@@ -2982,6 +2982,10 @@ public abstract class PluginForHost extends Plugin {
         return true;
     }
 
+    public Object getPluginProperty(final DownloadLink link, final String returnFormat, final String key, final Object def) {
+        return link.getProperty(key, def);
+    }
+
     /**
      * Used to disable slow speed warning, useful in plugins which have login services but may not provide speed increases.
      *

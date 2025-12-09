@@ -18,11 +18,10 @@ package jd.plugins.hoster;
 import jd.PluginWrapper;
 import jd.nutils.JDHash;
 import jd.plugins.Account;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49695 $", interfaceVersion = 3, names = { "nopremium.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "nopremium.pl" }, urls = { "" })
 public class NoPremiumPl extends RapideoCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("nopremium.pl");
 
@@ -54,13 +53,5 @@ public class NoPremiumPl extends RapideoCore {
     @Override
     protected String getPasswordAPIV1(Account account) {
         return JDHash.getSHA1(JDHash.getMD5(account.getPass()));
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

@@ -25,13 +25,14 @@ import jd.http.requests.GetRequest;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "xsnews.nl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "xsnews.nl" }, urls = { "" })
 public class XsNewsNl extends UseNet {
     public XsNewsNl(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,111 +71,103 @@ public class XsNewsNl extends UseNet {
             br.setFollowRedirects(true);
             final Cookies cookies = account.loadCookies("");
             final Cookies userCookies = account.loadUserCookies();
-            try {
-                if (userCookies != null) {
-                    logger.info("Attempting user cookie login");
-                    br.setCookies(userCookies);
-                } else if (cookies != null) {
-                    logger.info("Attempting normal cookie login");
-                    br.setCookies(getHost(), cookies);
-                }
-                if (containsSessionCookie(br)) {
-                    br.setCurrentURL("https://www.xsnews.nl/en/myxsnews.html");
-                    final GetRequest request = br.createGetRequest("https://www.xsnews.nl/action/auth/status?_=" + System.currentTimeMillis());
-                    request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    br.getPage(request);
-                    if (!containsSessionCookie(br)) {
-                        br.clearCookies(getHost());
-                    } else if (!br.containsHTML("\"ok\"\\s*:\\s*true")) {
-                        br.clearCookies(getHost());
-                    }
-                }
-                if (!containsSessionCookie(br)) {
-                    final AccountInfo oldai = account.getAccountInfo();
-                    if (oldai != null && oldai.getLastValidUntil() != -1 && oldai.getLastValidUntil() > System.currentTimeMillis()) {
-                        try {
-                            logger.info("Usenet only login");
-                            verifyUseNetLogins(account);
-                            ai.setStatus(oldai.getStatus());
-                            ai.setValidUntil(oldai.getLastValidUntil());
-                            return ai;
-                        } catch (InvalidAuthException e2) {
-                        }
-                    }
-                    if (userCookies != null) {
-                        if (account.hasEverBeenValid()) {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                        } else {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                        }
-                    }
-                    logger.info("Full login");
-                    account.clearCookies("");
-                    br.clearCookies(getHost());
-                    br.setCookie(getHost(), "lang", "en");
-                    br.cloneBrowser().getPage("https://www.xsnews.nl/action/acct/status?_=" + System.currentTimeMillis());
-                    br.getPage("https://www.xsnews.nl/en/myxsnews.html");
-                    final UrlQuery query = new UrlQuery();
-                    if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
-                        final String reCaptchaKey = "6LcZur0UAAAAAKgw3J_fWyW6Dip32vp3QIQwtyGo";
-                        final CaptchaHelperHostPluginRecaptchaV2 captcha = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey) {
-                            @Override
-                            public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
-                                return TYPE.INVISIBLE;
-                            }
-                        };
-                        query.add("g_recaptcha_response", Encoding.urlEncode(captcha.getToken()));
-                    }
-                    query.add("user", Encoding.urlEncode(account.getUser()));
-                    query.add("pass", Encoding.urlEncode(account.getPass()));
-                    final PostRequest login = br.createPostRequest("https://www.xsnews.nl/action/auth/login&lang=en", query);
-                    login.getHeaders().put("Accept", "application/json");
-                    login.getHeaders().put("Origin", "https://www.xsnews.nl");
-                    login.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    br.getPage(login);
-                    if (br.containsHTML("No such user/pass")) {
-                        throw new AccountInvalidException();
-                    } else if (!containsSessionCookie(br)) {
-                        throw new AccountInvalidException();
-                    } else if (!br.containsHTML("\"ok\"\\s*:\\s*true")) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
-                logger.info("Full login successful");
-                account.saveCookies(br.getCookies(br.getHost()), "");
-                br.setCurrentURL("https://www.xsnews.nl/en/my-subscriptions.html");
-                final GetRequest request = br.createGetRequest("https://www.xsnews.nl/action/acct/subr?_=" + System.currentTimeMillis());
+            if (userCookies != null) {
+                logger.info("Attempting user cookie login");
+                br.setCookies(userCookies);
+            } else if (cookies != null) {
+                logger.info("Attempting normal cookie login");
+                br.setCookies(getHost(), cookies);
+            }
+            if (containsSessionCookie(br)) {
+                br.setCurrentURL("https://www.xsnews.nl/en/myxsnews.html");
+                final GetRequest request = br.createGetRequest("https://www.xsnews.nl/action/auth/status?_=" + System.currentTimeMillis());
                 request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
                 br.getPage(request);
-                final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final Object activeO = response.get("active");
-                final String textErrorNoActivePackage = "No active paid package";
-                if (Boolean.FALSE.equals(activeO)) {
-                    throw new AccountInvalidException(textErrorNoActivePackage);
+                if (!containsSessionCookie(br)) {
+                    br.clearCookies(getHost());
+                } else if (!br.containsHTML("\"ok\"\\s*:\\s*true")) {
+                    br.clearCookies(getHost());
                 }
-                final Map<String, Object> active = (Map<String, Object>) activeO;
-                if (active == null || active.size() == 0) {
-                    throw new AccountInvalidException(textErrorNoActivePackage);
-                }
-                final long conns = JavaScriptEngineFactory.toLong(active.get("conns"), 1);
-                account.setMaxSimultanDownloads((int) conns);
-                final String title = (String) active.get("title");
-                ai.setStatus("Package: " + title);
-                final String expire_date = (String) active.get("expire_date");
-                if (expire_date != null) {
-                    final long date = TimeFormatter.getMilliSeconds(expire_date, "yyyy'-'MM'-'dd", Locale.ENGLISH);
-                    if (date > 0) {
-                        ai.setValidUntil(date + (12 * 60 * 60 * 1000l));
+            }
+            if (!containsSessionCookie(br)) {
+                final AccountInfo oldai = account.getAccountInfo();
+                if (oldai != null && oldai.getLastValidUntil() != -1 && oldai.getLastValidUntil() > System.currentTimeMillis()) {
+                    try {
+                        logger.info("Usenet only login");
+                        verifyUseNetLogins(account);
+                        ai.setStatus(oldai.getStatus());
+                        ai.setValidUntil(oldai.getLastValidUntil());
+                        return ai;
+                    } catch (InvalidAuthException e2) {
                     }
                 }
-                account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-                return ai;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
+                if (userCookies != null) {
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                    }
                 }
-                throw e;
+                logger.info("Full login");
+                account.clearCookies("");
+                br.clearCookies(getHost());
+                br.setCookie(getHost(), "lang", "en");
+                br.cloneBrowser().getPage("https://www.xsnews.nl/action/acct/status?_=" + System.currentTimeMillis());
+                br.getPage("https://www.xsnews.nl/en/myxsnews.html");
+                final UrlQuery query = new UrlQuery();
+                if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
+                    final String reCaptchaKey = "6LcZur0UAAAAAKgw3J_fWyW6Dip32vp3QIQwtyGo";
+                    final CaptchaHelperHostPluginRecaptchaV2 captcha = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey) {
+                        @Override
+                        public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
+                            return TYPE.INVISIBLE;
+                        }
+                    };
+                    query.add("g_recaptcha_response", Encoding.urlEncode(captcha.getToken()));
+                }
+                query.add("user", Encoding.urlEncode(account.getUser()));
+                query.add("pass", Encoding.urlEncode(account.getPass()));
+                final PostRequest login = br.createPostRequest("https://www.xsnews.nl/action/auth/login&lang=en", query);
+                login.getHeaders().put("Accept", "application/json");
+                login.getHeaders().put("Origin", "https://www.xsnews.nl");
+                login.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                br.getPage(login);
+                if (br.containsHTML("No such user/pass")) {
+                    throw new AccountInvalidException();
+                } else if (!containsSessionCookie(br)) {
+                    throw new AccountInvalidException();
+                } else if (!br.containsHTML("\"ok\"\\s*:\\s*true")) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
+            logger.info("Full login successful");
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            br.setCurrentURL("https://www.xsnews.nl/en/my-subscriptions.html");
+            final GetRequest request = br.createGetRequest("https://www.xsnews.nl/action/acct/subr?_=" + System.currentTimeMillis());
+            request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            br.getPage(request);
+            final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Object activeO = response.get("active");
+            final String textErrorNoActivePackage = "No active paid package";
+            if (Boolean.FALSE.equals(activeO)) {
+                throw new AccountInvalidException(textErrorNoActivePackage);
+            }
+            final Map<String, Object> active = (Map<String, Object>) activeO;
+            if (active == null || active.size() == 0) {
+                throw new AccountInvalidException(textErrorNoActivePackage);
+            }
+            final long conns = JavaScriptEngineFactory.toLong(active.get("conns"), 1);
+            account.setMaxSimultanDownloads((int) conns);
+            final String title = (String) active.get("title");
+            ai.setStatus("Package: " + title);
+            final String expire_date = (String) active.get("expire_date");
+            if (expire_date != null) {
+                final long date = TimeFormatter.getMilliSeconds(expire_date, "yyyy'-'MM'-'dd", Locale.ENGLISH);
+                ai.setValidUntil(date + (12 * 60 * 60 * 1000l));
+            }
+            account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+            account.setType(AccountType.PREMIUM);
+            return ai;
         }
     }
 

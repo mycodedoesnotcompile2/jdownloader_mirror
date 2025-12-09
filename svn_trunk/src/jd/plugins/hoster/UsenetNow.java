@@ -20,13 +20,14 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = { "usenetnow.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "usenetnow.net" }, urls = { "" })
 public class UsenetNow extends UseNet {
     public UsenetNow(PluginWrapper wrapper) {
         super(wrapper);
@@ -168,8 +169,10 @@ public class UsenetNow extends UseNet {
         if (validUntil != null) {
             final long date = TimeFormatter.getMilliSeconds(validUntil, "MM/dd/yy", Locale.ENGLISH);
             ai.setValidUntil(date + (24 * 60 * 60 * 1000l));
+            account.setType(AccountType.PREMIUM);
         } else {
             ai.setExpired(true);
+            account.setType(AccountType.FREE);
         }
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;

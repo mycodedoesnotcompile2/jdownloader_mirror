@@ -1,5 +1,7 @@
 package jd.plugins.hoster;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -8,6 +10,7 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
@@ -17,9 +20,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 45578 $", interfaceVersion = 3, names = { "bentbox.co" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51944 $", interfaceVersion = 3, names = { "bentbox.co" }, urls = { "" })
 public class BentBoxCo extends PluginForHost {
     public BentBoxCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,7 +101,7 @@ public class BentBoxCo extends PluginForHost {
         setBrowserExclusive();
         final AccountInfo ai = new AccountInfo();
         login(br, account, null);
-        ai.setStatus("Valid Account");
+        account.setType(AccountType.FREE);
         return ai;
     }
 

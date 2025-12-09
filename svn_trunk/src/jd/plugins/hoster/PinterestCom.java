@@ -49,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PinterestComDecrypter;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 51866 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51941 $", interfaceVersion = 3, names = {}, urls = {})
 public class PinterestCom extends PluginForHost {
     public PinterestCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,7 +114,7 @@ public class PinterestCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://about.pinterest.com/de/terms-service";
+        return "https://about." + getHost() + "/de/terms-service";
     }
 
     @Override

@@ -20,12 +20,13 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "astraweb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "astraweb.com" }, urls = { "" })
 public class NewsAstraWebCom extends UseNet {
     public NewsAstraWebCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,129 +89,125 @@ public class NewsAstraWebCom extends UseNet {
             br.setFollowRedirects(true);
             String jwtToken = account.getStringProperty(jwtTokenProperty, null);
             Map<String, Object> response = null;
-            try {
-                if (jwtToken != null) {
-                    if (true) {
-                        try {
-                            verifyUseNetLogins(account);
-                            if (previousai != null) {
-                                ai.setStatus(previousai.getStatus());
-                            }
-                            ai.setUnlimitedTraffic();
-                            // https://www.astraweb.com/, 50
-                            account.setMaxSimultanDownloads(50);
-                            account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-                            return ai;
-                        } catch (InvalidAuthException e) {
-                            logger.log(e);
-                            account.removeProperty(jwtTokenProperty);
-                            jwtToken = null;
+            final AccountType type = AccountType.PREMIUM;
+            if (jwtToken != null) {
+                if (true) {
+                    try {
+                        verifyUseNetLogins(account);
+                        if (previousai != null) {
+                            ai.setStatus(previousai.getStatus());
                         }
-                    } else {
-                        // session expire very fast
-                        response = createPostRequest(br, "https://middleware.astraweb.com/subscription/getSubscriptionsForUser?XDEBUG_SESSION_START=PHPSTORM", jwtToken, null);
-                        if (response.containsKey("errorCode")) {
-                            switch (((Number) response.get("errorCode")).intValue()) {
-                            case 1002:
-                                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                            case 1014:
-                                // {"function":"..........","errorType":"ExpiredException","errorCode":1014}
-                                account.removeProperty(jwtTokenProperty);
-                                jwtToken = null;
-                                break;
-                            default:
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Response:" + response.toString());
-                            }
-                        } else if (response.isEmpty()) {
-                            account.removeProperty(jwtTokenProperty);
-                            jwtToken = null;
-                        }
+                        ai.setUnlimitedTraffic();
+                        // https://www.astraweb.com/, 50
+                        account.setMaxSimultanDownloads(50);
+                        account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+                        account.setType(type);
+                        return ai;
+                    } catch (InvalidAuthException e) {
+                        logger.log(e);
+                        account.removeProperty(jwtTokenProperty);
+                        jwtToken = null;
                     }
-                }
-                if (jwtToken == null) {
-                    final String userName = account.getUser();
-                    br.getPage("https://www.astraweb.com/login?redirect=%2Fmember");
-                    final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LcXsloaAAAAAHEnpDmiuFfOw61pHmms9Wt_aH0x") {
-                        @Override
-                        public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
-                            return TYPE.INVISIBLE;
-                        }
-                    };
-                    final Map<String, Object> loginJSON = new HashMap<String, Object>();
-                    loginJSON.put("brandName", "astraweb");
-                    loginJSON.put("username", userName);
-                    loginJSON.put("password", account.getPass());
-                    loginJSON.put("reCaptchaToken", rc2.getToken());
-                    final Browser brc = br.cloneBrowser();
-                    final PostRequest loginRequest = brc.createJSonPostRequest("https://middleware.astraweb.com/user/authenticate?XDEBUG_SESSION_START=PHPSTORM", JSonStorage.toString(loginJSON));
-                    loginRequest.getHeaders().put("Origin", "https://www.astraweb.com");
-                    loginRequest.getHeaders().put("Referer", "https://www.astraweb.com");
-                    final String responseString = brc.getPage(loginRequest);
-                    response = restoreFromString(responseString, TypeRef.MAP);
+                } else {
+                    // session expire very fast
+                    response = createPostRequest(br, "https://middleware.astraweb.com/subscription/getSubscriptionsForUser?XDEBUG_SESSION_START=PHPSTORM", jwtToken, null);
                     if (response.containsKey("errorCode")) {
                         switch (((Number) response.get("errorCode")).intValue()) {
                         case 1002:
                             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                        case 1014:
+                            // {"function":"..........","errorType":"ExpiredException","errorCode":1014}
+                            account.removeProperty(jwtTokenProperty);
+                            jwtToken = null;
+                            break;
                         default:
                             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Response:" + response.toString());
                         }
-                    } else if (!response.containsKey("user") || !response.containsKey(jwtTokenProperty)) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    } else {
-                        jwtToken = (String) response.get(jwtTokenProperty);
-                        if (jwtToken == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        } else {
-                            account.setProperty(jwtTokenProperty, jwtToken);
-                        }
-                        final String username = (String) JavaScriptEngineFactory.walkJson(response, "user/meta_data/username");
-                        if (StringUtils.isEmpty(username)) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        } else {
-                            account.setProperty(USENET_USERNAME, username.trim());
-                        }
-                        response = createPostRequest(br, "https://middleware.astraweb.com/subscription/getSubscriptionsForUser?XDEBUG_SESSION_START=PHPSTORM", jwtToken, null);
+                    } else if (response.isEmpty()) {
+                        account.removeProperty(jwtTokenProperty);
+                        jwtToken = null;
                     }
                 }
-                final Number subscription_id = (Number) response.get("subscription_id");
-                if (subscription_id == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String status = (String) response.get("status");
-                final Number threads = JavaScriptEngineFactory.toLong(JavaScriptEngineFactory.walkJson(response, "current_package/meta_data/threads"), 1);
-                // https://www.astraweb.com/, 50
-                account.setMaxSimultanDownloads(threads.intValue());
-                if (StringUtils.equalsIgnoreCase("Unlimited", (String) JavaScriptEngineFactory.walkJson(response, "current_package/meta_data/bandwidth"))) {
-                    ai.setUnlimitedTraffic();
-                } else {
-                    // not yet supported
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String package_identifier = (String) JavaScriptEngineFactory.walkJson(response, "current_package/package_identifier");
-                ai.setStatus(package_identifier);
-                if (StringUtils.containsIgnoreCase(package_identifier, "BLOCK")) {
-                    // TODO: traffic left
-                    // https://middleware.astraweb.com/subscription/subscriptionCallSpi?XDEBUG_SESSION_START=PHPSTORM
-                    // {brandName":"astraweb","subscriptionId":number,"reCaptchaToken":...
-                    // {"used":"203417977305","allowed":"798199167657","remaining":594781190352,"success":true}
-                    // unlimited, prepaid traffic
-                } else if (!StringUtils.equalsIgnoreCase(status, "running")) {
-                    // TODO check expire date
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else {
-                    // TODO: expire date
-                    // https://middleware.astraweb.com/billing/getBillingEventsForUser?XDEBUG_SESSION_START=PHPSTORM
-                    // [{"billing_event_id":xyz,"billing_method_name":"Creditcard","currency_code":"USD","amount":35.88,"created_at":"2020-09-09T10:01:31+00:00","status":"success","description":"12
-                    // Months"}
-                }
-                account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-                return ai;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.removeProperty(jwtTokenProperty);
-                }
-                throw e;
             }
+            if (jwtToken == null) {
+                final String userName = account.getUser();
+                br.getPage("https://www.astraweb.com/login?redirect=%2Fmember");
+                final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LcXsloaAAAAAHEnpDmiuFfOw61pHmms9Wt_aH0x") {
+                    @Override
+                    public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
+                        return TYPE.INVISIBLE;
+                    }
+                };
+                final Map<String, Object> loginJSON = new HashMap<String, Object>();
+                loginJSON.put("brandName", "astraweb");
+                loginJSON.put("username", userName);
+                loginJSON.put("password", account.getPass());
+                loginJSON.put("reCaptchaToken", rc2.getToken());
+                final Browser brc = br.cloneBrowser();
+                final PostRequest loginRequest = brc.createJSonPostRequest("https://middleware.astraweb.com/user/authenticate?XDEBUG_SESSION_START=PHPSTORM", JSonStorage.toString(loginJSON));
+                loginRequest.getHeaders().put("Origin", "https://www.astraweb.com");
+                loginRequest.getHeaders().put("Referer", "https://www.astraweb.com");
+                final String responseString = brc.getPage(loginRequest);
+                response = restoreFromString(responseString, TypeRef.MAP);
+                if (response.containsKey("errorCode")) {
+                    switch (((Number) response.get("errorCode")).intValue()) {
+                    case 1002:
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    default:
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Response:" + response.toString());
+                    }
+                } else if (!response.containsKey("user") || !response.containsKey(jwtTokenProperty)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else {
+                    jwtToken = (String) response.get(jwtTokenProperty);
+                    if (jwtToken == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else {
+                        account.setProperty(jwtTokenProperty, jwtToken);
+                    }
+                    final String username = (String) JavaScriptEngineFactory.walkJson(response, "user/meta_data/username");
+                    if (StringUtils.isEmpty(username)) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else {
+                        account.setProperty(USENET_USERNAME, username.trim());
+                    }
+                    response = createPostRequest(br, "https://middleware.astraweb.com/subscription/getSubscriptionsForUser?XDEBUG_SESSION_START=PHPSTORM", jwtToken, null);
+                }
+            }
+            final Number subscription_id = (Number) response.get("subscription_id");
+            if (subscription_id == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String status = (String) response.get("status");
+            final Number threads = JavaScriptEngineFactory.toLong(JavaScriptEngineFactory.walkJson(response, "current_package/meta_data/threads"), 1);
+            // https://www.astraweb.com/, 50
+            account.setMaxSimultanDownloads(threads.intValue());
+            if (StringUtils.equalsIgnoreCase("Unlimited", (String) JavaScriptEngineFactory.walkJson(response, "current_package/meta_data/bandwidth"))) {
+                ai.setUnlimitedTraffic();
+            } else {
+                // not yet supported
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String package_identifier = (String) JavaScriptEngineFactory.walkJson(response, "current_package/package_identifier");
+            ai.setStatus(package_identifier);
+            if (StringUtils.containsIgnoreCase(package_identifier, "BLOCK")) {
+                // TODO: traffic left
+                // https://middleware.astraweb.com/subscription/subscriptionCallSpi?XDEBUG_SESSION_START=PHPSTORM
+                // {brandName":"astraweb","subscriptionId":number,"reCaptchaToken":...
+                // {"used":"203417977305","allowed":"798199167657","remaining":594781190352,"success":true}
+                // unlimited, prepaid traffic
+            } else if (!StringUtils.equalsIgnoreCase(status, "running")) {
+                // TODO check expire date
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            } else {
+                // TODO: expire date
+                // https://middleware.astraweb.com/billing/getBillingEventsForUser?XDEBUG_SESSION_START=PHPSTORM
+                // [{"billing_event_id":xyz,"billing_method_name":"Creditcard","currency_code":"USD","amount":35.88,"created_at":"2020-09-09T10:01:31+00:00","status":"success","description":"12
+                // Months"}
+            }
+            account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+            account.setType(type);
+            return ai;
         }
     }
 

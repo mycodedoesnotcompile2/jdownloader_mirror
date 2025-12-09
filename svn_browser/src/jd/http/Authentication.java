@@ -1,7 +1,9 @@
 package jd.http;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Arrays;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
@@ -48,7 +50,7 @@ public abstract class Authentication {
 
     public String getURLWithUserInfo(URL url) throws IOException {
         if (url != null) {
-            return URLHelper.createURL(url.getProtocol(), StringUtils.valueOrEmpty(this.getUsername()) + ":" + StringUtils.valueOrEmpty(this.getPassword()), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
+            return URLHelper.createURL(url.getProtocol(), URLHelper.toUserInfo(getUsername(), this.getPassword()), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
         } else {
             return null;
         }

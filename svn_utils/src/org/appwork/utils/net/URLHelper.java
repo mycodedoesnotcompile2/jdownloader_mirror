@@ -188,6 +188,52 @@ public class URLHelper {
         }
     }
 
+    public static String toUserInfo(final String user, final String password) {
+        final class Encoder {
+            String encode(final String in) {
+                if (in == null) {
+                    return null;
+                }
+                return in.replace("%", "%25").replace("@", "%40").replace(":", "%3A");
+            }
+        }
+        final Encoder encoder = new Encoder();
+        final StringBuilder sb = new StringBuilder();
+        if (user != null) {
+            sb.append(encoder.encode(user));
+        }
+        if (password != null) {
+            sb.append(":");
+            sb.append(encoder.encode(password));
+        }
+        return sb.toString();
+    }
+
+    public static String[] getUserInfo(final URL url) {
+        final String userInfo = url.getUserInfo();
+        if (userInfo == null) {
+            return null;
+        }
+        final String[] ret = new Regex(userInfo, "^(.*?)(:(.*?))?$").getRow(0);
+        if (ret == null || ret.length == 0) {
+            return null;
+        }
+        final class Decoder {
+            String decode(final String in) {
+                if (in == null) {
+                    return null;
+                }
+                return in.replace("%3A", ":").replace("%40", "@").replace("%25", "%");
+            }
+        }
+        final Decoder decoder = new Decoder();
+        if (ret.length == 1) {
+            return new String[] { decoder.decode(ret[0]), null };
+        } else {
+            return new String[] { decoder.decode(ret[0]), decoder.decode(ret[2]) };
+        }
+    }
+
     public static URL createURL(final String url) throws MalformedURLException {
         URL tmp = new URL(url.trim().replaceAll(" ", "%20"));
         if (StringUtils.isEmpty(tmp.getHost()) && tmp.getProtocol() != null && tmp.getProtocol().matches("(https?|ftp)")) {

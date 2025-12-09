@@ -17,13 +17,6 @@ import javax.swing.JTextField;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 
-import jd.controlling.TaskQueue;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.proxy.PacProxySelectorImpl;
-import jd.controlling.proxy.SingleBasicProxySelectorImpl;
-import jd.controlling.proxy.SingleDirectGatewaySelector;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
@@ -33,6 +26,7 @@ import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.AbstractDialog;
@@ -44,6 +38,13 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.updatev2.InternetConnectionSettings;
+
+import jd.controlling.TaskQueue;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.proxy.PacProxySelectorImpl;
+import jd.controlling.proxy.SingleBasicProxySelectorImpl;
+import jd.controlling.proxy.SingleDirectGatewaySelector;
+import net.miginfocom.swing.MigLayout;
 
 public class ProxyDialog extends AbstractDialog<AbstractProxySelectorImpl> implements CaretListener {
     private JComboBox       cmbType;
@@ -217,15 +218,10 @@ public class ProxyDialog extends AbstractDialog<AbstractProxySelectorImpl> imple
                 if (url.getPort() > 0) {
                     txtPort.setText(url.getPort() + "");
                 }
-                String userInfo = url.getUserInfo();
+                final String userInfo[] = URLHelper.getUserInfo(url);
                 if (userInfo != null) {
-                    int in = userInfo.indexOf(":");
-                    if (in >= 0) {
-                        txtUser.setText(userInfo.substring(0, in));
-                        txtPass.setText(userInfo.substring(in + 1));
-                    } else {
-                        txtUser.setText(userInfo);
-                    }
+                    txtUser.setText(StringUtils.valueOrEmpty(userInfo[0]));
+                    txtUser.setText(StringUtils.valueOrEmpty(userInfo[1]));
                 }
                 return;
             } catch (MalformedURLException e) {

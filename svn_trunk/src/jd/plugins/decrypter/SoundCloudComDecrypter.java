@@ -50,7 +50,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51489 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 51947 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -344,7 +344,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         for (final Map<String, Object> trackmap : trackItemsFound) {
             final ArrayList<DownloadLink> results = this.crawlProcessSingleTrack(trackmap);
             for (final DownloadLink result : results) {
-                result.setProperty(SoundcloudCom.PROPERTY_setsposition, counter + ".");
+                result.setProperty(SoundcloudCom.PROPERTY_setsposition, counter);
                 result.setProperty(SoundcloudCom.PROPERTY_playlist_id, playlistID);
                 result._setFilePackage(fp);
                 ret.add(result);

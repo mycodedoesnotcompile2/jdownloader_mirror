@@ -21,12 +21,6 @@ import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.BasicJDTable;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -45,6 +39,12 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberTableModel;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.MenuManagerLinkgrabberTableContext;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.BasicJDTable;
 
 public abstract class FilterTable extends BasicJDTable<Filter> implements PackageControllerTableModelFilter<CrawledPackage, CrawledLink> {
     private static class FilterTableUpdater {
@@ -76,13 +76,13 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
     protected static final long                            SELECTION_REFRESH_MIN = 25l;
     protected static final long                            SELECTION_REFRESH_MAX = 100l;
     private static final DelayedRunnable                   SELECTIONUPDATER      = new DelayedRunnable(EXECUTER, SELECTION_REFRESH_MIN, SELECTION_REFRESH_MAX) {
-        @Override
-        public void delayedrun() {
-            if (org.jdownloader.settings.staticreferences.CFG_LINKGRABBER.QUICK_VIEW_SELECTION_ENABLED.isEnabled()) {
-                LinkGrabberTableModel.getInstance().addTableModifier(getTableDataModification(null), false);
-            }
-        };
-    };
+                                                                                     @Override
+                                                                                     public void delayedrun() {
+                                                                                         if (org.jdownloader.settings.staticreferences.CFG_LINKGRABBER.QUICK_VIEW_SELECTION_ENABLED.isEnabled()) {
+                                                                                             LinkGrabberTableModel.getInstance().addTableModifier(getTableDataModification(null), false);
+                                                                                         }
+                                                                                     };
+                                                                                 };
 
     private static LinkGrabberTableModel.TableDataModification getTableDataModification(final Runnable runnable) {
         return LinkGrabberTableModel.getInstance().new TableDataModification() {
@@ -125,32 +125,32 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
     protected static final long                 FILTER_REFRESH_MIN     = 1000l;
     protected static final long                 FILTER_REFRESH_MAX     = 3000l;
     private static final DelayedRunnable        FILTERTABLESUPDATER    = new DelayedRunnable(EXECUTER, FILTER_REFRESH_MIN, FILTER_REFRESH_MAX) {
-        @Override
-        public String getID() {
-            return "FilterTable";
-        }
+                                                                           @Override
+                                                                           public String getID() {
+                                                                               return "FilterTable";
+                                                                           }
 
-        @Override
-        public void delayedrun() {
-            try {
-                ArrayList<FilterTableDataUpdater> updater = new ArrayList<FilterTableDataUpdater>();
-                for (FilterTableUpdater filterTable : FILTERTABLES) {
-                    if (filterTable.getUpdate().getAndSet(false)) {
-                        updater.add(filterTable.getTable().getFilterTableDataUpdater());
-                    }
-                }
-                updateFilterTables(updater);
-            } catch (final Throwable e) {
-                org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
-            }
-        }
-    };
+                                                                           @Override
+                                                                           public void delayedrun() {
+                                                                               try {
+                                                                                   ArrayList<FilterTableDataUpdater> updater = new ArrayList<FilterTableDataUpdater>();
+                                                                                   for (FilterTableUpdater filterTable : FILTERTABLES) {
+                                                                                       if (filterTable.getUpdate().getAndSet(false)) {
+                                                                                           updater.add(filterTable.getTable().getFilterTableDataUpdater());
+                                                                                       }
+                                                                                   }
+                                                                                   updateFilterTables(updater);
+                                                                               } catch (final Throwable e) {
+                                                                                   org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
+                                                                               }
+                                                                           }
+                                                                       };
     private static final PropertyChangeListener PROPERTYCHANGELISTENER = new PropertyChangeListener() {
-        @Override
-        public void propertyChange(PropertyChangeEvent evt) {
-            updateAllFiltersInstant();
-        }
-    };
+                                                                           @Override
+                                                                           public void propertyChange(PropertyChangeEvent evt) {
+                                                                               updateAllFiltersInstant();
+                                                                           }
+                                                                       };
     private static volatile Filter              filterException        = null;
     private static volatile Thread              filterExceptionThread  = null;
     private BooleanKeyHandler                   visibleKeyHandler;
@@ -379,7 +379,6 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
                 @Override
                 public void run() {
                     SwingUtilities.invokeLater(new Runnable() {
-
                         @Override
                         public void run() {
                             final JPopupMenu ret = MenuManagerLinkgrabberTableContext.getInstance().build(mouseEvent);
@@ -407,6 +406,20 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
                         getSelectionModel().removeSelectionInterval(row, row);
                     }
                     return;
+                }
+            }
+        }
+        if (e.getID() == MouseEvent.MOUSE_RELEASED && isContextMenuTrigger(e)) {
+            final int row = this.rowAtPoint(e.getPoint());
+            final Filter obj = this.getModel().getObjectbyRow(row);
+            if (obj == null || row == -1 || !this.isRowSelected(row)) {
+                for (FilterTableUpdater filterTableUpdater : FILTERTABLES) {
+                    FilterTable f = filterTableUpdater.getTable();
+                    if (f == FilterTable.this) {
+                        clearSelection();
+                    } else {
+                        f.getModel().clearSelection();
+                    }
                 }
             }
         }
@@ -449,8 +462,10 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
             action.actionPerformed(null);
             return true;
         case KeyEvent.VK_SPACE:
-            for (Filter f : getModel().getSelectedObjects()) {
-                f.setEnabled(!f.isEnabled());
+            for (FilterTableUpdater filterTableUpdater : FILTERTABLES) {
+                for (Filter f : filterTableUpdater.getTable().getModel().getSelectedObjects()) {
+                    f.setEnabled(!f.isEnabled());
+                }
             }
             return true;
         case KeyEvent.VK_X:

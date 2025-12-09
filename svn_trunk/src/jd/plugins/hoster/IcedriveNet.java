@@ -37,16 +37,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48638 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51944 $", interfaceVersion = 3, names = {}, urls = {})
 public class IcedriveNet extends PluginForHost {
     public IcedriveNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.test.com/help/privacy";
+        return "https://" + getHost() + "/legal/terms-of-service";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -273,13 +272,5 @@ public class IcedriveNet extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return -1;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

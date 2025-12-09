@@ -24,6 +24,7 @@ import jd.http.Cookies;
 import jd.http.Request;
 import jd.http.requests.PostRequest;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
@@ -32,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51837 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -216,6 +217,9 @@ public class UsenextCom extends UseNet {
             if (expireDate != null) {
                 ai.setValidUntil(expireDate.getTime());
                 accountStatusPackageText = (String) JavaScriptEngineFactory.walkJson(currentServiceRound, "article/name");
+                account.setType(AccountType.PREMIUM);
+            } else {
+                account.setType(AccountType.FREE);
             }
             if (accountStatusPackageText == null) {
                 accountStatusPackageText = account.getType().getLabel();

@@ -28,6 +28,7 @@ import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -36,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "trinimixzone.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "trinimixzone.com" }, urls = { "" })
 public class TrinimixzoneCom extends PluginForHost {
     public TrinimixzoneCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +50,7 @@ public class TrinimixzoneCom extends PluginForHost {
         if (!login(br, account)) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
+        account.setType(AccountType.FREE);
         return ai;
     }
 

@@ -19,6 +19,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.HTTPHeader;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.controlling.linkcrawler.LinkVariant;
+import org.jdownloader.logging.LogController;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -28,6 +36,7 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -38,15 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.TwentyOneMembersVariantInfo;
 import jd.utils.JDUtilities;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.HTTPHeader;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.controlling.linkcrawler.LinkVariant;
-import org.jdownloader.logging.LogController;
-
-@HostPlugin(revision = "$Revision: 45496 $", interfaceVersion = 3, names = { "21members.com" }, urls = { "http://21members\\.com/dummy/file/\\d+" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "21members.com" }, urls = { "http://21members\\.com/dummy/file/\\d+" })
 public class TwentyOneMembersCom extends PluginForHost {
     private final String LOGIN_ERROR_REGEX = "<ul.*?class=\"loginErrors\".*?>.*?<li class=\"warning\">(.+?)</li>";
 
@@ -63,17 +64,10 @@ public class TwentyOneMembersCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         synchronized (account) {
-            try {
-                login(br, account, -1);
-                final AccountInfo ai = new AccountInfo();
-                parseAccountInfo(account, ai);
-                return ai;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
-            }
+            login(br, account, -1);
+            final AccountInfo ai = new AccountInfo();
+            parseAccountInfo(account, ai);
+            return ai;
         }
     }
 
@@ -138,11 +132,6 @@ public class TwentyOneMembersCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, error, PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
                 account.saveCookies(br.getCookies(getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             } finally {
                 br.setFollowRedirects(followRedirect);
             }
@@ -178,8 +167,13 @@ public class TwentyOneMembersCom extends PluginForHost {
         ai.setStatus(sb.toString());
         if (maxDaysLeft >= 0) {
             ai.setValidUntil(System.currentTimeMillis() + (maxDaysLeft + 1) * (24 * 60 * 60 * 1000l));
+            ai.setUnlimitedTraffic();
+            account.setType(AccountType.PREMIUM);
+        } else {
+            ai.setExpired(true);
+            ai.setTrafficLeft(0);
+            account.setType(AccountType.FREE);
         }
-        ai.setUnlimitedTraffic();
     }
 
     @Override
@@ -283,18 +277,6 @@ public class TwentyOneMembersCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return 0;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     public static boolean login(final Browser br) {

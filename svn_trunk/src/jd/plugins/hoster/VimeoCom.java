@@ -65,6 +65,7 @@ import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
@@ -82,7 +83,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49678 $", interfaceVersion = 2, names = { "vimeo.com" }, urls = { "decryptedforVimeoHosterPlugin://.+" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 2, names = { "vimeo.com" }, urls = { "decryptedforVimeoHosterPlugin://.+" })
 public class VimeoCom extends PluginForHost {
     /* Skip HLS because of unsupported split video/audio. */
     public static final boolean  ALLOW_HLS                       = false;
@@ -858,6 +859,8 @@ public class VimeoCom extends PluginForHost {
                 ai.setStatus(null);
             }
             ai.setUnlimitedTraffic();
+            /* Account type is irrelevant for downloading -> Treat acc accounts as free accounts */
+            account.setType(AccountType.FREE);
             return ai;
         }
     }

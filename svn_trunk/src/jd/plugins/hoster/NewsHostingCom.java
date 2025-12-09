@@ -19,13 +19,14 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
 public class NewsHostingCom extends UseNet {
     public NewsHostingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,9 +85,11 @@ public class NewsHostingCom extends UseNet {
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         setBrowserExclusive();
+        final AccountType type = AccountType.PREMIUM;
         synchronized (account) {
             AccountInfo ai = quickCheckAccountInfo(account);
             if (ai != null) {
+                account.setType(type);
                 return ai;
             } else {
                 ai = new AccountInfo();
@@ -187,17 +190,10 @@ public class NewsHostingCom extends UseNet {
                 } else if (StringUtils.equalsIgnoreCase(trafficLeft, "unlimited") || StringUtils.equalsIgnoreCase(trafficLeft, "Powerpack")) {
                     ai.setUnlimitedTraffic();
                 }
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             } catch (IOException e) {
                 logger.log(e);
                 try {
                     verifyUseNetLogins(account);
-                    account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-                    return ai;
                 } catch (InvalidAuthException e2) {
                     if (account.getProperty(USENET_USERNAME) != null) {
                         throw new PluginException(LinkStatus.ERROR_PREMIUM, null, PluginException.VALUE_ID_PREMIUM_DISABLE, e2);
@@ -208,6 +204,7 @@ public class NewsHostingCom extends UseNet {
                 }
             }
             account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+            account.setType(type);
             return ai;
         }
     }

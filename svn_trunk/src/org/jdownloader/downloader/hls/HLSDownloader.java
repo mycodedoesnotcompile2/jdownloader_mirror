@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -102,6 +103,7 @@ import org.jdownloader.controlling.ffmpeg.FFprobe;
 import org.jdownloader.controlling.ffmpeg.json.Stream;
 import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment.X_KEY_METHOD;
 import org.jdownloader.gui.translate._GUI;
@@ -473,19 +475,24 @@ public class HLSDownloader extends DownloadInterface {
         for (int index = 0; index < m3u8.size(); index++) {
             final M3U8Segment segment = m3u8.getSegment(index);
             if (segment.isEXT_X_MAP()) {
-                // URI="089056-000-A_v1080_h265.mp4",BYTERANGE="9595@0"
-                sb.append("#EXT-X-MAP:");
-                // TODO: UMBAU
-            } else {
-                sb.append("#EXTINF:" + M3U8Segment.toExtInfDuration(segment.getDuration()));
-                // prefer relative URLs
-                sb.append("\r\ndownload." + getSegmentExtension(ffmpeg, segment));
+                sb.append("#EXT-X-MAP:URI=");
+                sb.append("\"");
+                sb.append("download." + getSegmentExtension(ffmpeg, segment));
                 sb.append("?id=").append(processID);
                 sb.append("&").append(QUERY_M3U8_ID).append("=").append(request.getParameterbyKey(QUERY_M3U8_ID));
                 sb.append("&").append(QUERY_M3U8_INDEX).append("=").append(request.getParameterbyKey(QUERY_M3U8_INDEX));
                 sb.append("&").append(QUERY_M3U8_SEGMENT).append("=").append(index);
+                sb.append("\"");
+            } else {
+                sb.append("#EXTINF:" + M3U8Segment.toExtInfDuration(segment.getDuration()));
                 sb.append("\r\n");
+                sb.append("download." + getSegmentExtension(ffmpeg, segment));
+                sb.append("?id=").append(processID);
+                sb.append("&").append(QUERY_M3U8_ID).append("=").append(request.getParameterbyKey(QUERY_M3U8_ID));
+                sb.append("&").append(QUERY_M3U8_INDEX).append("=").append(request.getParameterbyKey(QUERY_M3U8_INDEX));
+                sb.append("&").append(QUERY_M3U8_SEGMENT).append("=").append(index);
             }
+            sb.append("\r\n");
         }
         sb.append("#EXT-X-ENDLIST\r\n");
         return sb.toString();
@@ -1355,18 +1362,33 @@ public class HLSDownloader extends DownloadInterface {
             }
         }
         final String extension = Files.getExtension(new URL(segment.getUrl()).getPath(), true);
-        if (CompiledFiletypeFilter.getExtensionsFilterInterface(extension) != null) {
+        final CompiledFiletypeExtension fileType = CompiledFiletypeFilter.getExtensionsFilterInterface(extension);
+        if (CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(fileType) || CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(fileType)) {
             return extension;
         }
         return "ts";
     }
 
-    protected boolean isSegmentDownload(GetRequest request) {
+    protected boolean isSegmentDownload(GetRequest request) throws IOException {
         final String requestedPath = request.getRequestedPath();
         if (requestedPath == null) {
             return false;
         }
-        return requestedPath.matches("^/download(\\.(opus|ogg|flac|mp3|ts))?$");
+        if (requestedPath.matches("^/download(\\.(opus|ogg|flac|mp3|ts))?$")) {
+            return true;
+        }
+        final M3U8Segment segment = getSegment(request);
+        if (segment == null) {
+            return false;
+        }
+        final String extension = Files.getExtension(new URL(segment.getUrl()).getPath(), true);
+        final CompiledFiletypeExtension fileType = CompiledFiletypeFilter.getExtensionsFilterInterface(extension);
+        if (CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(fileType) || CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(fileType)) {
+            if (requestedPath.matches("^/download\\." + Pattern.quote(extension) + "$")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private HttpServer initPipe(final AbstractFFmpegBinary ffmpeg, final AtomicInteger requestsInProcess) throws IOException {

@@ -37,6 +37,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -840,7 +841,6 @@ public class Account extends Property {
             }
         },
         PREMIUM {
-
             @Override
             public boolean is(Account account) {
                 return super.is(account) || LIFETIME.is(account);
@@ -858,7 +858,6 @@ public class Account extends Property {
             }
         },
         UNKNOWN {
-
             @Override
             public boolean is(Account account) {
                 return account == null || account.getType() == null || super.is(account);
@@ -882,7 +881,7 @@ public class Account extends Property {
      */
     public void setType(AccountType type) {
         if (type == null) {
-            super.setProperty(ACCOUNT_TYPE, Property.NULL);
+            removeProperty(ACCOUNT_TYPE);
         } else {
             super.setProperty(ACCOUNT_TYPE, type.name());
         }
@@ -913,13 +912,19 @@ public class Account extends Property {
     public AccountType getType() {
         final String v = getStringProperty(ACCOUNT_TYPE, null);
         if (v != null) {
+            /* Account type is set -> Return it */
             try {
                 return AccountType.valueOf(v);
             } catch (Throwable e) {
                 e.printStackTrace();
             }
         }
-        return AccountType.PREMIUM;
+        final AccountInfo info = getAccountInfo();
+        if (info != null && !info.isExpired() && info.getValidUntil() > 0) {
+            DebugMode.debugger();
+            return AccountType.PREMIUM;
+        }
+        return AccountType.UNKNOWN;
     }
 
     /** Returns date format string to be used for account expire dates anywhere within GUI. */
@@ -928,14 +933,13 @@ public class Account extends Property {
         if (StringUtils.isNotEmpty(custom)) {
             /* User defined format */
             return custom;
+        }
+        final DateFormat sd = SimpleDateFormat.getDateTimeInstance();
+        if (sd instanceof SimpleDateFormat) {
+            return ((SimpleDateFormat) sd).toPattern();
         } else {
-            final DateFormat sd = SimpleDateFormat.getDateTimeInstance();
-            if (sd instanceof SimpleDateFormat) {
-                return ((SimpleDateFormat) sd).toPattern();
-            } else {
-                /* Localized default format */
-                return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
-            }
+            /* Localized default format */
+            return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
         }
     }
 }

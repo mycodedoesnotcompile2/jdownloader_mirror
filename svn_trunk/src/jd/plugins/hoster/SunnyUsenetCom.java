@@ -17,13 +17,14 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51406 $", interfaceVersion = 3, names = { "sunnyusenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "sunnyusenet.com" }, urls = { "" })
 public class SunnyUsenetCom extends UseNet {
     public SunnyUsenetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -138,6 +139,7 @@ public class SunnyUsenetCom extends UseNet {
         }
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+        account.setType(AccountType.PREMIUM);
         return ai;
     }
 
