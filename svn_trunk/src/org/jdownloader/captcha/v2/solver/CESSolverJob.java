@@ -68,8 +68,8 @@ public class CESSolverJob<T> {
         }
     }
 
-    public void setAnswer(AbstractResponse<T> abstractResponse) {
-        if (job.addAnswer(abstractResponse)) {
+    public void setAnswer(AbstractResponse<?> abstractResponse) {
+        if (job.addAnswer((AbstractResponse<T>) abstractResponse)) {
             answered = true;
             setStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer(abrev(abstractResponse.getValue() + "")), NewTheme.I().getIcon(IconKey.ICON_OK, 20));
         } else {

@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51941 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51951 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -191,7 +191,7 @@ public class JumploadsCom extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*?The file you are trying to download is no longer available|>\\s*?This could be due to the following reasons>\\s*?The file has been removed because of")) {
+        } else if (is_file_offline_html(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("filename[^\"]+\"[^>]*>([^<]+)</h2>").getMatch(0);
@@ -209,6 +209,10 @@ public class JumploadsCom extends PluginForHost {
             logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
+    }
+
+    public static final boolean is_file_offline_html(final Browser br) {
+        return br.containsHTML(">\\s*The file you are trying to download is no longer available|>\\s*This could be due to the following reasons>\\s*The file has been removed because of");
     }
 
     private boolean isPrivateContent(final Browser br) {

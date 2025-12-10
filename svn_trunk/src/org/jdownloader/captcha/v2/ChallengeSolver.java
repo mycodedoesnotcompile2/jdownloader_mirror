@@ -13,13 +13,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import jd.controlling.captcha.SkipException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+
+import jd.controlling.captcha.SkipException;
 
 public abstract class ChallengeSolver<T> {
     public static final ChallengeSolver EXTERN = new ChallengeSolver<Object>() {
@@ -203,8 +203,8 @@ public abstract class ChallengeSolver<T> {
         final String host = c.getHost();
         Boolean result = null;
         final ArrayList<String> whitelist = getService().getConfig().getWhitelistEntries();
-        if (whitelist != null && whitelist.size() > 0) {
-            whitelist: for (final String s : whitelist) {
+        whitelist: if (whitelist != null && whitelist.size() > 0) {
+            for (final String s : whitelist) {
                 try {
                     final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
                     if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {

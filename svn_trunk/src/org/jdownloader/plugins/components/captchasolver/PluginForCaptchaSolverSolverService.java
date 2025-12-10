@@ -5,8 +5,10 @@ import java.util.Map;
 
 import javax.swing.Icon;
 
+import org.appwork.storage.config.JsonConfig;
 import org.jdownloader.captcha.v2.ChallengeSolverConfig;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
+import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
@@ -46,7 +48,9 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public ChallengeSolverConfig getConfig() {
-        return null;
+        // return null;
+        // TODO: Remove this dummy config
+        return JsonConfig.create(TwoCaptchaConfigInterface.class);
     }
 
     @Override
@@ -62,18 +66,6 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     @Override
     public void extendServicePabel(List<ServiceCollection<?>> services) {
     }
-    // @Override
-    // public Map<String, Integer> getWaitForOthersDefaultMap() {
-    // HashMap<String, Integer> ret = new HashMap<String, Integer>();
-    // ret.put(JacSolverService.ID, 30000);
-    // ret.put(NineKwSolverService.ID, 120000);
-    // ret.put(ImageTyperzSolverService.ID, 60000);
-    // // ret.put(CheapCaptchaSolverService.ID, 60000);
-    // // ret.put(EndCaptchaSolverService.ID, 60000);
-    // // ret.put(TwoCaptchaSolverService.ID, 60000);
-    // ret.put(TwoCaptchaSolverService.ID, 60000);
-    // return ret;
-    // }
 
     @Override
     public Map<String, Integer> getWaitForOthersDefaultMap() {

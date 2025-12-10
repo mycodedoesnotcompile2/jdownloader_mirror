@@ -34,8 +34,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.JumploadsCom;
 
-@DecrypterPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51951 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsComFolder extends PluginForDecrypt {
     public JumploadsComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +80,8 @@ public class JumploadsComFolder extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl().replace(oldDomain + "/", this.getHost() + "/");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (JumploadsCom.is_file_offline_html(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("class=\"tc empty-dir\"")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);

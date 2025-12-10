@@ -23,15 +23,14 @@ import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ClickCaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaResponse;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -78,7 +77,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws InterruptedException, SolverException, SkipException {
         final Challenge<?> captchachallenge = job.getChallenge();
-        // final Challenge<String> captchachallenge = (Challenge<String>) job.getChallenge();
+        job.setStatus(SolverStatus.UPLOADING);
         try {
             final Map<String, Object> postdata = new HashMap<String, Object>();
             final String apikey = account.getPass();
@@ -152,10 +151,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 task.put("comment", captchachallenge.getExplain());
             }
             postdata.put("task", task);
-            // TODO
-            // job.showBubble(this);
-            checkInterruption();
-            job.setStatus(SolverStatus.SOLVING);
             /* Submit captcha */
             final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBase() + "/createTask", postdata);
             br.getPage(req_createTask);
@@ -164,7 +159,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             final Map<String, Object> postdata_getTaskResult = new HashMap<String, Object>();
             postdata_getTaskResult.put("clientKey", apikey);
             postdata_getTaskResult.put("taskId", id);
-            job.setStatus(new SolverStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_solving(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 10)));
+            /* Wait for captcha answer */
+            job.setStatus(SolverStatus.SOLVING);
             while (job.getJob().isAlive() && !job.getJob().isSolved()) {
                 checkInterruption();
                 final PostRequest req_getTaskResult = br.createJSonPostRequest(this.getApiBase() + "/getTaskResult", postdata_getTaskResult);
@@ -172,23 +168,25 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 entries = this.handleAPIErrors(br, getCurrentAccount());
                 logger.info(br.getRequest().getHtmlCode());
                 final String status = entries.get("status").toString();
-                if (status.equals("processing")) {
-                    Thread.sleep(5000);
+                if (status.equalsIgnoreCase("processing")) {
+                    /* Not yet ready */
+                    Thread.sleep(getPollingIntervalMillis());
                     continue;
                 }
+                if (!status.equalsIgnoreCase("ready")) {
+                    /* Something must've gone wrong */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 final Map<String, Object> solutionmap = (Map<String, Object>) entries.get("solution");
-                final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("corrdinates");
-                final String resultText;
-                final String gRecaptchaResponse = (String) solutionmap.get("gRecaptchaResponse");
+                final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("coordinates");
+                /* Answer for interactive browser captchas is given both in field "gRecaptchaResponse" and "solution". */
+                // final String gRecaptchaResponse = (String) solutionmap.get("gRecaptchaResponse");
                 final String token = (String) solutionmap.get("token");
-                if (gRecaptchaResponse != null) {
-                    resultText = gRecaptchaResponse;
-                } else if (token != null) {
-                    /* For example reCaptchaV2, CloudflareTurnstile */
-                    resultText = token;
-                } else if (clicklist != null) {
-                    // TODO
-                    resultText = "TODO_IMPLEMENT_CLICK_CAPTCHA";
+                AbstractResponse resp = null;
+                if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
+                    resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, token, 0);
+                } else if (captchachallenge instanceof MultiClickCaptchaChallenge || captchachallenge instanceof ClickCaptchaChallenge) {
+                    // TODO: Test this
                     final int[] x = new int[clicklist.size()];
                     final int[] y = new int[clicklist.size()];
                     int i = 0;
@@ -201,19 +199,20 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                     if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                         final MultiClickedPoint mcp = new MultiClickedPoint(x, y);
                         final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-                        MultiClickCaptchaResponse multiClickCaptchaResponse = new MultiClickCaptchaResponse(challenge, this, mcp, 0);
-                    } else if (captchachallenge instanceof ImageCaptchaChallenge) {
+                        resp = new MultiClickCaptchaResponse(challenge, this, mcp, 0);
+                    } else {
                         final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
                         final ClickedPoint cp = new ClickedPoint(x[0], y[0]);
-                        ClickCaptchaResponse clickCaptchaResponse = new ClickCaptchaResponse(challenge, this, cp, 0);
-                        // ((SolverJob<ClickedPoint>))job.setAnswer(clickCaptchaResponse);
+                        resp = new ClickCaptchaResponse(challenge, this, cp, 0);
                     }
-                    job.setAnswer(null);
                 } else {
-                    resultText = solutionmap.get("text").toString();
+                    resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, solutionmap.get("text").toString(), 0);
                 }
-                // TODO
-                // job.setAnswer(new TwoCaptchaResponse(captchaChallenge, this, id, resultText));
+                if (resp == null) {
+                    throw new IllegalArgumentException();
+                }
+                resp.setCaptchaSolverTaskID(id);
+                job.setAnswer(resp);
                 return;
             }
         } catch (IOException e) {

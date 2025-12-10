@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 51933 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51951 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -938,10 +938,10 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 /* Double fail-safe */
                 logger.info("Stopping because: Reached last page");
                 break;
-            } else {
-                page++;
-                query.addAndReplace("max_id", Encoding.urlEncode(max_id));
             }
+            /* Continue to next page */
+            page++;
+            query.addAndReplace("max_id", Encoding.urlEncode(max_id));
         } while (true);
         return ret;
     }

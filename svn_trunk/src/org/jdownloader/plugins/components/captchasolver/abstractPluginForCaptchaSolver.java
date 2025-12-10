@@ -28,7 +28,7 @@ import jd.plugins.PluginForHost;
  * Abstract base class for captcha solver plugins.
  */
 public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
-    // Minimum balance threshold for notifications
+    // Minimum balance threshold for notifications, TODO: Add functionality
     private static final double MIN_BALANCE_THRESHOLD = 1.0; // $1.00 USD/EUR
 
     /**
@@ -245,6 +245,11 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public boolean notifyOnLowBalance() {
         // TODO: Implement setting and logic
         return true;
+    }
+
+    /** Returns interval used for polling when waiting for captcha solution from solver. */
+    protected int getPollingIntervalMillis() {
+        return 5000;
     }
 
     /**

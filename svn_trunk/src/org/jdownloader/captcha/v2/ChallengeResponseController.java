@@ -16,7 +16,6 @@ import org.appwork.timetracker.TrackerRule;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
@@ -415,33 +414,31 @@ public class ChallengeResponseController {
                 logger.log(e);
             }
         }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
-            final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
-            final HashSet<String> unavailableSolverDomains = new HashSet<String>();
-            for (final Account solverAccount : solverAccounts) {
-                boolean success = false;
-                try {
-                    final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
-                    final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
-                    if (solver == null) {
-                        /* E.g. solver cannot handle challenge it gets presented */
-                        continue;
-                    }
-                    ret.add(solver);
-                    success = true;
-                } catch (final Throwable e) {
-                    logger.log(e);
-                } finally {
-                    if (success) {
-                        unavailableSolverDomains.remove(solverAccount.getHoster());
-                    } else {
-                        unavailableSolverDomains.add(solverAccount.getHoster());
-                    }
+        final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
+        final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
+        final HashSet<String> unavailableSolverDomains = new HashSet<String>();
+        for (final Account solverAccount : solverAccounts) {
+            boolean success = false;
+            try {
+                final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
+                final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
+                if (solver == null) {
+                    /* E.g. solver cannot handle challenge it gets presented */
+                    continue;
+                }
+                ret.add(solver);
+                success = true;
+            } catch (final Throwable e) {
+                logger.log(e);
+            } finally {
+                if (success) {
+                    unavailableSolverDomains.remove(solverAccount.getHoster());
+                } else {
+                    unavailableSolverDomains.add(solverAccount.getHoster());
                 }
             }
-            logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         }
+        logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         return ret;
     }
 

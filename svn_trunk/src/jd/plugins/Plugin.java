@@ -39,33 +39,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkCheckerThread;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.BrowserSettingsThread;
-import jd.http.ProxySelectorInterface;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP.ENCODING;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.PluginForHost.FILENAME_SOURCE;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.utils.JDUtilities;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -104,6 +77,7 @@ import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.UserIOProgress;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver.CAPTCHA_TYPE;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -117,6 +91,33 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkCheckerThread;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.BrowserSettingsThread;
+import jd.http.ProxySelectorInterface;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP.ENCODING;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.PluginForHost.FILENAME_SOURCE;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.utils.JDUtilities;
 
 /**
  * Diese abstrakte Klasse steuert den Zugriff auf weitere Plugins. Alle Plugins müssen von dieser Klasse abgeleitet werden.
@@ -1462,6 +1463,13 @@ public abstract class Plugin implements ActionListener {
     public boolean hasChallengeResponse() {
         final List<Challenge<?>> challenges = this.challenges;
         return challenges != null && challenges.size() > 0;
+    }
+
+    /*
+     * Returns list of expected captcha types. <br> Returns null or empty list if no captcha is expected.
+     */
+    public CAPTCHA_TYPE[] getExpectedCaptchaTypes() {
+        return null;
     }
 
     protected void displayBubbleNotification(final String title, final String text) {
