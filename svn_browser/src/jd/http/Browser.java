@@ -3222,6 +3222,11 @@ public class Browser {
                             }
                         }
                     }
+                    if (request.containsHTML("Diese Webseite ist aus urheberrechtlichen Gr(&uuml;|ü)nden nicht verf(&uuml;|ü)gbar") && request.containsHTML("https://cuii.info/ueber-uns")) {
+                        // Diese Webseite ist aus urheberrechtlichen Gr&uuml;nden nicht verf&uuml;gbar. <br>
+                        // Zu den Hintergr&uuml;nden informieren Sie sich bitte <a href="https://cuii.info/ueber-uns/">hier</a>.
+                        return this;
+                    }
                     return null;
                 }
             }

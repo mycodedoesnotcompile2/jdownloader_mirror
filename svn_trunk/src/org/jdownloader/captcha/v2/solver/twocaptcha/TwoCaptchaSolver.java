@@ -6,14 +6,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.IO;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -36,6 +34,9 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_TWO_CAPTCHA;
+
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
 
 public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     private static final TwoCaptchaSolver     INSTANCE           = new TwoCaptchaSolver();
@@ -109,23 +110,32 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
             final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
             if (captchaChallenge instanceof RecaptchaV2Challenge) {
                 final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
-                task.put("type", "RecaptchaV2TaskProxyless");
+                String type = "RecaptchaV2TaskProxyless";
                 task.put("websiteKey", challenge.getSiteKey());
                 task.put("websiteURL", challenge.getSiteUrl());
                 final AbstractRecaptchaV2<?> recaptchaChallenge = challenge.getAbstractCaptchaHelperRecaptchaV2();
                 if (recaptchaChallenge != null) {
+                    final Map<String, Object> action = challenge.getV3Action();
                     if (challenge.isEnterprise()) {
                         task.put("isEnterprise", true);
-                    }
-                    final Map<String, Object> action = challenge.getV3Action();
-                    if (action != null && action.containsKey("action")) {
-                        task.put("type", "RecaptchaV3TaskProxyless");
-                        task.put("pageAction", String.valueOf(action.get("action")));
+                        type = "RecaptchaV2EnterpriseTaskProxyless";
                     } else if (challenge.isV3()) {
-                        task.put("type", "RecaptchaV3TaskProxyless");
-                    } else if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
+                        type = "RecaptchaV3TaskProxyless";
+                    }
+                    if (action != null && action.containsKey("action")) {
+                        if (!challenge.isEnterprise()) {
+                            type = "RecaptchaV3TaskProxyless";
+                        }
+                        task.put("pageAction", String.valueOf(action.get("action")));
+                    }
+                    if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
                         task.put("isInvisible", true);
                     }
+                }
+                task.put("type", type);
+                /* 2025-12-10: Small temporary hack for filer.net */
+                if (StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
+                    task.put("minScore", 0.5);
                 }
             } else if (captchaChallenge instanceof HCaptchaChallenge) {
                 final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();

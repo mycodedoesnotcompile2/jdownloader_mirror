@@ -30,7 +30,7 @@ import org.appwork.utils.Time;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.parser.UrlQuery;
 
-@DecrypterPlugin(revision = "$Revision: 50937 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 51954 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -53,7 +53,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 return token;
             } else {
                 final Browser brc = br.cloneBrowser();
-                final GetRequest req = brc.createGetRequest("https://" + getHost() + "/dist/js/global.js");
+                final GetRequest req = brc.createGetRequest("https://" + getHost() + "/dist/js/config.js");
                 GofileIo.getPage(this, brc, req);
                 token = brc.getRegex("websiteToken\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
                 if (token == null) {

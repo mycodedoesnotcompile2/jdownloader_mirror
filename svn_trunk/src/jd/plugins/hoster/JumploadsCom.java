@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51951 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51956 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -152,7 +152,6 @@ public class JumploadsCom extends PluginForHost {
                 weakFilename = urlSlug;
             }
             weakFilename = weakFilename.replace("-", " ").trim();
-            link.setName(weakFilename);
             return Encoding.htmlDecode(urlSlug);
         } else {
             /* Last chance fallback */

@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JumploadsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51951 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51956 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsComFolder extends PluginForDecrypt {
     public JumploadsComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class JumploadsComFolder extends PluginForDecrypt {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/folder/([A-Za-z0-9]+)/([^/]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/folder/([A-Za-z0-9]+)(/([^/]+))?");
         }
         return ret.toArray(new String[0]);
     }
@@ -86,7 +86,10 @@ public class JumploadsComFolder extends PluginForDecrypt {
         } else if (br.containsHTML("class=\"tc empty-dir\"")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
-        final String titleFromURL = Encoding.htmlDecode(new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1)).trim();
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), this.getSupportedLinks());
+        final String folder_id = urlinfo.getMatch(0);
+        String titleFromURL = urlinfo.getMatch(2);
+        String titleFromHTML = br.getRegex("<h2 class=\"name[^\"]*\">([^<]+)</h2>").getMatch(0);
         final String[] htmls = br.getRegex("<a [^>]+ data-isd[^>]+>.*?</div>\\s+</a>").getColumn(-1);
         if (htmls == null || htmls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -110,7 +113,18 @@ public class JumploadsComFolder extends PluginForDecrypt {
             ret.add(dl);
         }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(titleFromURL);
+        if (titleFromHTML != null) {
+            titleFromHTML = Encoding.htmlDecode(titleFromHTML).trim();
+            fp.setName(titleFromHTML);
+        } else if (titleFromURL != null) {
+            titleFromURL = Encoding.htmlDecode(titleFromURL).trim();
+            fp.setName(titleFromURL);
+        } else {
+            /* Final fallback */
+            logger.warning("Failed to find folder_title");
+            fp.setName(folder_id);
+        }
+        fp.setPackageKey("jumploads://folder/" + folder_id);
         fp.addLinks(ret);
         return ret;
     }
