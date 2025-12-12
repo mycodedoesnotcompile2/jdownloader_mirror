@@ -34,9 +34,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.processes.jna.tests;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.app.gui.BasicGui;
@@ -87,6 +90,8 @@ public class TestJNAWindowsProcessHandler extends AWTest {
         testSendCloseToWindow(unique, handler);
         testSendCTRL(unique, handler);
         testKill(unique, handler);
+        testGetLockingProcesses(unique, handler);
+        testGetLockingProcessesNoLock(unique, handler);
     }
 
     protected void testSendCTRL(String unique, ProcessHandler handler) throws IOException, InterruptedException, Exception {
@@ -212,6 +217,101 @@ public class TestJNAWindowsProcessHandler extends AWTest {
         list.remove(instance);
         assertFalse(handler.terminateRequest(instance));
         assertEqualsDeep(list2, list);
+    }
+
+    protected void testGetLockingProcesses(String unique, JNAWindowsProcessHandler handler) throws IOException, InterruptedException, Exception {
+        // Create a temporary file
+        File tempFile = File.createTempFile("testlock-" + unique, ".tmp");
+        tempFile.deleteOnExit();
+        try {
+            // Start a process that locks the file
+            final Command command = new Command(CrossSystem.getJavaBinary(), "-cp", java.lang.management.ManagementFactory.getRuntimeMXBean().getClassPath(), TestFileLock.class.getName(), tempFile.getAbsolutePath(), unique);
+            command.setOutputHandler(new AbstractLineHandler() {
+                @Override
+                public void handleLine(String line, Object caller) {
+                    System.out.println(caller + ":" + line);
+                }
+            });
+            command.start(true);
+            ProcessInfo lockingProcess = null;
+            try {
+                // Wait a bit for the process to start and lock the file
+                Thread.sleep(2000);
+                // Find the process that should be locking the file
+                List<ProcessInfo> javaProcesses = handler.listByPath(CrossSystem.getJavaBinary());
+                Timeout timeout = new Timeout(5000);
+                while (timeout.isAlive() && lockingProcess == null) {
+                    javaProcesses = handler.listByPath(CrossSystem.getJavaBinary());
+                    for (ProcessInfo p : javaProcesses) {
+                        if (p.getCommandLine().contains(TestFileLock.class.getName()) && p.getCommandLine().contains(unique)) {
+                            lockingProcess = p;
+                            break;
+                        }
+                    }
+                    if (lockingProcess == null) {
+                        Thread.sleep(500);
+                    }
+                }
+                assertTrue(lockingProcess != null, "Could not find locking process");
+                // Test getLockingProcesses
+                List<ProcessInfo> lockingProcesses = handler.getLockingProcesses(tempFile);
+                assertTrue(lockingProcesses.size() == 1, "getLockingProcesses should return one process");
+                // Verify that our process is in the list
+                Set<Integer> lockingPids = new HashSet<Integer>();
+                for (ProcessInfo pi : lockingProcesses) {
+                    lockingPids.add(pi.getPid());
+                }
+                assertTrue(lockingPids.contains(lockingProcess.getPid()), "Locking process PID " + lockingProcess.getPid() + " should be in the list of locking processes");
+                logInfoAnyway("Found " + lockingProcesses.size() + " locking process(es) for file: " + tempFile.getAbsolutePath());
+                for (ProcessInfo pi : lockingProcesses) {
+                    logInfoAnyway("  - PID: " + pi.getPid() + ", Name: " + pi.getReadableName() + ", Path: " + pi.getExecutablePath());
+                }
+                // Now unlock the file by terminating the process
+                command.destroy();
+                // Wait for process to exit
+                if (lockingProcess != null) {
+                    handler.waitForExit(TimeSpan.parse("5s"), lockingProcess);
+                }
+                // Wait a bit more to ensure file handles are released
+                Thread.sleep(500);
+                // Verify that getLockingProcesses now returns empty list
+                List<ProcessInfo> lockingProcessesAfterUnlock = handler.getLockingProcesses(tempFile);
+                assertTrue(lockingProcessesAfterUnlock.isEmpty(), "getLockingProcesses should return empty list after unlocking file, but returned " + lockingProcessesAfterUnlock.size() + " process(es)");
+                logInfoAnyway("Correctly returned empty list after unlocking file: " + tempFile.getAbsolutePath());
+            } finally {
+                // Ensure process is terminated even if something went wrong
+                if (command.getProcess() != null && command.getProcess().isAlive()) {
+                    command.destroy();
+                }
+            }
+        } finally {
+            // Clean up temp file
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+        }
+    }
+
+    protected void testGetLockingProcessesNoLock(String unique, JNAWindowsProcessHandler handler) throws IOException, InterruptedException, Exception {
+        // Create a temporary file that is NOT locked
+        File tempFile = File.createTempFile("testnolock-" + unique, ".tmp");
+        tempFile.deleteOnExit();
+        try {
+            // Write some content to the file
+            java.nio.file.Files.write(tempFile.toPath(), ("Test content for " + unique).getBytes());
+            // Ensure file is closed (not locked by any process)
+            // Wait a moment to ensure file handles are released
+            Thread.sleep(500);
+            // Test getLockingProcesses - should return empty list
+            List<ProcessInfo> lockingProcesses = handler.getLockingProcesses(tempFile);
+            assertTrue(lockingProcesses.isEmpty(), "getLockingProcesses should return empty list for unlocked file, but returned " + lockingProcesses.size() + " process(es)");
+            logInfoAnyway("Correctly returned empty list for unlocked file: " + tempFile.getAbsolutePath());
+        } finally {
+            // Clean up temp file
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+        }
     }
 
     public static void main(String[] args) {

@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
+import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
@@ -40,6 +41,96 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof ImageCaptchaChallenge;
             }
+
+            @Override
+            public String getDisplayName() {
+                return "Image Captcha";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return null;
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                // TODO: Add DomainInfo with fitting icon
+                return DomainInfo.getInstance("jdownloader.org");
+            }
+
+            @Override
+            public String getDescription() {
+                return "Simple image-based captcha where you need to solve a visual challenge";
+            }
+
+            @Override
+            public String getDomain() {
+                return null;
+            }
+        },
+        SINGLE_CLICK_CAPTCHA {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return c instanceof ClickCaptchaChallenge;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "Single Click image Captcha";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return null;
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                // TODO: Add DomainInfo with fitting icon
+                return DomainInfo.getInstance("jdownloader.org");
+            }
+
+            @Override
+            public String getDescription() {
+                return "Simple click-based captcha where you click on a single element";
+            }
+
+            @Override
+            public String getDomain() {
+                return null;
+            }
+        },
+        MULTI_CLICK_CAPTCHA {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return c instanceof MultiClickCaptchaChallenge;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "Multi Click image Captcha";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return null;
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                // TODO: Add DomainInfo with fitting icon
+                return DomainInfo.getInstance("jdownloader.org");
+            }
+
+            @Override
+            public String getDescription() {
+                return "Advanced click-based captcha requiring multiple clicks on specific elements";
+            }
+
+            @Override
+            public String getDomain() {
+                return null;
+            }
         },
         RECAPTCHA_V2_INVISIBLE {
             @Override
@@ -54,6 +145,32 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
                     return false;
                 }
             }
+
+            @Override
+            public String getDisplayName() {
+                return "reCAPTCHA v2 Invisible";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                // TODO: Find reCaptcha invisible demo
+                return "https://www.google.com/recaptcha/api2/demo";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Google's invisible reCAPTCHA v2 that runs in the background without user interaction";
+            }
+
+            @Override
+            public String getDomain() {
+                return "google.com";
+            }
         },
         RECAPTCHA_V2_ENTERPRISE {
             @Override
@@ -64,11 +181,62 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
                 final RecaptchaV2Challenge cl = (RecaptchaV2Challenge) c;
                 return cl.isEnterprise();
             }
+
+            @Override
+            public String getDisplayName() {
+                return "reCAPTCHA v2 Enterprise";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                // TODO: Find better reCaptcha enterprise demo
+                return "https://recaptcha-demo.appspot.com/recaptcha-v2-invisible.php";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Google's enterprise reCAPTCHA v2 with advanced security features";
+            }
+
+            @Override
+            public String getDomain() {
+                return "google.com";
+            }
         },
         RECAPTCHA_V2 {
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof RecaptchaV2Challenge;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "reCAPTCHA v2";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.google.com/recaptcha/api2/demo";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Google's reCAPTCHA v2 with checkbox verification";
+            }
+
+            @Override
+            public String getDomain() {
+                return "google.com";
             }
         },
         HCAPTCHA {
@@ -76,23 +244,61 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof HCaptchaChallenge;
             }
+
+            @Override
+            public String getDisplayName() {
+                return "hCaptcha";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://hcaptcha.com/?tab=demo";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Privacy-focused alternative to reCAPTCHA with image-based challenges";
+            }
+
+            @Override
+            public String getDomain() {
+                return "hcaptcha.com";
+            }
         },
         CUTCAPTCHA {
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof CutCaptchaChallenge;
             }
-        },
-        SINGLE_CLICK_CAPTCHA {
+
             @Override
-            public boolean canHandle(Challenge<?> c) {
-                return c instanceof ClickCaptchaChallenge;
+            public String getDisplayName() {
+                return "Cutcaptcha";
             }
-        },
-        MULTI_CLICK_CAPTCHA {
+
             @Override
-            public boolean canHandle(Challenge<?> c) {
-                return c instanceof MultiClickCaptchaChallenge;
+            public String getDemoUrl() {
+                return "https://www.cutcaptcha.com/";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Interactive puzzle-based captcha service. Mostly used for provider 'Filecrypt'.";
+            }
+
+            @Override
+            public String getDomain() {
+                return "cutcaptcha.com";
             }
         },
         /* Types that exist but we don't support. */
@@ -101,17 +307,94 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             public boolean canHandle(Challenge<?> c) {
                 return false;
             }
+
+            @Override
+            public String getDisplayName() {
+                return "Geetest v1";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.geetest.com/en/adaptive-captcha-demo";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Geetest v1 captcha (not currently supported)";
+            }
+
+            @Override
+            public String getDomain() {
+                return "geetest.com";
+            }
         },
         GEETEST_V4 {
             @Override
             public boolean canHandle(Challenge<?> c) {
+                /* 2025-12-11: Currently not supported by JDownloader */
                 return false;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "Geetest v4";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.geetest.com/en/adaptive-captcha-demo";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Geetest v4 captcha";
+            }
+
+            @Override
+            public String getDomain() {
+                return "geetest.com";
             }
         },
         CLOUDFLARE_TURNSTILE {
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof CloudflareTurnstileChallenge;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "Cloudflare Turnstile";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                // TODO: Add better demo URL
+                return "https://2captcha.com/demo/cloudflare-turnstile";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "Cloudflare's Turnstile captcha alternative with improved performance";
+            }
+
+            @Override
+            public String getDomain() {
+                return "cloudflare.com";
             }
         },
         MT_CAPTCHA {
@@ -120,6 +403,31 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             public boolean canHandle(Challenge<?> c) {
                 /* 2025-04-30: Not supported by JDownloader yet. */
                 return false;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "mTCaptcha";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.mtcaptcha.com/";
+            }
+
+            @Override
+            public DomainInfo getDomainInfo() {
+                return DomainInfo.getInstance(getDomain());
+            }
+
+            @Override
+            public String getDescription() {
+                return "mTCaptcha service (not currently supported)";
+            }
+
+            @Override
+            public String getDomain() {
+                return "mtcaptcha.com";
             }
         };
 
@@ -131,6 +439,41 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
          * @return true if this captcha type can handle the challenge, false otherwise
          */
         public abstract boolean canHandle(Challenge<?> c);
+
+        /**
+         * Returns the display name of this captcha type.
+         *
+         * @return Display name as String
+         */
+        public abstract String getDisplayName();
+
+        /**
+         * Returns the demo URL for this captcha type.
+         *
+         * @return Demo URL as String, or null if not applicable
+         */
+        public abstract String getDemoUrl();
+
+        /**
+         * Returns domain information for this captcha type.
+         *
+         * @return DomainInfo object, currently always null
+         */
+        public abstract DomainInfo getDomainInfo();
+
+        /**
+         * Returns a description of this captcha type.
+         *
+         * @return Description as String
+         */
+        public abstract String getDescription();
+
+        /**
+         * Returns the domain of the captcha provider.
+         *
+         * @return Domain as String (e.g. "google.com"), or null if not applicable
+         */
+        public abstract String getDomain();
 
         public static CAPTCHA_TYPE getCaptchaTypeForChallenge(Challenge<?> c) {
             if (c == null) {

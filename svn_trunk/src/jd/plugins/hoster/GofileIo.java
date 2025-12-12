@@ -34,6 +34,7 @@ import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
+import jd.http.requests.HeadRequest;
 import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -67,7 +68,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51958 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -245,9 +246,10 @@ public class GofileIo extends PluginForHost {
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        /* 2021-11-30: Token cookie is even needed to check directURLs! */
         getAndSetToken(this, br, account);
+        br.setCurrentURL("https://gofile.io/");// referer is checked on download
         final boolean allowDirecturlLinkcheck = true;
+        // NOTE: download URLs are bound to token
         if (allowDirecturlLinkcheck && this.checkDirectLink(link, account) != null) {
             logger.info("Availablecheck via directurl complete");
             return AvailableStatus.TRUE;
@@ -310,7 +312,8 @@ public class GofileIo extends PluginForHost {
         URLConnectionAdapter con = null;
         try {
             final Browser br2 = br.cloneBrowser();
-            con = br2.openHeadConnection(dllink);
+            final HeadRequest request = br2.createHeadRequest(dllink);
+            con = br2.openRequestConnection(request);
             if (!this.looksLikeDownloadableContent(con)) {
                 throw new IOException();
             }

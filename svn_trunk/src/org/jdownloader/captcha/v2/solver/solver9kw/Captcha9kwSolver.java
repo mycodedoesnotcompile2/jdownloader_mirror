@@ -87,7 +87,7 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
             final byte[] data = IO.readFile(((ImageCaptchaChallenge) captchaChallenge).getImageFile());
             final UrlQuery qi = createQueryForUpload(solverJob, options, data);
             final UrlQuery queryPoll = createQueryForPolling();
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(captchaChallenge);
             br.setAllowedResponseCodes(new int[] { 500 });
             final String captchaID = upload(br, solverJob, qi);
             poll(br, options, solverJob, captchaID, queryPoll);
@@ -133,7 +133,7 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
             qi.appendEncoded("captchachoice", "hcaptcha");
             qi.appendEncoded("interactive", "1");
             final UrlQuery queryPoll = createQueryForPolling();
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(hCaptcha);
             br.setAllowedResponseCodes(new int[] { 500 });
             final String captchaID = upload(br, solverJob, qi);
             poll(br, options, solverJob, captchaID, queryPoll);
@@ -193,7 +193,7 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
             qi.appendEncoded("securetoken", rcChallenge.getSecureToken());
             qi.appendEncoded("interactive", 1 + "");
             final UrlQuery queryPoll = createQueryForPolling();
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(rcChallenge);
             br.setAllowedResponseCodes(new int[] { 500 });
             final String captchaID = upload(br, solverJob, qi);
             poll(br, options, solverJob, captchaID, queryPoll);

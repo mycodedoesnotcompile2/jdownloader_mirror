@@ -281,7 +281,6 @@ public class InterfaceHandler<T> {
         this.signatureHandler = null;
         Class<T> signatureHandlerNeededClass = null;
         for (final Class<T> interfaceClass : this.interfaceClasses) {
-
             for (final Method m : interfaceClass.getMethods()) {
                 if (m.getAnnotation(ApiHiddenMethod.class) != null) {
                     continue;
@@ -289,7 +288,6 @@ public class InterfaceHandler<T> {
                 if (m.getAnnotation(ApiDoNotExpose.class) != null) {
                     continue;
                 }
-
                 int paramCounter = 0;
                 for (final Class<?> c : m.getParameterTypes()) {
                     if (c != RemoteAPIRequest.class && c != RemoteAPIResponse.class) {
@@ -343,7 +341,6 @@ public class InterfaceHandler<T> {
                     this.signatureRequiredMethods.add(m);
                 }
             }
-
         }
         if (signatureHandlerNeededClass != null && this.signatureHandler == null) {
             throw new ParseException(signatureHandlerNeededClass + " Contains methods that need validated Signatures but no Validator provided");
@@ -374,12 +371,10 @@ public class InterfaceHandler<T> {
      * @throws ParseException
      */
     private void validateMethod(final Method m) throws ParseException {
-
         if ("help".equalsIgnoreCase(m.getName())) {
             throw new ParseException(m + " is reserved for internal usage");
         }
         boolean responseIsParamater = false;
-
         for (final Type t : m.getGenericParameterTypes()) {
             if (RemoteAPIRequest.class == t) {
                 continue;
@@ -401,7 +396,6 @@ public class InterfaceHandler<T> {
                 // void is ok.
                 return;
             }
-
         }
         return;
     }
@@ -420,7 +414,7 @@ public class InterfaceHandler<T> {
                     }
                 }
             }
-        } catch (Throwable e) {            
+        } catch (Throwable e) {
             e.printStackTrace();
         }
         return null;

@@ -113,6 +113,46 @@ public class ProcessInfo {
     }
 
     /**
+     * Application type from Windows Restart Manager (e.g., MainWindow, Service, Console)
+     */
+    private RestartManagerApplicationType applicationType;
+
+    /**
+     * @return the applicationType
+     */
+    public RestartManagerApplicationType getApplicationType() {
+        return applicationType;
+    }
+
+    /**
+     * @param applicationType
+     *            the applicationType to set
+     */
+    public void setApplicationType(RestartManagerApplicationType applicationType) {
+        this.applicationType = applicationType;
+    }
+
+    /**
+     * Readable application name from Windows Restart Manager (e.g., "7-Zip File Manager")
+     */
+    private String readableName;
+
+    /**
+     * @return the readableName
+     */
+    public String getReadableName() {
+        return readableName;
+    }
+
+    /**
+     * @param readableName
+     *            the readableName to set
+     */
+    public void setReadableName(String readableName) {
+        this.readableName = readableName;
+    }
+
+    /**
      * @param intValue
      * @param string
      */
@@ -168,5 +208,7 @@ public class ProcessInfo {
         this.id = processInfo.getId();
         this.commandLine = processInfo.getCommandLine();
         this.creationTime = processInfo.getCreationTime();
+        this.applicationType = processInfo.getApplicationType();
+        this.readableName = processInfo.getReadableName();
     }
 }

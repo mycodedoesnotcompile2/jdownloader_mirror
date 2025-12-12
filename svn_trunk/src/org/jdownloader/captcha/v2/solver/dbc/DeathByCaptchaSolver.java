@@ -75,10 +75,19 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
+    protected LogSource getLogger() {
+        return logger;
+    }
+
+    @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
             return true;
         } else if (c instanceof RecaptchaV2Challenge) {
+            if (((RecaptchaV2Challenge) c).isEnterprise()) {
+                // not yet supported
+                return false;
+            }
             return true;
         } else if (c instanceof CutCaptchaChallenge) {
             return true;
@@ -97,7 +106,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         try {
             challenge.sendStatsSolving(this);
             job.setStatus(SolverStatus.UPLOADING);
-            final Browser br = createBrowser();
+            final Browser br = createNewBrowserInstance(challenge);
             final PostFormDataRequest r = new PostFormDataRequest(API_BASE + "/captcha");
             final String username = config.getUserName();
             final String password = config.getPassword();
@@ -119,23 +128,23 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 r.addFormData(new FormData("hcaptcha_params", JSonStorage.serializeToJson(hcaptcha_params)));
             } else if (challenge instanceof RecaptchaV2Challenge) {
                 /* https://deathbycaptcha.com/api/newtokenrecaptcha */
-                final RecaptchaV2Challenge rc = (RecaptchaV2Challenge) challenge;
+                final RecaptchaV2Challenge rc_challenge = (RecaptchaV2Challenge) challenge;
                 final Map<String, Object> token_param = new HashMap<String, Object>();
-                token_param.put("googlekey", rc.getSiteKey());
-                final Map<String, Object> v3action = rc.getV3Action();
+                token_param.put("googlekey", rc_challenge.getSiteKey());
+                token_param.put("pageurl", rc_challenge.getSiteUrl());
+                final Map<String, Object> v3action = rc_challenge.getV3Action();
                 if (v3action != null) {
                     // recaptchav3
                     type = "RecaptchaV3";
                     r.addFormData(new FormData("type", "5"));
                     // required parameters,https://deathbycaptcha.com/user/api/newtokenrecaptcha#reCAPTCHAv3
                     token_param.put("action", v3action.get("action"));
-                    token_param.put("pageurl", rc.getSiteUrl());
-                    token_param.put("min_score", "0.3");// minimal score
+                    token_param.put("min_score", rc_challenge.getMinScore());
                 } else {
-                    if (rc.isV3()) {
+                    if (rc_challenge.isV3()) {
                         type = "RecaptchaV3";
                         r.addFormData(new FormData("type", "5"));
-                    } else if (rc.isInvisible()) {
+                    } else if (rc_challenge.isInvisible()) {
                         type = "RecaptchaV2 invisible";
                         r.addFormData(new FormData("type", "4"));
                     } else {
@@ -144,7 +153,6 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                     }
                     // required parameters
                     // token_param.put("google_stoken", rv2c.getSecureToken());
-                    token_param.put("pageurl", rc.getSiteUrl());
                 }
                 // TODO invisible captcha oder falsche domain /pageurl hier
                 r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
@@ -189,7 +197,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 long startTime = Time.systemIndependentCurrentJVMTimeMillis();
                 while (true) {
                     checkInterruption();
-                    Thread.sleep(1000);
+                    Thread.sleep(5000);
                     job.getLogger().info("deathbycaptcha.com NO answer after " + ((Time.systemIndependentCurrentJVMTimeMillis() - startTime) / 1000) + "s ");
                     br.getPage(API_BASE + "/captcha/" + uploadStatus.getCaptcha());
                     status = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), DBCUploadResponse.TYPE);
@@ -299,7 +307,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                         } else {
                             query = query.addAndReplace("password", URLEncode.encodeRFC2396(password)).addAndReplace("username", URLEncode.encodeRFC2396(username));
                         }
-                        createBrowser().postPage(API_BASE + "/captcha/" + captcha.getCaptcha() + "/report", query);
+                        createNewBrowserInstance(null).postPage(API_BASE + "/captcha/" + captcha.getCaptcha() + "/report", query);
                     }
                 } catch (final Throwable e) {
                     logger.log(e);
@@ -350,7 +358,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         } else {
             query = query.addAndReplace("password", URLEncode.encodeRFC2396(password)).addAndReplace("username", URLEncode.encodeRFC2396(username));
         }
-        final String json = createBrowser().postPage(API_BASE + "/user", query);
+        final String json = createNewBrowserInstance(null).postPage(API_BASE + "/user", query);
         if (StringUtils.containsIgnoreCase(json, "<htm")) {
             throw new IOException("Invalid server response");
         }
@@ -361,12 +369,14 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         return JSonStorage.restoreFromString(json, DBCGetUserResponse.TYPE);
     }
 
-    private Browser createBrowser() {
-        final Browser br = new Browser();
+    @Override
+    protected Browser createNewBrowserInstance(Challenge<?> challenge) {
+        final Browser br = super.createNewBrowserInstance(challenge);
         br.setLogger(logger);
         br.setDebug(true);
         br.getHeaders().put("Accept", "application/json");
         br.getHeaders().put("User-Agent", "JDownloader");
         return br;
     }
+
 }

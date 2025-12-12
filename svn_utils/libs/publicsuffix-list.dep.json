@@ -19,6 +19,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd"
     },
     {
@@ -37,6 +38,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de"
     },
     {
@@ -55,6 +57,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa"
     },
     {
@@ -73,6 +76,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5"
     },
     {
@@ -91,6 +95,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556"
     },
     {
@@ -109,6 +114,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc"
     },
     {
@@ -127,6 +133,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.305.3 a4a3877056578c2b7225fa10fd144115539f9c64"
     },
     {
@@ -145,6 +152,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.310.1 e65bca4146a494d60dd4d3beb4a244376fb3825b"
     },
     {
@@ -163,6 +171,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.313.0 2733c1c9d0dad52c58e1fd04ea33952751a1f2fb"
     },
     {
@@ -181,6 +190,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.316.0 9258f6f90ccebbe68bd128393e38d3c5d5430d99"
     },
     {
@@ -199,6 +209,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.316.2 ca9b2901aa9ba1a2a4174ba92d036ffeb496e25a"
     },
     {
@@ -217,6 +228,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.317.3 c5a2c693abe0851e2aad80062f9ef654c05372ca"
     },
     {
@@ -235,6 +247,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.323.3 b00d15ea62059a24d57cac96740c98dcb80b6edc"
     },
     {
@@ -253,6 +266,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.325.2 204403f44f41a1466f8c4a6dace5596258c86b14"
     },
     {
@@ -271,6 +285,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.325.4 ab15d334922d67b6063d0098b6b6ae49e3d34a0f"
     },
     {
@@ -289,6 +304,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.327.0 cb7517da54bfba1bc262c68e5151f6df52a90677"
     },
     {
@@ -307,6 +323,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.328.0 931546b3beb45b544d0692aa116b420fb34b9dfa"
     },
     {
@@ -325,6 +342,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.331.0 bf32ba1ae6228a185ebf297d636f1c6541149c45"
     },
     {
@@ -343,6 +361,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.332.3 e1b1608547b24bb84034c1083060e3293e7907d0"
     },
     {
@@ -361,6 +380,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.334.1 70df5fb64d3337f49a1cb5e2e9d3bf3aa7a20f0f"
     },
     {
@@ -379,6 +399,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.337.1 a12cce094e9c97b3ea7ce921faeea606fde7ef98"
     },
     {
@@ -397,6 +418,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.339.1 7e9bf740f43749a8d57bc0d577783c8861d2663c"
     },
     {
@@ -415,6 +437,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.344.0 d20bb7fddc89f1c840b006f19be3c293a9b9aa8a"
     },
     {
@@ -433,6 +456,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.345.0 8ddd1834323e2e51a5208b6fa235c4750e19138c"
     },
     {
@@ -451,6 +475,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.347.7 d351216c9d8f2e1af9587dbfa285c8202c781bf3"
     },
     {
@@ -469,6 +494,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.350.0 0660ae7ec652fc051b3968c1cb36f03accd2a48c"
     },
     {
@@ -487,6 +513,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.351.1 bc9a4ea7bea6062240b3b6161125931925283dc1"
     },
     {
@@ -505,6 +532,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2024.359.7 f229d7f87051bb6197b315f42adae05cb68e33b5"
     },
     {
@@ -523,6 +551,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.5.0 397a13cba5672b1b4eb847995fc91e03fc3893e1"
     },
     {
@@ -541,6 +570,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.7.3 17440f51f53e1fb0e53f1d843dceb235a25893cf"
     },
     {
@@ -559,6 +589,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.8.0 d1420f641cf8523ae758342e8b5661287718d33f"
     },
     {
@@ -577,6 +608,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.9.0 d283cf7b0d097b0ac17b59e984e25827b91d4e69"
     },
     {
@@ -595,6 +627,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370"
     },
     {
@@ -613,6 +646,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737"
     },
     {
@@ -631,6 +665,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.21.1 47264b57765919188b9f4144de8d95cf77e1b6dc"
     },
     {
@@ -649,6 +684,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.25.0 2aa65d89a1b96b0065ad5970734200eed5a38713"
     },
     {
@@ -667,6 +703,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.31.2 5421ee732b6ad9733220267cd8d3d6b45a63ce05"
     },
     {
@@ -685,6 +722,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4"
     },
     {
@@ -703,6 +741,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577"
     },
     {
@@ -721,6 +760,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8"
     },
     {
@@ -739,6 +779,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.43.0 560007a8aea8267f15cad9abcdbcff7848186bd8"
     },
     {
@@ -757,6 +798,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.49.0 445e11a2ebe9ef1ff9c1983ed8e1ff6e5b5cda28"
     },
     {
@@ -775,6 +817,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.52.0 f83c8b19f351e813eda3ace0cc224ad965b79465"
     },
     {
@@ -793,6 +836,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.58.0 23f7ef2b96a01338ac761a395aa5d37572850567"
     },
     {
@@ -811,6 +855,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.59.1 9020852e6fadfeb0ea31f73486ede566de9b3093"
     },
     {
@@ -829,6 +874,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.64.0 b5aa82bff01b7f9ebd61ab118a224ad8ca57bf43"
     },
     {
@@ -847,6 +893,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7"
     },
     {
@@ -865,6 +912,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91"
     },
     {
@@ -883,6 +931,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded"
     },
     {
@@ -901,6 +950,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.87.1 b39e35ef3835c5db7aaf311c179fc1f6d92b92d5"
     },
     {
@@ -919,6 +969,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.101.3 54ed390e7c41b363942c07a19b8d456d4ca6aa13"
     },
     {
@@ -937,6 +988,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.112.2 6aeba31da00f72ffa035a8f1e4cd1b5c27dfaf01"
     },
     {
@@ -955,6 +1007,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.114.6 8605b91ddd176ffa4333adc3a6b4b6eece59f3b5"
     },
     {
@@ -973,6 +1026,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.115.0 7be9636c95503ce3ad400089d5448db28b0c0596"
     },
     {
@@ -991,6 +1045,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.119.0 e6828b0220ba84deedd48cc3477d2209649ca1ca"
     },
     {
@@ -1009,6 +1064,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.122.1 38015c25a1ecd231d411f599248563da3d64289a"
     },
     {
@@ -1027,6 +1083,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.128.4 0f514676eb334e07cddb8551ac824a5e95f10985"
     },
     {
@@ -1045,6 +1102,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.132.0 823beb1425def931c8b0b170a6bc33b424c3f9b0"
     },
     {
@@ -1063,6 +1121,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.137.0 d4f072b4db3db5c0bd6b144b54eba1802b763c96"
     },
     {
@@ -1081,6 +1140,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.147.0 f011d9d9fb6e3a625575440a223ee3167125992d"
     },
     {
@@ -1099,6 +1159,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.148.1 9228b7033159f1490bbc9fe45159a5aeb8da62ad"
     },
     {
@@ -1117,6 +1178,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.153.0 c792070bab60deb20e497677bf33e4e198433033"
     },
     {
@@ -1135,6 +1197,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.167.0 2141aa8a1f634c2b839175c559ceaac6a849592c"
     },
     {
@@ -1153,6 +1216,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.177.0 9ae55199aa39694b19b7791d2e7b0b7592b3bdd7"
     },
     {
@@ -1171,6 +1235,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b"
     },
     {
@@ -1189,6 +1254,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953"
     },
     {
@@ -1207,6 +1273,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.197.2 f0e36343e894c3094e4a1f6e88d68496c95ab8c3"
     },
     {
@@ -1225,6 +1292,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.203.0 66d74ce941749134f5b0c9f0b9ab3393084b0c21"
     },
     {
@@ -1243,6 +1311,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.223.1 568a834e835595f125e115cda197ab2ee66cc3db"
     },
     {
@@ -1261,6 +1330,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.225.1 2d435aebd8a70c0c77891e48516dc97cd7d28b1f"
     },
     {
@@ -1279,6 +1349,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.230.1 f6d9f996b248aa92a6fcf7dd739730220f1cbabd"
     },
     {
@@ -1297,6 +1368,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5"
     },
     {
@@ -1315,6 +1387,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.240.0 4103956c4300902436b03d7da482536e757b3601"
     },
     {
@@ -1333,6 +1406,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.253.1 c5d0e29d0d1b094ca1173497ff4e46b998d149c1"
     },
     {
@@ -1351,6 +1425,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.261.1 4a97adbc7f153c31b7d0f62a32bf856f0f1ee6c2"
     },
     {
@@ -1369,6 +1444,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.265.1 fe0ff47a24a5e77fa530703be0a7e378f85e14ac"
     },
     {
@@ -1387,6 +1463,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.268.0 c219a208200b713e056ad62d193672e34a539ab9"
     },
     {
@@ -1405,6 +1482,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.272.2 07f088c3601c917bec4a070e439f03944ebb4227"
     },
     {
@@ -1423,6 +1501,7 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993"
     },
     {
@@ -1441,12 +1520,32 @@
       }],
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
+      "signatures":null,
       "version":"2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889"
+    },
+    {
+      "changes":"2025.297.1 c280d0b7e29a4c829d37ecedb079cb24abaca222\t: Add bearblog.dev to PRIVATE section (#2620)\r\n2025.298.0 7ca3728d124daa3ee5664fb1667f4ae2fc4c1669\t: util: gTLD data autopull updates for 2025-10-24T15:19:14 UTC (#2630)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nICANN Json removed .dunlop\r\n2025.299.0 30f4f4244cfef423c0150cfab53a5d89bc734f65\t: Update `.bd` in ICANN section (#2623)\n\n* Update public_suffix_list.dat\n\n Update .bd section to enable second-level domain registrations\n\n* Update public_suffix_list.dat\n\nMy previous pull request https://github.com/publicsuffix/list/pull/2623 was failed due to unsorted list. Adding this new request with sorted one and modified _psl TXT.\r\n\r\nOrganization Name:\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nOrganization Website:\r\nhttps://btcl.portal.gov.bd/\r\n\r\nSubmitter:\r\nJoyeeta Sen Rimpee\r\nRegistry Operator, .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nRole-based Contact:\r\ndgm.domain@btcl.gov.bd\r\n\r\nAbuse Contact:\r\nemail: dgm.domain@btcl.gov.bd\r\n\r\nOrganization Overview:\r\nBangladesh Telecommunications Company Limited (BTCL) is the state-owned national telecommunications provider of Bangladesh and the official operator of the country code top-level domain (ccTLD) .bd, delegated by IANA and managed under the authority of the Government of Bangladesh.\r\nBTCL maintains the authoritative DNS infrastructure for .bd and .বাংলা, ensuring operational stability, DNSSEC deployment, and compliance with global Internet governance standards.\r\n\r\nReason for PSL Inclusion\r\n\r\nBTCL has officially enabled second-level domain registrations directly under .bd (e.g., example.bd) in addition to the existing structured third-level domains (e.g., example.com.bd, example.net.bd).\r\n\r\nThis update ensures that modern Internet infrastructure and hosting services\u2014including browsers, certificate authorities, cPanel, Cloudflare, and Let\u2019s Encrypt\u2014correctly recognize second-level .bd domains as registrable and valid.\r\n\r\nThe previous PSL configuration (*.bd) treated all subdomains as public registrable domains, which caused issues with cookie scope, HTTPS certificate validation, and domain recognition across major platforms.\r\nThe updated section below accurately represents the .bd namespace and preserves compatibility with both second-level and structured third-level registrations.\r\n\r\nProposed .bd Section:\r\n\r\n// Bangladesh : https://btcl.gov.bd\r\nbd\r\ncom.bd\r\nnet.bd\r\norg.bd\r\nedu.bd\r\ngov.bd\r\nac.bd\r\nmil.bd\r\ntv.bd\r\nco.bd\r\nai.bd\r\nsch.bd\r\nid.bd\r\nit.bd\r\ninfo.bd\r\n\r\nNumber of users this request is being made to serve:\r\nCurrently serving approximately 50,000 registered domains under .bd, with continuous growth as BTCL introduces direct second-level registration to encourage local digital presence.\r\n\r\nThird-party impact:\r\nThis submission is not intended to circumvent any third-party limits. However, the change will ensure proper functionality for:\r\n\r\nSSL/TLS certificate issuance (Let\u2019s Encrypt, DigiCert)\r\n\r\nHosting providers (cPanel, Plesk, Cloudflare)\r\n\r\nBrowser cookie scope handling (Chrome, Firefox, Safari)\r\n\r\nDuration of registration:\r\nAll listed second-level and third-level zones are registry-controlled and maintained with long-term renewals exceeding 2 years.\r\n\r\nAdditional Acknowledgements\r\n\r\nBTCL confirms:\r\nResponsibility for ongoing maintenance of .bd and its subzones.\r\nOpen communication with PSL maintainers via dgm.domain@btcl.gov.bd.\r\nActive abuse reporting channel publicly listed on btclportal.gov.bd\r\n\r\nSummary\r\n\r\nThis request aligns .bd with other ccTLDs (such as .uk, .in, .jp) that have transitioned to include second-level domain registrations.\r\nIt enhances domain usability, international compatibility, and DNS integrity across Bangladesh\u2019s national domain space.\r\n\r\nSubmitted by:\r\nDeputy General Manager\r\nRegistry Operator \u2013 .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\nEmail: dgm.domain@btcl.gov.bd, joyeetasen06@gmail.com\n\n* Update public_suffix_list.dat\n\nremoved empty line\r\n2025.300.0 b8816d09172f8f9ae8a51b4f8b22b20958291fb1\t: Add directwp.eu (#2600)\r\n2025.300.1 834a6c2e2a17467bb14c1f11c896bbfba9a4dd9e\t: add the ia.ve extension (#2592)\r\n2025.300.2 a20b1aa039dbd307132e61cc9961194cf0175a14\t: Add gitbook.io to the list (#2629)\r\n2025.300.3 95159fc75a06b786e5cc249820b690e494d9f039\t: Add statichost.eu (#2611)\r\n2025.300.4 8515b0cb8b0e2941a37803493c9d68f1c7ceb67e\t: Add reference link to .ve (#2636)\n\nAdded comments and submission information for '.ve' domains.\r\n2025.301.0 edb46e9c5f146e9302eb6f37b0c859b10ca9354c\t: add cloudflare.app to public suffix (#2631)\r\n2025.302.0 8e3b7b7885c7c198a66df3df8c049c066d7c1a6b\t: Add `wasmer.app` to Public Suffix List (#2635)\n\n`wasmer.app` is the eTLD for all apps hosted by Wasmer Edge's\nproduction environment. Each subdomain is its own app.\r\n2025.310.0 8a6908f3823256c5319a38b67ff20e8c1ab2c686\t: add bank.in and fin.in to the public suffix list (#2603)\n\nCo-authored-by: Ambikeshwar Srivastava <sambikeshwar@fortinet.com>\r\n2025.311.0 4a713a8a0606f2c6257aa630c7e1c0cd81306e0c\t: Adding bank.in and fin.in (#2652)\n\nAdded BANK.IN and FIN.IN on 06th of November 2025 by Gaurav Kansal ( GAURAV.KANSAL@NIC.IN)\r\n2025.312.0 9476034f965ca9dcfaf88c337f010e90fdc17795\t: util: gTLD data autopull updates for 2025-11-08T15:16:38 UTC (#2653)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.314.0 66bee43058306ce4ec3fc69b83d32f48ca88c7ce\t: Add Mocha to public suffix list (#2651)\r\n2025.314.1 0fe8347e72fdac046abc658fe9bf0027328fa2b5\t: Update `.no` section (#2648)\n\nRemoved entries for 'bjarkoy.no', 'bjarkøy.no', and 'mosvik.no' from the public suffix list.\r\n2025.314.2 fd029dd331dd5ae0f52495c115b8fece48f65fb4\t: add `figma-gov.site` (#2640)\r\n2025.314.3 27eccb1b6a2e34768f577e915713524e05a51c6e\t: Add Developed Methods LLC to PSL (#2641)\r\n2025.314.4 ac0cca381b7043df7dc4755d9a434ad991302efe\t: Remove Netfy Domains from public suffix list (#2642)\r\n2025.314.5 20d6be8515062d30b385d804c29f5a4f8205be7c\t: add ispmanager.name (#2638)\r\n2025.314.6 9b05e2b87afa0c681fc84688940e871e51d1e3d9\t: Add edu.fj and id.fj to Fiji ccTLD section (#2607)\r\n2025.314.7 c95fd3ae4c0f4ca1e454cbc6a374136f3f5c649a\t: AWS Submissions to the Public Suffix List - Q3 2025 (#2536)\n\n* Add rules for Amazon Relational Database Service\n\n* Add rules for Amazon Managed Workflows for Apache Airflow\n\n* Add rules for AWS Elastic Beanstalk\n\n* Add rules for AWS Lambda Function URLs\r\n2025.315.0 4eb9fbbdea1ba430c5040e7bd6b5ac2748b210be\t: Add tunnelmole.net reverse proxy service (#2646)\r\n2025.315.1 1ecde4048dfda7d3ed99c74b47cf9fccbaa8b985\t: Add de5.net (#2655)\r\n2025.316.0 7fbd910208bc53709cbdb678e136dc40af036190\t: Add co.site (#2633)\r\n2025.318.0 f07e1733675458af3cbd46a4ce3eca90a45680c6\t: Add Umso.co (#2661)\r\n2025.318.1 64ba165cf391818a086139239c8fa223264eebcc\t: Add emergent.cloud and emergent.host (#2662)\r\n2025.321.0 e31cf59c0b3d9de1ecb5001ef329f39b71597749\t: remove `wdh.app` and `hrsn.au` (#2665)\r\n2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48\t: Add prvw.eu (#2658)",
+      "date":"2025-11-20T17:19:18.546+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"30b3793949887ef9446800e389075773e997cc5aadac35b7c6d61c5824475571"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":null,
+      "version":"2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48"
     }
   ],
   "installed":{
-    "changes":"2025.297.1 c280d0b7e29a4c829d37ecedb079cb24abaca222\t: Add bearblog.dev to PRIVATE section (#2620)\r\n2025.298.0 7ca3728d124daa3ee5664fb1667f4ae2fc4c1669\t: util: gTLD data autopull updates for 2025-10-24T15:19:14 UTC (#2630)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nICANN Json removed .dunlop\r\n2025.299.0 30f4f4244cfef423c0150cfab53a5d89bc734f65\t: Update `.bd` in ICANN section (#2623)\n\n* Update public_suffix_list.dat\n\n Update .bd section to enable second-level domain registrations\n\n* Update public_suffix_list.dat\n\nMy previous pull request https://github.com/publicsuffix/list/pull/2623 was failed due to unsorted list. Adding this new request with sorted one and modified _psl TXT.\r\n\r\nOrganization Name:\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nOrganization Website:\r\nhttps://btcl.portal.gov.bd/\r\n\r\nSubmitter:\r\nJoyeeta Sen Rimpee\r\nRegistry Operator, .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nRole-based Contact:\r\ndgm.domain@btcl.gov.bd\r\n\r\nAbuse Contact:\r\nemail: dgm.domain@btcl.gov.bd\r\n\r\nOrganization Overview:\r\nBangladesh Telecommunications Company Limited (BTCL) is the state-owned national telecommunications provider of Bangladesh and the official operator of the country code top-level domain (ccTLD) .bd, delegated by IANA and managed under the authority of the Government of Bangladesh.\r\nBTCL maintains the authoritative DNS infrastructure for .bd and .বাংলা, ensuring operational stability, DNSSEC deployment, and compliance with global Internet governance standards.\r\n\r\nReason for PSL Inclusion\r\n\r\nBTCL has officially enabled second-level domain registrations directly under .bd (e.g., example.bd) in addition to the existing structured third-level domains (e.g., example.com.bd, example.net.bd).\r\n\r\nThis update ensures that modern Internet infrastructure and hosting services\u2014including browsers, certificate authorities, cPanel, Cloudflare, and Let\u2019s Encrypt\u2014correctly recognize second-level .bd domains as registrable and valid.\r\n\r\nThe previous PSL configuration (*.bd) treated all subdomains as public registrable domains, which caused issues with cookie scope, HTTPS certificate validation, and domain recognition across major platforms.\r\nThe updated section below accurately represents the .bd namespace and preserves compatibility with both second-level and structured third-level registrations.\r\n\r\nProposed .bd Section:\r\n\r\n// Bangladesh : https://btcl.gov.bd\r\nbd\r\ncom.bd\r\nnet.bd\r\norg.bd\r\nedu.bd\r\ngov.bd\r\nac.bd\r\nmil.bd\r\ntv.bd\r\nco.bd\r\nai.bd\r\nsch.bd\r\nid.bd\r\nit.bd\r\ninfo.bd\r\n\r\nNumber of users this request is being made to serve:\r\nCurrently serving approximately 50,000 registered domains under .bd, with continuous growth as BTCL introduces direct second-level registration to encourage local digital presence.\r\n\r\nThird-party impact:\r\nThis submission is not intended to circumvent any third-party limits. However, the change will ensure proper functionality for:\r\n\r\nSSL/TLS certificate issuance (Let\u2019s Encrypt, DigiCert)\r\n\r\nHosting providers (cPanel, Plesk, Cloudflare)\r\n\r\nBrowser cookie scope handling (Chrome, Firefox, Safari)\r\n\r\nDuration of registration:\r\nAll listed second-level and third-level zones are registry-controlled and maintained with long-term renewals exceeding 2 years.\r\n\r\nAdditional Acknowledgements\r\n\r\nBTCL confirms:\r\nResponsibility for ongoing maintenance of .bd and its subzones.\r\nOpen communication with PSL maintainers via dgm.domain@btcl.gov.bd.\r\nActive abuse reporting channel publicly listed on btclportal.gov.bd\r\n\r\nSummary\r\n\r\nThis request aligns .bd with other ccTLDs (such as .uk, .in, .jp) that have transitioned to include second-level domain registrations.\r\nIt enhances domain usability, international compatibility, and DNS integrity across Bangladesh\u2019s national domain space.\r\n\r\nSubmitted by:\r\nDeputy General Manager\r\nRegistry Operator \u2013 .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\nEmail: dgm.domain@btcl.gov.bd, joyeetasen06@gmail.com\n\n* Update public_suffix_list.dat\n\nremoved empty line\r\n2025.300.0 b8816d09172f8f9ae8a51b4f8b22b20958291fb1\t: Add directwp.eu (#2600)\r\n2025.300.1 834a6c2e2a17467bb14c1f11c896bbfba9a4dd9e\t: add the ia.ve extension (#2592)\r\n2025.300.2 a20b1aa039dbd307132e61cc9961194cf0175a14\t: Add gitbook.io to the list (#2629)\r\n2025.300.3 95159fc75a06b786e5cc249820b690e494d9f039\t: Add statichost.eu (#2611)\r\n2025.300.4 8515b0cb8b0e2941a37803493c9d68f1c7ceb67e\t: Add reference link to .ve (#2636)\n\nAdded comments and submission information for '.ve' domains.\r\n2025.301.0 edb46e9c5f146e9302eb6f37b0c859b10ca9354c\t: add cloudflare.app to public suffix (#2631)\r\n2025.302.0 8e3b7b7885c7c198a66df3df8c049c066d7c1a6b\t: Add `wasmer.app` to Public Suffix List (#2635)\n\n`wasmer.app` is the eTLD for all apps hosted by Wasmer Edge's\nproduction environment. Each subdomain is its own app.\r\n2025.310.0 8a6908f3823256c5319a38b67ff20e8c1ab2c686\t: add bank.in and fin.in to the public suffix list (#2603)\n\nCo-authored-by: Ambikeshwar Srivastava <sambikeshwar@fortinet.com>\r\n2025.311.0 4a713a8a0606f2c6257aa630c7e1c0cd81306e0c\t: Adding bank.in and fin.in (#2652)\n\nAdded BANK.IN and FIN.IN on 06th of November 2025 by Gaurav Kansal ( GAURAV.KANSAL@NIC.IN)\r\n2025.312.0 9476034f965ca9dcfaf88c337f010e90fdc17795\t: util: gTLD data autopull updates for 2025-11-08T15:16:38 UTC (#2653)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.314.0 66bee43058306ce4ec3fc69b83d32f48ca88c7ce\t: Add Mocha to public suffix list (#2651)\r\n2025.314.1 0fe8347e72fdac046abc658fe9bf0027328fa2b5\t: Update `.no` section (#2648)\n\nRemoved entries for 'bjarkoy.no', 'bjarkøy.no', and 'mosvik.no' from the public suffix list.\r\n2025.314.2 fd029dd331dd5ae0f52495c115b8fece48f65fb4\t: add `figma-gov.site` (#2640)\r\n2025.314.3 27eccb1b6a2e34768f577e915713524e05a51c6e\t: Add Developed Methods LLC to PSL (#2641)\r\n2025.314.4 ac0cca381b7043df7dc4755d9a434ad991302efe\t: Remove Netfy Domains from public suffix list (#2642)\r\n2025.314.5 20d6be8515062d30b385d804c29f5a4f8205be7c\t: add ispmanager.name (#2638)\r\n2025.314.6 9b05e2b87afa0c681fc84688940e871e51d1e3d9\t: Add edu.fj and id.fj to Fiji ccTLD section (#2607)\r\n2025.314.7 c95fd3ae4c0f4ca1e454cbc6a374136f3f5c649a\t: AWS Submissions to the Public Suffix List - Q3 2025 (#2536)\n\n* Add rules for Amazon Relational Database Service\n\n* Add rules for Amazon Managed Workflows for Apache Airflow\n\n* Add rules for AWS Elastic Beanstalk\n\n* Add rules for AWS Lambda Function URLs\r\n2025.315.0 4eb9fbbdea1ba430c5040e7bd6b5ac2748b210be\t: Add tunnelmole.net reverse proxy service (#2646)\r\n2025.315.1 1ecde4048dfda7d3ed99c74b47cf9fccbaa8b985\t: Add de5.net (#2655)\r\n2025.316.0 7fbd910208bc53709cbdb678e136dc40af036190\t: Add co.site (#2633)\r\n2025.318.0 f07e1733675458af3cbd46a4ce3eca90a45680c6\t: Add Umso.co (#2661)\r\n2025.318.1 64ba165cf391818a086139239c8fa223264eebcc\t: Add emergent.cloud and emergent.host (#2662)\r\n2025.321.0 e31cf59c0b3d9de1ecb5001ef329f39b71597749\t: remove `wdh.app` and `hrsn.au` (#2665)\r\n2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48\t: Add prvw.eu (#2658)",
-    "date":"2025-11-20T17:19:18.546+01:00",
+    "changes":"2025.328.0 bf4f2d47e2b6a58eb160df6deba3acb217f7f9a2\t: Add xtooldevice.com (#2613)\r\n2025.328.1 6be64e4d01d9e5dde6afab60154c546e3caecd14\t: add sld ᬩᬮᬶ.id (#2673)\r\n2025.328.2 565e9dc7907cba1b3ae6b6d588120ec54d789806\t: Add grebedoc.dev (#2664)\r\n2025.330.0 d572776986ac2431fe72536339cf23c52d36d9ee\t: Brave Submissions to the Public Suffix List - Q4 2025 (#2668)\r\n2025.330.1 57fe3782c08b97be51672e098c9ccc529538b408\t: Remove `obl.ong` (#2368)\r\n2025.330.2 d74821138fd58ad8caab21d3b91f1a7fa3c09e91\t: Add Microsoft Azure US government cloud service domains (#2660)\n\n* Add US government cloud service domains\r\n2025.330.3 7456e993bf8822a643b3f807234ae2a76f6f6512\t: Add Gadget Software Inc. domains: `gadget.app` and `gadget.host` (#2666)\r\n2025.331.0 d3567de748c61e2de5a3156cc52ef0e0fdc1dc0c\t: Add AgentbaseAI *.auiusercontent.com to public suffix list (#2676)\r\n2025.338.0 f6e59d0fcbf77987d8dff6ba69a7700026a6141b\t: Remove lk3.ru (#1149) (#2682)\r\n2025.338.1 a79ee032efd3a77ed6b107e0be702c4f547d8f29\t: Add new public suffix 'preview.emergentagent.com' (#2681)\r\n2025.338.2 ea600e443a922cd3f1e2f96e1db3f860d0b097ea\t: Add Redpanda Data entries for rdpa.co (#2679)\r\n2025.340.0 24874d0227995dff18964458432da2b987eb4837\t: util: gTLD data autopull updates for 2025-12-06T15:17:26 UTC (#2686)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520\t: Adding co.scot, me.scot, and org.scot (#2683)",
+    "date":"2025-12-08T14:51:51.778+01:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -1551,7 +1650,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"30b3793949887ef9446800e389075773e997cc5aadac35b7c6d61c5824475571"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"74c6de09a8f99ec3af903e83f628104ea911979b7d89e1379f63a1a817426cd7"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1561,7 +1660,8 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48"
+    "signatures":{},
+    "version":"2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520"
   },
   "minJRE":null,
   "provider":"github-clone",

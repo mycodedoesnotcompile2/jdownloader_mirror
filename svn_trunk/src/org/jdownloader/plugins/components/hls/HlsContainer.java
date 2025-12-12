@@ -8,17 +8,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
-
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.GenericM3u8;
+
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 public class HlsContainer {
     public static class MEDIA {
@@ -780,6 +780,7 @@ public class HlsContainer {
     }
 
     public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... medias) {
+        // old variant to store information
         if (this.getWidth() > 0) {
             link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
         }
@@ -797,19 +798,15 @@ public class HlsContainer {
         }
         link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
         link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
-        link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_GROUP, getAudioGroupID());
+
+        // new variant to store the information
+        final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
         for (HlsContainer.MEDIA media : medias) {
             if (media == null) {
                 continue;
             }
-            switch (media.getType()) {
-            case AUDIO:
-                link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_LNG, media.getLanguage());
-                link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_NAME, media.getName());
-                break;
-            default:
-                break;
-            }
+            containerStorable.getMedia().add(new HlsContainerMediaStorable(media));
         }
+        link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, containerStorable);
     }
 }

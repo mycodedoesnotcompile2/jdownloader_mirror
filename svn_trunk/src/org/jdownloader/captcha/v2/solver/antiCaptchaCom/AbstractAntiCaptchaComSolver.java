@@ -16,24 +16,29 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.logging.LogController;
 
 public abstract class AbstractAntiCaptchaComSolver<T> extends CESChallengeSolver<T> {
-    private String                            accountStatusString;
+    private String                                accountStatusString;
     protected final AntiCaptchaComConfigInterface config;
-    AtomicInteger                             counter            = new AtomicInteger();
-    AtomicInteger                             counterInterrupted = new AtomicInteger();
-    AtomicInteger                             counterNotOK       = new AtomicInteger();
-    AtomicInteger                             counterOK          = new AtomicInteger();
-    AtomicInteger                             counterSend        = new AtomicInteger();
-    AtomicInteger                             counterSendError   = new AtomicInteger();
-    AtomicInteger                             counterSolved      = new AtomicInteger();
-    AtomicInteger                             counterUnused      = new AtomicInteger();
-    private String                            long_debuglog      = "";
-    protected final LogSource                 logger;
+    AtomicInteger                                 counter            = new AtomicInteger();
+    AtomicInteger                                 counterInterrupted = new AtomicInteger();
+    AtomicInteger                                 counterNotOK       = new AtomicInteger();
+    AtomicInteger                                 counterOK          = new AtomicInteger();
+    AtomicInteger                                 counterSend        = new AtomicInteger();
+    AtomicInteger                                 counterSendError   = new AtomicInteger();
+    AtomicInteger                                 counterSolved      = new AtomicInteger();
+    AtomicInteger                                 counterUnused      = new AtomicInteger();
+    private String                                long_debuglog      = "";
+    protected final LogSource                     logger;
 
     public AbstractAntiCaptchaComSolver() {
         super(new AntiCaptchaComSolverService(), Math.max(1, Math.min(25, JsonConfig.create(AntiCaptchaComConfigInterface.class).getThreadpoolSize())));
         config = JsonConfig.create(AntiCaptchaComConfigInterface.class);
         logger = LogController.getInstance().getLogger(AntiCaptchaComSolver.class.getName());
         threadPool.allowCoreThreadTimeOut(true);
+    }
+
+    @Override
+    protected LogSource getLogger() {
+        return logger;
     }
 
     public synchronized void dellong_debuglog() {

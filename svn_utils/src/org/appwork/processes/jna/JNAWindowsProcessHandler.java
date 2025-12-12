@@ -34,6 +34,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.processes.jna;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -45,15 +46,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.UUID;
+
 
 import org.appwork.jna.processes.CTRLSender;
 import org.appwork.jna.windows.Kernel32Ext;
 import org.appwork.jna.windows.User32Ext;
+import org.appwork.jna.windows.interfaces.RM_PROCESS_INFO;
+import org.appwork.jna.windows.interfaces.Rstrtmgr;
 import org.appwork.jna.windows.wmi.JNAWMIUtils;
 import org.appwork.jna.windows.wmi.WMIException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.processes.ProcessHandler;
 import org.appwork.processes.ProcessInfo;
+import org.appwork.processes.RestartManagerApplicationType;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.NonInterruptibleRunnable;
@@ -61,12 +67,14 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.NotSupportedException;
 import org.appwork.utils.processes.command.Command;
 import org.appwork.utils.processes.command.ProcessOutputHandler;
 
 import com.sun.jna.LastErrorException;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.WString;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.Psapi;
@@ -93,6 +101,10 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
      *
      */
     private static final String[] REQUIRED_PROPERTIES = new String[] { "ProcessId", "CommandLine", "CreationDate", "ExecutablePath", "Name", "ParentProcessId" };
+    /**
+     * Windows error code: ERROR_MORE_DATA - The buffer is too small for the requested data.
+     */
+    private static final int      ERROR_MORE_DATA     = 234;
 
     /**
      * @throws InterruptedException
@@ -117,6 +129,63 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
             return ret;
         } catch (WMIException e) {
             throw new IOException(e);
+        }
+    }
+
+
+    @Override
+    public List<ProcessInfo> getLockingProcesses(File file) throws IOException, NotSupportedException, InterruptedException {
+        // Restart Manager is only available on Windows Vista and later
+        if (!CrossSystem.getOS().isMinimum(CrossSystem.OperatingSystem.WINDOWS_VISTA)) {
+            throw new NotSupportedException("getLockingProcesses requires Windows Vista or later. Current OS: " + CrossSystem.getOS());
+        }
+        IntByReference session = new IntByReference();
+        char[] key = UUID.randomUUID().toString().toCharArray();
+        int res = Rstrtmgr.INSTANCE.RmStartSession(session, 0, key);
+        if (res != 0) {
+            String errorMessage = Kernel32Util.formatMessage(W32Errors.HRESULT_FROM_WIN32(res));
+            throw new IOException("RmStartSession failed for file '" + file + "': " + errorMessage);
+        }
+        try {
+            WString[] files = { new WString(file.getAbsolutePath()) };
+            res = Rstrtmgr.INSTANCE.RmRegisterResources(session.getValue(), 1, files, 0, null, 0, null);
+            if (res != 0) {
+                String errorMessage = Kernel32Util.formatMessage(W32Errors.HRESULT_FROM_WIN32(res));
+                throw new IOException("RmRegisterResources failed for file '" + file + "': " + errorMessage);
+            }
+            IntByReference needed = new IntByReference();
+            IntByReference count = new IntByReference(0);
+            RM_PROCESS_INFO[] list = new RM_PROCESS_INFO[1];
+            // First call: get required buffer size
+            res = Rstrtmgr.INSTANCE.RmGetList(session.getValue(), needed, count, list, new IntByReference());
+            if (res == ERROR_MORE_DATA) {
+                int size = needed.getValue();
+                list = (RM_PROCESS_INFO[]) new RM_PROCESS_INFO().toArray(size);
+                count.setValue(size);
+                // Second call: actually retrieve list
+                res = Rstrtmgr.INSTANCE.RmGetList(session.getValue(), needed, count, list, new IntByReference());
+            }
+            if (res != 0) {
+                String errorMessage = Kernel32Util.formatMessage(W32Errors.HRESULT_FROM_WIN32(res));
+                throw new IOException("RmGetList failed for file '" + file + "': " + errorMessage);
+            }
+            ArrayList<ProcessInfo> ret = new ArrayList<ProcessInfo>();
+            for (int i = 0; i < count.getValue(); i++) {
+                int pid = list[i].Process.dwProcessId;
+                ProcessInfo pi = new ProcessInfo(pid);
+                String appName = Native.toString(list[i].strAppName);
+                int appType = list[i].ApplicationType;
+                pi.setReadableName(appName);
+                pi.setApplicationType(RestartManagerApplicationType.fromValue(appType));
+                ret.add(pi);
+            }
+            return ret;
+        } finally {
+            try {
+                Rstrtmgr.INSTANCE.RmEndSession(session.getValue());
+            } catch (Exception e) {
+                LogV3.log(e);
+            }
         }
     }
 

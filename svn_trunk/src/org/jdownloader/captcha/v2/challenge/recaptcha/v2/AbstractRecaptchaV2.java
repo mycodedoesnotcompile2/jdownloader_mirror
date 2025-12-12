@@ -46,6 +46,7 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
     protected final Browser      br;
     protected String             siteKey;
     protected String             secureToken;
+    private final String         siteDomain;
 
     public String getSecureToken() {
         return getSecureToken(br != null ? br.toString() : null);
@@ -149,7 +150,7 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
             return null;
         }
         for (final String div : divs) {
-            if (new Regex(div, "class\\s*=\\s*('|\")(?:.*?\\s+)?g-recaptcha(-response)?(\\1|\\s+)").matches()) {
+            if (new Regex(div, "class\\s*=\\s*('|\")(?:.*?\\s+)?g-recaptcha(-response)?(\\1|\\s+)").patternFind()) {
                 final String siteKey = new Regex(div, "data-sitekey\\s*=\\s*('|\")\\s*(" + apiKeyRegex + ")\\s*\\1").getMatch(1);
                 if (siteKey != null && StringUtils.equals(siteKey, getSiteKey())) {
                     final String action = new Regex(div, "data-action\\s*=\\s*('|\")\\s*(.*?)\\s*\\1").getMatch(1);
@@ -277,7 +278,13 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
         }
     }
 
-    private final String siteDomain;
+    /**
+     * Use this if a website requires the reCaptcha token answer to have a certain "quality" in order to be accepted. <br>
+     * Example: filer.net
+     */
+    public double getMinScore() {
+        return 0.3d;
+    }
 
     public AbstractRecaptchaV2(final T plugin, final Browser br, final String siteKey, final String secureToken, boolean boundToDomain) {
         this.plugin = plugin;
@@ -516,6 +523,11 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
             @Override
             public boolean isV3() {
                 return VERSION.V3.equals(AbstractRecaptchaV2.this.getVersion());
+            }
+
+            @Override
+            public double getMinScore() {
+                return AbstractRecaptchaV2.this.getMinScore();
             }
 
             @Override

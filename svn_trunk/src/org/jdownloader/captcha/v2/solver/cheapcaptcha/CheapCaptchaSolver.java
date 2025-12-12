@@ -9,6 +9,13 @@ import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.nutils.encoding.Encoding;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -29,13 +36,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CHEAP_CAPTCHA;
 import org.seamless.util.io.IO;
-
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.nutils.encoding.Encoding;
 
 public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     private CheapCaptchaConfigInterface     config;
@@ -66,6 +66,11 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
+    protected LogSource getLogger() {
+        return logger;
+    }
+
+    @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
         return c instanceof BasicCaptchaChallenge;
     }
@@ -75,7 +80,7 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            Browser br = new Browser();
+            Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -176,7 +181,7 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
                         String captcha = ((CheapCaptchaResponse) response).getCaptchaID();
                         Challenge<?> challenge = response.getChallenge();
                         if (challenge instanceof BasicCaptchaChallenge) {
-                            Browser br = new Browser();
+                            Browser br = createNewBrowserInstance(challenge);
                             PostFormDataRequest r = new PostFormDataRequest(" http://api.cheapcaptcha.com/api/captcha/" + captcha + "/report");
                             r.addFormData(new FormData("username", (config.getUserName())));
                             r.addFormData(new FormData("password", (config.getPassword())));
@@ -202,7 +207,7 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     public CheapCaptchaAccount loadAccount() {
         CheapCaptchaAccount ret = new CheapCaptchaAccount();
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(null);
             final PostFormDataRequest r = new PostFormDataRequest("http://api.cheapcaptcha.com/api/user");
             r.addFormData(new FormData("username", (config.getUserName())));
             r.addFormData(new FormData("password", (config.getPassword())));

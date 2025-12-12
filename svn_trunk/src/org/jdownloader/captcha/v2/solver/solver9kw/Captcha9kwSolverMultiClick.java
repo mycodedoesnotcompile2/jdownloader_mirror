@@ -87,7 +87,7 @@ public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiCl
             }
             UrlQuery qi = createQueryForUpload(solverJob, options, data).appendEncoded("multimouse", "1").appendEncoded("textinstructions", captchaChallenge.getExplain());
             UrlQuery queryPoll = createQueryForPolling().appendEncoded("multimouse", "1");
-            Browser br = new Browser();
+            Browser br = createNewBrowserInstance(captchaChallenge);
             br.setAllowedResponseCodes(new int[] { 500 });
             String captchaID = upload(br, solverJob, qi);
             poll(br, options, solverJob, captchaID, queryPoll);

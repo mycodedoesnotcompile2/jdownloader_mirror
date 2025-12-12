@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -21,7 +24,6 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnst
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
@@ -34,9 +36,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_TWO_CAPTCHA;
-
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
 
 public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     private static final TwoCaptchaSolver     INSTANCE           = new TwoCaptchaSolver();
@@ -75,6 +74,11 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
+    protected LogSource getLogger() {
+        return logger;
+    }
+
+    @Override
     public String getAccountStatusString() {
         return accountStatusString;
     }
@@ -110,32 +114,31 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
             final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
             if (captchaChallenge instanceof RecaptchaV2Challenge) {
                 final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
-                String type = "RecaptchaV2TaskProxyless";
+                task.put("type", "RecaptchaV2TaskProxyless");
                 task.put("websiteKey", challenge.getSiteKey());
                 task.put("websiteURL", challenge.getSiteUrl());
-                final AbstractRecaptchaV2<?> recaptchaChallenge = challenge.getAbstractCaptchaHelperRecaptchaV2();
-                if (recaptchaChallenge != null) {
-                    final Map<String, Object> action = challenge.getV3Action();
-                    if (challenge.isEnterprise()) {
-                        task.put("isEnterprise", true);
-                        type = "RecaptchaV2EnterpriseTaskProxyless";
-                    } else if (challenge.isV3()) {
-                        type = "RecaptchaV3TaskProxyless";
-                    }
-                    if (action != null && action.containsKey("action")) {
-                        if (!challenge.isEnterprise()) {
-                            type = "RecaptchaV3TaskProxyless";
-                        }
-                        task.put("pageAction", String.valueOf(action.get("action")));
-                    }
-                    if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
-                        task.put("isInvisible", true);
-                    }
+                final Map<String, Object> action = challenge.getV3Action();
+                if (challenge.isV3() || action != null) {
+                    task.put("type", "RecaptchaV3TaskProxyless");
+                    task.put("isEnterprise", challenge.isEnterprise());
+                } else if (challenge.isEnterprise()) {
+                    task.put("type", "RecaptchaV2EnterpriseTaskProxyless");
                 }
-                task.put("type", type);
-                /* 2025-12-10: Small temporary hack for filer.net */
-                if (StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
-                    task.put("minScore", 0.5);
+                if (action != null) {
+                    task.put("pageAction", action.get("action"));
+                }
+                task.put("isInvisible", TYPE.INVISIBLE.equals(challenge.getType()));
+                task.put("minScore", challenge.getMinScore());
+                if (challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
+                    /**
+                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results. <br>
+                     * Is: https://2captcha.com/api-docs/recaptcha-v2-enterprise#recaptcha-v2-enterprise <br>
+                     * Should be: https://2captcha.com/api-docs/recaptcha-v3
+                     */
+                    /**
+                     * undocumented: RecaptchaV2EnterpriseTaskProxyless also supports pageAction(v3)
+                     */
+                    task.put("type", "RecaptchaV2EnterpriseTaskProxyless");
                 }
             } else if (captchaChallenge instanceof HCaptchaChallenge) {
                 final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();
@@ -169,21 +172,13 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
                 task.put("body", Base64.encodeToString(data, false));
                 task.put("comment", challenge.getExplain());
             }
-            boolean clickCaptcha = false;
-            if (clickCaptcha) {
-                task.put("type", "CoordinatesTask");
-                // v2task.put("body", Base64.encodeToString(data, false));
-                // v2task.put("comment", challenge.getExplain());
-                /* We want a single set of coordinates -> One click */
-                task.put("maxClicks", 1);
-            }
             postdata.put("task", task);
             job.showBubble(this);
             checkInterruption();
             job.getChallenge().sendStatsSolving(this);
             job.setStatus(SolverStatus.SOLVING);
             /* Submit captcha */
-            final Browser br = this.createNewBrowserInstance();
+            final Browser br = this.createNewBrowserInstance(captchaChallenge);
             final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBaseV2() + "/createTask", postdata);
             br.getPage(req_createTask);
             final BalanceResponse resp_createTask = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<BalanceResponse>() {
@@ -202,7 +197,6 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
                 br.getPage(req_getTaskResult);
                 final BalanceResponse resp_getTaskResult = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<BalanceResponse>() {
                 });
-                logger.info(br.getRequest().getHtmlCode());
                 final String status = resp_getTaskResult.getStatus();
                 if (status.equals("processing")) {
                     Thread.sleep(5000);
@@ -270,7 +264,7 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
         }
         final TwoCaptchaResponse twocaptcharesponse = (TwoCaptchaResponse) response;
         final String captchaID = twocaptcharesponse.getCaptchaID();
-        final Browser br = this.createNewBrowserInstance();
+        final Browser br = this.createNewBrowserInstance(null);
         try {
             final String url;
             if (positiveFeedback) {
@@ -446,7 +440,7 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     public TwoCaptchaAccount loadAccount() {
         final TwoCaptchaAccount ret = new TwoCaptchaAccount();
         try {
-            final Browser br = this.createNewBrowserInstance();
+            final Browser br = this.createNewBrowserInstance(null);
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("clientKey", this.config.getApiKey());
             final PostRequest req = br.createJSonPostRequest(this.getApiBaseV2() + "/getBalance", postdata);

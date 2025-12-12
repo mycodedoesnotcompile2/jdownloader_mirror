@@ -32,7 +32,6 @@ import jd.http.BasicAuthentication;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -57,7 +56,7 @@ import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51928 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51969 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -78,6 +77,7 @@ public class FilerNet extends PluginForHost {
     /* API Docs: https://filer.net/api */
     public static final String   API_BASE                                           = "https://filer.net/api";
     public static final String   WEBSITE_BASE                                       = "https://filer.net";
+    private static final float   RECAPTCHA_ENTERPRISE_MIN_SCORE                     = 0.5f;
 
     @SuppressWarnings("deprecation")
     public FilerNet(PluginWrapper wrapper) {
@@ -241,9 +241,15 @@ public class FilerNet extends PluginForHost {
                 for (final DownloadLink link : links) {
                     hashes.add(this.getFileID(link));
                 }
-                final Map<String, Object> postData = new HashMap<String, Object>();
-                postData.put("hashes", hashes);
-                final PostRequest request = br.createJSonPostRequest(getAPI_BASE() + "/multi_status.json", postData);
+                final Request request;
+                if (hashes.size() > 1) {
+                    // due to a bug requires minimum 2 entries in hashes
+                    final Map<String, Object> postData = new HashMap<String, Object>();
+                    postData.put("hashes", hashes);
+                    request = br.createJSonPostRequest(getAPI_BASE() + "/multi_status.json", postData);
+                } else {
+                    request = br.createGetRequest(getAPI_BASE() + "/multi_status/" + hashes.iterator().next() + ".json");
+                }
                 final Map<String, Object> entries = (Map<String, Object>) this.callAPI(null, request);
                 final Map<String, Object> data = (Map<String, Object>) entries.get("data");
                 for (final DownloadLink link : links) {
@@ -357,6 +363,12 @@ public class FilerNet extends PluginForHost {
                 @Override
                 protected boolean isEnterprise() {
                     return true;
+                }
+
+                /* 2025-12-11: Without this, the following erro may happen: {"error":"Score too low: 0.3 (minimum: 0.5)"} */
+                @Override
+                public double getMinScore() {
+                    return RECAPTCHA_ENTERPRISE_MIN_SCORE;
                 }
             };
             String recaptchaV2Response = null;
@@ -633,7 +645,22 @@ public class FilerNet extends PluginForHost {
             }
         } else if (errorO instanceof String) {
             /* e.g. {"error":"Action mismatch: expected 'download', got ''"} */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + errorO);
+            final String error = errorO.toString();
+            final Regex captchaErrorMinScoreFailure = new Regex(error, "Score too low: ([0-9]\\.[0-9]) \\(minimum: ([0-9]\\.[0-9])\\)");
+            if (captchaErrorMinScoreFailure.patternFind()) {
+                // final String receivedScoreStr = captchaErrorMinScoreFailure.getMatch(0);
+                final String minScoreStr = captchaErrorMinScoreFailure.getMatch(1);
+                if (minScoreStr.equals(Float.toString(RECAPTCHA_ENTERPRISE_MIN_SCORE))) {
+                    /*
+                     * Their minScore hasn't changed and still equals our current hardcoded minScore -> Captcha Solver delivered wrong
+                     * result -> Treat as captcha error (wrong captcha)
+                     */
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, error);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, error);
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + error);
         }
         return entries;
     }

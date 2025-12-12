@@ -10,6 +10,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
+
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
@@ -54,12 +60,6 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -249,7 +249,9 @@ public class ChallengeResponseController {
         if (solvers.size() == 0) {
             logger.info("No solver available!");
             if (c instanceof CloudflareTurnstileChallenge) {
-                showNoBrowserSolverInformation(c);
+                showNoBrowserSolverInfoDialog(c, "Cloudflare Turnstile");
+            } else if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise()) {
+                showNoBrowserSolverInfoDialog(c, "reCaptcha Enterprise with custom action");
             }
             /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");
@@ -323,7 +325,7 @@ public class ChallengeResponseController {
 
     protected final static AtomicLong TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new AtomicLong(-1);
 
-    public <T> Thread showNoBrowserSolverInformation(final Challenge<T> c) {
+    public <T> Thread showNoBrowserSolverInfoDialog(final Challenge<T> c, String captcha_challenge_type) {
         while (true) {
             final long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get();
             if ((Time.systemIndependentCurrentJVMTimeMillis() - lastDisplay) < TimeUnit.HOURS.toMillis(1)) {
@@ -333,7 +335,9 @@ public class ChallengeResponseController {
                 break;
             }
         }
-        String captcha_challenge_type = c.getTypeID();
+        if (captcha_challenge_type == null) {
+            captcha_challenge_type = c.getTypeID();
+        }
         if (captcha_challenge_type != null && captcha_challenge_type.contains("turnstile")) {
             captcha_challenge_type = "Cloudflare Turnstile";
         }

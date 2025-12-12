@@ -1,9 +1,17 @@
 package org.jdownloader.captcha.v2.solver;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.http.Browser;
+import jd.plugins.Plugin;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.SolverService;
@@ -14,11 +22,6 @@ import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
-import jd.http.Browser;
 
 public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
     protected final static CaptchaSettings SETTINGS = JsonConfig.create(CaptchaSettings.class);
@@ -50,6 +53,8 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
         return null;
     }
 
+    protected abstract LogSource getLogger();
+
     final public void solve(final SolverJob<T> job) throws InterruptedException, SolverException {
         if (!validateLogins()) {
             return;
@@ -67,8 +72,22 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
         }
     }
 
-    protected Browser createNewBrowserInstance() {
-        return new Browser();
+    protected Browser createNewBrowserInstance(final Challenge<?> challenge) {
+        final Browser br = new Browser();
+        LogInterface logger = null;
+        final Plugin plugin;
+        if (challenge != null && (plugin = challenge.getPlugin()) != null) {
+            logger = plugin.getLogger();
+        }
+        if (logger == null) {
+            logger = getLogger();
+        }
+        if (logger != null) {
+            br.setLogger(logger);
+        }
+        br.setDebug(true);
+        br.setVerbose(true);
+        return br;
     }
 
     protected void solveCES(CESSolverJob<T> job) throws InterruptedException, SolverException {

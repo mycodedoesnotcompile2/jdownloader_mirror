@@ -244,13 +244,11 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         }
     }
 
-    public boolean isV3() {
-        return false;
-    }
+    public abstract double getMinScore();
 
-    public boolean isEnterprise() {
-        return false;
-    }
+    public abstract boolean isV3();
+
+    public abstract boolean isEnterprise();
 
     public AbstractRecaptchaV2<?> getAbstractCaptchaHelperRecaptchaV2() {
         return null;
@@ -260,9 +258,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         return AbstractRecaptchaV2.TYPE.INVISIBLE.name().equals(getType());
     }
 
-    public String getType() {
-        return AbstractRecaptchaV2.TYPE.NORMAL.name();
-    };
+    public abstract String getType();
 
     public String getSiteUrl() {
         return null;

@@ -30,7 +30,7 @@ import org.appwork.utils.Time;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.parser.UrlQuery;
 
-@DecrypterPlugin(revision = "$Revision: 51954 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 51958 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -81,8 +81,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("contentId", folderID);
-        query.appendEncoded("token", token);
-        query.appendEncoded("wt", getWebsiteToken(br));
+        final String X_Website_Token = getWebsiteToken(br);
         String passCode = param.getDecrypterPassword();
         boolean passwordCorrect = true;
         boolean passwordRequired = false;
@@ -98,8 +97,11 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 query.addAndReplace("password", Hash.getSHA256(passCode));
             }
             final GetRequest req = br.createGetRequest("https://api." + this.getHost() + "/contents/" + folderID + "?" + query.toString());
-            if (account != null) {
+            if (token != null) {
                 req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+            }
+            if (X_Website_Token != null) {
+                req.getHeaders().put("X-Website-Token", X_Website_Token);
             }
             req.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + this.getHost()));
             req.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_REFERER, "https://" + this.getHost()));

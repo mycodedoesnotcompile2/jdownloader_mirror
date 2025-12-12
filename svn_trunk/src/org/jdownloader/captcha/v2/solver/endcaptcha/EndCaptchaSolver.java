@@ -5,6 +5,11 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
@@ -21,11 +26,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_END_CAPTCHA;
 import org.seamless.util.io.IO;
-
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
 
 public class EndCaptchaSolver extends CESChallengeSolver<String> {
     private final EndCaptchaConfigInterface config;
@@ -45,6 +45,11 @@ public class EndCaptchaSolver extends CESChallengeSolver<String> {
     @Override
     public EndCaptchaSolverService getService() {
         return (EndCaptchaSolverService) super.getService();
+    }
+
+    @Override
+    protected LogSource getLogger() {
+        return logger;
     }
 
     private EndCaptchaSolver() {
@@ -84,7 +89,7 @@ public class EndCaptchaSolver extends CESChallengeSolver<String> {
         job.getChallenge().sendStatsSolving(this);
         URLConnectionAdapter conn = null;
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -164,7 +169,7 @@ public class EndCaptchaSolver extends CESChallengeSolver<String> {
                         final String captcha = ((EndCaptchaResponse) response).getCaptchaID();
                         final Challenge<?> challenge = response.getChallenge();
                         if (challenge instanceof BasicCaptchaChallenge) {
-                            final Browser br = new Browser();
+                            final Browser br = createNewBrowserInstance(challenge);
                             final PostFormDataRequest r = new PostFormDataRequest(" http://api.endcaptcha.com/api/captcha/" + captcha + "/report");
                             r.addFormData(new FormData("username", (config.getUserName())));
                             r.addFormData(new FormData("password", (config.getPassword())));
@@ -195,7 +200,7 @@ public class EndCaptchaSolver extends CESChallengeSolver<String> {
 
     public EndCaptchaAccount loadAccount() {
         final EndCaptchaAccount ret = new EndCaptchaAccount();
-        final Browser br = new Browser();
+        final Browser br = createNewBrowserInstance(null);
         URLConnectionAdapter conn = null;
         try {
             final PostFormDataRequest r = new PostFormDataRequest("http://api.endcaptcha.com/balance");

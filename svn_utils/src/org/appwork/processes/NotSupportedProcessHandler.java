@@ -34,6 +34,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.processes;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -113,6 +114,15 @@ public class NotSupportedProcessHandler implements ProcessHandler {
      */
     @Override
     public int toFront(ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
+        throw new NotSupportedException("No Supported");
+    }
+
+    /**
+     * @throws NotSupportedException
+     * @see org.appwork.processes.ProcessHandler#getLockingProcesses(java.io.File)
+     */
+    @Override
+    public List<ProcessInfo> getLockingProcesses(File file) throws IOException, NotSupportedException, InterruptedException {
         throw new NotSupportedException("No Supported");
     }
 }

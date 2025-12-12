@@ -47,7 +47,17 @@ public class Installed implements Storable {
     @AllowNonStorableObjects
     private Object                  dependencies;
     private HashMap<String, String> hashes;
-    private List<String>            files;
+    private HashMap<String, String> signatures;
+
+    public HashMap<String, String> getSignatures() {
+        return this.signatures;
+    }
+
+    public void setSignatures(final HashMap<String, String> signatures) {
+        this.signatures = signatures;
+    }
+
+    private List<String> files;
 
     public List<String> getFiles() {
         return this.files;

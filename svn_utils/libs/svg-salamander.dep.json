@@ -12,7 +12,9 @@
       "",
       "meta.json",
       "svgSalamander.jar",
-      "svgSalamander.jar.info"
+      "svgSalamander.jar.asc",
+      "svgSalamander.jar.info",
+      "svgSalamander.jar.info.asc"
     ],
     "hashes":{
       "svgSalamander.jar.info":"37a3e6543de81642ca5e5f2a4ac52b01e504bd6ceda1a52a47ec594350b505eb",
@@ -25,6 +27,10 @@
     }],
     "minJRE":"JVM_1_6",
     "name":"SVG Salamander",
+    "signatures":{
+      "svgSalamander.jar.info":"-----BEGIN PGP SIGNATURE-----\r\n\r\niJUEABMJAB0WIQS6wcvrODSrHRYT3Q8MjH3EEkRaDwUCaTqmQAAKCRAMjH3EEkRa\r\nD/j0AYDK8R45uQ9Qp4mRtjrh15/SYHIT94WTgwiVzA/4DuYrSXGgquj3oJX9PEGI\r\nIlMnAXQBf06TQVfPRox5D/HfjR2cPobfUjo0hGlbe79ZbgLGXWsNOc6JZbi6PgAo\r\nDDOyfBV2aw==\r\n=bDYg\r\n-----END PGP SIGNATURE-----\r\n",
+      "svgSalamander.jar":"-----BEGIN PGP SIGNATURE-----\r\n\r\niJUEABMJAB0WIQS6wcvrODSrHRYT3Q8MjH3EEkRaDwUCaTqfqAAKCRAMjH3EEkRa\r\nDzQMAYCbTiUZnjD8pfOoOnab6jmjt3zi9gv2DbxoFQn5tbUEI6orivHccTZ3DslY\r\nv+fYMfwBf2IwUZ8paOVAa4igEuhkomsM0XpmMMFjWb4PHHLaK44Wg5xXEZl1+TwM\r\n+9UT1JVoiQ==\r\n=u599\r\n-----END PGP SIGNATURE-----\r\n"
+    },
     "version":"1.1.4.1-appwork.jre16"
   },
   "minJRE":"1.6",

@@ -15,17 +15,27 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.config;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.net.Base64InputStream;
+import org.appwork.utils.net.Base64OutputStream;
+import org.appwork.utils.net.CharSequenceInputStream;
 
 /**
  * Von dieser Klasse kann abgeleitet werden wenn die Neue Klasse Properties unterstützen soll. Die SimpleGUI elemente nutzen das um einfache
@@ -440,6 +450,49 @@ public class Property {
             synchronized (NEWIMPLEMENTATION) {
                 propertiesList = null;
             }
+        }
+    }
+
+    public static final Charset UTF8 = Charset.forName("UTF-8");
+
+    public void setCompressedProperty(final String key, final Object value) {
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        final Base64OutputStream b64os = new Base64OutputStream(bos);
+        final SimpleMapper mapper = new SimpleMapper() {
+            @Override
+            protected void initMapper() {
+            }
+
+            @Override
+            public boolean isPrettyPrintEnabled() {
+                return false;
+            }
+        };
+        try {
+            final GZIPOutputStream gos = new GZIPOutputStream(b64os);
+            mapper.writeObject(gos, value);
+            gos.close();
+            setProperty(key + ".gz", new String(bos.toByteArray(), UTF8));
+        } catch (IOException e) {
+            throw new WTFException(e);
+        }
+    }
+
+    public <T> T getCompressedProperty(final String key, TypeRef<T> typeRef) {
+        String compressedGZJSonString = getStringProperty(key + ".gz");
+        if (compressedGZJSonString == null) {
+            // old key from UsenetFile
+            compressedGZJSonString = getStringProperty(key);
+        }
+        if (compressedGZJSonString == null) {
+            return null;
+        }
+        try {
+            final InputStream is = new GZIPInputStream(new Base64InputStream(new CharSequenceInputStream(compressedGZJSonString, UTF8)));
+            final T ret = JSonStorage.getMapper().inputStreamToObject(is, typeRef);
+            return ret;
+        } catch (IOException e) {
+            throw new WTFException(e);
         }
     }
 

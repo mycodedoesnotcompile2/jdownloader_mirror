@@ -110,7 +110,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            final Browser br = createNewBrowserInstance();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -168,7 +168,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            final Browser br = createNewBrowserInstance();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             job.setStatus(SolverStatus.SOLVING);
             final HashMap<String, Object> task = new HashMap<String, Object>();
@@ -213,7 +213,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            final Browser br = createNewBrowserInstance();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -330,7 +330,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     public AntiCaptchaComAccount loadAccount() {
         final AntiCaptchaComAccount ret = new AntiCaptchaComAccount();
         try {
-            final Browser br = createNewBrowserInstance();
+            final Browser br = createNewBrowserInstance(null);
             final HashMap<String, Object> dataMap = new HashMap<String, Object>();
             dataMap.put("clientKey", config.getApiKey());
             final String json = br.postPageRaw(URLHelper.parseLocation(new URL(config.getApiBase()), "/getBalance"), JSonStorage.serializeToJson(dataMap));

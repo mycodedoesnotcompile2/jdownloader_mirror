@@ -10,7 +10,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -178,9 +177,8 @@ public class AccountTooltip extends PanelToolTip {
     }
 
     private List<DomainInfo> getDomainInfos(final AccountServiceCollection accountCollection) {
-        final HashSet<DomainInfo> domains = new HashSet<DomainInfo>();
+        final HashSet<DomainInfo> domain_infos = new HashSet<DomainInfo>();
         if (accountCollection.isCaptchaSolver()) {
-            final String[] captchatypesTestDummies = new String[] { "recaptcha.com", "cutcaptcha.com", "cloudflare.com", "hcaptcha.com" };
             for (final Account acc : accountCollection) {
                 final PluginForHost plg = acc.getPlugin();
                 if (plg == null) {
@@ -188,14 +186,11 @@ public class AccountTooltip extends PanelToolTip {
                 } else if (!(plg instanceof abstractPluginForCaptchaSolver)) {
                     continue;
                 }
-                /* TODO: Remove this dummy handling and replace it with real return values */
                 final abstractPluginForCaptchaSolver captchaplugin = (abstractPluginForCaptchaSolver) plg;
                 final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes();
                 for (final CAPTCHA_TYPE supported_captcha_type : supported_captcha_types) {
-                    final String domain = captchatypesTestDummies[new Random().nextInt(captchatypesTestDummies.length - 1)];
-                    domains.add(DomainInfo.getInstance(domain));
+                    domain_infos.add(supported_captcha_type.getDomainInfo());
                 }
-                domains.add(DomainInfo.getInstance("captcha_type_image"));
             }
         } else {
             /* Multihoster account */
@@ -212,7 +207,7 @@ public class AccountTooltip extends PanelToolTip {
                     switch (mhost.getStatus()) {
                     case WORKING:
                     case WORKING_UNSTABLE:
-                        domains.add(mhost.getDomainInfo());
+                        domain_infos.add(mhost.getDomainInfo());
                         break;
                     default:
                         break;
@@ -220,7 +215,7 @@ public class AccountTooltip extends PanelToolTip {
                 }
             }
         }
-        final ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
+        final ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domain_infos);
         if (ret.size() < 2) {
             return ret;
         }

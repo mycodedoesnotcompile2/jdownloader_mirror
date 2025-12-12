@@ -34,6 +34,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.processes;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -116,4 +117,19 @@ public interface ProcessHandler {
      * @throws NotSupportedException
      */
     public int toFront(ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException;
+
+    /**
+     * Returns a list of processes that are locking the specified file.
+     * 
+     * @param file
+     *            The file to check for locking processes
+     * @return List of ProcessInfo objects representing processes that are locking the file. Empty list if no processes are locking the file.
+     * @throws NotSupportedException
+     *             If the operation is not supported on the current platform (e.g., Windows versions before Vista)
+     * @throws IOException
+     *             If an I/O error occurs
+     * @throws InterruptedException
+     *             If the operation is interrupted
+     */
+    List<ProcessInfo> getLockingProcesses(File file) throws IOException, NotSupportedException, InterruptedException;
 }

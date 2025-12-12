@@ -8,10 +8,14 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+
 import org.appwork.uio.MessageDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.MessageDialogImpl;
@@ -30,9 +34,6 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-
 public abstract class AbstractCaptcha9kwSolver<T> extends CESChallengeSolver<T> {
     private String                     accountStatusString;
     protected final Captcha9kwSettings config;
@@ -46,11 +47,18 @@ public abstract class AbstractCaptcha9kwSolver<T> extends CESChallengeSolver<T> 
     AtomicInteger                      counterUnused      = new AtomicInteger();
     private volatile NineKWAccount     lastAccount        = null;
     private String                     long_debuglog      = "";
+    private LogSource                  logger;
 
     public AbstractCaptcha9kwSolver() {
         super(NineKwSolverService.getInstance(), Math.max(1, Math.min(25, NineKwSolverService.getInstance().getConfig().getThreadpoolSize())));
         config = NineKwSolverService.getInstance().getConfig();
         threadPool.allowCoreThreadTimeOut(true);
+        logger = LogController.getInstance().getLogger(getClass().getName());
+    }
+
+    @Override
+    protected LogSource getLogger() {
+        return logger;
     }
 
     protected Challenge<T> getChallenge(SolverJob<?> job) throws SolverException {
@@ -131,7 +139,7 @@ public abstract class AbstractCaptcha9kwSolver<T> extends CESChallengeSolver<T> 
         ret.setSolved(counterSolved.get());
         ret.setUser(config.getApiKey());
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(null);
             br.setDebug(true);
             br.setVerbose(true);
             String result = br.getPage(getAPIROOT() + "index.cgi?action=usercaptchaguthaben&cbh=1&apikey=" + Encoding.urlEncode(config.getApiKey()));
@@ -213,7 +221,7 @@ public abstract class AbstractCaptcha9kwSolver<T> extends CESChallengeSolver<T> 
             @Override
             public void run() {
                 try {
-                    final Browser br = new Browser();
+                    final Browser br = createNewBrowserInstance(null);
                     br.setAllowedResponseCodes(new int[] { 500 });
                     for (int i = 0; i <= 3; i++) {
                         final String ret = br.getPage(getAPIROOT() + "index.cgi?action=usercaptchacorrectback&source=jd2&correct=" + feedback.code + "&id=" + captchaID + "&apikey=" + Encoding.urlEncode(config.getApiKey()));
@@ -488,7 +496,7 @@ public abstract class AbstractCaptcha9kwSolver<T> extends CESChallengeSolver<T> 
         if (check_highqueue == true) {
             String servercheck = "";
             try {
-                Browser br_short = new Browser();
+                Browser br_short = createNewBrowserInstance(captchaChallenge);
                 servercheck = br_short.getPage(NineKwSolverService.getInstance().getAPIROOT() + "grafik/servercheck.txt");
             } catch (IOException e) {
             }

@@ -54,7 +54,7 @@ public class Captcha9kwSolverClick extends AbstractCaptcha9kwSolver<ClickedPoint
             final byte[] data = IO.readFile(captchaChallenge.getImageFile());
             UrlQuery qi = createQueryForUpload(solverJob, options, data).appendEncoded("mouse", "1");
             UrlQuery queryPoll = createQueryForPolling().appendEncoded("mouse", "1");
-            Browser br = new Browser();
+            Browser br = createNewBrowserInstance(captchaChallenge);
             br.setAllowedResponseCodes(new int[] { 500 });
             String captchaID = upload(br, solverJob, qi);
             poll(br, options, solverJob, captchaID, queryPoll);

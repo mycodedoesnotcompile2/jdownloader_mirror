@@ -55,6 +55,11 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
+    protected LogSource getLogger() {
+        return logger;
+    }
+
+    @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
         return c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge || c instanceof HCaptchaChallenge;
     }
@@ -79,7 +84,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
         URLConnectionAdapter conn = null;
         try {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             job.setStatus(SolverStatus.SOLVING);
             final PostFormDataRequest upload = new PostFormDataRequest("https://captchatypers.com/captchaapi/UploadHCaptchaUser.ashx");
@@ -141,7 +146,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
         URLConnectionAdapter conn = null;
         try {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             job.setStatus(SolverStatus.SOLVING);
             final PostFormDataRequest upload;
@@ -220,7 +225,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
         job.getChallenge().sendStatsSolving(this);
         URLConnectionAdapter conn = null;
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -297,7 +302,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
                         final String captchaID = ((ImageTyperzResponse) response).getCaptchaID();
                         final Challenge<?> challenge = response.getChallenge();
                         if (challenge instanceof BasicCaptchaChallenge) {
-                            final Browser br = new Browser();
+                            final Browser br = createNewBrowserInstance(challenge);
                             final PostFormDataRequest r = new PostFormDataRequest("https://captchatypers.com/Forms/SetBadImage.ashx");
                             final String userName = config.getUserName();
                             r.addFormData(new FormData("action", "SETBADIMAGE"));
@@ -333,7 +338,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
         final ImageTyperzAccount ret = new ImageTyperzAccount();
         URLConnectionAdapter conn = null;
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance(null);
             final PostFormDataRequest r = new PostFormDataRequest("https://captchatypers.com/Forms/RequestBalance.ashx");
             final String userName = config.getUserName();
             r.addFormData(new FormData("action", "REQUESTBALANCE"));
