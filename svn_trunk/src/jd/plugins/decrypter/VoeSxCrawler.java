@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.VoeSx;
 
-@DecrypterPlugin(revision = "$Revision: 51865 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51972 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,6 +96,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
+        /* Try to avoid rate limit via http response 503 */
         return 1;
     }
 
@@ -190,7 +191,10 @@ public class VoeSxCrawler extends PluginForDecrypt {
         } else {
             /* File */
             if (!crawlSubtitle) {
-                /* User does not want subtitle -> Let hosterplugin do the linkcheck as crawler handling is not needed. */
+                /*
+                 * User does not want subtitle -> We have a single result -> Let hosterplugin do the linkcheck as crawler handling is not
+                 * needed.
+                 */
                 ret.add(this.createDownloadlink(param.getCryptedUrl()));
                 return ret;
             }
@@ -215,6 +219,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
             final String videoFilename = link.getName();
             final String packagename;
             if (videoFilename.contains(".")) {
+                /* Remove file extension from filename */
                 packagename = videoFilename.substring(0, videoFilename.lastIndexOf("."));
             } else {
                 packagename = videoFilename;

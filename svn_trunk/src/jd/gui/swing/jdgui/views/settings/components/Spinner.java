@@ -55,8 +55,7 @@ public class Spinner extends ExtSpinner implements SettingsComponent {
     }
 
     public Spinner(IntegerKeyHandler cfg) {
-        super(new ConfigIntSpinnerModel(cfg));
-        init();
+        this(new ConfigIntSpinnerModel(cfg));
     }
 
     @Override

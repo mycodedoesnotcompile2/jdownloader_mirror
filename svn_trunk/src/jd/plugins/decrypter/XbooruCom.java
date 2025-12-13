@@ -17,6 +17,8 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -25,29 +27,28 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.utils.StringUtils;
-
-@DecrypterPlugin(revision = "$Revision: 46348 $", interfaceVersion = 3, names = { "xbooru.com" }, urls = { "https?://(?:www\\.)?xbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=[A-Za-z0-9\\_]+" })
+@DecrypterPlugin(revision = "$Revision: 51975 $", interfaceVersion = 3, names = { "xbooru.com" }, urls = { "https?://(?:www\\.)?xbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=[A-Za-z0-9\\_]+" })
 public class XbooruCom extends PluginForDecrypt {
     public XbooruCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
-        br.getPage(parameter);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String fpName = new Regex(parameter, "tags=([A-Za-z0-9\\_]+)").getMatch(0);
+        final String fpName = new Regex(contenturl, "tags=([A-Za-z0-9\\_]+)").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(Encoding.htmlDecode(fpName.trim()));
-        final String url_part = parameter;
+        fp.setName(Encoding.htmlDecode(fpName).trim());
+        final String url_part = contenturl;
         int page_counter = 1;
         int offset = 0;
         final int max_entries_per_page = 42;
@@ -55,7 +56,7 @@ public class XbooruCom extends PluginForDecrypt {
         do {
             if (this.isAbort()) {
                 logger.info("Decryption aborted by user");
-                return decryptedLinks;
+                return ret;
             }
             if (page_counter > 1) {
                 this.br.getPage(url_part + "&pid=" + offset);
@@ -63,7 +64,7 @@ public class XbooruCom extends PluginForDecrypt {
             logger.info("Decrypting: " + this.br.getURL());
             final String[][] links = br.getRegex("id=\"s(\\d+)\".*?alt=\"\\s*(.*?)\\s*\"").getMatches();
             if (links == null || links.length == 0) {
-                logger.warning("Decrypter might be broken for link: " + parameter);
+                logger.warning("Decrypter might be broken for link: " + contenturl);
                 break;
             }
             entries_per_page_current = links.length;
@@ -79,13 +80,13 @@ public class XbooruCom extends PluginForDecrypt {
                     dl.setName(linkID + ".jpeg");
                 }
                 dl._setFilePackage(fp);
-                decryptedLinks.add(dl);
+                ret.add(dl);
                 distribute(dl);
                 offset++;
             }
             page_counter++;
         } while (entries_per_page_current >= max_entries_per_page);
-        return decryptedLinks;
+        return ret;
     }
 
     @Override

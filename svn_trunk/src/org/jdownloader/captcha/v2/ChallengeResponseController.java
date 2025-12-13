@@ -33,6 +33,7 @@ import org.jdownloader.captcha.blacklist.CaptchaBlackList;
 import org.jdownloader.captcha.event.ChallengeResponseEvent;
 import org.jdownloader.captcha.event.ChallengeResponseEventSender;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
@@ -252,6 +253,8 @@ public class ChallengeResponseController {
                 showNoBrowserSolverInfoDialog(c, "Cloudflare Turnstile");
             } else if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise()) {
                 showNoBrowserSolverInfoDialog(c, "reCaptcha Enterprise with custom action");
+            } else if (c instanceof CutCaptchaChallenge) {
+                showNoBrowserSolverInfoDialog(c, "CutCaptcha");
             }
             /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");

@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
-import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
@@ -32,9 +31,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     // Minimum balance threshold for notifications, TODO: Add functionality
     private static final double MIN_BALANCE_THRESHOLD = 1.0; // $1.00 USD/EUR
 
-    /**
-     * Enum representing different types of captchas with canHandle functionality.
-     */
     public enum CAPTCHA_TYPE {
         IMAGE {
             @Override
@@ -50,12 +46,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             @Override
             public String getDemoUrl() {
                 return null;
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                // TODO: Add DomainInfo with fitting icon
-                return DomainInfo.getInstance("jdownloader.org");
             }
 
             @Override
@@ -85,12 +75,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             }
 
             @Override
-            public DomainInfo getDomainInfo() {
-                // TODO: Add DomainInfo with fitting icon
-                return DomainInfo.getInstance("jdownloader.org");
-            }
-
-            @Override
             public String getDescription() {
                 return "Simple click-based captcha where you click on a single element";
             }
@@ -114,12 +98,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             @Override
             public String getDemoUrl() {
                 return null;
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                // TODO: Add DomainInfo with fitting icon
-                return DomainInfo.getInstance("jdownloader.org");
             }
 
             @Override
@@ -153,13 +131,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
 
             @Override
             public String getDemoUrl() {
-                // TODO: Find reCaptcha invisible demo
                 return "https://www.google.com/recaptcha/api2/demo";
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
             }
 
             @Override
@@ -189,13 +161,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
 
             @Override
             public String getDemoUrl() {
-                // TODO: Find better reCaptcha enterprise demo
                 return "https://recaptcha-demo.appspot.com/recaptcha-v2-invisible.php";
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
             }
 
             @Override
@@ -225,11 +191,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             }
 
             @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
-            }
-
-            @Override
             public String getDescription() {
                 return "Google's reCAPTCHA v2 with checkbox verification";
             }
@@ -256,11 +217,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             }
 
             @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
-            }
-
-            @Override
             public String getDescription() {
                 return "Privacy-focused alternative to reCAPTCHA with image-based challenges";
             }
@@ -284,11 +240,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             @Override
             public String getDemoUrl() {
                 return "https://www.cutcaptcha.com/";
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
             }
 
             @Override
@@ -319,11 +270,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             }
 
             @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
-            }
-
-            @Override
             public String getDescription() {
                 return "Geetest v1 captcha (not currently supported)";
             }
@@ -336,7 +282,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         GEETEST_V4 {
             @Override
             public boolean canHandle(Challenge<?> c) {
-                /* 2025-12-11: Currently not supported by JDownloader */
                 return false;
             }
 
@@ -351,13 +296,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             }
 
             @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
-            }
-
-            @Override
             public String getDescription() {
-                return "Geetest v4 captcha";
+                return "Geetest v4 captcha (not currently supported)";
             }
 
             @Override
@@ -378,13 +318,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
 
             @Override
             public String getDemoUrl() {
-                // TODO: Add better demo URL
                 return "https://2captcha.com/demo/cloudflare-turnstile";
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
             }
 
             @Override
@@ -401,7 +335,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             /* https://www.mtcaptcha.com/ */
             @Override
             public boolean canHandle(Challenge<?> c) {
-                /* 2025-04-30: Not supported by JDownloader yet. */
                 return false;
             }
 
@@ -413,11 +346,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             @Override
             public String getDemoUrl() {
                 return "https://www.mtcaptcha.com/";
-            }
-
-            @Override
-            public DomainInfo getDomainInfo() {
-                return DomainInfo.getInstance(getDomain());
             }
 
             @Override
@@ -455,13 +383,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         public abstract String getDemoUrl();
 
         /**
-         * Returns domain information for this captcha type.
-         *
-         * @return DomainInfo object, currently always null
-         */
-        public abstract DomainInfo getDomainInfo();
-
-        /**
          * Returns a description of this captcha type.
          *
          * @return Description as String
@@ -475,6 +396,13 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
          */
         public abstract String getDomain();
 
+        /**
+         * Retrieves the captcha type that can handle the given challenge.
+         *
+         * @param c
+         *            The challenge to check
+         * @return The appropriate CAPTCHA_TYPE, or null if no type can handle it
+         */
         public static CAPTCHA_TYPE getCaptchaTypeForChallenge(Challenge<?> c) {
             if (c == null) {
                 return null;

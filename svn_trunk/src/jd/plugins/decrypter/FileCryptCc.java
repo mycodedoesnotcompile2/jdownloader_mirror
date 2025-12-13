@@ -22,21 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FileCryptConfig;
-import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -55,9 +40,23 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 51804 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FileCryptConfig;
+import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 51985 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,6 +76,7 @@ public class FileCryptCc extends PluginForDecrypt {
         /* Prefer English language */
         br.setCookie(getHost(), "lang_v2", "en_US");
         br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
+        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
         return br;
     }
 
@@ -228,6 +228,8 @@ public class FileCryptCc extends PluginForDecrypt {
             }
             /* Try CNL/clicknload first as it doesn't rely on JD service.jdownloader.org, which can go down! */
             final boolean testDevCnlFailure = false;
+            final boolean testDevDLCFailure = false;
+            final boolean testDevRedirectLinksFailure = false;
             final ArrayList<DownloadLink> thisMirrorResults = new ArrayList<DownloadLink>();
             final ArrayList<DownloadLink> cnlResults;
             // cldHandling: if (true) {
@@ -235,28 +237,32 @@ public class FileCryptCc extends PluginForDecrypt {
                 if (testDevCnlFailure && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                     logger.warning("CNL failure test active!");
                     cnlResults = new ArrayList<DownloadLink>();
-                } else {
-                    cnlResults = handleCnl2(contenturl, successfullyUsedFolderPassword);
-                    if (cnlResults.isEmpty()) {
-                        logger.info("Failed to find CNL results");
-                        break cldHandling;
+                    break cldHandling;
+                }
+                cnlResults = handleCnl2(contenturl, successfullyUsedFolderPassword);
+                if (cnlResults.isEmpty()) {
+                    logger.info("Failed to find CNL results");
+                    break cldHandling;
+                }
+                logger.info("CNL success");
+                for (final DownloadLink link : cnlResults) {
+                    if (fp != null) {
+                        link._setFilePackage(fp);
                     }
-                    logger.info("CNL success");
-                    for (final DownloadLink link : cnlResults) {
-                        if (fp != null) {
-                            link._setFilePackage(fp);
-                        }
-                        if (extractionPasswordList != null) {
-                            link.setSourcePluginPasswordList(extractionPasswordList);
-                        }
-                        distribute(link);
-                        thisMirrorResults.add(link);
+                    if (extractionPasswordList != null) {
+                        link.setSourcePluginPasswordList(extractionPasswordList);
                     }
+                    distribute(link);
+                    thisMirrorResults.add(link);
                 }
             }
             dlcContainerHandling: if (thisMirrorResults.isEmpty()) {
                 /* Second try DLC, then single links */
                 logger.info("CNL failure -> Trying DLC");
+                if (testDevDLCFailure && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    logger.warning("DLC failure test active!");
+                    break dlcContainerHandling;
+                }
                 String dlc_id = br.getRegex("DownloadDLC\\('([^<>\"]*?)'\\)").getMatch(0);
                 if (dlc_id == null) {
                     /* 2023-02-13 */
@@ -300,6 +306,10 @@ public class FileCryptCc extends PluginForDecrypt {
             redirectLinksHandling: if (thisMirrorResults.isEmpty()) {
                 /* Last resort: Try most time intensive way to crawl links: Crawl each link individually. */
                 logger.info("Trying single link redirect handling");
+                if (testDevRedirectLinksFailure && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    logger.warning("Redirect handling failure test active!");
+                    break redirectLinksHandling;
+                }
                 String[] links = br.getRegex("<button[^<>]+\\sdata-[0-9a-z]{5,}=\"([^\"]+)").getColumn(0);
                 if (links == null || links.length == 0) {
                     logger.info("Failed to find redirectLinks");
@@ -360,7 +370,7 @@ public class FileCryptCc extends PluginForDecrypt {
                     }
                 }
             }
-            logger.info("Mirror " + currentMirrorID + "results: " + thisMirrorResults.size());
+            logger.info("Mirror " + currentMirrorID + " results: " + thisMirrorResults.size());
             if (thisMirrorResults.isEmpty()) {
                 if (mirrorLooksToBeOffline) {
                     logger.info("Skipping mirror which looks to be offline: " + mirrorurl);
@@ -475,11 +485,13 @@ public class FileCryptCc extends PluginForDecrypt {
 
     private static final Map<String, String> LOGO_PASSWORD_MAP = new HashMap<String, String>();
     static {
-        LOGO_PASSWORD_MAP.put("53d1b", "serienfans.org");
-        LOGO_PASSWORD_MAP.put("80d13", "serienfans.org");
-        LOGO_PASSWORD_MAP.put("fde1d", "serienfans.org");
-        LOGO_PASSWORD_MAP.put("8abe0", "serienfans.org");
-        LOGO_PASSWORD_MAP.put("8f073", "serienfans.org");
+        final String pw_sfans = "serienfans.org";
+        LOGO_PASSWORD_MAP.put("53d1b", pw_sfans);
+        LOGO_PASSWORD_MAP.put("80d13", pw_sfans);
+        LOGO_PASSWORD_MAP.put("fde1d", pw_sfans);
+        LOGO_PASSWORD_MAP.put("8abe0", pw_sfans);
+        LOGO_PASSWORD_MAP.put("8f073", pw_sfans);
+        LOGO_PASSWORD_MAP.put("48544", pw_sfans);
         LOGO_PASSWORD_MAP.put("975e4", "filmfans.org");
         LOGO_PASSWORD_MAP.put("51967", "kellerratte");
         LOGO_PASSWORD_MAP.put("aaf75", "cs.rin.ru");
@@ -490,15 +502,13 @@ public class FileCryptCc extends PluginForDecrypt {
             return logoPW;
         }
         /**
-         * Search password based on folder-logo. </br>
-         * Only do this one time in the first run of this loop.
+         * Search password based on folder-logo. </br> Only do this one time in the first run of this loop.
          */
         final String customLogoID = br.getRegex("(?:logo|custom)/([a-z0-9]+)\\.png").getMatch(0);
         if (customLogoID != null) {
             /**
-             * Magic auto passwords: </br>
-             * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first that
-             * are typically associated with folders published by those sources.
+             * Magic auto passwords: </br> Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try
+             * specific passwords first that are typically associated with folders published by those sources.
              */
             final String password = getLogoPassword(customLogoID);
             if (password != null) {
@@ -570,145 +580,86 @@ public class FileCryptCc extends PluginForDecrypt {
     }
 
     private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String url) throws Exception {
-        int cutCaptchaRetryIndex = -1;
-        final FileCryptConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
-        final int cutCaptchaAvoidanceMaxRetries = cfg.getMaxCutCaptchaAvoidanceRetries();
-        boolean captchaSuccess = false;
-        boolean lastCaptchaIsCutCaptcha = false;
-        boolean tryToSolveCutCaptcha = false;
-        cutcaptchaAvoidanceLoop: while (cutCaptchaRetryIndex++ <= cutCaptchaAvoidanceMaxRetries && !this.isAbort()) {
-            logger.info("cutcaptchaAvoidanceLoop " + (cutCaptchaRetryIndex + 1) + " / " + (cutCaptchaAvoidanceMaxRetries + 1));
-            /* Website has no language selection as it auto-chooses based on IP and/or URL but we can force English language. */
-            final String host;
-            if (br.getRequest() != null) {
-                host = br.getHost();
-            } else {
-                host = Browser.getHost(url);
-            }
-            br.setCookie(host, "lang", "en");
-            if (cutCaptchaRetryIndex > 0) {
-                /* Use new User-Agent for each attempt */
-                br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
-            }
-            this.getPage(url);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.getURL().matches("(?i)https?://[^/]+/404\\.html.*")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML(">\\s*Dieser Ordner enthält keine Mirror")) {
-                /* Empty link/folder. */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (containsPassword(this.cleanHTML)) {
-                handlePassword(param);
-            }
-            lastCaptchaIsCutCaptcha = false;
-            if (!containsCaptcha(this.cleanHTML)) {
-                logger.info("Looks like no captcha is required");
-                captchaSuccess = true;
-                break cutcaptchaAvoidanceLoop;
-            }
-            /* Process captcha */
-            logger.info("Looks like captcha is required");
-            int captchaCounter = -1;
-            final int maxCaptchaRetries = 10;
-            captchaLoop: while (captchaCounter++ < maxCaptchaRetries && !this.isAbort()) {
-                logger.info("Captcha loop: " + captchaCounter + "/" + maxCaptchaRetries);
-                final boolean isLastLoop = captchaCounter >= maxCaptchaRetries;
-                Form captchaForm = null;
-                final Form[] forms = br.getForms();
-                if (forms != null && forms.length != 0) {
-                    for (final Form form : forms) {
-                        if (form.containsHTML("captcha") || AbstractRecaptchaV2.containsRecaptchaV2Class(form)) {
-                            captchaForm = form;
-                            break;
-                        } else if (form.containsHTML("cform")) {
-                            captchaForm = form;
-                            break;
-                        }
-                    }
-                }
-                if (captchaForm == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find captchaForm");
-                }
-                final String captchaURL = captchaForm.getRegex("((https?://[^<>\"']*?)?/captcha/[^<>\"']*?)\"").getMatch(0);
-                if (captchaURL != null && this.containsCircleCaptcha(captchaURL)) {
-                    /* Click-captcha */
-                    final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captchaURL), param, "Click on the open circle");
-                    if (cp == null) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
-                    final InputField button = captchaForm.getInputFieldByType(InputField.InputType.IMAGE.name());
-                    if (button == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    captchaForm.removeInputField(button);
-                    captchaForm.put(button.getKey() + ".x", String.valueOf(cp.getX()));
-                    captchaForm.put(button.getKey() + ".y", String.valueOf(cp.getY()));
-                } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
-                    final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-                    captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
-                    lastCaptchaIsCutCaptcha = true;
-                    if (cutCaptchaRetryIndex == 0 || tryToSolveCutCaptcha) {
-                        logger.info("Attempting to solve CutCaptcha");
-                        try {
-                            final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
-                            captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
-                            tryToSolveCutCaptcha = true;
-                        } catch (final Exception e) {
-                            if (tryToSolveCutCaptcha) {
-                                /* Handling worked before and failed now -> Throw exception */
-                                throw e;
-                            }
-                            logger.log(e);
-                            logger.info("CutCaptcha failed - most likely no CutCaptcha solver is available");
-                            /* Don't try again! */
-                            tryToSolveCutCaptcha = false;
-                        }
-                    }
-                    if (!tryToSolveCutCaptcha) {
-                        logger.info("Trying to avoid cutcaptcha | cutCaptchaRetryIndex = " + cutCaptchaRetryIndex);
-                        /* Clear cookies to increase the chances of getting a different captcha type than cutcaptcha. */
-                        br.clearCookies(null);
-                        /* Only wait if we know that we will try again */
-                        if (!isLastLoop) {
-                            sleep(1000, param);
-                        }
-                        /*
-                         * Continue from the beginning. If a password was required, we already know the correct password and won't have to
-                         * ask the user again.
-                         */
-                        continue cutcaptchaAvoidanceLoop;
-                    }
-                } else {
-                    /* Normal image captcha */
-                    final String code = getCaptchaCode(captchaURL, param);
-                    captchaForm.put("recaptcha_response_field", Encoding.urlEncode(code));
-                }
-                submitForm(captchaForm);
-                if (this.containsCaptcha(this.cleanHTML)) {
-                    logger.info("User entered wrong captcha");
-                    this.invalidateLastChallengeResponse();
-                    continue captchaLoop;
-                } else {
-                    logger.info("User entered correct captcha");
-                    this.validateLastChallengeResponse();
-                    captchaSuccess = true;
-                    break captchaLoop;
-                }
-            }
-            /* Dead end: No reason to continue this loop here. */
-            logger.info("Stepping out of cutCaptchaAvoidanceLoop");
-            break cutcaptchaAvoidanceLoop;
+        final String host;
+        if (br.getRequest() != null) {
+            host = br.getHost();
+        } else {
+            host = Browser.getHost(url);
         }
-        if (!captchaSuccess) {
-            if (cutCaptchaRetryIndex >= cutCaptchaAvoidanceMaxRetries && lastCaptchaIsCutCaptcha) {
-                throw new DecrypterRetryException(RetryReason.CAPTCHA, "CUTCAPTCHA_IS_NOT_SUPPORTED_" + folderID, "Cutcaptcha is not supported! Please read: support.jdownloader.org/Knowledgebase/Article/View/cutcaptcha-not-supported");
+        br.setCookie(host, "lang", "en");
+        this.getPage(url);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getURL().matches("(?i)https?://[^/]+/404\\.html.*")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Dieser Ordner enthält keine Mirror")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (containsPassword(this.cleanHTML)) {
+            handlePassword(param);
+        }
+        if (!containsCaptcha(this.cleanHTML)) {
+            logger.info("Looks like no captcha is required");
+            return;
+        } else {
+            logger.info("Looks like a captcha is required");
+        }
+        int captchaCounter = -1;
+        final int maxCaptchaRetries = 10;
+        captchaLoop: while (captchaCounter++ < maxCaptchaRetries && !this.isAbort()) {
+            logger.info("Captcha loop: " + captchaCounter + "/" + maxCaptchaRetries);
+            Form captchaForm = null;
+            final Form[] forms = br.getForms();
+            if (forms != null && forms.length != 0) {
+                for (final Form form : forms) {
+                    if (form.containsHTML("captcha") || AbstractRecaptchaV2.containsRecaptchaV2Class(form)) {
+                        captchaForm = form;
+                        break;
+                    } else if (form.containsHTML("cform")) {
+                        captchaForm = form;
+                        break;
+                    }
+                }
+            }
+            if (captchaForm == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find captchaForm");
+            }
+            final String captchaURL = captchaForm.getRegex("((https?://[^<>\"']*?)?/captcha/[^<>\"']*?)\"").getMatch(0);
+            if (captchaURL != null && this.containsCircleCaptcha(captchaURL)) {
+                final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captchaURL), param, "Click on the open circle");
+                if (cp == null) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                }
+                final InputField button = captchaForm.getInputFieldByType(InputField.InputType.IMAGE.name());
+                if (button == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                captchaForm.removeInputField(button);
+                captchaForm.put(button.getKey() + ".x", String.valueOf(cp.getX()));
+                captchaForm.put(button.getKey() + ".y", String.valueOf(cp.getY()));
+            } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
+                final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+                captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
+                logger.info("Attempting to solve CutCaptcha");
+                final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
+                captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
             } else {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                final String code = getCaptchaCode(captchaURL, param);
+                captchaForm.put("recaptcha_response_field", Encoding.urlEncode(code));
+            }
+            submitForm(captchaForm);
+            if (this.containsCaptcha(this.cleanHTML)) {
+                logger.info("User entered wrong captcha");
+                this.invalidateLastChallengeResponse();
+                continue captchaLoop;
+            } else {
+                logger.info("User entered correct captcha");
+                this.validateLastChallengeResponse();
+                return;
             }
         }
+        throw new DecrypterRetryException(RetryReason.CAPTCHA);
     }
 
     private String handleLink(final Browser br, final CryptedLink param, final String singleLink, final int round) throws Exception {
@@ -778,13 +729,13 @@ public class FileCryptCc extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Form[] forms = br.getForms();
         Form CNLPOP = null;
-        Form cnl = null;
         for (final Form f : forms) {
             if (f.containsHTML("CNLPOP") || f.containsHTML("cnlform")) {
                 CNLPOP = f;
                 break;
             }
         }
+        Form cnl = null;
         if (CNLPOP != null) {
             final String infos[] = CNLPOP.getRegex("'(.*?)'").getColumn(0);
             cnl = new Form();

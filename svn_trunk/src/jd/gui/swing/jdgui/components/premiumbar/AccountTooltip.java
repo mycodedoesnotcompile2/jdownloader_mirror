@@ -107,7 +107,7 @@ public class AccountTooltip extends PanelToolTip {
             SwingUtils.toBold(label);
             label.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
             panel.add(label);
-            List<DomainInfo> dis = getDomainInfos(accountCollection);
+            List<DomainInfo> dis = getMultihosterDomainInfos(accountCollection);
             final JList list = new JList(dis.toArray(new DomainInfo[] {}));
             // list.setPreferredSize(new Dimension(400, 750));
             list.setLayoutOrientation(JList.VERTICAL_WRAP);
@@ -136,18 +136,35 @@ public class AccountTooltip extends PanelToolTip {
             SwingUtils.toBold(label);
             label.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
             panel.add(label);
-            List<DomainInfo> dis = getDomainInfos(accountCollection);
-            final JList list = new JList(dis.toArray(new DomainInfo[] {}));
+            List<CAPTCHA_TYPE> dis = new ArrayList<CAPTCHA_TYPE>();
+            for (final Account acc : accountCollection) {
+                final PluginForHost plg = acc.getPlugin();
+                if (plg == null) {
+                    continue;
+                } else if (!(plg instanceof abstractPluginForCaptchaSolver)) {
+                    continue;
+                }
+                final abstractPluginForCaptchaSolver captchaplugin = (abstractPluginForCaptchaSolver) plg;
+                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes();
+                if (supported_captcha_types == null) {
+                    continue;
+                }
+                dis.addAll(supported_captcha_types);
+            }
+            final JList list = new JList(dis.toArray(new CAPTCHA_TYPE[] {}));
             // list.setPreferredSize(new Dimension(400, 750));
             list.setLayoutOrientation(JList.VERTICAL_WRAP);
             final ListCellRenderer org = list.getCellRenderer();
             list.setCellRenderer(new ListCellRenderer() {
                 public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                    DomainInfo di = (DomainInfo) value;
+                    final CAPTCHA_TYPE ctype = (CAPTCHA_TYPE) value;
                     JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
                     ret.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
-                    ret.setText(di.getTld());
-                    ret.setIcon(di.getFavIcon());
+                    ret.setText(ctype.getDisplayName());
+                    if (ctype.getDomain() != null) {
+                        // TODO: Add icons for items without domains
+                        ret.setIcon(DomainInfo.getInstance(ctype.getDomain()));
+                    }
                     ret.setOpaque(false);
                     ret.setBackground(null);
                     return ret;
@@ -173,45 +190,30 @@ public class AccountTooltip extends PanelToolTip {
 
     @Override
     public Dimension getPreferredSize() {
+        // TODO: 2025-12-12: Remove this override?
         return super.getPreferredSize();
     }
 
-    private List<DomainInfo> getDomainInfos(final AccountServiceCollection accountCollection) {
+    private List<DomainInfo> getMultihosterDomainInfos(final AccountServiceCollection accountCollection) {
         final HashSet<DomainInfo> domain_infos = new HashSet<DomainInfo>();
-        if (accountCollection.isCaptchaSolver()) {
-            for (final Account acc : accountCollection) {
-                final PluginForHost plg = acc.getPlugin();
-                if (plg == null) {
-                    continue;
-                } else if (!(plg instanceof abstractPluginForCaptchaSolver)) {
-                    continue;
-                }
-                final abstractPluginForCaptchaSolver captchaplugin = (abstractPluginForCaptchaSolver) plg;
-                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes();
-                for (final CAPTCHA_TYPE supported_captcha_type : supported_captcha_types) {
-                    domain_infos.add(supported_captcha_type.getDomainInfo());
-                }
+        /* Multihoster account */
+        for (final Account acc : accountCollection) {
+            final AccountInfo ai = acc.getAccountInfo();
+            if (ai == null) {
+                continue;
             }
-        } else {
-            /* Multihoster account */
-            for (final Account acc : accountCollection) {
-                final AccountInfo ai = acc.getAccountInfo();
-                if (ai == null) {
-                    continue;
-                }
-                final List<MultiHostHost> supported = ai.getMultiHostSupportV2();
-                if (supported == null) {
-                    continue;
-                }
-                for (final MultiHostHost mhost : supported) {
-                    switch (mhost.getStatus()) {
-                    case WORKING:
-                    case WORKING_UNSTABLE:
-                        domain_infos.add(mhost.getDomainInfo());
-                        break;
-                    default:
-                        break;
-                    }
+            final List<MultiHostHost> supported = ai.getMultiHostSupportV2();
+            if (supported == null) {
+                continue;
+            }
+            for (final MultiHostHost mhost : supported) {
+                switch (mhost.getStatus()) {
+                case WORKING:
+                case WORKING_UNSTABLE:
+                    domain_infos.add(mhost.getDomainInfo());
+                    break;
+                default:
+                    break;
                 }
             }
         }

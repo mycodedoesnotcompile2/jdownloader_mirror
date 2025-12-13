@@ -2144,7 +2144,7 @@ public interface GuiTranslation extends TranslateInterface {
     String AdvancedValueColumn_AdvancedValueColumn_object_();
 
     @Default(lngs = { "en" }, values = { "Valid Range: %s1 - %s2" })
-    String RangeValidator_toString_object_(long min, long max);
+    String RangeValidator_toString_object_(String min, String max);
 
     @Default(lngs = { "en" }, values = { "We need your help" })
     String JDGui_showStatsDialog_title_();

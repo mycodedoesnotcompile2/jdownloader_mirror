@@ -36,7 +36,10 @@ package org.appwork.storage.config.handler;
 import java.lang.annotation.Annotation;
 
 import org.appwork.storage.Storage;
+import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.DefaultDoubleValue;
+import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
+import org.appwork.storage.config.annotations.LookUpKeys;
 import org.appwork.utils.StringUtils;
 
 /**
@@ -44,7 +47,6 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class DoubleKeyHandler extends KeyHandler<Double> {
-
     /**
      * @param storageHandler
      * @param key
@@ -56,6 +58,11 @@ public class DoubleKeyHandler extends KeyHandler<Double> {
     @Override
     protected Class<? extends Annotation> getDefaultAnnotation() {
         return DefaultDoubleValue.class;
+    }
+
+    @Override
+    protected Class<? extends Annotation>[] getAllowedAnnotations() {
+        return (Class<? extends Annotation>[]) new Class<?>[] { LookUpKeys.class, DoubleSpinnerValidator.class };
     }
 
     @Override
@@ -95,8 +102,16 @@ public class DoubleKeyHandler extends KeyHandler<Double> {
         }
     }
 
+    private DoubleSpinnerValidator validator;
+
     @Override
-    protected void initHandler() throws Throwable {
+    protected void initHandler() {
+        this.validator = this.getAnnotation(DoubleSpinnerValidator.class);
+        try {
+            this.setDefaultValue(this.getAnnotation(DefaultDoubleValue.class).value());
+        } catch (final NullPointerException e) {
+            this.setDefaultValue(0d);
+        }
         setStorageSyncMode(getDefaultStorageSyncMode());
     }
 
@@ -110,7 +125,15 @@ public class DoubleKeyHandler extends KeyHandler<Double> {
 
     @Override
     protected void validateValue(final Double object) throws Throwable {
-
+        if (this.validator != null) {
+            final double v = object.doubleValue();
+            final double min = this.validator.min();
+            final double max = this.validator.max();
+            if (v < min) {
+                throw new ValidationException("value=" + v + " < min=" + min);
+            } else if (v > max) {
+                throw new ValidationException("value=" + v + " > max=" + max);
+            }
+        }
     }
-
 }

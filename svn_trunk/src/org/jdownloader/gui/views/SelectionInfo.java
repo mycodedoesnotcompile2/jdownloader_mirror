@@ -458,7 +458,7 @@ public class SelectionInfo<PackageType extends AbstractPackageNode<ChildrenType,
     protected final HashMap<PluginForHost, PluginView<ChildrenType>> pluginViews          = new HashMap<PluginForHost, SelectionInfo.PluginView<ChildrenType>>();
     protected final AtomicBoolean                                    pluginViewsInitiated = new AtomicBoolean(false);
 
-    protected PluginView<ChildrenType> internalPluginView(ChildrenType node, PluginView<ChildrenType> lastPluginView) {
+    protected PluginView<ChildrenType> internalPluginView(ChildrenType node, final PluginView<ChildrenType> lastPluginView) {
         final PluginForHost plugin = node instanceof CrawledLink ? ((CrawledLink) node).gethPlugin() : ((DownloadLink) node).getDefaultPlugin();
         if (lastPluginView != null && lastPluginView.getPlugin() == plugin) {
             /* faster than map lookup */

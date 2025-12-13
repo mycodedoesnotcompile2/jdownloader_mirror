@@ -9,10 +9,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.ConfigEntryKeywords;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
+import org.appwork.storage.config.annotations.FloatSpinnerValidator;
 import org.appwork.storage.config.annotations.HexColorString;
 import org.appwork.storage.config.annotations.MultiLineString;
 import org.appwork.storage.config.annotations.RequiresRestart;
@@ -27,9 +32,6 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
-
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
 
 public class AdvancedConfigEntry {
     private final ConfigInterface configInterface;
@@ -232,7 +234,7 @@ public class AdvancedConfigEntry {
 
     public boolean hasValidator() {
         if (hasValidator == null) {
-            hasValidator = getKeyHandler().getAnnotation(SpinnerValidator.class) != null;
+            hasValidator = getKeyHandler().getAnnotation(SpinnerValidator.class) != null || getKeyHandler().getAnnotation(DoubleSpinnerValidator.class) != null || getKeyHandler().getAnnotation(FloatSpinnerValidator.class) != null;
         }
         return hasValidator;
     }
@@ -241,12 +243,19 @@ public class AdvancedConfigEntry {
         if (!hasValidator()) {
             return null;
         } else {
-            final SpinnerValidator an = getKeyHandler().getAnnotation(SpinnerValidator.class);
-            if (an != null) {
-                return new org.jdownloader.settings.advanced.RangeValidator(an.min(), an.max());
-            } else {
-                return null;
+            final SpinnerValidator fixedSpinner = getKeyHandler().getAnnotation(SpinnerValidator.class);
+            if (fixedSpinner != null) {
+                return new org.jdownloader.settings.advanced.RangeValidator(fixedSpinner.min(), fixedSpinner.max(), fixedSpinner.step());
             }
+            final DoubleSpinnerValidator doubleSpinner = getKeyHandler().getAnnotation(DoubleSpinnerValidator.class);
+            if (doubleSpinner != null) {
+                return new org.jdownloader.settings.advanced.RangeValidator(doubleSpinner.min(), doubleSpinner.max(), doubleSpinner.step());
+            }
+            final FloatSpinnerValidator floatSpinner = getKeyHandler().getAnnotation(FloatSpinnerValidator.class);
+            if (floatSpinner != null) {
+                return new org.jdownloader.settings.advanced.RangeValidator(floatSpinner.min(), floatSpinner.max(), floatSpinner.step());
+            }
+            return null;
         }
     }
 

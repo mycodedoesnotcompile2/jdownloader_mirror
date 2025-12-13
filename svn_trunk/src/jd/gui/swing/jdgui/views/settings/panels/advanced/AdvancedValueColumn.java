@@ -17,6 +17,8 @@ import javax.swing.JMenuItem;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.EnumLabel;
@@ -39,15 +41,13 @@ import org.jdownloader.settings.advanced.AdvancedConfigEntry;
 import org.jdownloader.settings.advanced.RangeValidator;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
-import net.miginfocom.swing.MigLayout;
-
 public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> {
     private static final long                              serialVersionUID = 1L;
     private ExtTextColumn<AdvancedConfigEntry>             stringColumn;
     private ExtCheckColumn<AdvancedConfigEntry>            booleanColumn;
     private ExtTextAreaColumn<AdvancedConfigEntry>         defaultColumn;
     private java.util.List<ExtColumn<AdvancedConfigEntry>> columns;
-    private ExtSpinnerColumn<AdvancedConfigEntry>          longColumn;
+    private ExtSpinnerColumn<AdvancedConfigEntry>          numberColumn;
     private ExtTextColumn<AdvancedConfigEntry>             enumColumn;
     private ExtTextColumn<AdvancedConfigEntry>             colorColumn;
 
@@ -249,7 +249,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
             }
         };
         register(booleanColumn);
-        longColumn = new ExtSpinnerColumn<AdvancedConfigEntry>(getName()) {
+        numberColumn = new ExtSpinnerColumn<AdvancedConfigEntry>(getName()) {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -263,29 +263,29 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                 if (value.getValidator() != null) {
                     if (value.getValidator() instanceof RangeValidator) {
                         if (Clazz.isDouble(n.getClass())) {
-                            ret.setMaximum((double) ((RangeValidator) value.getValidator()).getMax());
-                            ret.setMinimum((double) ((RangeValidator) value.getValidator()).getMin());
-                            ret.setStepSize((double) ((RangeValidator) value.getValidator()).getSteps());
+                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().doubleValue());
+                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().doubleValue());
+                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().doubleValue());
                         } else if (Clazz.isFloat(n.getClass())) {
-                            ret.setMaximum((float) ((RangeValidator) value.getValidator()).getMax());
-                            ret.setMinimum((float) ((RangeValidator) value.getValidator()).getMin());
-                            ret.setStepSize((float) ((RangeValidator) value.getValidator()).getSteps());
+                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().floatValue());
+                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().floatValue());
+                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().floatValue());
                         } else if (Clazz.isLong(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps());
+                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().longValue());
+                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().longValue());
+                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().longValue());
                         } else if (Clazz.isInteger(n.getClass())) {
-                            ret.setMaximum((int) ((RangeValidator) value.getValidator()).getMax());
-                            ret.setMinimum((int) ((RangeValidator) value.getValidator()).getMin());
-                            ret.setStepSize((int) ((RangeValidator) value.getValidator()).getSteps());
+                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().intValue());
+                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().intValue());
+                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().intValue());
                         } else if (Clazz.isShort(n.getClass())) {
-                            ret.setMaximum((short) ((RangeValidator) value.getValidator()).getMax());
-                            ret.setMinimum((short) ((RangeValidator) value.getValidator()).getMin());
-                            ret.setStepSize((short) ((RangeValidator) value.getValidator()).getSteps());
+                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().shortValue());
+                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().shortValue());
+                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().shortValue());
                         } else if (Clazz.isByte(n.getClass())) {
-                            ret.setMaximum((byte) ((RangeValidator) value.getValidator()).getMax());
-                            ret.setMinimum((byte) ((RangeValidator) value.getValidator()).getMin());
-                            ret.setStepSize((byte) ((RangeValidator) value.getValidator()).getSteps());
+                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().byteValue());
+                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().byteValue());
+                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().byteValue());
                         }
                     }
                 }
@@ -308,7 +308,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                 return value.getValue() + "";
             }
         };
-        register(longColumn);
+        register(numberColumn);
         enumColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
             private static final long serialVersionUID = 1L;
             {
@@ -454,13 +454,13 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
         } else if (object.getType() == String.class) {
             if (object.hasHexColorString()) {
                 return colorColumn;
-            }
-            if (object.isMultiLineString()) {
+            } else if (object.isMultiLineString()) {
                 return defaultColumn;
+            } else {
+                return stringColumn;
             }
-            return stringColumn;
         } else if (Clazz.isDouble(object.getType()) || Clazz.isFloat(object.getType()) || Clazz.isLong(object.getType()) || Clazz.isInteger(object.getType()) || Clazz.isByte(object.getType())) {
-            return longColumn;
+            return numberColumn;
         } else if (Enum.class.isAssignableFrom(object.getClazz())) {
             return enumColumn;
         } else {

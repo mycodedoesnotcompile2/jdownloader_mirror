@@ -32,20 +32,47 @@ import javax.swing.JLabel;
 import javax.swing.JSeparator;
 import javax.swing.SwingUtilities;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.components.TextPane;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
+import jd.nutils.Formatter;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
+import org.appwork.storage.config.handler.ByteKeyHandler;
+import org.appwork.storage.config.handler.DoubleKeyHandler;
 import org.appwork.storage.config.handler.EnumKeyHandler;
+import org.appwork.storage.config.handler.FloatKeyHandler;
 import org.appwork.storage.config.handler.IntegerKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.storage.config.handler.LongKeyHandler;
 import org.appwork.storage.config.handler.ObjectKeyHandler;
+import org.appwork.storage.config.handler.ShortKeyHandler;
 import org.appwork.storage.config.handler.StringKeyHandler;
+import org.appwork.storage.config.swing.models.ConfigByteSpinnerModel;
+import org.appwork.storage.config.swing.models.ConfigDoubleSpinnerModel;
+import org.appwork.storage.config.swing.models.ConfigFloatSpinnerModel;
 import org.appwork.storage.config.swing.models.ConfigIntSpinnerModel;
 import org.appwork.storage.config.swing.models.ConfigLongSpinnerModel;
+import org.appwork.storage.config.swing.models.ConfigShortSpinnerModel;
 import org.appwork.swing.components.ExtCheckBox;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.ColorUtils;
@@ -85,25 +112,6 @@ import org.jdownloader.premium.BuyAndAddPremiumAccount;
 import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.Label;
-import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.components.TextPane;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
 
 public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements AccountControllerListener {
     private List<Group> groups = new ArrayList<Group>();
@@ -607,11 +615,23 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             } else if (m instanceof StringKeyHandler) {
                 pair = addPair(label, null, new TextInput((StringKeyHandler) m));
                 return;
+            } else if (m instanceof ByteKeyHandler) {
+                pair = addPair(label, null, new Spinner(new ConfigByteSpinnerModel((ByteKeyHandler) m)));
+                return;
+            } else if (m instanceof ShortKeyHandler) {
+                pair = addPair(label, null, new Spinner(new ConfigShortSpinnerModel((ShortKeyHandler) m)));
+                return;
             } else if (m instanceof IntegerKeyHandler) {
                 pair = addPair(label, null, new Spinner(new ConfigIntSpinnerModel((IntegerKeyHandler) m)));
                 return;
             } else if (m instanceof LongKeyHandler) {
                 pair = addPair(label, null, new Spinner(new ConfigLongSpinnerModel((LongKeyHandler) m)));
+                return;
+            } else if (m instanceof DoubleKeyHandler) {
+                pair = addPair(label, null, new Spinner(new ConfigDoubleSpinnerModel((DoubleKeyHandler) m)));
+                return;
+            } else if (m instanceof FloatKeyHandler) {
+                pair = addPair(label, null, new Spinner(new ConfigFloatSpinnerModel((FloatKeyHandler) m)));
                 return;
             } else if (m instanceof EnumKeyHandler) {
                 pair = addPair(label, null, null, new ComboBox<Enum>(m, ((EnumKeyHandler) m).values(), null));

@@ -40,10 +40,10 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD })
-public @interface SpinnerValidator {
-    long min();
+public @interface DoubleSpinnerValidator {
+    double min();
 
-    long max();
+    double max();
 
-    long step() default 1;
+    double step() default 1;
 }

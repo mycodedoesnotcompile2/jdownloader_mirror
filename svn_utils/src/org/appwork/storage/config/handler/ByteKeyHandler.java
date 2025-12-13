@@ -47,9 +47,6 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class ByteKeyHandler extends KeyHandler<Byte> {
-
-    private SpinnerValidator validator;
-
     /**
      * @param storageHandler
      * @param key
@@ -62,15 +59,6 @@ public class ByteKeyHandler extends KeyHandler<Byte> {
     @SuppressWarnings("unchecked")
     @Override
     protected Class<? extends Annotation>[] getAllowedAnnotations() {
-        // final java.util.List<Class<? extends Annotation>> list = new
-        // ArrayList<Class<? extends Annotation>>();
-        //
-        // list.add(SpinnerValidator.class);
-
-        // return (Class<? extends Annotation>[]) list.toArray(new Class<?>[]
-        // {});
-        //
-
         return (Class<? extends Annotation>[]) new Class<?>[] { LookUpKeys.class, SpinnerValidator.class };
     }
 
@@ -116,6 +104,8 @@ public class ByteKeyHandler extends KeyHandler<Byte> {
         }
     }
 
+    private SpinnerValidator validator;
+
     @Override
     protected void initHandler() {
         this.validator = this.getAnnotation(SpinnerValidator.class);
@@ -143,5 +133,4 @@ public class ByteKeyHandler extends KeyHandler<Byte> {
             }
         }
     }
-
 }

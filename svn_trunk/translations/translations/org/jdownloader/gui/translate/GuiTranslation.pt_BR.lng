@@ -422,6 +422,7 @@ EnabledAction_EnabledAction_empty=Ativar/Desativar Link
 EnabledAction_EnabledAction_enable=Ativar
 EnabledAction_EnabledAction_mode=Modo
 EnabledDisabledColumn_EnabledDisabledColumn=Ativado / Desativado
+EnabledFileCountColumn_EnabledFileCountColumn=Contagem de arquivos habilitada
 EndCaptchaSolver_gettypeName_=EndCaptcha.com
 ExceptionsRuleDialog_ExceptionsRuleDialog_title_=Regra de Exceção de Filtro
 ExceptionsRuleDialog_getIfText_=Permitir todos os Links que correspondam estas condições, e ignorar a Lista de Filtros

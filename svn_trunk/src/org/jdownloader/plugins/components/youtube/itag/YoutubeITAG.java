@@ -169,22 +169,22 @@ public enum YoutubeITAG {
     // we do not need such a bad itag. Ignore the variants
     THREEGP4_ITAG13_H263_144P_15FPS_AMRNB_12KBIT(13, StreamContainer.THREEGP, VideoResolution.P_144, VideoCodec.H263, VideoFrameRate.FPS_15, AudioCodec.AMR, AudioBitrate.KBIT_12),
     // fake id
-    IMAGE_HQ(10002, StreamContainer.PLAIN, ImageQuality.HIGH),
-    // fake id
-    IMAGE_LQ(10004, StreamContainer.PLAIN, ImageQuality.LOW),
-    // fake id
     IMAGE_MAX(10001, StreamContainer.PLAIN, ImageQuality.HIGHEST),
     // fake id
+    IMAGE_HQ(10002, StreamContainer.PLAIN, ImageQuality.HIGH),
+    // fake id
     IMAGE_MQ(10003, StreamContainer.PLAIN, ImageQuality.NORMAL),
+    // fake id
+    IMAGE_LQ(10004, StreamContainer.PLAIN, ImageQuality.LOW),
 
-    // fake id
-    COVER_HQ(11002, StreamContainer.PLAIN, ImageQuality.HIGH),
-    // fake id
-    COVER_LQ(11004, StreamContainer.PLAIN, ImageQuality.LOW),
     // fake id
     COVER_MAX(11001, StreamContainer.PLAIN, ImageQuality.HIGHEST),
     // fake id
+    COVER_HQ(11002, StreamContainer.PLAIN, ImageQuality.HIGH),
+    // fake id
     COVER_MQ(11003, StreamContainer.PLAIN, ImageQuality.NORMAL),
+    // fake id
+    COVER_LQ(11004, StreamContainer.PLAIN, ImageQuality.LOW),
 
     // 192 kbits aac
     MP4_VIDEO_1080P_H264_AUDIO_AAC(37, StreamContainer.MP4, VideoResolution.P_1080, VideoCodec.H264, VideoFrameRate.FPS_30, AudioCodec.AAC, AudioBitrate.KBIT_192),

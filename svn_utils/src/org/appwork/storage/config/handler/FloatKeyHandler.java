@@ -36,7 +36,10 @@ package org.appwork.storage.config.handler;
 import java.lang.annotation.Annotation;
 
 import org.appwork.storage.Storage;
+import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.DefaultFloatValue;
+import org.appwork.storage.config.annotations.FloatSpinnerValidator;
+import org.appwork.storage.config.annotations.LookUpKeys;
 import org.appwork.utils.StringUtils;
 
 /**
@@ -44,7 +47,6 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class FloatKeyHandler extends KeyHandler<Float> {
-
     /**
      * @param storageHandler
      * @param key
@@ -56,6 +58,11 @@ public class FloatKeyHandler extends KeyHandler<Float> {
     @Override
     protected Class<? extends Annotation> getDefaultAnnotation() {
         return DefaultFloatValue.class;
+    }
+
+    @Override
+    protected Class<? extends Annotation>[] getAllowedAnnotations() {
+        return (Class<? extends Annotation>[]) new Class<?>[] { LookUpKeys.class, FloatSpinnerValidator.class };
     }
 
     @Override
@@ -95,8 +102,11 @@ public class FloatKeyHandler extends KeyHandler<Float> {
         }
     }
 
+    private FloatSpinnerValidator validator;
+
     @Override
     protected void initHandler() {
+        this.validator = this.getAnnotation(FloatSpinnerValidator.class);
         try {
             this.setDefaultValue(this.getAnnotation(DefaultFloatValue.class).value());
         } catch (final NullPointerException e) {
@@ -115,7 +125,15 @@ public class FloatKeyHandler extends KeyHandler<Float> {
 
     @Override
     protected void validateValue(final Float object) throws Throwable {
-
+        if (this.validator != null) {
+            final float v = object.floatValue();
+            final float min = this.validator.min();
+            final float max = this.validator.max();
+            if (v < min) {
+                throw new ValidationException("value=" + v + " < min=" + min);
+            } else if (v > max) {
+                throw new ValidationException("value=" + v + " > max=" + max);
+            }
+        }
     }
-
 }

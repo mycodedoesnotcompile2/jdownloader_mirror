@@ -148,8 +148,8 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     private boolean                        isEnabled;
     /** Beschreibung des Downloads */
     private String                         name;
-    private PluginForHost                  defaultplugin;
-    private PluginForHost                  liveplugin;
+    private volatile PluginForHost         defaultplugin;
+    private volatile PluginForHost         liveplugin;
     /**
      * Do not rename urlDownload. We need this field to restore old downloadlinks from the jd09 database
      */
@@ -1143,7 +1143,7 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     /*
      * Gibt zurueck ob Dieser Link schon auf verfuegbarkeit getestet wurde.+ Diese FUnktion fuehrt keinen!! Check durch. Sie prueft nur ob
      * schon geprueft worden ist. anschiessend kann mit isAvailable() die verfuegbarkeit ueberprueft werden
-     *
+     * 
      * @return Link wurde schon getestet (true) nicht getestet(false)
      */
     public boolean isAvailabilityStatusChecked() {

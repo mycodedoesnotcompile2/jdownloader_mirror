@@ -169,6 +169,7 @@ LinkFilterSettings_DefaultFilterList_directhttp=HTTP direto
 LinkFilterSettings_DefaultFilterList_dupes=Já presente na lista de downloads
 LinkFilterSettings_DefaultFilterList_enabled=Habilitado
 LinkFilterSettings_DefaultFilterList_getDefaultValue_=Arquivos Offline
+LinkFilterSettings_condition_link_enabled=O link está ativado
 LinkSource_ADD_CONTAINER_ACTION=Ação ao adicionar container
 LinkSource_ADD_LINKS_DIALOG=Ação ao Adicionar Links
 LinkSource_CLIPBOARD=Área de Transferência

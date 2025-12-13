@@ -3,10 +3,12 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
 
@@ -25,11 +27,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51048 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51971 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
 public class HitNewsCom extends UseNet {
     public HitNewsCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://member.hitnews.com/signup.php");
+        this.enablePremium("https://my.hitnews.com/signup.php");
     }
 
     public static interface HitNewsConfigInterface extends UsenetAccountConfigInterface {
@@ -37,7 +39,7 @@ public class HitNewsCom extends UseNet {
 
     @Override
     public String getAGBLink() {
-        return "http://www.hitnews.com/index.php?id=41";
+        return "https://" + getHost() + "/contact/";
     }
 
     private AccountInfo parseAccountInfo(Browser br, Account account) throws Exception {
@@ -58,7 +60,6 @@ public class HitNewsCom extends UseNet {
         final Number conns = (Number) user.get("conns");
         final Number bytes = (Number) user.get("bytes");
         account.setMaxSimultanDownloads(conns.intValue());
-        account.setType(AccountType.PREMIUM);
         account.setUser(user.get("login").toString());
         final AccountInfo ai = new AccountInfo();
         if (bytes != null) {
@@ -66,7 +67,12 @@ public class HitNewsCom extends UseNet {
             ai.setTrafficMax(bytes.longValue());
         }
         final String expire_date = active.get("expire_date").toString();
-        if (!"Lifetime".equalsIgnoreCase(expire_date)) {
+        if (expire_date.equalsIgnoreCase("Lifetime")) {
+            account.setType(AccountType.LIFETIME);
+        } else if (expire_date.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            account.setType(AccountType.PREMIUM);
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(expire_date, "yyyy-MM-dd", Locale.ENGLISH), br);
+        } else {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported account expire date \"" + expire_date + "\", please contact JDownloader support!");
         }
         ai.setValidUntil(-1);
@@ -103,12 +109,13 @@ public class HitNewsCom extends UseNet {
         br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
         if (cookies != null) {
-            br.setCookies(getHost(), cookies);
+            br.setCookies(cookies);
+            logger.info("Attempting cookie login");
             try {
                 return parseAccountInfo(br, account);
             } catch (PluginException e) {
                 logger.log(e);
-                br.getCookies(getHost()).clear();
+                logger.info("Cookie login failed");
             }
         }
         if (br.getCookie(getHost(), "sess", Cookies.NOTDELETEDPATTERN) == null) {

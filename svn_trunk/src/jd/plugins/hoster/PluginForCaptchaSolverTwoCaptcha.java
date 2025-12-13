@@ -4,12 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51979 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -60,5 +61,10 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
     @Override
     protected String getAPILoginHelpURL() {
         return "https://" + getHost() + "/enterpage";
+    }
+
+    @Override
+    public Class<? extends CaptchaSolverPluginConfig> getConfigInterface() {
+        return CaptchaSolverPluginConfig.class;
     }
 }
