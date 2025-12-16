@@ -35,6 +35,7 @@ package org.appwork.storage.simplejson.mapper;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
@@ -56,9 +57,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.MapperType;
 import org.appwork.storage.StorableSupportedMappers;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.mapper.FlexiEnumFallback;
 import org.appwork.storage.simplejson.JSonArray;
 import org.appwork.storage.simplejson.JSonNode;
 import org.appwork.storage.simplejson.JSonObject;
@@ -292,6 +295,34 @@ public class JSonMapper {
         }
     }
 
+    protected Enum stringToEnum(final String value, final Class<Enum> enumClass) throws IllegalArgumentException {
+        try {
+            return Enum.valueOf(enumClass, value);
+        } catch (final IllegalArgumentException e) {
+            if (value == null) {
+                throw e;
+            }
+            for (final Field f : enumClass.getDeclaredFields()) {
+                final FlexiEnumFallback fallback = f.getAnnotation(FlexiEnumFallback.class);
+                if (fallback == null) {
+                    continue;
+                }
+                for (final String fb : fallback.value()) {
+                    if (StringUtils.equals(fb, value)) {
+                        try {
+                            return (Enum) f.get(null);
+                        } catch (final IllegalArgumentException e1) {
+                            LogV3.log(e1);
+                        } catch (final IllegalAccessException e1) {
+                            LogV3.log(e1);
+                        }
+                    }
+                }
+            }
+            throw e;
+        }
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public Object jsonToObject(final JSonNode json, Type type) throws MapperException {
         final ClassCache cc;
@@ -385,7 +416,7 @@ public class JSonMapper {
                 case STRING:
                     if (type instanceof Class && ((Class<?>) type).isEnum()) {
                         try {
-                            return Enum.valueOf((Class<Enum>) type, StringUtils.valueOfOrNull(((JSonValue) json).getValue()));
+                            return stringToEnum(StringUtils.valueOfOrNull(((JSonValue) json).getValue()), (Class<Enum>) type);
                         } catch (final IllegalArgumentException e) {
                             if (isIgnoreIllegalArgumentMappings() || isIgnoreIllegalEnumMappings()) {
                                 return null;

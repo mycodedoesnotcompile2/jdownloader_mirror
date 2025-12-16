@@ -244,7 +244,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         }
     }
 
-    public abstract double getMinScore();
+    public abstract Double getMinScore();
 
     public abstract boolean isV3();
 

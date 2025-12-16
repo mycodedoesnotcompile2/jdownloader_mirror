@@ -10,7 +10,6 @@ import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
@@ -35,10 +34,6 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
 
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
-        if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise()) {
-            // TODO: current version of the browser extension doesn't support Recaptcha Enterprise
-            return false;
-        }
         return c instanceof AbstractBrowserChallenge;
     }
 

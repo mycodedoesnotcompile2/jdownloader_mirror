@@ -36,6 +36,9 @@ public interface EventScripterTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Confirm dialog from %s1@%s2" })
     String showConfirmDialog_title(String name, String trigger);
 
+    @Default(lngs = { "en" }, values = { "Input dialog from %s1@%s2" })
+    String showInputDialog_title(String name, String trigger);
+
     @Default(lngs = { "en" }, values = { "JDownloader started" })
     String ON_JDOWNLOADER_STARTED();
 

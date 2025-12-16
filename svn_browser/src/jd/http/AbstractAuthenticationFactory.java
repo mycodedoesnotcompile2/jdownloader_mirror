@@ -1,12 +1,10 @@
 package jd.http;
 
-import java.net.URL;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 
 public abstract class AbstractAuthenticationFactory implements AuthenticationFactory {
@@ -32,9 +30,23 @@ public abstract class AbstractAuthenticationFactory implements AuthenticationFac
         return this.authentications;
     }
 
-    protected String[] getUserInfo(Request request) {
+    protected class UserInfo {
+        protected final String user;
+        protected final String pass;
+
+        protected UserInfo(final String user, final String pass) {
+            this.user = user;
+            this.pass = pass;
+        }
+    }
+
+    protected UserInfo getUserInfo(Request request) {
         // TODO: request.getURL(true), because getURL() returns raw/without user info?!
-        return URLHelper.getUserInfo(request.getURL());
+        final String[] ret = URLHelper.getUserInfo(request.getURL());
+        if (ret == null) {
+            return null;
+        }
+        return new UserInfo(ret[0], ret[1]);
     }
 
     protected abstract Authentication buildBasicAuthentication(Browser browser, Request request, final String realm);

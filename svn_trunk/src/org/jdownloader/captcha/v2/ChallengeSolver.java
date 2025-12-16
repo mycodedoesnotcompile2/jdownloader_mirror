@@ -3,9 +3,12 @@ package org.jdownloader.captcha.v2;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadFactory;
@@ -13,13 +16,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import jd.controlling.captcha.SkipException;
+import jd.plugins.Plugin;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
-
-import jd.controlling.captcha.SkipException;
 
 public abstract class ChallengeSolver<T> {
     public static final ChallengeSolver EXTERN = new ChallengeSolver<Object>() {
@@ -200,26 +204,25 @@ public abstract class ChallengeSolver<T> {
             /* Black/Whitelist disabled by user -> No need to check */
             return true;
         }
-        final String host = c.getHost();
+        final Set<String> hosts = new HashSet<String>();
+        hosts.add(c.getHost());
+        final Plugin plugin = c.getPlugin();
+        final String[] siteSupportedNames = plugin.siteSupportedNames();
+        if (siteSupportedNames != null) {
+            hosts.addAll(Arrays.asList(siteSupportedNames));
+        }
         Boolean result = null;
-        final ArrayList<String> whitelist = getService().getConfig().getWhitelistEntries();
-        whitelist: if (whitelist != null && whitelist.size() > 0) {
-            for (final String s : whitelist) {
+        final ArrayList<String> whiteListEntries = getService().getConfig().getWhitelistEntries();
+        whiteListHandling: if (whiteListEntries != null && whiteListEntries.size() > 0) {
+            for (final String whiteListEntry : whiteListEntries) {
                 try {
-                    final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
-                    if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-                        if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                            result = true;
-                            break whitelist;
+                    final Pattern whiteListPattern = Pattern.compile(whiteListEntry, Pattern.CASE_INSENSITIVE);
+                    for (final String host : hosts) {
+                        final Boolean matches = match(c, host, whiteListPattern);
+                        if (Boolean.TRUE.equals(matches)) {
+                            result = Boolean.TRUE;
+                            break whiteListHandling;
                         }
-                        if (pattern.matcher(host).matches()) {
-                            result = true;
-                            break whitelist;
-                        }
-                    }
-                    if (pattern.matcher(c.getTypeID()).matches()) {
-                        result = true;
-                        break whitelist;
                     }
                 } catch (Throwable e) {
                     c.getPlugin().getLogger().log(e);
@@ -227,24 +230,17 @@ public abstract class ChallengeSolver<T> {
             }
         }
         if (result == null) {
-            final ArrayList<String> blacklist = getService().getConfig().getBlacklistEntries();
-            if (blacklist != null && blacklist.size() > 0) {
-                blacklist: for (final String s : blacklist) {
+            final ArrayList<String> blackListEntries = getService().getConfig().getBlacklistEntries();
+            if (blackListEntries != null && blackListEntries.size() > 0) {
+                blackListHandling: for (final String blackListEntry : blackListEntries) {
                     try {
-                        final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
-                        if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-                            if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                                result = false;
-                                break blacklist;
+                        final Pattern blackListPattern = Pattern.compile(blackListEntry, Pattern.CASE_INSENSITIVE);
+                        for (final String host : hosts) {
+                            final Boolean matches = match(c, host, blackListPattern);
+                            if (Boolean.TRUE.equals(matches)) {
+                                result = Boolean.FALSE;
+                                break blackListHandling;
                             }
-                            if (pattern.matcher(host).matches()) {
-                                result = false;
-                                break blacklist;
-                            }
-                        }
-                        if (pattern.matcher(c.getTypeID()).matches()) {
-                            result = false;
-                            break blacklist;
                         }
                     } catch (Throwable e) {
                         c.getPlugin().getLogger().log(e);
@@ -256,11 +252,26 @@ public abstract class ChallengeSolver<T> {
             return true;
         }
         if (result) {
-            c.getPlugin().getLogger().info(c + " is whitelisted for " + this);
+            plugin.getLogger().info(c + " is whitelisted for " + this);
         } else {
-            c.getPlugin().getLogger().info(c + " is blacklisted for " + this);
+            plugin.getLogger().info(c + " is blacklisted for " + this);
         }
         return result.booleanValue();
+    }
+
+    private Boolean match(final Challenge<?> c, final String host, final Pattern pattern) {
+        if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
+            if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
+                return true;
+            }
+            if (pattern.matcher(host).matches()) {
+                return true;
+            }
+        }
+        if (pattern.matcher(c.getTypeID()).matches()) {
+            return true;
+        }
+        return null;
     }
 
     public long getTimeout() {

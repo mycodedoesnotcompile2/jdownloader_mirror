@@ -84,10 +84,6 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         if (c instanceof BasicCaptchaChallenge) {
             return true;
         } else if (c instanceof RecaptchaV2Challenge) {
-            if (((RecaptchaV2Challenge) c).isEnterprise()) {
-                // not yet supported
-                return false;
-            }
             return true;
         } else if (c instanceof CutCaptchaChallenge) {
             return true;
@@ -139,7 +135,10 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                     r.addFormData(new FormData("type", "5"));
                     // required parameters,https://deathbycaptcha.com/user/api/newtokenrecaptcha#reCAPTCHAv3
                     token_param.put("action", v3action.get("action"));
-                    token_param.put("min_score", rc_challenge.getMinScore());
+                    final Double minScore = rc_challenge.getMinScore();
+                    if (minScore != null) {
+                        token_param.put("min_score", minScore);
+                    }
                 } else {
                     if (rc_challenge.isV3()) {
                         type = "RecaptchaV3";

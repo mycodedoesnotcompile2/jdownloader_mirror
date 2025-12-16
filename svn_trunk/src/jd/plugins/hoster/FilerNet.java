@@ -25,15 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -56,7 +47,16 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51971 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51997 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -77,7 +77,7 @@ public class FilerNet extends PluginForHost {
     /* API Docs: https://filer.net/api */
     public static final String   API_BASE                                           = "https://filer.net/api";
     public static final String   WEBSITE_BASE                                       = "https://filer.net";
-    private static final float   RECAPTCHA_ENTERPRISE_MIN_SCORE                     = 0.5f;
+    private static final double  RECAPTCHA_ENTERPRISE_MIN_SCORE                     = 0.5d;
 
     @SuppressWarnings("deprecation")
     public FilerNet(PluginWrapper wrapper) {
@@ -97,9 +97,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
-                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
-                 * this, http protocol would be used even if user preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
+                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
+                 * preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -367,7 +367,7 @@ public class FilerNet extends PluginForHost {
 
                 /* 2025-12-11: Without this, the following error may happen: {"error":"Score too low: 0.3 (minimum: 0.5)"} */
                 @Override
-                public double getMinScore() {
+                public Double getMinScore() {
                     return RECAPTCHA_ENTERPRISE_MIN_SCORE;
                 }
             };
@@ -637,11 +637,31 @@ public class FilerNet extends PluginForHost {
         final Object errorO = entries.get("error");
         final String message = (String) entries.get("message");
         if (errorO instanceof Number) {
+            /*
+             * Error codes and messages can be extracted from here: https://filer.net/assets/ErrorPage-Br2HzfRN-1765742941422.js
+             */
             final int error = ((Number) errorO).intValue();
-            if (error == 502) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, message, 5 * 60 * 1000);
+            if (error == 404) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, getErrorMessage(message, message));
+            } else if (error == 500) {
+                /* SERVICE_TEMPORARILY_UNAVAILABLE */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, getErrorMessage(message, message));
+            } else if (error == 501) {
+                /* SERVICE_BUSY */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, getErrorMessage(message, message));
+            } else if (error == 502) {
+                /* {"error":502,"message":"CONCURRENT_DOWNLOAD_LIMIT"} */
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 3 * 60 * 1000);
+            } else if (error == 503) {
+                /* HOURLY_DOWNLOAD_LIMIT */
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 1 * 60 * 60 * 1000);
+            } else if (error == 504) {
+                /* BANDWIDTH_QUOTA_EXCEEDED */
+            } else if (error == 505) {
+                /* PREMIUM_REQUIRED */
+                throw new AccountRequiredException(getErrorMessage(message, message));
             } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + error);
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error code " + error + " | " + message);
             }
         } else if (errorO instanceof String) {
             /* e.g. {"error":"Action mismatch: expected 'download', got ''"} */
@@ -650,7 +670,7 @@ public class FilerNet extends PluginForHost {
             if (captchaErrorMinScoreFailure.patternFind()) {
                 // final String receivedScoreStr = captchaErrorMinScoreFailure.getMatch(0);
                 final String minScoreStr = captchaErrorMinScoreFailure.getMatch(1);
-                if (minScoreStr.equals(Float.toString(RECAPTCHA_ENTERPRISE_MIN_SCORE))) {
+                if (minScoreStr.equals(Double.toString(RECAPTCHA_ENTERPRISE_MIN_SCORE))) {
                     /*
                      * Their minScore hasn't changed and still equals our current hardcoded minScore -> Captcha Solver delivered wrong
                      * result -> Treat as captcha error (wrong captcha)
@@ -659,10 +679,30 @@ public class FilerNet extends PluginForHost {
                 } else {
                     throw new PluginException(LinkStatus.ERROR_FATAL, error);
                 }
+            } else if (error.equalsIgnoreCase("HOURLY_DOWNLOAD_LIMIT")) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 1 * 60 * 60 * 1000);
             }
             throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + error);
         }
         return entries;
+    }
+
+    private static final Map<String, String> ERROR_MESSAGES = new HashMap<String, String>();
+    static {
+        ERROR_MESSAGES.put("CONCURRENT_DOWNLOAD_LIMIT", "Concurrent download limit exceeded.");
+        ERROR_MESSAGES.put("HOURLY_DOWNLOAD_LIMIT", "Hourly download limit reached.");
+        ERROR_MESSAGES.put("BANDWIDTH_QUOTA_EXCEEDED", "Bandwidth quota exceeded.");
+        ERROR_MESSAGES.put("SERVICE_TEMPORARILY_UNAVAILABLE", "Service temporarily unavailable");
+        ERROR_MESSAGES.put("SERVICE_BUSY", "Service busy");
+        ERROR_MESSAGES.put("PREMIUM_REQUIRED", "Premium account required to download this file");
+    }
+
+    public static String getErrorMessage(String errorKey, String defaultMessage) {
+        if (errorKey == null || StringUtils.isEmpty(errorKey)) {
+            return defaultMessage;
+        }
+        String message = ERROR_MESSAGES.get(errorKey);
+        return message != null ? message : defaultMessage;
     }
 
     private void checkErrorsWebsite(final Account account, final boolean afterDownload) throws PluginException {

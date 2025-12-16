@@ -251,8 +251,6 @@ public class ChallengeResponseController {
             logger.info("No solver available!");
             if (c instanceof CloudflareTurnstileChallenge) {
                 showNoBrowserSolverInfoDialog(c, "Cloudflare Turnstile");
-            } else if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise()) {
-                showNoBrowserSolverInfoDialog(c, "reCaptcha Enterprise with custom action");
             } else if (c instanceof CutCaptchaChallenge) {
                 showNoBrowserSolverInfoDialog(c, "CutCaptcha");
             }

@@ -2,6 +2,7 @@ package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultDoubleValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
 import org.appwork.storage.config.annotations.SpinnerValidator;
@@ -59,8 +60,8 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
     void setWarnOnLowCredits(boolean b);
 
     @AboutConfig
-    @DoubleSpinnerValidator(min = 1, max = 10, step = 1)
-    @DefaultIntValue(1)
+    @DoubleSpinnerValidator(min = 0.1, max = 10, step = 0.1)
+    @DefaultDoubleValue(0.5)
     @Order(35)
     double getLowCreditsWarningThreshold();
 

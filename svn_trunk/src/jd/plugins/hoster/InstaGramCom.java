@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 51933 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51992 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -617,15 +617,20 @@ public class InstaGramCom extends PluginForHost {
         try {
             con = br2.openHeadConnection(directurl);
             if (!looksLikeDownloadableContent(con)) {
-                throw new IOException();
-            } else {
-                if (con.getCompleteContentLength() > 0) {
-                    /* 2022-04-05: Don't use con.getCompleteContentLength()! */
-                    // link.setVerifiedFileSize(con.getCompleteContentLength());
-                    link.setDownloadSize(con.getCompleteContentLength());
+                try {
+                    checkSpecialDownloadErrors(br2);
+                } catch (final Exception e) {
+                    throwException = true;
+                    throw e;
                 }
-                return directurl;
+                throw new IOException();
             }
+            if (con.getCompleteContentLength() > 0) {
+                /* 2022-04-05: Don't use con.getCompleteContentLength()! */
+                // link.setVerifiedFileSize(con.getCompleteContentLength());
+                link.setDownloadSize(con.getCompleteContentLength());
+            }
+            return directurl;
         } catch (final Exception e) {
             if (throwException) {
                 throw e;
@@ -649,6 +654,13 @@ public class InstaGramCom extends PluginForHost {
         handleDownload(link);
     }
 
+    private void checkSpecialDownloadErrors(final Browser br) throws PluginException {
+        if (br.getHttpConnection().getResponseCode() == 500) {
+            /* E.g. photos and videos where in browser it says "Media cannot be played at this moment". */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Broken media?");
+        }
+    }
+
     public void handleDownload(final DownloadLink link) throws Exception {
         if (isText(link)) {
             /* Write text to file */
@@ -666,14 +678,15 @@ public class InstaGramCom extends PluginForHost {
                 maxchunks = MAXCHUNKS_pictures;
             }
             /*
-             * Other User-Agents get throtteled downloadspeed (block by Instagram). For linkchecking we can continue to use the other
+             * Other User-Agents get throttled download speed (block by Instagram). For linkchecking we can continue to use the other
              * User-Agents.
              */
             br.getHeaders().put("User-Agent", "curl/7.64.1");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, this.dllink, this.isResumeable(link, null), maxchunks);
             if (!looksLikeDownloadableContent(dl.getConnection())) {
-                link.removeProperty(PROPERTY_DIRECTURL);
                 br.followConnection(true);
+                checkSpecialDownloadErrors(br);
+                link.removeProperty(PROPERTY_DIRECTURL);
                 if (this.hasJustRefreshedDirecturl) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Directurl expired -> Broken content?", 5 * 60 * 1000l);
                 } else {
@@ -682,11 +695,6 @@ public class InstaGramCom extends PluginForHost {
             }
             dl.startDownload();
         }
-    }
-
-    @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return Integer.MAX_VALUE;
     }
 
     public void login(final Account account, final boolean force) throws Exception {
@@ -906,21 +914,22 @@ public class InstaGramCom extends PluginForHost {
 
     public static String getFileNameFromURL(final Plugin plugin, final URL url) throws Exception {
         if (url != null) {
-            try {
-                String ret = getFileNameFromURL(url);
-                if (ret != null) {
-                    final UrlQuery query = UrlQuery.parse(url.getQuery());
-                    final String stp = query.get("stp");
-                    if (StringUtils.containsIgnoreCase(stp, "dst-jpg")) {
-                        ret = ret.replaceFirst("\\.webp$", ".jpg");
-                    } else if (StringUtils.containsIgnoreCase(stp, "dst-webp")) {
-                        ret = ret.replaceFirst("\\.jpe?g$", ".webp");
-                    }
+            return null;
+        }
+        try {
+            String ret = getFileNameFromURL(url);
+            if (ret != null) {
+                final UrlQuery query = UrlQuery.parse(url.getQuery());
+                final String stp = query.get("stp");
+                if (StringUtils.containsIgnoreCase(stp, "dst-jpg")) {
+                    ret = ret.replaceFirst("\\.webp$", ".jpg");
+                } else if (StringUtils.containsIgnoreCase(stp, "dst-webp")) {
+                    ret = ret.replaceFirst("\\.jpe?g$", ".webp");
                 }
-                return ret;
-            } catch (final Throwable e) {
-                plugin.getLogger().log(e);
             }
+            return ret;
+        } catch (final Throwable e) {
+            plugin.getLogger().log(e);
         }
         return null;
     }
@@ -1142,6 +1151,11 @@ public class InstaGramCom extends PluginForHost {
         br.setAllowedResponseCodes(new int[] { 400, 429, 500 });
         br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public int getMaxSimultanFreeDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 
     @Override

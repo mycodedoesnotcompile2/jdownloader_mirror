@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51084 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51988 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmloadCom extends PluginForHost {
     public EmloadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -316,13 +316,12 @@ public class EmloadCom extends PluginForHost {
                     logger.info("Login via user cookies successful");
                     account.setProperty("useragent", br.getRequest().getHeaders().get(HTTPConstants.HEADER_REQUEST_USER_AGENT));
                     return;
+                }
+                logger.info("Login via user cookies failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    logger.info("Login via user cookies failed");
-                    if (account.hasEverBeenValid()) {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                    } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                    }
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             } else if (cookies != null) {
                 logger.info("Attempting cookie login");
@@ -331,12 +330,11 @@ public class EmloadCom extends PluginForHost {
                     logger.info("Login via stored cookies successful");
                     account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
-                } else {
-                    logger.info("Login via stored cookies failed");
-                    br.clearCookies(null);
-                    account.clearCookies("");
-                    /* Perform full login */
                 }
+                logger.info("Login via stored cookies failed");
+                br.clearCookies(null);
+                account.clearCookies("");
+                /* Perform full login */
             }
             logger.info("Performing full login");
             br.getPage(getWebsiteBase() + "/user/login");
@@ -387,7 +385,7 @@ public class EmloadCom extends PluginForHost {
             final String result = PluginJSonUtils.getJson(br, "result");
             String userdata = PluginJSonUtils.getJson(br, "doz");
             if (!"ok".equals(result) || StringUtils.isEmpty(userdata)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                throw new AccountInvalidException();
             }
             userdata = URLEncode.encodeURIComponent(userdata);
             br.setCookie(br.getHost(), "userdata", userdata);
@@ -463,10 +461,21 @@ public class EmloadCom extends PluginForHost {
 
     private void handleWebsiteErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
-            if (br.containsHTML("This link only for premium|>\\s*This link is for premium only user")) {
-                throw new AccountRequiredException();
-            } else if (br.containsHTML(">\\s*Max Filesize Limit Reached")) {
+            if (br.containsHTML(">\\s*Max Filesize Limit Reached")) {
                 /* "As a free user you can download files up to X mb" */
+                final String msg_max_filesize_limit_reached = "Max File Size Limit Reached.";
+                String more_detailed_error_msg = br.getRegex(">\\s*(As a Free user you can[^<]+)").getMatch(0);
+                if (more_detailed_error_msg != null) {
+                    more_detailed_error_msg = Encoding.htmlDecode(more_detailed_error_msg).trim();
+                    if (!more_detailed_error_msg.endsWith(".")) {
+                        /* Properly end sentence. */
+                        more_detailed_error_msg += ".";
+                    }
+                    throw new AccountRequiredException(msg_max_filesize_limit_reached + " " + more_detailed_error_msg);
+                } else {
+                    throw new AccountRequiredException(msg_max_filesize_limit_reached);
+                }
+            } else if (br.containsHTML("This link only for premium|>\\s*This link is for premium only user")) {
                 throw new AccountRequiredException();
             }
         }
@@ -480,6 +489,7 @@ public class EmloadCom extends PluginForHost {
         if (account.getType() == AccountType.FREE) {
             requestFileInformation(link, account);
             br.getPage(link.getPluginPatternMatcher());
+            logged_in_or_error(br);
             doFree(link, "account_free_directlink");
         } else {
             String dllink = this.checkDirectLink(link, "premium_directlink_2");
@@ -495,13 +505,14 @@ public class EmloadCom extends PluginForHost {
                         dllink = br.getRegex("\"(https?://[^/]+/download\\.php[^<>\"]+)\"").getMatch(0);
                     }
                     if (StringUtils.isEmpty(dllink)) {
-                        dllink = br.getRegex("<p>Click here to download</p>\\s*?<a href=\"(https?://[^<>\"]+)\"").getMatch(0);
+                        dllink = br.getRegex("<p>\\s*Click here to download\\s*</p>\\s*<a href=\"(https?://[^\"]+)\"").getMatch(0);
                     }
                 } finally {
                     br.setFollowRedirects(followRedirectsBefore);
                 }
                 if (StringUtils.isEmpty(dllink)) {
                     handleWebsiteErrors(br, link, account);
+                    logged_in_or_error(br);
                     logger.warning("Final downloadlink (String is \"dllink\") regex didn't match!");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -512,6 +523,14 @@ public class EmloadCom extends PluginForHost {
             link.setProperty("premium_directlink", dl.getConnection().getURL().toExternalForm());
             dl.startDownload();
         }
+    }
+
+    private void logged_in_or_error(final Browser br) throws AccountUnavailableException {
+        if (this.isLoggedin(br)) {
+            /* We are logged in -> All good */
+            return;
+        }
+        throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000);
     }
 
     @Override
@@ -537,13 +556,5 @@ public class EmloadCom extends PluginForHost {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

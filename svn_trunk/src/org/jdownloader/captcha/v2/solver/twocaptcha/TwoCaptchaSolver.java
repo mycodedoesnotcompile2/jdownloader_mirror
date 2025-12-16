@@ -128,7 +128,10 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
                     task.put("pageAction", action.get("action"));
                 }
                 task.put("isInvisible", TYPE.INVISIBLE.equals(challenge.getType()));
-                task.put("minScore", challenge.getMinScore());
+                final Double minScore = challenge.getMinScore();
+                if (minScore != null) {
+                    task.put("minScore", minScore);
+                }
                 if (challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
                     /**
                      * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results. <br>

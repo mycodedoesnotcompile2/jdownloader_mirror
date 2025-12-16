@@ -127,17 +127,22 @@ public class FavIcons {
         };
         THREAD_POOL.allowCoreThreadTimeOut(true);
         /* load failed hosts list */
-        ArrayList<String> FAILED_ARRAY_LIST = JsonConfig.create(FavIconsConfig.class).getFailedHosts();
-        if (FAILED_ARRAY_LIST == null || (System.currentTimeMillis() - CONFIG.getLastRefresh()) > RETRY_TIMEOUT) {
-            CONFIG.setLastRefresh(System.currentTimeMillis());
-            /* timeout is over, lets try again the failed ones */
-            FAILED_ARRAY_LIST = new ArrayList<String>();
-            CONFIG.setFailedHosts(FAILED_ARRAY_LIST);
-        }
-        synchronized (LOCK) {
-            for (String host : FAILED_ARRAY_LIST) {
-                FAILED_ICONS.put(host, null);
+        try {
+            ArrayList<String> FAILED_ARRAY_LIST = JsonConfig.create(FavIconsConfig.class).getFailedHosts();
+            if (FAILED_ARRAY_LIST == null || (System.currentTimeMillis() - CONFIG.getLastRefresh()) > RETRY_TIMEOUT) {
+                CONFIG.setLastRefresh(System.currentTimeMillis());
+                /* timeout is over, lets try again the failed ones */
+                FAILED_ARRAY_LIST = new ArrayList<String>();
+                CONFIG.setFailedHosts(FAILED_ARRAY_LIST);
             }
+            synchronized (LOCK) {
+                for (String host : FAILED_ARRAY_LIST) {
+                    FAILED_ICONS.put(host, null);
+                }
+            }
+        } catch (Exception e) {
+            // avoid java.lang.ExceptionInInitializerError
+            LogController.CL(false).log(e);
         }
         ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
             @Override
@@ -151,7 +156,11 @@ public class FavIcons {
                 synchronized (LOCK) {
                     failedHosts = new ArrayList<String>(FAILED_ICONS.keySet());
                 }
-                CONFIG.setFailedHosts(failedHosts);
+                try {
+                    CONFIG.setFailedHosts(failedHosts);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
     }

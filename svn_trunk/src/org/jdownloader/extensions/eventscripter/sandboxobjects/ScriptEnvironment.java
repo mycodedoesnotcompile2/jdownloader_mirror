@@ -68,6 +68,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
@@ -90,6 +91,7 @@ import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.appwork.utils.swing.dialog.InputDialog;
 import org.jdownloader.api.RemoteAPIController;
 import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.extensions.eventscripter.EnvironmentException;
@@ -1205,19 +1207,99 @@ public class ScriptEnvironment {
         });
     }
 
-    @ScriptAPI(description = "Show a Confirm Dialog", parameters = { "message", "okOption", "cancelOption" }, example = "showConfirmDialog(\"Do you like this method?\",\"yes\",\"no\")")
-    public static int showConfirmDialog(final String message, final String okOption, final String cancelOption) {
+    @ScriptAPI(description = "Show a Input Dialog", parameters = { "message", "defaultText" }, example = "showInputDialog(\"Are you a bot?\",\"no\")")
+    public static String showInputDialog(final String message, final String defaultText) {
         final ScriptThread env = getScriptThread();
         final String id = T.T.showConfirmDialog_title(env.getScript().getName(), env.getScript().getEventTrigger().getLabel());
         final AtomicReference<Object> dialogReference = new AtomicReference<Object>();
         new Thread(id) {
+            private final int flags;
             {
                 setDaemon(true);
+                if (message != null && message.matches("<html>.+</html>")) {
+                    flags = Dialog.STYLE_LARGE | Dialog.STYLE_HTML;
+                } else {
+                    flags = Dialog.STYLE_LARGE;
+                }
             }
 
             public void run() {
                 try {
-                    final ConfirmDialog confirmDialog = new ConfirmDialog(Dialog.STYLE_LARGE, id, message, new AbstractIcon(IconKey.ICON_QUESTION, 32), okOption, cancelOption) {
+                    final InputDialog inputDialog = new InputDialog(flags, id, message, defaultText) {
+                        @Override
+                        protected int getPreferredWidth() {
+                            return 600;
+                        }
+
+                        @Override
+                        public String getDontShowAgainKey() {
+                            return null;
+                        };
+
+                        @Override
+                        public boolean isRemoteAPIEnabled() {
+                            return true;
+                        }
+
+                        @Override
+                        public ModalityType getModalityType() {
+                            return ModalityType.MODELESS;
+                        }
+
+                        @Override
+                        public void pack() {
+                            getDialog().pack();
+                        }
+                    };
+                    final InputDialogInterface dialog = UIOManager.I().show(InputDialogInterface.class, inputDialog);
+                    dialogReference.set(dialog);
+                } finally {
+                    synchronized (dialogReference) {
+                        dialogReference.compareAndSet(null, Boolean.FALSE);
+                        dialogReference.notifyAll();
+                    }
+                }
+            };
+        }.start();
+        synchronized (dialogReference) {
+            while (dialogReference.get() == null) {
+                try {
+                    dialogReference.wait();
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }
+        if (dialogReference.get() instanceof InputDialogInterface) {
+            try {
+                ((InputDialogInterface) dialogReference.get()).throwCloseExceptions();
+                return ((InputDialogInterface) dialogReference.get()).getText();
+            } catch (DialogNoAnswerException e) {
+            }
+        }
+        return null;
+    }
+
+    @ScriptAPI(description = "Show a Confirm Dialog", parameters = { "message", "okOption", "cancelOption" }, example = "showConfirmDialog(\"Do you like this method?\",\"yes\",\"no\")")
+    public static int showConfirmDialog(final String message, final String okOption, final String cancelOption) {
+        final ScriptThread env = getScriptThread();
+        final String id = T.T.showConfirmDialog_title(env.getScript().getName(), env.getScript().getEventTrigger().getLabel());
+
+        final AtomicReference<Object> dialogReference = new AtomicReference<Object>();
+        new Thread(id) {
+            private final int flags;
+            {
+                setDaemon(true);
+                if (message != null && message.matches("<html>.+</html>")) {
+                    flags = Dialog.STYLE_LARGE | Dialog.STYLE_HTML;
+                } else {
+                    flags = Dialog.STYLE_LARGE;
+                }
+            }
+
+            public void run() {
+                try {
+                    final ConfirmDialog confirmDialog = new ConfirmDialog(flags, id, message, new AbstractIcon(IconKey.ICON_QUESTION, 32), okOption, cancelOption) {
                         @Override
                         protected int getPreferredWidth() {
                             return 600;

@@ -6,9 +6,9 @@ public class URLUserInfoAuthentication extends AbstractAuthenticationFactory {
 
     @Override
     protected Authentication buildBasicAuthentication(Browser browser, Request request, final String realm) {
-        final String userInfo[] = this.getUserInfo(request);
+        final UserInfo userInfo = this.getUserInfo(request);
         if (userInfo != null) {
-            return new BasicAuthentication(request.getURL().getHost(), userInfo[0], userInfo[2], realm);
+            return new BasicAuthentication(request.getURL().getHost(), userInfo.user, userInfo.pass, realm);
         } else {
             return null;
         }
@@ -16,9 +16,9 @@ public class URLUserInfoAuthentication extends AbstractAuthenticationFactory {
 
     @Override
     protected Authentication buildDigestAuthentication(Browser browser, Request request, final String realm) {
-        final String userInfo[] = this.getUserInfo(request);
+        final UserInfo userInfo = this.getUserInfo(request);
         if (userInfo != null) {
-            return DigestAuthentication.build(browser, request, realm, userInfo[0], userInfo[2]);
+            return DigestAuthentication.build(browser, request, realm, userInfo.user, userInfo.pass);
         } else {
             return null;
         }

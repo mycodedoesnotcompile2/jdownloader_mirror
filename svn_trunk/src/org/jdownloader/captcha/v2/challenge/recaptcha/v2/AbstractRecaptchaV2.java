@@ -282,8 +282,8 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
      * Use this if a website requires the reCaptcha token answer to have a certain "quality" in order to be accepted. <br>
      * Example: filer.net
      */
-    public double getMinScore() {
-        return 0.3d;
+    public Double getMinScore() {
+        return null;
     }
 
     public AbstractRecaptchaV2(final T plugin, final Browser br, final String siteKey, final String secureToken, boolean boundToDomain) {
@@ -526,7 +526,7 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
             }
 
             @Override
-            public double getMinScore() {
+            public Double getMinScore() {
                 return AbstractRecaptchaV2.this.getMinScore();
             }
 

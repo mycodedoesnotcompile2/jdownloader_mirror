@@ -51,10 +51,6 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
 
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
-        if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise()) {
-            // TODO: check if app does support Recaptcha Enterprise
-            return false;
-        }
         return c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof AccountLoginOAuthChallenge || c instanceof ImageCaptchaChallenge;
     }
 
