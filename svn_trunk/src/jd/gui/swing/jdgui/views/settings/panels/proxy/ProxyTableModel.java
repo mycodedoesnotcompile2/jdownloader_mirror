@@ -393,6 +393,56 @@ public class ProxyTableModel extends ExtTableModel<AbstractProxySelectorImpl> {
                 }
             }
         });
+        this.addColumn(new ExtCheckColumn<AbstractProxySelectorImpl>(_GUI.T.gui_column_resolvehost(), this) {
+            private static final long serialVersionUID = -4667150369226691276L;
+
+            @Override
+            public int getMaxWidth() {
+                return 125;
+            }
+
+            @Override
+            protected boolean isDefaultResizable() {
+                return true;
+            }
+
+            public boolean isDefaultVisible() {
+                return false;
+            }
+
+            @Override
+            public boolean isSortable(final AbstractProxySelectorImpl obj) {
+                return false;
+            }
+
+            @Override
+            protected boolean getBooleanValue(AbstractProxySelectorImpl value) {
+                return value.isResolveDNSLocally();
+            }
+
+            @Override
+            public boolean isEditable(AbstractProxySelectorImpl obj) {
+                switch (obj.getType()) {
+                case DIRECT:
+                case NONE:
+                case HTTP:
+                case HTTPS:
+                case PAC:
+                    return false;
+                case SOCKS4:
+                case SOCKS4A:
+                case SOCKS5:
+                    return true;
+                default:
+                    return false;
+                }
+            }
+
+            @Override
+            protected void setBooleanValue(final boolean value, final AbstractProxySelectorImpl object) {
+                object.setResolveDNSLocally(value);
+            }
+        });
         this.addColumn(new ExtCheckColumn<AbstractProxySelectorImpl>(_GUI.T.gui_column_nativeauth(), this) {
             private static final long serialVersionUID = -4667150369226691276L;
 

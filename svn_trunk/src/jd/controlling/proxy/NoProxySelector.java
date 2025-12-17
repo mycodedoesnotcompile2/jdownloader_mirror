@@ -41,6 +41,15 @@ public class NoProxySelector extends SingleBasicProxySelectorImpl {
     }
 
     @Override
+    public boolean isResolveDNSLocally() {
+        return true;
+    }
+
+    @Override
+    public void setResolveDNSLocally(boolean resolveLocally) {
+    }
+
+    @Override
     public String toExportString() {
         return "none://";
     }

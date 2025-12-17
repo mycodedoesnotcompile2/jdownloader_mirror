@@ -21,6 +21,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
 import jd.http.Browser;
@@ -41,13 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52002 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -239,7 +239,11 @@ public class BestdebridCom extends PluginForHost {
         }
         final ArrayList<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostinfo : hosters) {
-            final String domain = hostinfo.get("name").toString();
+            String domain = hostinfo.get("name").toString();
+            if (domain.equalsIgnoreCase("filestore")) {
+                /* 2025-12-16: Workaround since plugin finder will find "filestore.me" and "filestore.to" and then nothing will match. */
+                domain = "filestore.me";
+            }
             final String status = (String) hostinfo.get("status");
             final String downsincedate = (String) hostinfo.get("downsincedate");
             final MultiHostHost mhost = new MultiHostHost(domain);

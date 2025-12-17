@@ -36,6 +36,15 @@ public class SingleDirectGatewaySelector extends SingleBasicProxySelectorImpl {
     }
 
     @Override
+    public boolean isResolveDNSLocally() {
+        return true;
+    }
+
+    @Override
+    public void setResolveDNSLocally(boolean resolveLocally) {
+    }
+
+    @Override
     public int hashCode() {
         return SingleBasicProxySelectorImpl.class.hashCode();
     }

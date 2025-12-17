@@ -152,6 +152,10 @@ public abstract class AbstractProxySelectorImpl implements ProxySelectorInterfac
 
     abstract protected boolean isLocal();
 
+    abstract public boolean isResolveDNSLocally();
+
+    abstract public void setResolveDNSLocally(boolean resolveLocally);
+
     protected final CopyOnWriteArrayList<ConnectionBan> banList = new CopyOnWriteArrayList<ConnectionBan>();
 
     public List<ConnectionBan> getBanList() {

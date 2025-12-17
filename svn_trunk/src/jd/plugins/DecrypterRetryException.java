@@ -4,31 +4,42 @@ import org.jdownloader.translate._JDT;
 
 public class DecrypterRetryException extends Exception {
     public static enum RetryReason {
-        CAPTCHA(_JDT.T.decrypter_wrongcaptcha()),
-        EMPTY_FOLDER(_JDT.T.decrypter_empty_folder()),
-        EMPTY_PROFILE(_JDT.T.decrypter_empty_profile()),
-        EMPTY_SEARCH_QUERY(_JDT.FIX_ME("Search query without search results")),
-        NO_ACCOUNT(_JDT.T.decrypter_invalidaccount()),
-        FILE_NOT_FOUND(_JDT.T.decrypter_contentoffline()),
-        PLUGIN_DEFECT(_JDT.T.decrypter_plugindefect()),
-        PLUGIN_SETTINGS(_JDT.T.decrypter_pluginsettings()),
-        PASSWORD(_JDT.T.decrypter_wrongpassword()),
-        HOST(_JDT.T.plugins_errors_hosterproblem()),
-        HOST_RATE_LIMIT(_JDT.T.plugins_errors_hosterproblem_rate_limit()),
-        GEO(_JDT.T.decrypter_unavailable_geo()),
-        IP(_JDT.T.decrypter_unavailable_ip()),
-        UNSUPPORTED_LIVESTREAM(_JDT.T.decrypter_unavailable_unsupported_livestream()),
-        UNSUPPORTED_DRM("DRM"),
-        BLOCKED_BY(_JDT.T.decrypter_unavailable_blocked_by());
+        AGE_VERIFICATION_REQUIRED("Age verification required", "To access this content, age verification is required. In some cases it helps to use a VPN. Otherwise adding a verified account may help."),
+        CAPTCHA(_JDT.T.decrypter_wrongcaptcha(), null),
+        EMPTY_FOLDER(_JDT.T.decrypter_empty_folder(), _JDT.T.decrypter_empty_folder_description()),
+        EMPTY_PROFILE(_JDT.T.decrypter_empty_profile(), null),
+        EMPTY_SEARCH_QUERY(_JDT.FIX_ME("Search query without search results"), _JDT.FIX_ME("The search query you've entered did not lead to any search results.")),
+        NO_ACCOUNT(_JDT.T.decrypter_invalidaccount(), null),
+        FILE_NOT_FOUND(_JDT.T.decrypter_contentoffline(), null),
+        PLUGIN_DEFECT(_JDT.T.decrypter_plugindefect(), null),
+        PLUGIN_SETTINGS(_JDT.T.decrypter_pluginsettings(), _JDT.T.decrypter_pluginsettings_description()),
+        PASSWORD(_JDT.T.decrypter_wrongpassword(), null),
+        HOST(_JDT.T.plugins_errors_hosterproblem(), null),
+        HOST_RATE_LIMIT(_JDT.T.plugins_errors_hosterproblem_rate_limit(), null),
+        GEO(_JDT.T.decrypter_unavailable_geo(), _JDT.T.decrypter_unavailable_geo_description()),
+        IP(_JDT.T.decrypter_unavailable_ip(), _JDT.T.decrypter_unavailable_ip_description()),
+        UNSUPPORTED_LIVESTREAM(_JDT.T.decrypter_unavailable_unsupported_livestream(), _JDT.T.decrypter_unavailable_unsupported_livestream()),
+        UNSUPPORTED_DRM("DRM", "Unsupported DRM protected content"),
+        BLOCKED_BY(_JDT.T.decrypter_unavailable_blocked_by(), null);
 
         private final String exp;
+        private final String longExp;
 
-        private RetryReason(String exp) {
+        private RetryReason(String exp, String longExp) {
             this.exp = exp;
+            this.longExp = longExp;
         }
 
         public String getExplanation(Object requestor) {
             return exp;
+        }
+
+        public String getLongExplanation() {
+            if (longExp != null) {
+                return longExp;
+            } else {
+                return exp;
+            }
         }
     }
 
@@ -46,25 +57,7 @@ public class DecrypterRetryException extends Exception {
         if (customComment != null) {
             return customComment;
         }
-        /* Return default comment for some states. */
-        if (this.reason == RetryReason.EMPTY_FOLDER) {
-            return _JDT.T.decrypter_empty_folder_description();
-        } else if (this.reason == RetryReason.EMPTY_SEARCH_QUERY) {
-            return _JDT.FIX_ME("The search query you've entered did not lead to any search results.");
-        } else if (this.reason == RetryReason.GEO) {
-            return _JDT.T.decrypter_unavailable_geo_description();
-        } else if (this.reason == RetryReason.PLUGIN_SETTINGS) {
-            return _JDT.T.decrypter_pluginsettings_description();
-        } else if (this.reason == RetryReason.IP) {
-            return _JDT.T.decrypter_unavailable_ip_description();
-        } else if (this.reason == RetryReason.UNSUPPORTED_LIVESTREAM) {
-            return _JDT.T.decrypter_unavailable_unsupported_livestream();
-        } else if (this.reason == RetryReason.UNSUPPORTED_DRM) {
-            // TODO: Add translation
-            return "Unsupported DRM protected content";
-        } else {
-            return null;
-        }
+        return reason.getLongExplanation();
     }
 
     public String getCustomComment() {

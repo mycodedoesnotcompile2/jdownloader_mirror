@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 51992 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52000 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -913,7 +913,7 @@ public class InstaGramCom extends PluginForHost {
     }
 
     public static String getFileNameFromURL(final Plugin plugin, final URL url) throws Exception {
-        if (url != null) {
+        if (url == null) {
             return null;
         }
         try {

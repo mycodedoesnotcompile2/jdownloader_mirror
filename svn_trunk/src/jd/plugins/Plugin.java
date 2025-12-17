@@ -299,8 +299,8 @@ public abstract class Plugin implements ActionListener {
      *
      * @return Datename des Downloads.
      */
-    public static String extractFileNameFromURL(final String filename) {
-        String ret = filename;
+    public static String extractFileNameFromURL(final String url) {
+        String ret = url;
         if (StringUtils.isEmpty(ret)) {
             return null;
         }

@@ -48,6 +48,16 @@ public class SingleBasicProxySelectorImpl extends AbstractProxySelectorImpl {
         return ProxyController.getInstance().updateProxy(this, request, retryCounter);
     }
 
+    @Override
+    public boolean isResolveDNSLocally() {
+        return getProxy().isResolveHostname();
+    }
+
+    @Override
+    public void setResolveDNSLocally(boolean resolveLocally) {
+        getProxy().setResolveHostname(resolveLocally);
+    }
+
     public SingleBasicProxySelectorImpl(ProxyData proxyData) {
         proxy = new SelectedProxy(this, HTTPProxy.getHTTPProxy(proxyData.getProxy()));
         setFilter(proxyData.getFilter());

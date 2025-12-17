@@ -1207,24 +1207,29 @@ public class ScriptEnvironment {
         });
     }
 
-    @ScriptAPI(description = "Show a Input Dialog", parameters = { "message", "defaultText" }, example = "showInputDialog(\"Are you a bot?\",\"no\")")
-    public static String showInputDialog(final String message, final String defaultText) {
+    @ScriptAPI(description = "Show a Input Dialog", parameters = { "inputDialogMap" }, example = "showInputDialog({\"message\":\"Are you a bot?\",\"multiLine\":false,\"default\":\"yes\"})")
+    public static String showInputDialog(final Map<String, Object> inputDialogMap) {
         final ScriptThread env = getScriptThread();
         final String id = T.T.showConfirmDialog_title(env.getScript().getName(), env.getScript().getEventTrigger().getLabel());
         final AtomicReference<Object> dialogReference = new AtomicReference<Object>();
         new Thread(id) {
-            private final int flags;
+
             {
                 setDaemon(true);
-                if (message != null && message.matches("<html>.+</html>")) {
-                    flags = Dialog.STYLE_LARGE | Dialog.STYLE_HTML;
-                } else {
-                    flags = Dialog.STYLE_LARGE;
-                }
+
             }
 
             public void run() {
                 try {
+                    final String message = StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(inputDialogMap.get("message")));
+                    int flags = 0;
+                    if (Boolean.TRUE.equals(inputDialogMap.get("multiLine"))) {
+                        flags = flags | Dialog.STYLE_LARGE;
+                    }
+                    if (message != null && message.matches("<html>.+</html>")) {
+                        flags = flags | Dialog.STYLE_HTML;
+                    }
+                    final String defaultText = StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(inputDialogMap.get("default")));
                     final InputDialog inputDialog = new InputDialog(flags, id, message, defaultText) {
                         @Override
                         protected int getPreferredWidth() {

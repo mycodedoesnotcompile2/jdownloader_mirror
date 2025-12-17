@@ -73,6 +73,15 @@ public class PacProxySelectorImpl extends AbstractProxySelectorImpl {
     }
 
     @Override
+    public void setResolveDNSLocally(boolean resolveLocally) {
+    }
+
+    @Override
+    public boolean isResolveDNSLocally() {
+        return false;
+    }
+
+    @Override
     public List<HTTPProxy> getProxiesByURL(URL url) {
         final List<HTTPProxy> ret = getProxyByUrlInternal(url);
         for (final SelectProxyByURLHook hook : selectProxyByURLHooks) {

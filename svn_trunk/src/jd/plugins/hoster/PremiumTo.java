@@ -71,23 +71,29 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 51918 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 51998 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
-    private final String PROPERTY_normalTraffic                                            = "normalTraffic";
-    private final String PROPERTY_specialTraffic                                           = "specialTraffic";
-    private final String type_torrent                                                      = "(?i)https?://torrent.*?\\..+";
-    private final String type_torrent_file                                                 = "(?i)https?://torrent.*?\\.[^/]+/(?:t|z)/(.+)";
-    private final String type_torrent_remote                                               = "(?i)https?://torrent.*?\\.[^/]+/r/\\d+/[A-F0-9]{32}/([a-z0-9]+/\\d+)/[^/]+";
-    private final String type_storage                                                      = "(?i)https?://storage\\..+";
+    private final String             PROPERTY_normalTraffic                                            = "normalTraffic";
+    private final String             PROPERTY_specialTraffic                                           = "specialTraffic";
+    private final String             type_torrent                                                      = "(?i)https?://torrent.*?\\..+";
+    private final String             type_torrent_file                                                 = "(?i)https?://torrent.*?\\.[^/]+/(?:t|z)/(.+)";
+    private final String             type_torrent_remote                                               = "(?i)https?://torrent.*?\\.[^/]+/r/\\d+/[A-F0-9]{32}/([a-z0-9]+/\\d+)/[^/]+";
+    private final String             type_storage                                                      = "(?i)https?://storage\\..+";
     /* storage.premium.to --> Extract download URLs */
-    private final String type_storage_file                                                 = "(?i)https?://storage\\.[^/]+/file/(.+)";
+    private final String             type_storage_file                                                 = "(?i)https?://storage\\.[^/]+/file/(.+)";
     /* storage.premium.to --> Extract remote URLs */
-    private final String type_storage_remote                                               = "(?i)https?://storage\\.[^/]+/(?:remote|r)/[A-Z0-9]+/[A-Z0-9]+/([A-Z0-9]+)/.+";
+    private final String             type_storage_remote                                               = "(?i)https?://storage\\.[^/]+/(?:remote|r)/[A-Z0-9]+/[A-Z0-9]+/([A-Z0-9]+)/.+";
     // private static final String type_torrent = "https?://torrent.+";
-    private final String API_BASE                                                          = "https://api.premium.to/api";
-    private final String API_BASE_STORAGE                                                  = "https://storage.premium.to/api/2";
-    private final String API_BASE_TORRENT                                                  = "https://torrent.premium.to/api/2";
-    private final String PROPERTY_ACCOUNT_DEACTIVATED_FILEHOSTS_DIALOG_SHOWN_AND_CONFIRMED = "deactivated_filehosts_dialog_shown_and_confirmed";
+    private final String             API_BASE                                                          = "https://api.premium.to/api";
+    private final String             API_BASE_STORAGE                                                  = "https://storage.premium.to/api/2";
+    private final String             API_BASE_TORRENT                                                  = "https://torrent.premium.to/api/2";
+    private final String             PROPERTY_ACCOUNT_DEACTIVATED_FILEHOSTS_DIALOG_SHOWN_AND_CONFIRMED = "deactivated_filehosts_dialog_shown_and_confirmed";
+    /*
+     * 2019-11-10: Internal switch to force disable all Storage hosts - do not touch this unless e.g. admin requests this or API breaks
+     * down.
+     */
+    private static final boolean     plugin_supports_storage_download                                  = true;
+    private static final Set<String> supported_hosts_storage                                           = new HashSet<String>();
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -95,7 +101,7 @@ public class PremiumTo extends UseNet {
     }
 
     private boolean requiresAccount(final DownloadLink link) {
-        if (link == null || link.getPluginPatternMatcher() == null) {
+        if (link.getPluginPatternMatcher() == null) {
             return false;
         } else if (link.getPluginPatternMatcher().matches(type_torrent_remote) || link.getPluginPatternMatcher().matches(type_storage_remote)) {
             return false;
@@ -103,13 +109,6 @@ public class PremiumTo extends UseNet {
             return true;
         }
     }
-
-    /*
-     * 2019-11-10: Internal switch to force disable all Storage hosts - do not touch this unless e.g. admin requests this or API breaks
-     * down.
-     */
-    private static final boolean     plugin_supports_storage_download = true;
-    private static final Set<String> supported_hosts_storage          = new HashSet<String>();
 
     public PremiumTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -143,21 +142,23 @@ public class PremiumTo extends UseNet {
     }
 
     private String getFID(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() == null) {
+        final String url = link.getPluginPatternMatcher();
+        if (url == null) {
             return null;
-        } else if (link.getPluginPatternMatcher().matches(type_storage)) {
-            if (link.getPluginPatternMatcher().matches(type_storage_file)) {
-                return new Regex(link.getPluginPatternMatcher(), type_storage_file).getMatch(0);
+        } else if (url.matches(type_storage)) {
+            if (url.matches(type_storage_file)) {
+                return new Regex(url, type_storage_file).getMatch(0);
             } else {
-                return new Regex(link.getPluginPatternMatcher(), type_storage_remote).getMatch(0);
+                return new Regex(url, type_storage_remote).getMatch(0);
             }
-        } else if (link.getPluginPatternMatcher().matches(type_torrent)) {
-            if (link.getPluginPatternMatcher().matches(type_torrent_file)) {
-                return new Regex(link.getPluginPatternMatcher(), type_torrent_file).getMatch(0);
+        } else if (url.matches(type_torrent)) {
+            if (url.matches(type_torrent_file)) {
+                return new Regex(url, type_torrent_file).getMatch(0);
             } else {
-                return new Regex(link.getPluginPatternMatcher(), type_torrent_remote).getMatch(0);
+                return new Regex(url, type_torrent_remote).getMatch(0);
             }
         } else {
+            logger.warning("Unsupported type of link: " + url);
             return null;
         }
     }
@@ -261,13 +262,9 @@ public class PremiumTo extends UseNet {
         return br.getPage(req);
     }
 
-    private Map<String, Object> login(final Account account, final boolean force) throws Exception {
+    private Map<String, Object> fetchAccountDataFromAPI(final Account account) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            if (!force) {
-                /* Trust existing login-data without check */
-                return null;
-            }
             this.callAPI(API_BASE + "/traffic.php", account, AuthType.HEADER);
             return this.handleErrorsAPI(null, account, false);
         }
@@ -275,7 +272,7 @@ public class PremiumTo extends UseNet {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final Map<String, Object> userinfo = login(account, true);
+        final Map<String, Object> userinfo = fetchAccountDataFromAPI(account);
         final AccountInfo ai = new AccountInfo();
         ai.setTrafficRefill(false);
         /* Normal traffic */
@@ -510,7 +507,7 @@ public class PremiumTo extends UseNet {
         }
         this.requestFileInformation(link, account);
         final String dllink = getDirectURL(link, account);
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, true, -10);
+        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
@@ -575,7 +572,6 @@ public class PremiumTo extends UseNet {
             }
             query.add("url", urlUrlEncoded); // check.php and download.php
             query.add("link", urlUrlEncoded); // getfile.php
-            login(account, false);
             final GetRequest req;
             if (requiresStorageDownload) {
                 /* Storage download */
@@ -622,7 +618,7 @@ public class PremiumTo extends UseNet {
                     return false;
                 }
             };
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, downloadable, req, true, -10);
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, downloadable, req, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 if (dl.getConnection().getResponseCode() == 404) {
@@ -789,6 +785,16 @@ public class PremiumTo extends UseNet {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        /* 2025-12-16: max 20 per file is okay according to admin */
+        return -20;
+    }
+
+    @Override
     public boolean isProxyRotationEnabledForLinkChecker() {
         return false;
     }
@@ -810,10 +816,8 @@ public class PremiumTo extends UseNet {
     private AvailableStatus getDirecturlStatus(final DownloadLink link, final Account account) throws Exception {
         if (requiresAccount(link) && account == null) {
             /* Account required to check given link. */
+            logger.info("Cannot check this link without account: " + link.getPluginPatternMatcher());
             return AvailableStatus.UNCHECKABLE;
-        }
-        if (account != null) {
-            this.login(account, false);
         }
         final String dllink = getDirectURL(link, account);
         URLConnectionAdapter con = null;
@@ -831,8 +835,8 @@ public class PremiumTo extends UseNet {
                     return AvailableStatus.UNCHECKABLE;
                 }
             }
-            final long fileSize = con.getCompleteContentLength();
-            if (fileSize <= 0) {
+            final long filesize = con.getCompleteContentLength();
+            if (filesize <= 0) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String filenameFromConnection = getFileNameFromConnection(con);
@@ -840,9 +844,9 @@ public class PremiumTo extends UseNet {
                 link.setFinalFileName(filenameFromConnection);
             }
             if (con.isContentDecoded()) {
-                link.setDownloadSize(fileSize);
+                link.setDownloadSize(filesize);
             } else {
-                link.setVerifiedFileSize(fileSize);
+                link.setVerifiedFileSize(filesize);
             }
             return AvailableStatus.TRUE;
         } finally {

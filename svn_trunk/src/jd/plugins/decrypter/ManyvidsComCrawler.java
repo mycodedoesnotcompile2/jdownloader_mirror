@@ -42,12 +42,13 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51098 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51999 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,9 +130,8 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             // }
             br.getPage("https://www." + getHost() + "/Profile/" + contentID + "/" + urlSlug + "/Store/Videos/");
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (!br.getURL().contains(contentID)) {
+            this.checkErrors(br);
+            if (!br.getURL().contains(contentID)) {
                 /* E.g. redirect to mainpage */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -163,7 +163,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 int numberofNewItems = 0;
                 for (final Map<String, Object> item : items) {
                     final Map<String, Object> creator = (Map<String, Object>) item.get("creator");
-                    final Map<String, Object> thumbnail = (Map<String, Object>) item.get("thumbnail");
+                    final Map<String, Object> thumbnailMap = (Map<String, Object>) item.get("thumbnail");
                     final Map<String, Object> preview = (Map<String, Object>) item.get("preview");
                     final Map<String, Object> price = (Map<String, Object>) item.get("price");
                     final String video_id = item.get("id").toString();
@@ -198,17 +198,23 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                         distribute(video);
                         continue;
                     }
-                    if (thumbnail != null) {
-                        final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnail.get("url").toString()));
-                        thumb.setAvailable(true);
-                        ret.add(thumb);
+                    final String filename_base = creator.get("slug") + "_" + video_title;
+                    if (thumbnailMap != null) {
+                        final String urlThumbnail = thumbnailMap.get("url").toString();
+                        final DownloadLink thumbnail = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
+                        final String thumbnailFilenameFromURL = Plugin.extractFileNameFromURL(urlThumbnail);
+                        if (thumbnailFilenameFromURL != null) {
+                            thumbnail.setFinalFileName(filename_base + "_" + thumbnailFilenameFromURL);
+                        }
+                        thumbnail.setAvailable(true);
+                        ret.add(thumbnail);
                     }
                     final String fullVideoURL = br.getURL(path).toExternalForm();
                     final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(fullVideoURL));
                     video.setContentUrl(content_url);
                     video.setAvailable(true);
                     video._setFilePackage(fp);
-                    video.setFinalFileName(creator.get("slug") + "_" + video_title + previewSuffix + ".mp4");
+                    video.setFinalFileName(filename_base + previewSuffix + ".mp4");
                     video.setLinkID(manyvidsKeyPrefix + "video/" + video_id + "/quality/preview");
                     ret.add(video);
                     distribute(video);
@@ -216,30 +222,27 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 logger.info("Crawled page: " + page + "/" + pagination.get("totalPages") + " | Offset: " + offset + " |  Number of new items on this page: " + numberofNewItems + " | Total found so far: " + ret.size() + "/" + totalNumberofItems);
                 if (this.isAbort()) {
                     logger.info("Stopping because: Aborted by user");
-                    break;
+                    throw new InterruptedException();
                 } else if (numberofNewItems == 0) {
                     logger.info("Stopping because: Failed to find any new items on current page");
                     break;
                 } else if (nextPage == null || nextPage.intValue() <= page) {
                     logger.info("Stopping because: Reached end");
                     break;
-                } else {
-                    /* Continue to next page */
-                    offset += numberofNewItems;
-                    page++;
                 }
+                /* Continue to next page */
+                offset += numberofNewItems;
+                page++;
             } while (true);
         } else {
             /* Crawl single video */
             if (useWebsiteHandling) {
                 /* Deprecated code */
                 br.getPage(param.getCryptedUrl());
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
+                this.checkErrors(br);
                 if (this.isAbort()) {
                     logger.info("Aborted by user");
-                    return ret;
+                    throw new InterruptedException();
                 }
                 /* Search video title */
                 if (urlSlug == null) {
@@ -267,21 +270,31 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             title = Encoding.htmlDecode(title).trim();
             final String filesizeStr = (String) data.get("size");
             final String description = (String) data.get("description");
+            final String filename_base = model.get("displayName") + "_" + title;
             // final Boolean isFree = (Boolean) data.get("isFree");
             final String urlThumbnail = data.get("thumbnail").toString();
-            ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail)));
+            final DownloadLink thumbnail = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
+            final String thumbnailFilenameFromURL = Plugin.extractFileNameFromURL(urlThumbnail);
+            if (thumbnailFilenameFromURL != null) {
+                thumbnail.setFinalFileName(filename_base + "_" + thumbnailFilenameFromURL);
+            }
+            ret.add(thumbnail);
             final String urlScreenshot = data.get("screenshot").toString();
-            ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlScreenshot)));
+            final DownloadLink screenshot = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlScreenshot));
+            final String screenshotFilenameFromURL = Plugin.extractFileNameFromURL(urlScreenshot);
+            if (screenshotFilenameFromURL != null) {
+                screenshot.setFinalFileName(filename_base + "_" + screenshotFilenameFromURL);
+            }
+            ret.add(screenshot);
             if (this.isAbort()) {
                 logger.info("Aborted by user");
-                return ret;
+                throw new InterruptedException();
             }
             /* Find stream-downloadurls */
             brc.getPage("/vercel/videos/" + contentID + "/private");
             final Map<String, Object> entries2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> data2 = (Map<String, Object>) entries2.get("data");
             boolean crawlVideoStreams = true;
-            final String filename_base = model.get("displayName") + "_" + title;
             if (Boolean.TRUE.equals(data2.get("isDownloadable"))) {
                 /**
                  * Crawl official video downloads </br>
@@ -372,5 +385,13 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    private void checkErrors(final Browser br) throws PluginException, DecrypterRetryException {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br._getURL().getPath().equalsIgnoreCase("/enter")) {
+            throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
+        }
     }
 }

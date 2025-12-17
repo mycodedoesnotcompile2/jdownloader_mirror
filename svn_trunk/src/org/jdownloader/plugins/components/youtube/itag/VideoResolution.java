@@ -66,7 +66,8 @@ public enum VideoResolution implements LabelInterface, IntegerInterface {
     public static VideoResolution getByVariant(AbstractVariant o1) {
         if (o1 instanceof VideoVariant) {
             return ((VideoVariant) o1).getVideoResolution();
-        } else if (o1 instanceof ImageVariant) {
+        } else if (false && o1 instanceof ImageVariant) {
+            // now has it's own sorter/handling in ImageQuality and QualitySortIdentifier
             return getByHeight(((ImageVariant) o1).getHeight());
         } else {
             return null;

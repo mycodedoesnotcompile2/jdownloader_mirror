@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49945 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51998 $", interfaceVersion = 2, names = {}, urls = {})
 public class XupIn extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -97,18 +97,21 @@ public class XupIn extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-            final String fid = urlinfo.getMatch(0);
-            final String filenameURL = urlinfo.getMatch(2);
-            if (filenameURL != null) {
-                link.setName(filenameURL);
-            } else {
-                link.setName(fid);
-            }
+    protected String getDefaultFileName(DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final String fid = urlinfo.getMatch(0);
+        final String filenameURL = urlinfo.getMatch(2);
+        if (filenameURL != null) {
+            return filenameURL;
+        } else {
+            return fid;
         }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
+        br.getHeaders().put("User-Agent", RandomUserAgent.generate());
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -138,7 +141,6 @@ public class XupIn extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        br.getHeaders().put("User-Agent", RandomUserAgent.generate());
         Form dlform = br.getForm(0);
         if (dlform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -177,17 +179,5 @@ public class XupIn extends PluginForHost {
             link.setDownloadPassword(passCode);
         }
         dl.startDownload();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

@@ -27,6 +27,7 @@ import org.jdownloader.plugins.components.youtube.configpanel.YoutubeVariantColl
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
 import org.jdownloader.plugins.components.youtube.itag.AudioType;
+import org.jdownloader.plugins.components.youtube.itag.ImageQuality;
 import org.jdownloader.plugins.components.youtube.itag.QualitySortIdentifier;
 import org.jdownloader.plugins.components.youtube.itag.VideoCodec;
 import org.jdownloader.plugins.components.youtube.itag.VideoFrameRate;
@@ -260,6 +261,12 @@ public interface YoutubeConfig extends PluginConfigInterface {
     public static class QualitySortIdentifierOrderResolution extends AbstractEnumOrderFixList {
         public QualitySortIdentifierOrderResolution() {
             super(VideoResolution.class);
+        }
+    }
+
+    public static class QualitySortIdentifierOrderImageQuality extends AbstractEnumOrderFixList {
+        public QualitySortIdentifierOrderImageQuality() {
+            super(ImageQuality.class);
         }
     }
 
@@ -563,6 +570,10 @@ public interface YoutubeConfig extends PluginConfigInterface {
     @CustomValueGetter(QualitySortIdentifierOrderResolution.class)
     String[] getQualitySortIdentifierOrderResolution();
 
+    @AboutConfig
+    @CustomValueGetter(QualitySortIdentifierOrderImageQuality.class)
+    String[] getQualitySortIdentifierOrderImageQuality();
+
     @CustomValueGetter(QualitySortIdentifierOrderVideoCodec.class)
     @AboutConfig
     String[] getQualitySortIdentifierOrderVideoCodec();
@@ -708,6 +719,8 @@ public interface YoutubeConfig extends PluginConfigInterface {
     void setQualitySortIdentifierOrderFiletype(String[] s);
 
     void setQualitySortIdentifierOrderResolution(String[] s);
+
+    void setQualitySortIdentifierOrderImageQuality(String[] s);
 
     void setQualitySortIdentifierOrderVideoCodec(String[] s);
 

@@ -56,6 +56,7 @@ public class CFG_YOUTUBE {
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_PROJECTIONS             = SH.getKeyHandler("ChooseVariantDialogBlacklistedProjections", ObjectKeyHandler.class);
     public static final ObjectKeyHandler              BLACKLISTED_RESOLUTIONS                                   = SH.getKeyHandler("BlacklistedResolutions", ObjectKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_RESOLUTION                  = SH.getKeyHandler("QualitySortIdentifierOrderResolution", StringListHandler.class);
+    public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_IMAGE_QUALITY               = SH.getKeyHandler("QualitySortIdentifierOrderImageQuality", StringListHandler.class);
     public static final StringKeyHandler              IMAGE_FILENAME_PATTERN                                    = SH.getKeyHandler("ImageFilenamePattern", StringKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_VIDEO_FRAMERATE             = SH.getKeyHandler("QualitySortIdentifierOrderVideoFramerate", StringListHandler.class);
     public static final IntegerKeyHandler             CHUNKS_COUNT                                              = SH.getKeyHandler("ChunksCount", IntegerKeyHandler.class);

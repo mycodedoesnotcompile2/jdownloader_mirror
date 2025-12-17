@@ -18,6 +18,16 @@ public enum QualitySortIdentifier implements LabelInterface {
             return CompareUtils.compareInt(VideoResolution.getSortId(o1), VideoResolution.getSortId(o2));
         }
     },
+    IMAGE_QUALITY {
+        @Override
+        public String getLabel() {
+            return _JDT.T.lit_image_quality();
+        }
+
+        public int compare(AbstractVariant o1, AbstractVariant o2) {
+            return CompareUtils.compareInt(ImageQuality.getSortId(o1), ImageQuality.getSortId(o2));
+        }
+    },
     VIDEO_CODEC {
         @Override
         public String getLabel() {

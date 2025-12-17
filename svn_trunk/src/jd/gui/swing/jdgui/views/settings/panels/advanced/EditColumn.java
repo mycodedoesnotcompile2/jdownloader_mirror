@@ -11,6 +11,7 @@ import javax.swing.Icon;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JPopupMenu;
 
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.exttable.ExtColumn;
@@ -18,8 +19,7 @@ import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogCanceledException;
-import org.appwork.utils.swing.dialog.DialogClosedException;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.components.MergedIcon;
@@ -115,14 +115,14 @@ public class EditColumn extends ExtTextColumn<AdvancedConfigEntry> {
                 public Void edtRun() {
                     try {
                         final Object defaultValue = value.getDefault();
-                        Dialog.getInstance().showConfirmDialog(0, "Reset to default?", "Really reset " + value.getKey() + " to " + defaultValue);
+                        Dialog.getInstance().showConfirmDialog(0, "Reset to default?", "Really reset " + value.getKey() + " to \r\n" + JSonStorage.getMapper().objectToString(defaultValue));
                         value.setValue(defaultValue);
                         if (editColumn != null) {
                             editColumn.getModel().getTable().repaint();
                         }
-                    } catch (DialogClosedException e1) {
+                    } catch (DialogNoAnswerException e1) {
                         e1.printStackTrace();
-                    } catch (DialogCanceledException e1) {
+                    } catch (JSonMapperException e1) {
                         e1.printStackTrace();
                     }
                     return null;

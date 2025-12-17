@@ -173,16 +173,15 @@ public enum YoutubeITAG {
     // fake id
     IMAGE_HQ(10002, StreamContainer.PLAIN, ImageQuality.HIGH),
     // fake id
-    IMAGE_MQ(10003, StreamContainer.PLAIN, ImageQuality.NORMAL),
+    IMAGE_MQ(10003, StreamContainer.PLAIN, ImageQuality.MEDIUM),
     // fake id
     IMAGE_LQ(10004, StreamContainer.PLAIN, ImageQuality.LOW),
-
     // fake id
     COVER_MAX(11001, StreamContainer.PLAIN, ImageQuality.HIGHEST),
     // fake id
     COVER_HQ(11002, StreamContainer.PLAIN, ImageQuality.HIGH),
     // fake id
-    COVER_MQ(11003, StreamContainer.PLAIN, ImageQuality.NORMAL),
+    COVER_MQ(11003, StreamContainer.PLAIN, ImageQuality.MEDIUM),
     // fake id
     COVER_LQ(11004, StreamContainer.PLAIN, ImageQuality.LOW),
 

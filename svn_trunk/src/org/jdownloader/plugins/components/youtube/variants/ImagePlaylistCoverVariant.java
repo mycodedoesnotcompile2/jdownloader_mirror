@@ -1,13 +1,14 @@
 package org.jdownloader.plugins.components.youtube.variants;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.plugins.components.youtube.itag.ImageQuality;
 import org.jdownloader.plugins.config.PluginJsonConfig;
-
-import jd.plugins.DownloadLink;
 
 public class ImagePlaylistCoverVariant extends ImageVariant {
     public ImagePlaylistCoverVariant(VariantBase base) {
@@ -55,6 +56,10 @@ public class ImagePlaylistCoverVariant extends ImageVariant {
         return getBaseVariant().getiTagData().getImageQuality().getLocaleTag();
     }
 
+    public ImageQuality getImageQuality() {
+        return getBaseVariant().getiTagData().getImageQuality();
+    }
+
     public int getHeight() {
         switch (getBaseVariant()) {
         case PLAYLIST_COVER_HQ:
@@ -69,4 +74,5 @@ public class ImagePlaylistCoverVariant extends ImageVariant {
             throw new WTFException("Unsupported:" + getBaseVariant());
         }
     }
+
 }

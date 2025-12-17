@@ -13,6 +13,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.components.youtube.YoutubeClipData;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig;
 import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
+import org.jdownloader.plugins.components.youtube.itag.ImageQuality;
 import org.jdownloader.plugins.components.youtube.variants.generics.ImageGenericInfo;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
@@ -55,6 +56,10 @@ public class ImageVariant extends AbstractVariant<ImageGenericInfo> {
     @Override
     public String getTypeId() {
         return getBaseVariant().name();
+    }
+
+    public ImageQuality getImageQuality() {
+        return getBaseVariant().getiTagData().getImageQuality();
     }
 
     public int getWidth() {

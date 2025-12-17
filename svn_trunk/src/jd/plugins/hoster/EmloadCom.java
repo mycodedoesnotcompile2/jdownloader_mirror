@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51988 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52003 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmloadCom extends PluginForHost {
     public EmloadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,19 +164,19 @@ public class EmloadCom extends PluginForHost {
         }
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
-        final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
         final String fid = urlinfo.getMatch(0);
         final String filenameFromURL = urlinfo.getMatch(2);
-        if (!link.isNameSet()) {
-            /* Set fallback-filename */
-            if (filenameFromURL != null) {
-                link.setName(Encoding.htmlDecode(filenameFromURL).trim());
-            } else {
-                link.setName(fid);
-            }
+        if (filenameFromURL != null) {
+            return Encoding.htmlDecode(filenameFromURL).trim();
+        } else {
+            return fid;
         }
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         if (account != null) {
             this.login(br, account, false);
         }
@@ -494,18 +494,19 @@ public class EmloadCom extends PluginForHost {
         } else {
             String dllink = this.checkDirectLink(link, "premium_directlink_2");
             if (dllink == null) {
+                this.login(br, account, false);
                 final boolean followRedirectsBefore = br.isFollowingRedirects();
                 try {
                     br.setFollowRedirects(false);
-                    br.getPage(link.getPluginPatternMatcher());
+                    br.getPage(link.getPluginPatternMatcher().replaceFirst("http://", "https://"));
                     /* First check if user has direct download enabled */
                     dllink = br.getRedirectLocation();
                     /* Direct download disabled? We have to find the final downloadurl. */
                     if (StringUtils.isEmpty(dllink)) {
-                        dllink = br.getRegex("\"(https?://[^/]+/download\\.php[^<>\"]+)\"").getMatch(0);
-                    }
-                    if (StringUtils.isEmpty(dllink)) {
-                        dllink = br.getRegex("<p>\\s*Click here to download\\s*</p>\\s*<a href=\"(https?://[^\"]+)\"").getMatch(0);
+                        dllink = br.getRegex("\"(https?://[^/]+/v2/dl[^\"]+)\"").getMatch(0);
+                        if (StringUtils.isEmpty(dllink)) {
+                            dllink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Now").getMatch(0);
+                        }
                     }
                 } finally {
                     br.setFollowRedirects(followRedirectsBefore);

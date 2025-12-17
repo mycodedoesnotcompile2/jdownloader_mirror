@@ -2692,6 +2692,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Native Authentication" })
     String gui_column_nativeauth();
 
+    @Default(lngs = { "en" }, values = { "Resolve DNS locally" })
+    String gui_column_resolvehost();
+
     // TODO Remove unused code found by UCDetector
     // @Default(lngs = { "en" }, values = { "Default Connection" })
     // String ProxyConfig_ProxyConfig_defaultproxy_();

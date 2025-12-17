@@ -259,7 +259,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
 
             @Override
             protected SpinnerNumberModel getModel(AdvancedConfigEntry value, Number n) {
-                SpinnerNumberModel ret = super.getModel(value, n);
+                final SpinnerNumberModel ret = super.getModel(value, n);
                 if (value.getValidator() != null) {
                     if (value.getValidator() instanceof RangeValidator) {
                         if (Clazz.isDouble(n.getClass())) {

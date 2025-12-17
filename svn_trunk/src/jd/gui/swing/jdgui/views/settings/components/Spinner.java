@@ -1,5 +1,8 @@
 package jd.gui.swing.jdgui.views.settings.components;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.JSpinner;
@@ -11,6 +14,7 @@ import javax.swing.event.ChangeListener;
 import org.appwork.storage.config.handler.IntegerKeyHandler;
 import org.appwork.storage.config.swing.models.ConfigIntSpinnerModel;
 import org.appwork.swing.components.ExtSpinner;
+import org.appwork.utils.reflection.Clazz;
 
 public class Spinner extends ExtSpinner implements SettingsComponent {
     /**
@@ -29,21 +33,38 @@ public class Spinner extends ExtSpinner implements SettingsComponent {
         init();
     }
 
+    protected String getDecimalFormatPattern(SpinnerModel model) {
+        if (model instanceof SpinnerNumberModel) {
+            final Number stepSize = ((SpinnerNumberModel) model).getStepSize();
+            if (stepSize != null && Clazz.isFloatingPointNumber(stepSize.getClass())) {
+                final Set<String> numbers = new HashSet<String>();
+                final Comparable<?> max = ((SpinnerNumberModel) model).getMaximum();
+                final Comparable<?> min = ((SpinnerNumberModel) model).getMinimum();
+                if (max instanceof Number) {
+                    numbers.add(max.toString());
+                }
+                if (min instanceof Number) {
+                    numbers.add(min.toString());
+                }
+                numbers.add(stepSize.toString());
+                int nachKomma = 1;
+                int vorKomma = 1;
+                for (final String number : numbers) {
+                    nachKomma = Math.max(nachKomma, number.contains(".") ? number.length() - number.indexOf('.') - 1 : 0);
+                    vorKomma = Math.max(vorKomma, number.contains(".") ? number.indexOf('.') : number.length());
+                }
+                final char[] arr = new char[vorKomma + 1 + nachKomma];
+                Arrays.fill(arr, '#');
+                arr[vorKomma] = '.';
+                return String.valueOf(arr);
+            }
+        }
+        return "#";
+    }
+
     protected void init() {
-        setEditor(new JSpinner.NumberEditor(this, "#"));
+        setEditor(new JSpinner.NumberEditor(this, getDecimalFormatPattern(getModel())));
         eventSender = new StateUpdateEventSender<Spinner>();
-        // JComponent comp = getEditor();
-        // JFormattedTextField field = (JFormattedTextField) comp.getComponent(0);
-        // field.addActionListener(new ActionListener() {
-        //
-        // @Override
-        // public void actionPerformed(ActionEvent e) {
-        // System.out.println(1 + " -a " + (setting.get() == 0));
-        // if (setting.get() == 0) {
-        // eventSender.fireEvent(new StateUpdateEvent<Spinner>(Spinner.this));
-        // }
-        // }
-        // });
         this.addChangeListener(new ChangeListener() {
             public void stateChanged(ChangeEvent e) {
                 // System.out.println(1 + " -c " + (setting.get() == 0));

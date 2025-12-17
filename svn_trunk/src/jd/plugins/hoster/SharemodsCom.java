@@ -18,30 +18,29 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver.CAPTCHA_TYPE;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47580 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52004 $", interfaceVersion = 3, names = {}, urls = {})
 public class SharemodsCom extends XFileSharingProBasic {
     public SharemodsCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
 
-    /**
-     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
-     * mods: See overridden functions<br />
-     * limit-info:<br />
-     * captchatype-info: 2020-05-26: null<br />
-     * other:<br />
-     */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
@@ -109,6 +108,10 @@ public class SharemodsCom extends XFileSharingProBasic {
 
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, final String src) {
+        if (account == null || AccountType.FREE.equals(account.getType())) {
+            /* 2025-12-16: Dirty hack to make "doFree" overridden handling down below work. */
+            return null;
+        }
         /* 2023-04-11 */
         final String dllink = new Regex(src, "href=\"(https://[^\"]+)\"\\s*id=\"downloadbtn\"").getMatch(0);
         if (dllink != null) {
@@ -116,5 +119,42 @@ public class SharemodsCom extends XFileSharingProBasic {
         } else {
             return super.getDllink(link, account, br, src);
         }
+    }
+
+    @Override
+    public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
+        try {
+            super.doFree(link, account);
+        } catch (final PluginException e) {
+            if (e.getLinkStatus() != LinkStatus.ERROR_PLUGIN_DEFECT) {
+                throw e;
+            }
+        }
+        final String nextStepURL = br.getRegex("href=\"(https://[^ \"]+)\"[^>]*class=\"btn btn-primary\"").getMatch(0);
+        if (nextStepURL == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        getPage(nextStepURL);
+        final Form captchaform = br.getFormbyProperty("id", "vform");
+        if (captchaform == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+        captchaform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+        br.setFollowRedirects(false);
+        this.submitForm(captchaform);
+        final String finallink = br.getRedirectLocation();
+        if (finallink == null) {
+            // TODO: Add error handling for invalid captcha
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        br.setFollowRedirects(true);
+        handleDownload(link, account, null, finallink);
+    }
+
+    @Override
+    public CAPTCHA_TYPE[] getExpectedCaptchaTypes() {
+        // 2025-12-16
+        return new CAPTCHA_TYPE[] { CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE };
     }
 }

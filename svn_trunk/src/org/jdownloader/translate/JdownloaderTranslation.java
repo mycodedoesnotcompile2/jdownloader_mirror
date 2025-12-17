@@ -1251,6 +1251,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Video Framerate" })
     String lit_video_framerate();
 
+    @Default(lngs = { "en" }, values = { "Image Quality" })
+    String lit_image_quality();
+
     @Default(lngs = { "en" }, values = { "Resolution" })
     String lit_resolution();
 
