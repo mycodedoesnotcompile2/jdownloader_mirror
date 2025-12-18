@@ -38,7 +38,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 51923 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52010 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class VidhideCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidhide.com", "vidhidepro.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com", "vidhidefast.com", "seraphinapl.com", "taylorplayer.com", "dinisglows.com", "dingtezuni.com", "dintezuvio.com", "dhtpre.com" });
+        ret.add(new String[] { "vidhide.com", "vidhidepro.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com", "vidhidefast.com", "seraphinapl.com", "taylorplayer.com", "dinisglows.com", "dingtezuni.com", "dintezuvio.com", "dhtpre.com", "callistanise.com" });
         return ret;
     }
 

@@ -1837,6 +1837,7 @@ gui_column_proxytype_socks4a=Proxy Socks 4a
 gui_column_proxytype_socks4a_tt=Servidor Proxy SOCKS-4a-Protocol
 gui_column_proxytype_socks5=Proxy Socks 5
 gui_column_proxytype_socks5_tt=Servidor Proxy Protoloco-SOCKS-5
+gui_column_resolvehost=Resolver DNS localmente
 gui_column_use=Usar
 gui_column_user=Usuário
 gui_config_dialogs=Janelas de Diálogo

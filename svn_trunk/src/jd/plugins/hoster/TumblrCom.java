@@ -44,13 +44,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "tumblr.com" }, urls = { "https://[a-z0-9]+\\.media\\.tumblr\\.com/.+|https?://vtt\\.tumblr\\.com/tumblr_[A-Za-z0-9]+\\.mp4" })
+@HostPlugin(revision = "$Revision: 52013 $", interfaceVersion = 3, names = { "tumblr.com" }, urls = { "https://[a-z0-9]+\\.media\\.tumblr\\.com/.+|https?://vtt\\.tumblr\\.com/tumblr_[A-Za-z0-9]+\\.mp4" })
 public class TumblrCom extends PluginForHost {
     public static final long trust_cookie_age = 300000l;
 
     public TumblrCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.tumblr.com/register");
+        this.enablePremium("https://www." + getHost() + "/register");
     }
 
     @Override
@@ -60,7 +60,7 @@ public class TumblrCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.tumblr.com/terms_of_service";
+        return "https://www." + getHost() + "/terms_of_service";
     }
 
     @Override
@@ -145,23 +145,22 @@ public class TumblrCom extends PluginForHost {
                 if (!force) {
                     logger.info("Trust cookies without check");
                     return;
-                } else {
-                    /* Check cookies */
-                    br.getHeaders().put("Authorization", "Bearer " + apikey);
-                    br.getPage(API_BASE + "/user/info?fields%5Bblogs%5D=avatar%2Cname%2Ctitle%2Curl%2Ccan_message%2Cdescription%2Cis_adult%2Cuuid%2Cis_private_channel%2Cposts%2Cis_group_channel%2C%3Fprimary%2C%3Fadmin%2C%3Fdrafts%2C%3Ffollowers%2C%3Fqueue%2C%3Fhas_flagged_posts%2Cmessages%2Cask%2C%3Fcan_submit%2C%3Ftweet%2Cmention_key%2C%3Ftimezone_offset%2C%3Fanalytics_url%2C%3Fis_premium_partner%2C%3Fis_blogless_advertiser%2C%3Fcan_onboard_to_paywall%2C%3Fis_tumblrpay_onboarded%2C%3Fis_paywall_on%2C%3Flinked_accounts");
-                    try {
-                        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-                        if (entries.containsKey("errors")) {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        }
-                        logger.info("Cookie login successful");
-                        return;
-                    } catch (final Throwable e) {
-                        logger.exception("Cookie login with stored token failed", e);
-                    }
-                    /* Delete cookies / Headers to perform a full login (= try to obtain new token/apikey) */
-                    this.br.clearAll();
                 }
+                /* Check cookies */
+                br.getHeaders().put("Authorization", "Bearer " + apikey);
+                br.getPage(API_BASE + "/user/info?fields%5Bblogs%5D=avatar%2Cname%2Ctitle%2Curl%2Ccan_message%2Cdescription%2Cis_adult%2Cuuid%2Cis_private_channel%2Cposts%2Cis_group_channel%2C%3Fprimary%2C%3Fadmin%2C%3Fdrafts%2C%3Ffollowers%2C%3Fqueue%2C%3Fhas_flagged_posts%2Cmessages%2Cask%2C%3Fcan_submit%2C%3Ftweet%2Cmention_key%2C%3Ftimezone_offset%2C%3Fanalytics_url%2C%3Fis_premium_partner%2C%3Fis_blogless_advertiser%2C%3Fcan_onboard_to_paywall%2C%3Fis_tumblrpay_onboarded%2C%3Fis_paywall_on%2C%3Flinked_accounts");
+                try {
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    if (entries.containsKey("errors")) {
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    }
+                    logger.info("Cookie login successful");
+                    return;
+                } catch (final Throwable e) {
+                    logger.exception("Cookie login with stored token failed", e);
+                }
+                /* Delete cookies / Headers to perform a full login (= try to obtain new token/apikey) */
+                this.br.clearAll();
             }
             logger.info("Performing full cookie login");
             br.setCookies(userCookies);
@@ -177,7 +176,7 @@ public class TumblrCom extends PluginForHost {
             br.getHeaders().put("Authorization", "Bearer " + apikey);
             br.getPage(API_BASE + "/user/info?fields%5Bblogs%5D=avatar%2Cname%2Ctitle%2Curl%2Ccan_message%2Cdescription%2Cis_adult%2Cuuid%2Cis_private_channel%2Cposts%2Cis_group_channel%2C%3Fprimary%2C%3Fadmin%2C%3Fdrafts%2C%3Ffollowers%2C%3Fqueue%2C%3Fhas_flagged_posts%2Cmessages%2Cask%2C%3Fcan_submit%2C%3Ftweet%2Cmention_key%2C%3Ftimezone_offset%2C%3Fanalytics_url%2C%3Fis_premium_partner%2C%3Fis_blogless_advertiser%2C%3Fcan_onboard_to_paywall%2C%3Fis_tumblrpay_onboarded%2C%3Fis_paywall_on%2C%3Flinked_accounts");
             try {
-                final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 if (entries.containsKey("errors")) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
@@ -192,7 +191,7 @@ public class TumblrCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> user = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "response/user");
         /* User could enter any name as username during cookie login -> Fixed this -> Make sure that name is unique */
         account.setUser(user.get("name").toString());
@@ -214,14 +213,6 @@ public class TumblrCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

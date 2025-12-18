@@ -395,6 +395,7 @@ lit_expired=Expirado
 lit_file_container=Tipo de arquivo
 lit_hide=Ocultar
 lit_host=Servidor
+lit_image_quality=Qualidade da imagem
 lit_no=Não
 lit_please_wait=Aguarde...
 lit_plugin_defect_pls_contact_support=Plugin com defeito. Entre em contato com support@jdownloader.org
