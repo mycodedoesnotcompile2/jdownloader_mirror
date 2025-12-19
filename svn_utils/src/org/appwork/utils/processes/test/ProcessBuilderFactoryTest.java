@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -48,7 +48,6 @@ import org.appwork.utils.processes.ProcessOutput;
  *
  */
 public class ProcessBuilderFactoryTest extends AWTest {
-
     public static void main(String[] args) throws IOException, InterruptedException {
         run();
     }
@@ -82,7 +81,7 @@ public class ProcessBuilderFactoryTest extends AWTest {
             ProcessOutput result = ProcessBuilderFactory.runCommand(pb);
             assertEqualsDeep(result.getStdOutString(), "");
             assertEqualsDeep(result.getExitCode(), 2);
-            assertTrue(result.getErrOutString().contains("Usage: ping"));
+            assertTrue(result.getErrOutString().matches("(?s).*Usage:?\\s*ping.*"));
         }
     }
 
@@ -103,13 +102,10 @@ public class ProcessBuilderFactoryTest extends AWTest {
             ArrayList<String> l = new ArrayList<String>();
             l.add("ping");
             l.add("/BAD");
-
             ProcessBuilder pb = ProcessBuilderFactory.create(l);
             ProcessOutput result = ProcessBuilderFactory.runCommand(pb);
-
             assertEqualsDeep(result.getErrOutString(), "");
             assertEqualsDeep(result.getExitCode(), 1);
-
             assertTrue(result.getStdOutString().contains("Syntax: ping") || result.getStdOutString().contains("Usage: ping"));
         }
         {
@@ -137,5 +133,4 @@ public class ProcessBuilderFactoryTest extends AWTest {
             assertEqualsDeepNot(result.getErrOutString(), "");
         }
     }
-
 }

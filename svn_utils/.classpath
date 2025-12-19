@@ -11,6 +11,7 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="libs/jsvg.jar" />
-	<classpathentry kind="output" path="bin"/> 
+	<classpathentry kind="lib" path="libs/jsvg.jar"/>
+	<classpathentry kind="lib" path="dev_libs/asm.jar"/>
+	<classpathentry kind="output" path="bin"/>
 </classpath>

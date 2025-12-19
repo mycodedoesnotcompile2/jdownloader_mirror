@@ -37,6 +37,7 @@ import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -213,8 +214,8 @@ public class TimeFormatter {
     public static long getMilliSeconds(final String dateString, String dateFormatString, final Locale locale) {
         if (dateString == null) {
             return -1;
-        } // en_GB has "Sept" but en has "Sep"
-        final String correctedDateString = dateString.replaceAll("(?i)Sept($|\\s)", "Sep$1");
+        }
+        String correctedDateString = dateString;
         if (!JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
             final String newDateFormatString = dateFormatString.replaceAll("X+$", "");
             if (newDateFormatString != dateFormatString) {
@@ -232,16 +233,21 @@ public class TimeFormatter {
         dateFormatVariants.add(dateFormatString.replaceAll("h+", "KK")); // Hour in am/pm (1-12) to Hour in am/pm (0-11)
         dateFormatVariants.add(dateFormatString.replaceAll("h+", "kk")); // Hour in am/pm (1-12) to Hour in day (1-24)
         dateFormatVariants.add(dateFormatString.replaceAll("h+", "HH")); // Hour in am/pm (1-12) to Hour in day (0-23)
-        for (final String dateFormatVariant : dateFormatVariants) {
-            final SimpleDateFormat dateFormat = new SimpleDateFormat(dateFormatVariant, locale != null ? locale : Locale.ENGLISH);
-            try {
-                dateFormat.setLenient(false);
-                if (dateFormatVariant.contains("'Z'")) {
-                    dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        final Set<String> variants = new HashSet<String>();
+        variants.add(correctedDateString);
+        variants.add(correctedDateString.replaceAll("(?i)Sept($|\\s)", "Sep$1"));
+        variants.add(correctedDateString.replaceAll("(?i)Sep($|\\s)", "Sept$1"));
+        for (String input : variants) {
+            for (final String dateFormatVariant : dateFormatVariants) {
+                final SimpleDateFormat dateFormat = new SimpleDateFormat(dateFormatVariant, locale != null ? locale : Locale.ENGLISH);
+                try {
+                    dateFormat.setLenient(false);
+                    if (dateFormatVariant.contains("'Z'")) {
+                        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                    }
+                    return dateFormat.parse(input).getTime();
+                } catch (final Exception ignore) {
                 }
-                return dateFormat.parse(correctedDateString).getTime();
-            } catch (final Exception e) {
-                e.printStackTrace();
             }
         }
         return -1;

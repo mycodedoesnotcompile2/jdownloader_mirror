@@ -49,13 +49,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
 import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.utils.Application;
@@ -86,12 +94,15 @@ public class IDETestRunner {
         }
     }
 
-    private static File lastExecutedTestsFile = null;
+    private static File                      lastExecutedTestsFile = null;
+    private static File                      knownClassesCacheFile = null;
+    private static final Map<String, String> knownClasses          = new HashMap<String, String>();
 
     private static void init() {
         System.setProperty("AWTEST", "true");
         Application.setApplication(".tests");
         lastExecutedTestsFile = Application.getResource("cfg/lastExecutedTests.classes");
+        knownClassesCacheFile = Application.getResource("cfg/knownClasses.cache");
         AWTest.initLogger(new SimpleFormatter() {
             {
                 offsetForThrownAt = new IByReference(20);
@@ -105,6 +116,24 @@ public class IDETestRunner {
                 return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - " + fillPost("(" + record.getThrownAt().getFileName() + ":" + record.getThrownAt().getLineNumber() + ")." + abbr(record.getThrownAt().getMethodName(), 30), " ", offsetForThrownAt) + " > ";
             }
         });
+        if (knownClassesCacheFile != null && knownClassesCacheFile.isFile()) {
+            try {
+                final String cacheJSON = IO.readFileToTrimmedString(knownClassesCacheFile);
+                final Map<String, String> cache = JSonStorage.restoreFromString(cacheJSON, TypeRef.HASHMAP_STRING);
+                if (cache != null) {
+                    knownClasses.putAll(cache);
+                }
+            } catch (IOException e) {
+                LogV3.log(e);
+            }
+        }
+    }
+
+    private static void writeKnownClassesCache() throws IOException {
+        if (knownClassesCacheFile != null) {
+            knownClassesCacheFile.delete();
+            IO.writeToFile(knownClassesCacheFile, JSonStorage.serializeToJsonByteArray(knownClasses));
+        }
     }
 
     public static void main(final String[] args) {
@@ -138,7 +167,7 @@ public class IDETestRunner {
         }
     }
 
-    public static void runClasspathTests() throws URISyntaxException, ClassNotFoundException {
+    public static void runClasspathTests() throws URISyntaxException, ClassNotFoundException, IOException {
         AWTest.pauseLogger();
         final ArrayList<String> testClasses = new ArrayList<String>();
         final ArrayList<String> lastExecutedTestClasses = new ArrayList<String>();
@@ -166,40 +195,75 @@ public class IDETestRunner {
                     final String rel = Files.getRelativePath(root, file);
                     if (rel.matches("(?i).*(test|ide).*\\.class$")) {
                         if (file.isFile()) {
-                            testClasses.add(rel.replace("/", ".").substring(0, rel.length() - ".class".length()));
-                            testsFound++;
+                            final String testClass = rel.replace("/", ".").substring(0, rel.length() - ".class".length());
+                            try {
+                                final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
+                                if (TestInterface.class.isAssignableFrom(cls) && TestInterface.class != cls && cls != AWTest.class) {
+                                    testClasses.add(testClass);
+                                }
+                            } catch (ClassNotFoundException e) {
+                                AWTest.logInfoAnyway(e.toString());
+                            }
                         }
                     }
                 }
                 AWTest.logInfoAnyway("Scanned " + root + " and found " + files.size() + " files and " + testsFound + " test-related classes/files");
             }
         }
-        // shuffle test classes, tests must not rely on specific order of execution
-        Collections.shuffle(testClasses);
-        final Iterator<String> it = lastExecutedTestClasses.iterator();
-        while (it.hasNext()) {
-            final String lastExecutedTestClass = it.next();
-            if (testClasses.remove(lastExecutedTestClass)) {
-                if (it.hasNext()) {
-                    testClasses.add(lastExecutedTestClass);
-                } else {
-                    testClasses.add(0, lastExecutedTestClass);
+        final int testClassesFound = testClasses.size();
+        int skippedTestClasses = 0;
+        {
+            final ListIterator<String> it = testClasses.listIterator();
+            Set<String> alreadyCollectedClasses = new HashSet<String>();
+            testClassLoop: while (it.hasNext()) {
+                final String next = it.next();
+                // AWTest.logInfoAnyway("collect classes for:" + next + " " + it.nextIndex());
+                final List<String> classes = new ArrayList<String>();
+                classes.add(next);
+                while (classes.size() > 0) {
+                    final String nextClass = classes.remove(0);
+                    final Map<String, String> refClasses = new ClassCollector().getClasses(nextClass, false);
+                    for (Entry<String, String> refClassEntry : refClasses.entrySet()) {
+                        final String refClass = refClassEntry.getKey();
+                        final String existing = knownClasses.get(refClass);
+                        if (existing == null) {
+                            // AWTest.logInfoAnyway("no class cache:" + refClass);
+                            continue testClassLoop;
+                        } else if (!StringUtils.equals(existing, refClassEntry.getValue())) {
+                            // AWTest.logInfoAnyway("outdated class cache:" + refClass);
+                            continue testClassLoop;
+                        } else if (alreadyCollectedClasses.add(refClass)) {
+                            classes.add(refClass);
+                        }
+                    }
+                }
+                AWTest.logInfoAnyway("skip unchanged test-class:" + next);
+                skippedTestClasses++;
+                it.remove();
+            }
+        }
+        {
+            // shuffle test classes, tests must not rely on specific order of execution
+            Collections.shuffle(testClasses);
+            final Iterator<String> it = lastExecutedTestClasses.iterator();
+            while (it.hasNext()) {
+                final String lastExecutedTestClass = it.next();
+                if (testClasses.remove(lastExecutedTestClass)) {
+                    if (it.hasNext()) {
+                        testClasses.add(lastExecutedTestClass);
+                    } else {
+                        testClasses.add(0, lastExecutedTestClass);
+                    }
                 }
             }
         }
-        int actualTestCount = 0;
+        AWTest.logInfoAnyway("Found  " + testClassesFound + " - Skipped Tests: " + skippedTestClasses);
         for (final String testClass : testClasses) {
             final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
-            if (TestInterface.class.isAssignableFrom(cls) && TestInterface.class != cls && cls != AWTest.class) {
-                actualTestCount++;
-            }
-        }
-        AWTest.logInfoAnyway("Found  " + testClasses.size() + " test-related classes/files - Actual Tests: " + actualTestCount);
-        for (final String testClass : testClasses) {
-            final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
-            if (TestInterface.class.isAssignableFrom(cls) && TestInterface.class != cls && cls != AWTest.class) {
-                runTestInternal(cls);
-            }
+            runTestInternal(cls);
+            final Map<String, String> refClasses = new ClassCollector().getClasses(testClass, true);
+            knownClasses.putAll(refClasses);
+            writeKnownClassesCache();
         }
         AWTest.logInfoAnyway("Finished IDE Build Tests");
         lastExecutedTestsFile.delete();

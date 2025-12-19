@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52004 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52020 $", interfaceVersion = 3, names = {}, urls = {})
 public class SharemodsCom extends XFileSharingProBasic {
     public SharemodsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -130,11 +130,15 @@ public class SharemodsCom extends XFileSharingProBasic {
                 throw e;
             }
         }
-        final String nextStepURL = br.getRegex("href=\"(https://[^ \"]+)\"[^>]*class=\"btn btn-primary\"").getMatch(0);
+        final String nextStepURL = br.getRegex("href=\"(https://[^\"]+)\"[^>]*class=\"btn btn-primary\"").getMatch(0);
         if (nextStepURL == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(nextStepURL);
+        // getPage(nextStepURL);
+        if (this.tryDownload(br, link, account, br.createGetRequest(nextStepURL), DOWNLOAD_ATTEMPT_FLAGS.CONNECT_OR_EXCEPTION)) {
+            /* Download starts right away without captcha */
+            return;
+        }
         final Form captchaform = br.getFormbyProperty("id", "vform");
         if (captchaform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

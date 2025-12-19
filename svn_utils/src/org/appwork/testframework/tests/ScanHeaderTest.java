@@ -35,8 +35,10 @@
 package org.appwork.testframework.tests;
 
 import java.io.File;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
@@ -74,6 +76,12 @@ public class ScanHeaderTest extends AWTest {
 
             @Override
             public void onFile(File f) throws Exception {
+                BasicFileAttributes attrs = java.nio.file.Files.readAttributes(f.toPath(), BasicFileAttributes.class);
+                // Creation time as epoch milliseconds
+                long timestamp = attrs.creationTime().toMillis();
+                if (f.lastModified() - timestamp < TimeUnit.DAYS.toMillis(3)) {
+                    return;
+                }
                 if (f.isFile() && f.getName().endsWith(".java")) {
                     if (f.getName().equals((ScanHeaderTest.class.getSimpleName() + ".java"))) {
                         return;

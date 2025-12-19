@@ -4,11 +4,6 @@ import java.io.File;
 import java.net.URL;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.RegexFilter.MatchType;
-import org.jdownloader.controlling.packagizer.PackagizerController;
-import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
-
 import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcollector.LinkOriginDetails;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -16,6 +11,11 @@ import jd.controlling.linkcrawler.LinkCrawler;
 import jd.controlling.linkcrawler.PackageInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkInfo;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.RegexFilter.MatchType;
+import org.jdownloader.controlling.packagizer.PackagizerController;
+import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
 
 public class RuleWrapper<T extends FilterRule> {
     private final CompiledRegexFilter        fileNameRule;
@@ -318,7 +318,7 @@ public class RuleWrapper<T extends FilterRule> {
 
     protected Pattern getPatternWithoutDynamicTags(final CrawledLink link, CompiledRegexFilter rule) {
         Pattern ret = rule._getPattern();
-        if (Boolean.FALSE.equals(rule.getDynamicTags())) {
+        if (Boolean.FALSE.equals(rule._getDynamicTags())) {
             return ret;
         }
         try {
@@ -326,10 +326,10 @@ public class RuleWrapper<T extends FilterRule> {
             /* Replace dynamic tags which allows user to e.g. check for current date in packagename. */
             patternString = PackagizerController.replaceDynamicTags(patternString, getPackageName(link), link, null);
             if (!ret.pattern().equals(patternString)) {
-                rule.setDynamicTags(Boolean.TRUE);
+                rule._setDynamicTags(Boolean.TRUE);
                 ret = rule.buildPattern(patternString);
             } else {
-                rule.setDynamicTags(Boolean.FALSE);
+                rule._setDynamicTags(Boolean.FALSE);
             }
         } catch (Exception e) {
             e.printStackTrace();

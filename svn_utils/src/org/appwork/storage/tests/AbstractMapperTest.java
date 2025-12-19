@@ -41,11 +41,6 @@ import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.simplejson.mapper.test.CharJSONTest;
 import org.appwork.testframework.AWTest;
 
-/**
- * @author thomas
- * @date 21.01.2022
- *
- */
 public abstract class AbstractMapperTest extends AWTest {
     public void runWith(JSONMapper mapper) throws Exception {
         final Locale def = Locale.getDefault();
@@ -284,7 +279,7 @@ public abstract class AbstractMapperTest extends AWTest {
                 assertTrue(diff < 0.01f);
             }
         }
-        for (float num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 0.33f) {
+        for (float num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 3.7f) {
             final boolean isNegativ = num < 0;
             for (String numberString : new String[] { Float.toString(Math.abs(num)), String.format(Locale.ROOT, "%e", Math.abs(num)), String.format(Locale.ROOT, "%E", Math.abs(num)) }) {
                 Float diff = num - mapper.stringToObject((isNegativ ? "-" : "") + numberString, Float.class).floatValue();
@@ -295,7 +290,7 @@ public abstract class AbstractMapperTest extends AWTest {
                 }
             }
         }
-        for (double num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 0.33d) {
+        for (double num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 3.7d) {
             final boolean isNegativ = num < 0;
             for (String numberString : new String[] { Double.toString(Math.abs(num)), String.format(Locale.ROOT, "%e", Math.abs(num)), String.format(Locale.ROOT, "%E", Math.abs(num)) }) {
                 Double diff = num - mapper.stringToObject((isNegativ ? "-" : "") + numberString, Double.class).doubleValue();

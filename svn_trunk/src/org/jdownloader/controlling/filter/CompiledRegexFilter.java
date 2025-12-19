@@ -24,11 +24,11 @@ public class CompiledRegexFilter extends RegexFilter implements Storable {
 
     private Boolean dynamicTags = null;
 
-    protected Boolean getDynamicTags() {
+    protected Boolean _getDynamicTags() {
         return dynamicTags;
     }
 
-    protected void setDynamicTags(Boolean dynamicTags) {
+    protected void _setDynamicTags(Boolean dynamicTags) {
         this.dynamicTags = dynamicTags;
     }
 

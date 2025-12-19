@@ -40,7 +40,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 
@@ -50,7 +49,11 @@ import org.appwork.utils.os.CrossSystem;
  */
 public class ShellParser {
     public static enum Style {
-        WINDOWS
+        WINDOWS,
+        /**
+         * POSIX-style shell (Linux, macOS, BSD, ...)
+         */
+        UNIX
     }
 
     private static int min(int space, int q, int dq) {
@@ -91,36 +94,23 @@ public class ShellParser {
      * @return
      */
 
-    private static String unescapeSpecials(String s, char escChar, boolean allowEscapedWhitespace) {
-        if (s.indexOf(escChar) < 0) {
-            return s;
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == escChar && i + 1 < s.length()) {
-                char next = s.charAt(i + 1);
-                if (allowEscapedWhitespace && Character.isWhitespace(next)) {
-                    sb.append(next);
-                    i++;
-                    continue;
-                }
-                if (next == '\'' || next == '"' || next == escChar) {
-                    sb.append(next);
-                    i++;
-                    continue;
-                }
-            }
-            sb.append(c);
-        }
-        return sb.toString();
-    }
-
     public static java.util.List<String> splitCommandString(String command, ShellParserHint... hints) {
-        // Style selection; default = Windows CMD
-        boolean styleUnix = false;
-        boolean styleCmd = true;
+        // Style selection; default depends on OS
+        boolean styleUnix;
+        boolean styleCmd;
         boolean stylePs = false;
+        // Default per OS if no explicit hint is given
+        switch (CrossSystem.getOSFamily()) {
+        case WINDOWS:
+            styleUnix = false;
+            styleCmd = true;
+            break;
+        default:
+            // Linux/macOS/BSD/... -> behave like a POSIX shell
+            styleUnix = true;
+            styleCmd = false;
+            break;
+        }
 
         if (hints != null) {
             for (ShellParserHint h : hints) {
@@ -352,9 +342,29 @@ public class ShellParser {
                 style = Style.WINDOWS;
                 break;
             default:
-                DebugMode.debugger("OS not supported!");
+                // Default to UNIX-style behaviour on non-Windows systems
+                style = Style.UNIX;
+                break;
             }
         }
+        if (style == Style.UNIX) {
+            // Simple, POSIX-compatible escaping: each argument is either left as-is
+            // (if safe) or single-quoted, with internal single quotes escaped via
+            // 'foo'\''bar' style.
+            if (commandline == null || commandline.length == 0) {
+                return "";
+            }
+            final StringBuilder sb = new StringBuilder(64);
+            for (int i = 0; i < commandline.length; i++) {
+                if (i > 0) {
+                    sb.append(' ');
+                }
+                final String arg = commandline[i] == null ? "" : commandline[i];
+                sb.append(escapeUnixArg(arg));
+            }
+            return sb.toString();
+        }
+        // Windows CMD/EXE style (existing behaviour)
         String[] cmd = commandline;
         String exe = cmd[0];
         exe = removeQuotes(exe);
@@ -431,6 +441,33 @@ public class ShellParser {
             }
         }
         return commandLine.toString();
+    }
+
+    /**
+     * Escape a single argument for use in a POSIX shell command line.
+     *
+     * - If the argument only contains "safe" characters, it is returned as-is
+     * - Otherwise, it is enclosed in single quotes, and inner single quotes are
+     *   escaped using the standard <code>'foo'\'bar'</code> style.
+     */
+    private static String escapeUnixArg(final String arg) {
+        if (arg == null || arg.length() == 0) {
+            return "''";
+        }
+        boolean needsQuoting = false;
+        for (int i = 0; i < arg.length(); i++) {
+            final char c = arg.charAt(i);
+            if (Character.isWhitespace(c) || "\"'\\$&|;<>*?[](){}!~`".indexOf(c) >= 0) {
+                needsQuoting = true;
+                break;
+            }
+        }
+        if (!needsQuoting) {
+            return arg;
+        }
+        // Escape single quotes inside single-quoted string: ' -> '\''
+        final String escaped = arg.replace("'", "'\"'\"'");
+        return "'" + escaped + "'";
     }
 
     protected static String removeQuotes(String exe) {

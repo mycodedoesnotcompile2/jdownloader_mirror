@@ -25,6 +25,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -47,16 +58,7 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51997 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52022 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -97,9 +99,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
-                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
-                 * preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
+                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
+                 * this, http protocol would be used even if user preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -243,7 +245,7 @@ public class FilerNet extends PluginForHost {
                 }
                 final Request request;
                 if (hashes.size() > 1) {
-                    // due to a bug requires minimum 2 entries in hashes
+                    /* Due to an API bug, the other request requires minimum 2 entries in hashes. */
                     final Map<String, Object> postData = new HashMap<String, Object>();
                     postData.put("hashes", hashes);
                     request = br.createJSonPostRequest(getAPI_BASE() + "/multi_status.json", postData);
@@ -350,40 +352,43 @@ public class FilerNet extends PluginForHost {
             if (!canHandle(link, account)) {
                 throw new AccountRequiredException("File is only downloadable by premium users");
             }
-            /* 2025-11-20: key was changed and type is now reCaptcha Enterprise. */
-            final String reCaptchaKey = "6LfUvREsAAAAAHd79QK9HOfIAEVGqK4G4JxovEEn";
-            final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey) {
-                @Override
-                protected Map<String, Object> getV3Action(String source) {
-                    final Map<String, Object> ret = new HashMap<String, Object>();
-                    ret.put("action", "download");
-                    return ret;
-                }
+            final CaptchaHosterHelperInterface captchaHelper;
+            if (true) {
+                /**
+                 * 2025-12-18: switched to hcaptcha
+                 */
+                captchaHelper = new CaptchaHelperHostPluginHCaptcha(this, br, "45623a98-7b08-43ae-b758-c21c13024e2a");
+            } else {
+                /**
+                 * 2025-11-20: key was changed and type is now reCaptcha Enterprise. <br>
+                 * Source of key: https://filer.net/assets/GetFileView-D0EkjwK_-1766004219124.js <br>
+                 * --> Search for sitekey
+                 */
+                captchaHelper = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LfUvREsAAAAAHd79QK9HOfIAEVGqK4G4JxovEEn") {
+                    @Override
+                    protected Map<String, Object> getV3Action(String source) {
+                        final Map<String, Object> ret = new HashMap<String, Object>();
+                        ret.put("action", "download");
+                        return ret;
+                    }
 
-                @Override
-                protected boolean isEnterprise() {
-                    return true;
-                }
+                    @Override
+                    protected boolean isEnterprise() {
+                        return true;
+                    }
 
-                /* 2025-12-11: Without this, the following error may happen: {"error":"Score too low: 0.3 (minimum: 0.5)"} */
-                @Override
-                public Double getMinScore() {
-                    return RECAPTCHA_ENTERPRISE_MIN_SCORE;
-                }
-            };
-            String recaptchaV2Response = null;
+                    /* 2025-12-11: Without this, the following error may happen: {"error":"Score too low: 0.3 (minimum: 0.5)"} */
+                    @Override
+                    public Double getMinScore() {
+                        return RECAPTCHA_ENTERPRISE_MIN_SCORE;
+                    }
+                };
+            }
+            String captchaResponseToken = null;
             String token = null;
             handle_pre_download_wait: {
                 /* Pre download wait time */
                 final boolean allowSolveCaptchaDuringWaitTime = true;
-                if (recaptchaV2Response != null) {
-                    /**
-                     * Nullify previous captcha response, that should be a rare case or even never happen. <br>
-                     * If it happens, we need to ask the user to solve the captcha two times which we want to avoid.
-                     */
-                    recaptchaV2Response = null;
-                    logger.warning("Wait loop is executed multiple times -> Nullify captcha response");
-                }
                 /* The following API call starts the server side pre download wait time. */
                 data = (Map<String, Object>) callAPI(null, "/api/file/request/" + fid);
                 token = data.get("t").toString();
@@ -392,13 +397,13 @@ public class FilerNet extends PluginForHost {
                 if (allowSolveCaptchaDuringWaitTime) {
                     /* 2025-10-27: Special: Solve captcha "during" wait time. */
                     final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-                    if (waitMillis > rc2.getSolutionTimeout()) {
-                        final long prePrePreDownloadWaitMillis = waitMillis - rc2.getSolutionTimeout();
+                    if (waitMillis > captchaHelper.getSolutionTimeout()) {
+                        final long prePrePreDownloadWaitMillis = waitMillis - captchaHelper.getSolutionTimeout();
                         logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid captcha-token-timeout");
                         logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWaitMillis / 1000));
                         this.sleep(prePrePreDownloadWaitMillis, link);
                     }
-                    recaptchaV2Response = rc2.getToken();
+                    captchaResponseToken = captchaHelper.getToken();
                     final long passedMillis = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
                     waitMillis = waitMillis - passedMillis;
                 }
@@ -409,11 +414,11 @@ public class FilerNet extends PluginForHost {
             }
             handle_captcha_send: {
                 /* Solve captcha if it hasn't been solved before. */
-                if (recaptchaV2Response == null) {
-                    recaptchaV2Response = rc2.getToken();
+                if (captchaResponseToken == null) {
+                    captchaResponseToken = captchaHelper.getToken();
                 }
                 final Map<String, Object> postdata = new HashMap<String, Object>();
-                postdata.put("recaptcha", recaptchaV2Response);
+                postdata.put("recaptcha", captchaResponseToken);
                 postdata.put("ticket", token);
                 br.postPageRaw("/api/file/download", JSonStorage.serializeToJson(postdata));
                 data = (Map<String, Object>) this.checkErrorsAPI(account);

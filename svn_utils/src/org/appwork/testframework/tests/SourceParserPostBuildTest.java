@@ -119,7 +119,7 @@ public class SourceParserPostBuildTest implements PostBuildTestInterface {
         {
             int index = code.toLowerCase(Locale.ROOT).indexOf("todo");
             if (index >= 0) {
-                logInfoAnyway("TODO in " + packageName + ". (" + className + ".java:" + code.substring(0, index).split("[\r\n]{1,2}").length + ")");
+                logInfoAnyway("TODO Tag found in " + packageName + ". (" + className + ".java:" + code.substring(0, index).split("[\r\n]{1,2}").length + ")");
             }
         }
     }

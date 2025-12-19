@@ -187,7 +187,7 @@ public abstract class ClassPathScanner<E extends Throwable> {
      * @return
      */
     protected boolean skip(String classname) {
-        if (classname.startsWith("net.miginfocom.")) {
+        if (classname.startsWith("sun.")) {
             return true;
         }
         if (classname.startsWith("org.slf4j.")) {

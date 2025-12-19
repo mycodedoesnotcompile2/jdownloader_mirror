@@ -62,7 +62,9 @@ public class TimeFormatterTest extends AWTest {
         final Date sept = TimeFormatter.parseDateString("Sat, 28 Sept 2024 09:57:00 GMT");
         assertNotNull(sept);
         assertEquals(sep.getTime(), sept.getTime());
+        long septUKCorrected = TimeFormatter.getMilliSeconds("Sat, 28 Sep 2024 09:57:00 GMT", "EEE, dd MMM yyyy HH:mm:ss zzz", Locale.UK);
         long septUK = TimeFormatter.getMilliSeconds("Sat, 28 Sept 2024 09:57:00 GMT", "EEE, dd MMM yyyy HH:mm:ss zzz", Locale.UK);
+        assertEquals(septUK, septUKCorrected);
         assertEqualsNot(septUK, -1l);
         long septEnglish = TimeFormatter.getMilliSeconds("Sat, 28 Sept 2024 09:57:00 GMT", "EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
         assertEqualsNot(septEnglish, -1l);

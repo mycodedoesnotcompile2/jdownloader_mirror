@@ -1,12 +1,10 @@
 package org.jdownloader.captcha.v2.solver;
 
 import jd.SecondLevelLaunch;
-import jd.controlling.captcha.CaptchaSettings;
 import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
 import jd.http.Browser;
 import jd.plugins.Plugin;
 
-import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -20,12 +18,9 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
-    protected final static CaptchaSettings SETTINGS = JsonConfig.create(CaptchaSettings.class);
-
+    // protected final static CaptchaSettings SETTINGS = JsonConfig.create(CaptchaSettings.class);
     protected int getDefaultWaitForOthersTimeout() {
         return 60000;
     }
@@ -36,21 +31,6 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
 
     public CESChallengeSolver(SolverService service, int threadCount) {
         super(service, threadCount);
-    }
-
-    protected boolean isAccountLoginSupported(Challenge<?> c) {
-        return !c.isAccountLogin() || SETTINGS.isCaptchaExchangeForAccountLoginEnabled();
-    }
-
-    public boolean canHandle(Challenge<?> c) {
-        return isAccountLoginSupported(c) && super.canHandle(c);
-    }
-
-    public FEATURE[] getFeatures() {
-        // Implementation would depend on the hoster and its capabilities
-        // This is a placeholder implementation
-        // return new FEATURE[] { FEATURE.API_KEY_LOGIN };
-        return null;
     }
 
     protected abstract LogSource getLogger();
@@ -64,7 +44,7 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
             return;
         }
         checkInterruption();
-        CESSolverJob<T> cesJob = new CESSolverJob<T>(job);
+        final CESSolverJob<T> cesJob = new CESSolverJob<T>(job);
         try {
             solveCES(cesJob);
         } finally {
@@ -137,22 +117,6 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
 
     /** Override if API key login is used for this solvers' account functionality. */
     protected boolean looksLikeValidAPIKey(final String str) {
-        return false;
-    }
-
-    public boolean hasFeature(final LazyPlugin.FEATURE feature) {
-        if (feature == null) {
-            return false;
-        }
-        final LazyPlugin.FEATURE[] features = getFeatures();
-        if (features == null) {
-            return false;
-        }
-        for (int i = 0; i < features.length; i++) {
-            if (features[i] == feature) {
-                return true;
-            }
-        }
         return false;
     }
 }

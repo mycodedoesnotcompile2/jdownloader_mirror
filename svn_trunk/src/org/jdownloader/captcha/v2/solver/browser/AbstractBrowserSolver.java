@@ -1,21 +1,22 @@
 package org.jdownloader.captcha.v2.solver.browser;
 
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.gui.swing.jdgui.JDGui;
-
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
+
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.gui.swing.jdgui.JDGui;
 
 public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
     protected final BrowserCaptchaSolverConfig config;
@@ -34,7 +35,11 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
 
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof AbstractBrowserChallenge;
+        if (isSpecialReCaptchaEnterpriseChallenge(c)) {
+            return false;
+        } else {
+            return c instanceof AbstractBrowserChallenge;
+        }
     }
 
     @Override
@@ -46,10 +51,19 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
             /* Browser captcha handling for Clouflare Turnstile has not yet been implemented. */
             return false;
         } else if (super.canHandle(c)) {
+            /* Looks good, now check if we can open browser windows on users' OS. */
             return BrowserSolverService.getInstance().isOpenBrowserSupported();
         } else {
             return false;
         }
+    }
+
+    public static boolean isSpecialReCaptchaEnterpriseChallenge(final Challenge<?> c) {
+        if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise() && "filer.net".equals(c.getHost())) {
+            // TODO: current version of the browser extension doesn't support special version of Recaptcha Enterprise used by filer.net
+            return true;
+        }
+        return false;
     }
 
     public void checkSilentMode(final SolverJob<String> job) throws SkipException, InterruptedException {

@@ -119,8 +119,11 @@ public class ScanClassStrings extends AWTest {
                                         f.setAccessible(true);
                                         String str = (String) f.get(null);
                                         try {
-                                            // logInfoAnyway("Check class reference: " + (String) f.get(null) + " in: " + type.getName());
                                             Class.forName(str);
+                                        } catch (IllegalAccessError e) {
+                                            // class is available, but the current jvm has no access..
+                                            logInfoAnyway("Access blocked by JVM(this is ok - classname is correct): " + str);
+                                            return;
                                         } catch (Exception e) {
                                             if (!checkPackage(anno, str)) {
                                                 logInfoAnyway("Skip Class Check: " + type.getName() + "." + f.getName() + " because none of " + anno.classpath() + " is in classpath");

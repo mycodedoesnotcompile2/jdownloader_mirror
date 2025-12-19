@@ -113,6 +113,9 @@ public class NewRuleAction extends AbstractAddAction {
             } else if (!plg.isPremium() && !multihosterSupportedDomains.contains(plg.getHost())) {
                 /* Plugin has no account support and no multihost has support for it -> Do not allow the user to create a rule for it. */
                 continue;
+            } else if (plg.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                /* Do not allow users to create account usage rules for captcha solver plugins. */
+                continue;
             }
             domains.add(plg.getDomainInfo());
         }

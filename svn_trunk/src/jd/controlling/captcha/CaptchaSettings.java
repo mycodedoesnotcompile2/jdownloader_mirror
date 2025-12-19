@@ -39,11 +39,11 @@ public interface CaptchaSettings extends ConfigInterface {
     void setRemoteCaptchaBubbleEnabled(boolean b);
 
     @AboutConfig
-    @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry("Allows automatic captcha solving and CES services for login captchas. This is not recommended, as users generally expect a near-instant login process. Using a solver can extend login times to several minutes.")
-    boolean isCaptchaExchangeForAccountLoginEnabled();
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: Captcha solver services can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas.")
+    boolean isAvoidAutoSolverForLoginCaptchas();
 
-    void setCaptchaExchangeForAccountLoginEnabled(boolean b);
+    void setAvoidAutoSolverForLoginCaptchas(boolean b);
 
     @AboutConfig
     @DefaultBooleanValue(true)

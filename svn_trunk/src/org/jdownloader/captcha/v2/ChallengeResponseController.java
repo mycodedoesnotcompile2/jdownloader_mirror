@@ -12,10 +12,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import jd.controlling.AccountController;
 import jd.controlling.AccountFilter;
+import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.plugins.Account;
 
+import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
@@ -38,6 +40,7 @@ import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
+import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComSolver;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
@@ -63,7 +66,8 @@ import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
 
 public class ChallengeResponseController {
-    private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
+    private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
+    protected final static CaptchaSettings           CAPTCHA_SETTINGS = JsonConfig.create(CaptchaSettings.class);
 
     /**
      * get the only existing instance of ChallengeResponseController. This is a singleton
@@ -410,10 +414,10 @@ public class ChallengeResponseController {
     @SuppressWarnings("unchecked")
     private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
-        for (final ChallengeSolver<?> s : solverList) {
+        for (final ChallengeSolver<?> solver : solverList) {
             try {
-                if (s.isEnabled() && s.validateLogins() && s.canHandle(c) && s.validateBlackWhite(c)) {
-                    ret.add((ChallengeSolver<T>) s);
+                if (solver.isEnabled() && solver.validateLogins() && solver.canHandle(c) && solver.validateBlackWhite(c)) {
+                    ret.add((ChallengeSolver<T>) solver);
                 }
             } catch (final Throwable e) {
                 logger.log(e);
@@ -444,6 +448,20 @@ public class ChallengeResponseController {
             }
         }
         logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
+        avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
+            final List<ChallengeSolver<T>> manualSolver = new ArrayList<ChallengeSolver<T>>();
+            for (final ChallengeSolver<T> solver : ret) {
+                if (solver instanceof CESChallengeSolver) {
+                    continue;
+                }
+                manualSolver.add(solver);
+            }
+            if (manualSolver.size() == 0) {
+                break avoidAutoSolver;
+            }
+            ret.clear();
+            ret.addAll(manualSolver);
+        }
         return ret;
     }
 

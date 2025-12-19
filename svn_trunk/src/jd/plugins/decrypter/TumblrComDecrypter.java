@@ -16,7 +16,6 @@
 package jd.plugins.decrypter;
 
 import java.io.IOException;
-import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -26,7 +25,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.TumblrComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -47,14 +45,13 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.TumblrCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 52013 $", interfaceVersion = 3, names = { "tumblr.com" }, urls = { "https?://(?![a-z0-9]+\\.media\\.tumblr\\.com/.+)[\\w\\.-]+tumblr\\.com/.*" })
+@DecrypterPlugin(revision = "$Revision: 52014 $", interfaceVersion = 3, names = { "tumblr.com" }, urls = { "https?://(?![a-z0-9]+\\.media\\.tumblr\\.com/.+)[\\w\\.-]+tumblr\\.com/.*" })
 public class TumblrComDecrypter extends PluginForDecrypt {
     public TumblrComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,16 +136,9 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                 /* 2025-12-17: API did not work here -> Use website */
                 // this.getAndSetAnonymousApikey(this.br);
                 // return crawlPostAPI(param, blog, puid);
-                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    /**
-                     * 2025-12-17: This is a small workaround to make stable users add an account -> API will be used and single posts will
-                     * be crawled fine via API <br>
-                     * TODO: Fix this
-                     */
-                    throw new AccountRequiredException();
-                }
                 return this.crawlSinglePostWebsite(blog, puid);
             } else if (isBlog) {
+                /* Get anonymous API key from website, then use API to crawl blog/user. */
                 this.getAndSetAnonymousApikey(this.br);
                 return crawlUserAPI(param, blog);
             } else {
@@ -201,7 +191,7 @@ public class TumblrComDecrypter extends PluginForDecrypt {
         }
         Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         entries = (Map<String, Object>) entries.get("response");
-        this.crawlSinglePostJsonAPI(ret, entries);
+        this.crawlSinglePostJsonAPI(ret, entries, JsonSchemeType.API);
         return ret;
     }
 
@@ -214,15 +204,39 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                 numberofSkippedItems++;
                 continue;
             }
-            this.crawlSinglePostJsonAPI(ret, post);
+            this.crawlSinglePostJsonAPI(ret, post, JsonSchemeType.API);
         }
         logger.info("Number of skipped non-post items (e.g. ads): " + numberofSkippedItems);
     }
 
-    private void crawlSinglePostJsonAPI(final ArrayList<DownloadLink> ret, Map<String, Object> entries) {
+    /** Wrapper */
+    private void crawlMultiplePostsArrayJsonWebsite(final ArrayList<DownloadLink> ret, final List<Map<String, Object>> posts) {
+        int numberofSkippedItems = 0;
+        for (final Map<String, Object> post : posts) {
+            final String object_type = post.get("objectType").toString();
+            if (!object_type.equalsIgnoreCase("post")) {
+                numberofSkippedItems++;
+                continue;
+            }
+            this.crawlSinglePostJsonAPI(ret, post, JsonSchemeType.WEBSITE);
+        }
+        logger.info("Number of skipped non-post items (e.g. ads): " + numberofSkippedItems);
+    }
+
+    private void crawlSinglePostJsonAPI(final ArrayList<DownloadLink> ret, final Map<String, Object> entries, final JsonSchemeType scheme) {
         // final String postURL = (String) entries.get("post_url");
-        final String blogName = (String) entries.get("blog_name");
-        final String fpName = blogName + " - " + ((String) entries.get("slug")).replace("-", " ").trim();
+        final String blogName;
+        if (scheme == JsonSchemeType.WEBSITE) {
+            blogName = entries.get("blogName").toString();
+        } else {
+            blogName = entries.get("blog_name").toString();
+        }
+        /* Slug can be empty */
+        final String slug = (String) entries.get("slug");
+        String fpName = blogName;
+        if (!StringUtils.isEmpty(slug)) {
+            fpName += " - " + slug.replace("-", " ").trim();
+        }
         String dateFormatted = null;
         final Object timestampO = entries.get("timestamp");
         if (timestampO != null && timestampO instanceof Number) {
@@ -237,8 +251,8 @@ public class TumblrComDecrypter extends PluginForDecrypt {
         final List<Object> contentArrays = new ArrayList<Object>();
         contentArrays.add(entries.get("content"));
         for (final Object repostO : repostList) {
-            entries = (Map<String, Object>) repostO;
-            final Object contentO = entries.get("content");
+            final Map<String, Object> contentMap = (Map<String, Object>) repostO;
+            final Object contentO = contentMap.get("content");
             if (contentO != null) {
                 contentArrays.add(contentO);
             }
@@ -246,23 +260,24 @@ public class TumblrComDecrypter extends PluginForDecrypt {
         for (final Object contentArrayO : contentArrays) {
             final List<Object> ressourcelist = (List<Object>) contentArrayO;
             for (final Object contentO : ressourcelist) {
-                entries = (Map<String, Object>) contentO;
+                final Map<String, Object> post = (Map<String, Object>) contentO;
                 /* Possible types: image, text, link, video */
-                final String type = entries.get("type").toString();
+                final String type = post.get("type").toString();
                 if (!type.matches("image|video")) {
                     /* Skip unsupported content e.g. "text" */
+                    logger.info("Skipping unsupported type: " + type);
                     continue;
                 }
                 /* E.g. "tumblr"(or null!) = selfhosted, "instagram" or others = extern content/embedded" */
-                final String provider = (String) entries.get("provider");
+                final String provider = (String) post.get("provider");
                 final DownloadLink dl;
                 if (type.equals("video")) {
                     /* Videos only have 1 version available */
                     String url;
-                    if (entries.containsKey("url")) {
-                        url = (String) entries.get("url");
+                    if (post.containsKey("url")) {
+                        url = (String) post.get("url");
                     } else {
-                        url = (String) JavaScriptEngineFactory.walkJson(entries, "media/url");
+                        url = (String) JavaScriptEngineFactory.walkJson(post, "media/url");
                     }
                     if (StringUtils.isEmpty(url)) {
                         logger.warning("Bad video object");
@@ -271,8 +286,8 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                     url = convertDirectVideoUrltoHD(url);
                     dl = this.createDownloadlink(url);
                 } else {
-                    final List<Object> versionsO = (List<Object>) entries.get("media");
-                    if (versionsO.isEmpty()) {
+                    final List<Map<String, Object>> versions = (List<Map<String, Object>>) post.get("media");
+                    if (versions.isEmpty()) {
                         /* This should never happen */
                         logger.warning("Found empty media versions array");
                         continue;
@@ -280,7 +295,7 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                     /*
                      * Look for best/original version (Array is usually sorted by quality, first is best).
                      */
-                    final Map<String, Object> versionInfo = (Map<String, Object>) versionsO.get(0);
+                    final Map<String, Object> version = versions.get(0);
                     // for (final Object versionO : versionsO) {
                     // final Map<String, Object> versionInfoTmp = (Map<String, Object>) versionO;
                     // if (versionInfoTmp.containsKey("has_original_dimensions")) {
@@ -291,7 +306,7 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                     // /* Fallback: Use first version */
                     // versionInfo = (Map<String, Object>) versionsO.get(0);
                     // }
-                    String url = (String) versionInfo.get("url");
+                    String url = (String) version.get("url");
                     if (url.endsWith(".gifv") && cfg.isPreferMp4OverGifv()) {
                         /*
                          * 2022-02-16: All gifv content should be available as mp4 files too --> Download mp4 instead of gifv files if
@@ -300,6 +315,24 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                         url = url.substring(0, url.lastIndexOf(".")) + ".mp4";
                     }
                     dl = this.createDownloadlink(url);
+                    if (StringUtils.endsWithCaseInsensitive(url, ".pnj")) {
+                        /*
+                         * 2025-12-18: .png image with fake .pnj ending -> Set final filename here to fix this in GUI for user. Looks to be
+                         * some kind of hotlinking protection.
+                         */
+                        final String mimeType = version.get("type").toString();
+                        String realExt = this.getExtensionFromMimeType(mimeType);
+                        if (realExt != null) {
+                            if (!realExt.startsWith(".")) {
+                                realExt = "." + realExt;
+                            }
+                            final String filenameFromURL = extractFileNameFromURL(url);
+                            final String filenameFixed = filenameFromURL.replaceFirst("(?i)\\.pnj$", realExt);
+                            dl.setName(filenameFixed);
+                        } else {
+                            logger.warning("Cannot fix file extension for item: " + url);
+                        }
+                    }
                     /* 2021-04-09: url can contain up to 2 MD5 hashes but neither of those is the actual file-hash! */
                     // final String md5 = new Regex(url, "([a-f0-9]{32})\\.\\w+$").getMatch(0);
                     // if (md5 != null) {
@@ -309,13 +342,6 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                 /* Allow external content to go back into another crawler (e.g. Instagram URLs). */
                 if (provider == null || provider.equalsIgnoreCase("tumblr")) {
                     dl.setAvailable(true);
-                    try {
-                        final String urlName = Plugin.getFileNameFromURL(new URL(dl.getPluginPatternMatcher()));
-                        if (urlName != null) {
-                            dl.setName(urlName);
-                        }
-                    } catch (final Throwable e) {
-                    }
                 }
                 // if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !StringUtils.isEmpty(postURL)) {
                 // dl.setContentUrl(postURL);
@@ -336,9 +362,9 @@ public class TumblrComDecrypter extends PluginForDecrypt {
         /* Get json which contains the same object-types returned by their official API. */
         final String json = br.getRegex("<script type=\"application/json\" id=\"___INITIAL_STATE___\">(.*?)</script>").getMatch(0);
         final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-        final List<Map<String, Object>> pagedata = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "PeeprRoute/initialTimeline/objects");
+        final List<Map<String, Object>> posts = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "PeeprRoute/initialTimeline/objects");
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        this.crawlMultiplePostsArrayJsonAPI(ret, pagedata);
+        this.crawlMultiplePostsArrayJsonWebsite(ret, posts);
         return ret;
     }
 
@@ -498,6 +524,11 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                 return source;
             }
         }
+    }
+
+    public static enum JsonSchemeType {
+        API,
+        WEBSITE;
     }
 
     @Override
