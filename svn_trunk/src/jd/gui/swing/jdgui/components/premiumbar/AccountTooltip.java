@@ -28,12 +28,12 @@ import org.appwork.utils.swing.locator.AbstractLocator;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver.CAPTCHA_TYPE;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.MultiHostHost;
 import jd.plugins.PluginForHost;
 import net.miginfocom.swing.MigLayout;

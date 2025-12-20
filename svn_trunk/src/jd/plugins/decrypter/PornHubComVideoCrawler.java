@@ -27,6 +27,15 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -51,16 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -457,8 +457,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String seeAllURL = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
-             * E.g. users/bla/videos --> /users/bla/videos/favorites </br> Without this we might only see some of all items and no
-             * pagination which is needed to be able to find all items.
+             * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
+             * Without this we might only see some of all items and no pagination which is needed to be able to find all items.
              */
             logger.info("Found seeAllURL: " + seeAllURL);
             PornHubCom.getPage(br, seeAllURL);
@@ -755,8 +755,12 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         int foundItems = 0;
         final Set<String> dupes = new HashSet<String>();
         Browser brc = br.cloneBrowser();
-        do {
-            logger.info("Crawling page: " + page);
+        final String hiddenItemsMessage = br.getRegex("Number of unavailable videos that are hidden:\\s*\\d+").getMatch(-1);
+        if (hiddenItemsMessage != null) {
+            /* A lot of playlists contain this message about hidden/deleted elements. */
+            this.displayBubbleNotification(br._getURL().getPath(), hiddenItemsMessage);
+        }
+        pagination: do {
             int numberofActuallyAddedItems = 0;
             int numberOfDupeItems = 0;
             final String publicVideosHTMLSnippet = brc.getRegex("(id=\"videoPlaylist\".*?</section>)").getMatch(0);
@@ -769,41 +773,40 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             } else {
                 foundItems += viewKeys.length;
                 for (final String viewKey : viewKeys) {
-                    if (dupes.add(viewKey)) {
-                        final DownloadLink dl = createDownloadlink(br.getURL("/view_video.php?viewkey=" + viewKey).toString());
-                        ret.add(dl);
-                        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                            distribute(dl);
-                        }
-                        numberofActuallyAddedItems++;
-                        addedItems++;
-                    } else {
+                    if (!dupes.add(viewKey)) {
                         numberOfDupeItems++;
+                        continue;
                     }
+                    final DownloadLink dl = createDownloadlink(br.getURL("/view_video.php?viewkey=" + viewKey).toString());
+                    ret.add(dl);
+                    if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        distribute(dl);
+                    }
+                    numberofActuallyAddedItems++;
+                    addedItems++;
                 }
             }
+            logger.info("Playlist pagination: page=" + page + "|all_found=" + foundItems + "|all_added=" + addedItems + "|page_found:" + (viewKeys != null ? viewKeys.length : -1) + "|page_added=" + numberofActuallyAddedItems + "|page_dupes=" + numberOfDupeItems);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
+                break pagination;
             } else if (numberofActuallyAddedItems == 0) {
                 logger.info("Stopping because: This page did not contain any NEW content: page=" + page + "|all_found=" + foundItems + "|all_added=" + addedItems + "|page_found:" + (viewKeys != null ? viewKeys.length : -1) + "|page_added=" + numberofActuallyAddedItems + "|page_dupes=" + numberOfDupeItems);
                 if (dupes.size() == 0) {
                     return ret;
                 } else {
-                    break;
+                    break pagination;
                 }
-            } else {
-                logger.info("found NEW content: page=" + page + "|all_found=" + foundItems + "|all_added=" + addedItems + "|page_found:" + (viewKeys != null ? viewKeys.length : -1) + "|page_added=" + numberofActuallyAddedItems + "|page_dupes=" + numberOfDupeItems);
             }
             final String next = br.getRegex("lazyloadUrl\\s*=\\s*\"(/playlist/.*?)\"").getMatch(0);
             if (next == null) {
                 logger.info("Stopping because: Reached last page?");
-                break;
-            } else {
-                logger.info("HTML pagination handling - parsing page: " + next);
-                brc = br.cloneBrowser();
-                PornHubCom.getPage(brc, brc.createGetRequest(next + "&page=" + ++page));
+                break pagination;
             }
+            /* Continue to next page */
+            logger.info("HTML pagination handling - parsing page: " + next);
+            brc = br.cloneBrowser();
+            PornHubCom.getPage(brc, brc.createGetRequest(next + "&page=" + ++page));
         } while (!this.isAbort());
         return ret;
     }
@@ -1048,7 +1051,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
                 /*
                  * 2023-02-17: The following line of code contains a typo. This typo now needs to be there forever otherwise it would break
                  * the ability to find duplicates for thumbnails added in order versions :D
-                 * 
+                 *
                  * 2023-03-17: Nope, you can just fix PluginForHost.getLinkID and add support for old/new one ;)
                  */
                 dl.setLinkID("pornhub://" + viewkey + "_thumnail");

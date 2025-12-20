@@ -60,53 +60,6 @@ import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.table.JTableHeader;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -210,6 +163,7 @@ import org.jdownloader.plugins.WaitForAccountTrafficSkipReasonMultihostLinksRequ
 import org.jdownloader.plugins.WaitForAccountTrafficSkipReasonMultihostTrafficRequired;
 import org.jdownloader.plugins.WaitingSkipReasonMultihostHostUnavailable;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.AccountJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -227,6 +181,54 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import net.miginfocom.swing.MigLayout;
+
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -235,14 +237,13 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-                                                  /**
-                                                   * these patterns should split filename and fileextension (extension must include the
-                                                   * point)
-                                                   */
-                                                  // multipart rar archives
-        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-        // normal files with extension
-        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+            /**
+             * these patterns should split filename and fileextension (extension must include the point)
+             */
+            // multipart rar archives
+            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+            // normal files with extension
+            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -1214,8 +1215,8 @@ public abstract class PluginForHost extends Plugin {
             }
             /**
              * In some cases, individual hosts can have different traffic calculation values than 100%. <br>
-             * This calculation applies for the global account-traffic and not for the individual host. </br> Example: File size is 1GB,
-             * individual host traffic calculation factor is 400% <br>
+             * This calculation applies for the global account-traffic and not for the individual host. </br>
+             * Example: File size is 1GB, individual host traffic calculation factor is 400% <br>
              * Account traffic needed: 4GB <br>
              * Individual host traffic needed: 1GB
              */
@@ -1442,16 +1443,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         * 
+         *
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         * 
+         *
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         * 
+         *
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         * 
-         * 
-         * 
+         *
+         *
+         *
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -3719,6 +3720,171 @@ public abstract class PluginForHost extends Plugin {
                 panel.dispatchEvent(e);
             }
         });
+        final JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane);
+    }
+
+    public void extendCaptchaSolverAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {
+        if (!acc.isEnabled()) {
+            /**
+             * Do not display detailed supported host information for disabled accounts because: <br>
+             * - Takes away a lot of space <br>
+             * - Supported host information may change frequently so chances are super high that the information we have is outdated
+             */
+            return;
+        }
+        final PluginForHost plg = acc.getPlugin();
+        if (!(plg instanceof abstractPluginForCaptchaSolver)) {
+            /* Not a captcha solver plugin */
+            return;
+        }
+        final AccountInfo ai = acc.getAccountInfo();
+        if (ai == null) {
+            return;
+        }
+        final abstractPluginForCaptchaSolver captchaSolverPlugin = (abstractPluginForCaptchaSolver) plg;
+        final List<CaptchaType> ctypes = new ArrayList<CaptchaType>();
+        for (final CAPTCHA_TYPE ctype_static : captchaSolverPlugin.getSupportedCaptchaTypes()) {
+            final CaptchaType ctype = new CaptchaType(ctype_static);
+            ctype.setAccountInfo(ai);
+            ctypes.add(ctype);
+        }
+        // TODO: Add meaningful default sort
+        // TODO: Maybe always add all types of captchas and mark the ones not supported by a solver as red.
+        /* Determine default visibility states for some columns */
+        boolean shouldShowDomainColumn = false;
+        boolean shouldShowDemoUrlColumn = false;
+        for (final CaptchaType ctype : ctypes) {
+            final CAPTCHA_TYPE stype_static = ctype.getCAPTCHA_TYPE_STATIC();
+            if (stype_static.getDomain() != null) {
+                shouldShowDomainColumn = true;
+            }
+            if (stype_static.getDemoUrl() != null) {
+                shouldShowDemoUrlColumn = true;
+            }
+            if (shouldShowDomainColumn && shouldShowDemoUrlColumn) {
+                break;
+            }
+        }
+        final boolean final_shouldShowDomainColumn = shouldShowDomainColumn;
+        final boolean final_shouldShowDemoUrlColumn = shouldShowDemoUrlColumn;
+        final ExtTableModel<CaptchaType> tableModel = new ExtTableModel<CaptchaType>("CaptchaTypeTable") {
+            @Override
+            protected void initColumns() {
+                addColumn(new ExtCheckColumn<CaptchaType>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
+                    @Override
+                    public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
+                        final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
+                            private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
+
+                            @Override
+                            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                                setIcon(ok);
+                                setHorizontalAlignment(CENTER);
+                                setText(null);
+                                return this;
+                            }
+                        };
+                        return ret;
+                    }
+
+                    @Override
+                    public int getMaxWidth() {
+                        return 30;
+                    }
+
+                    @Override
+                    protected boolean getBooleanValue(final CaptchaType captchaType) {
+                        return captchaType.isEnabled();
+                    }
+
+                    @Override
+                    public boolean isEditable(CaptchaType captchaType) {
+                        return true;
+                    }
+
+                    @Override
+                    protected void setBooleanValue(final boolean enabled, final CaptchaType captchaType) {
+                        captchaType.setEnabled(enabled);
+                        fireTableDataChanged();
+                    }
+                });
+                addColumn(new ExtTextColumn<CaptchaType>("Name") {
+                    @Override
+                    public String getStringValue(final CaptchaType captchaType) {
+                        return captchaType.getCAPTCHA_TYPE_STATIC().getDisplayName();
+                    }
+
+                    @Override
+                    public Icon getIcon(CaptchaType captchaType) {
+                        final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
+                        if (domain != null) {
+                            return DomainInfo.getInstance(domain).getFavIcon();
+                        } else {
+                            final Icon dummyIcon = NewTheme.I().getIcon(IconKey.ICON_BEER, 16);
+                            return dummyIcon;
+                        }
+                    }
+                });
+                if (final_shouldShowDomainColumn) {
+                    addColumn(new ExtTextColumn<CaptchaType>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
+                        @Override
+                        public String getStringValue(final CaptchaType captchaType) {
+                            final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
+                            return domain != null ? domain : "";
+                        }
+
+                        @Override
+                        protected String getTooltipText(final CaptchaType captchaType) {
+                            final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
+                            return domain != null ? domain : null;
+                        }
+                    });
+                }
+                addColumn(new ExtTextColumn<CaptchaType>("Description") {
+                    @Override
+                    public String getStringValue(final CaptchaType captchaType) {
+                        final String description = captchaType.getCAPTCHA_TYPE_STATIC().getDescription();
+                        return description != null ? description : "";
+                    }
+
+                    @Override
+                    protected String getTooltipText(final CaptchaType captchaType) {
+                        final String description = captchaType.getCAPTCHA_TYPE_STATIC().getDescription();
+                        return description != null ? description : null;
+                    }
+                });
+                if (final_shouldShowDemoUrlColumn) {
+                    addColumn(new ExtTextColumn<CaptchaType>("Demo URL") {
+                        @Override
+                        public String getStringValue(final CaptchaType captchaType) {
+                            final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
+                            return demoUrl != null ? demoUrl : "";
+                        }
+
+                        @Override
+                        protected String getTooltipText(final CaptchaType captchaType) {
+                            final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
+                            return demoUrl != null ? demoUrl : null;
+                        }
+
+                        @Override
+                        public boolean onDoubleClick(MouseEvent e, CaptchaType captchaType) {
+                            final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
+                            if (demoUrl != null && !demoUrl.isEmpty()) {
+                                // TODO: URL öffnen
+                            }
+                            return false;
+                        }
+                    });
+                }
+            }
+        };
+        tableModel._fireTableStructureChanged(ctypes, false);
+        final BasicJDTable<CaptchaType> table = new BasicJDTable<CaptchaType>(tableModel);
+        table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
+        table.setSearchEnabled(true);
         final JScrollPane scrollPane = new JScrollPane(table);
         panel.add(scrollPane);
     }

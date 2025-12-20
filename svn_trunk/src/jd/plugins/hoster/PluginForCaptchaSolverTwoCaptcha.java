@@ -8,9 +8,10 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51979 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {

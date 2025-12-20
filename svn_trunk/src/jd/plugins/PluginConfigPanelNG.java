@@ -32,25 +32,6 @@ import javax.swing.JLabel;
 import javax.swing.JSeparator;
 import javax.swing.SwingUtilities;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.Label;
-import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.components.TextPane;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -112,6 +93,25 @@ import org.jdownloader.premium.BuyAndAddPremiumAccount;
 import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.components.TextPane;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
+import jd.nutils.Formatter;
+import net.miginfocom.swing.MigLayout;
 
 public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements AccountControllerListener {
     private List<Group> groups = new ArrayList<Group>();
@@ -501,6 +501,9 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                             if (acc.isMultiHost() && acc.getPlugin().getLazyP().hasFeature(LazyPlugin.FEATURE.MULTIHOST)) {
                                 initMultiHosterInfo(plgh, acc);
                             }
+                            if (acc.getPlugin().getLazyP().hasFeature(LazyPlugin.FEATURE.CAPTCHA_SOLVER)) {
+                                initCaptchaSolverPluginInfo(plgh, acc);
+                            }
                         }
                     }
                 }
@@ -549,6 +552,21 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             addHeader(_GUI.T.multihoster_account_settings_header(), new AbstractIcon(IconKey.ICON_LIST, 18));
             addDescriptionPlain(_GUI.T.multihoster_account_settings_description());
             plugin.extendMultiHostAccountSettingsPanel(acc, this);
+        } finally {
+            gapleft = gapbefore;
+            gapright = gapbeforeright;
+        }
+    }
+
+    protected void initCaptchaSolverPluginInfo(final PluginForHost plugin, final Account acc) {
+        String gapbefore = getLeftGap();
+        String gapbeforeright = getRightGap();
+        try {
+            gapleft = "5";
+            gapright = ",gapright 5";
+            addHeader("Supported captcha types", new AbstractIcon(IconKey.ICON_LIST, 18));
+            addDescriptionPlain("This is a captcha solver account. You can use it to solve captchas.");
+            plugin.extendCaptchaSolverAccountSettingsPanel(acc, this);
         } finally {
             gapleft = gapbefore;
             gapright = gapbeforeright;

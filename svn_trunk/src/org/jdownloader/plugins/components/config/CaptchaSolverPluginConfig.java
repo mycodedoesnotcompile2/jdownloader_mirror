@@ -33,7 +33,7 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
         }
 
         public String getMaxParallelCaptchas_label() {
-            return "Maximum parallel captchas";
+            return "Max parallel captchas";
         }
     }
 

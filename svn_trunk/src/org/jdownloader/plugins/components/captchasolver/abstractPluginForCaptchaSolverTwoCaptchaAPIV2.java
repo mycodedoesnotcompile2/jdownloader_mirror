@@ -9,6 +9,8 @@ import java.util.Map;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
@@ -20,7 +22,6 @@ import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
@@ -68,7 +69,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         final PostRequest req = br.createJSonPostRequest(this.getApiBase() + "/getBalance", postdata);
         br.getPage(req);
         final Map<String, Object> entries = this.handleAPIErrors(br, account);
-        final double balance = ((Number) entries.get("balance")).doubleValue();
+        final double balance = ((Number) ReflectionUtils.cast(entries.get("balance"), Double.class)).doubleValue();
         final AccountInfo ai = new AccountInfo();
         ai.setAccountBalance(balance, Currency.getInstance("USD"));
         return ai;
@@ -84,22 +85,36 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             postdata.put("clientKey", apikey);
             final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
             if (captchachallenge instanceof RecaptchaV2Challenge) {
-                final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
+                final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
                 task.put("type", "RecaptchaV2TaskProxyless");
                 task.put("websiteKey", challenge.getSiteKey());
                 task.put("websiteURL", challenge.getSiteUrl());
-                final AbstractRecaptchaV2<?> recaptchaChallenge = challenge.getAbstractCaptchaHelperRecaptchaV2();
-                if (recaptchaChallenge != null) {
-                    if (challenge.isEnterprise()) {
-                        task.put("isEnterprise", true);
-                    }
-                    final Map<String, Object> action = challenge.getV3Action();
-                    if (action != null && action.containsKey("action")) {
-                        task.put("type", "RecaptchaV3TaskProxyless");
-                        task.put("pageAction", String.valueOf(action.get("action")));
-                    } else if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
-                        task.put("isInvisible", true);
-                    }
+                final Map<String, Object> action = challenge.getV3Action();
+                if (challenge.isV3() || action != null) {
+                    task.put("type", "RecaptchaV3TaskProxyless");
+                    task.put("isEnterprise", challenge.isEnterprise());
+                } else if (challenge.isEnterprise()) {
+                    task.put("type", "RecaptchaV2EnterpriseTaskProxyless");
+                }
+                if (action != null) {
+                    task.put("pageAction", action.get("action"));
+                }
+                task.put("isInvisible", TYPE.INVISIBLE.equals(challenge.getType()));
+                final Double minScore = challenge.getMinScore();
+                if (minScore != null) {
+                    task.put("minScore", minScore);
+                }
+                if (account.getHoster().equals("2captcha.com") && challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
+                    /**
+                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results.
+                     * <br>
+                     * Is: https://2captcha.com/api-docs/recaptcha-v2-enterprise#recaptcha-v2-enterprise <br>
+                     * Should be: https://2captcha.com/api-docs/recaptcha-v3
+                     */
+                    /**
+                     * undocumented: RecaptchaV2EnterpriseTaskProxyless also supports pageAction(v3)
+                     */
+                    task.put("type", "RecaptchaV2EnterpriseTaskProxyless");
                 }
             } else if (captchachallenge instanceof HCaptchaChallenge) {
                 final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;
@@ -170,7 +185,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 final String status = entries.get("status").toString();
                 if (status.equalsIgnoreCase("processing")) {
                     /* Not yet ready */
-                    Thread.sleep(getPollingIntervalMillis());
+                    Thread.sleep(getPollingIntervalMillis(account));
                     continue;
                 }
                 if (!status.equalsIgnoreCase("ready")) {

@@ -58,7 +58,7 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52022 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52023 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -355,7 +355,7 @@ public class FilerNet extends PluginForHost {
             final CaptchaHosterHelperInterface captchaHelper;
             if (true) {
                 /**
-                 * 2025-12-18: switched to hcaptcha
+                 * 2025-12-18: switched to hcaptcha, see https://filer.net/assets/GetFileView-BAC_MvhC-1766086422362.js
                  */
                 captchaHelper = new CaptchaHelperHostPluginHCaptcha(this, br, "45623a98-7b08-43ae-b758-c21c13024e2a");
             } else {
@@ -684,6 +684,10 @@ public class FilerNet extends PluginForHost {
                 } else {
                     throw new PluginException(LinkStatus.ERROR_FATAL, error);
                 }
+            } else if (error.equalsIgnoreCase("Invalid captcha")) {
+                /* {"error":"Invalid captcha"} */
+                // Along with http response 400
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, error);
             } else if (error.equalsIgnoreCase("HOURLY_DOWNLOAD_LIMIT")) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 1 * 60 * 60 * 1000);
             }

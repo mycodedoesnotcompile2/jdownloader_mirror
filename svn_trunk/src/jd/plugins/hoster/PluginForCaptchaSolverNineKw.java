@@ -27,6 +27,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {

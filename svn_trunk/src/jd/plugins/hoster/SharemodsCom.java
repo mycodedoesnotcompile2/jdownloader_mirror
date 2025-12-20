@@ -20,7 +20,6 @@ import java.util.List;
 
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver.CAPTCHA_TYPE;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -29,12 +28,13 @@ import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52020 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = {}, urls = {})
 public class SharemodsCom extends XFileSharingProBasic {
     public SharemodsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,6 @@ public class SharemodsCom extends XFileSharingProBasic {
         if (nextStepURL == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        // getPage(nextStepURL);
         if (this.tryDownload(br, link, account, br.createGetRequest(nextStepURL), DOWNLOAD_ATTEMPT_FLAGS.CONNECT_OR_EXCEPTION)) {
             /* Download starts right away without captcha */
             return;

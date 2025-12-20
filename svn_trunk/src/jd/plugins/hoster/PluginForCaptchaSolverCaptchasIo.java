@@ -7,9 +7,10 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51033 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
