@@ -113,7 +113,7 @@ public abstract class AbstractTray implements TrayMouseListener {
     /**
      * @return
      */
-    protected IconRef getIconRef() {
+    public IconRef getIconRef() {
         IconRef icon = TrayIconRef.trayicon;
         if (!TrayIconRef.trayicon.exists()) {
             icon = new IconRef() {
@@ -336,7 +336,7 @@ public abstract class AbstractTray implements TrayMouseListener {
     public void mousePressed(MouseEvent e) {
     }
 
-    protected TrayIconPopup createMenu(MouseEvent e) {
+    public TrayIconPopup createMenu(MouseEvent e) {
         TrayIconPopup jpopup = createPopup(e);
         MenuHeaderWrapper header;
         jpopup.add(header = new MenuHeaderWrapper(createMenuHeader(e)));

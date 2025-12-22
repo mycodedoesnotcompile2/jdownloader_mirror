@@ -395,6 +395,7 @@ lit_expired=Isteklo
 lit_file_container=Tip dokumenta
 lit_hide=Sakrij
 lit_host=Domaćin
+lit_image_quality=Kvalitet slike
 lit_no=Ne
 lit_please_wait=Molimo sačekajte...
 lit_plugin_defect_pls_contact_support=Defekt Dodatka. Molimo kontaktirajte support@jdownloader.org

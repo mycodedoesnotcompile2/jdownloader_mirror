@@ -241,6 +241,9 @@ public abstract class ClassPathScanner<E extends Throwable> {
         if (classname.startsWith("org.antlr.")) {
             return true;
         }
+        if (classname.startsWith("dorkbox.")) {
+            return true;
+        }
         if (classname.startsWith("jsyntaxpane.")) {
             return true;
         }

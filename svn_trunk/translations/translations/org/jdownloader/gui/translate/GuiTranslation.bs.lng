@@ -1837,6 +1837,7 @@ gui_column_proxytype_socks4a=Socks 4a Proxy
 gui_column_proxytype_socks4a_tt=SOCKS-4a-Protokol Proxy Server
 gui_column_proxytype_socks5=Socks 5 Proxy
 gui_column_proxytype_socks5_tt=SOCKS-5-Protokol Proxy Server
+gui_column_resolvehost=Lokalno rješavanje DNS-ova
 gui_column_use=Koristi
 gui_column_user=Korisnik
 gui_config_dialogs=Prozori Dijaloga
