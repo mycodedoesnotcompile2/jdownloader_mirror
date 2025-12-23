@@ -10,13 +10,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
@@ -64,6 +57,13 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -430,6 +430,9 @@ public class ChallengeResponseController {
             boolean success = false;
             try {
                 final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
+                if (!plugin.canHandle(c)) {
+                    continue;
+                }
                 final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
                 if (solver == null) {
                     /* E.g. solver cannot handle challenge it gets presented */
@@ -439,6 +442,7 @@ public class ChallengeResponseController {
                 success = true;
             } catch (final Throwable e) {
                 logger.log(e);
+                logger.warning("Exception happened during collecting fitting solver plugins");
             } finally {
                 if (success) {
                     unavailableSolverDomains.remove(solverAccount.getHoster());
@@ -449,18 +453,23 @@ public class ChallengeResponseController {
         }
         logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
-            final List<ChallengeSolver<T>> manualSolver = new ArrayList<ChallengeSolver<T>>();
+            /*
+             * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
+             * logins in JDownloader are supposed to happen fast.
+             */
+            final List<ChallengeSolver<T>> manualSolvers = new ArrayList<ChallengeSolver<T>>();
             for (final ChallengeSolver<T> solver : ret) {
                 if (solver instanceof CESChallengeSolver) {
                     continue;
                 }
-                manualSolver.add(solver);
+                manualSolvers.add(solver);
             }
-            if (manualSolver.size() == 0) {
+            if (manualSolvers.size() == 0) {
                 break avoidAutoSolver;
             }
+            /* Clear all external solvers and only allow local solvers. */
             ret.clear();
-            ret.addAll(manualSolver);
+            ret.addAll(manualSolvers);
         }
         return ret;
     }

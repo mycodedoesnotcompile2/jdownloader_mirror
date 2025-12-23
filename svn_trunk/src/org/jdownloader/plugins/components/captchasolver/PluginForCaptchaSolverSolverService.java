@@ -6,12 +6,11 @@ import java.util.Map;
 import javax.swing.Icon;
 
 import org.appwork.storage.config.JsonConfig;
+import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.ChallengeSolverConfig;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
-import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.NewTheme;
 
 import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
 import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
@@ -31,9 +30,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public Icon getIcon(int size) {
-        // TODO: Return plugin favicon
-        // return this.plugin.getFavIcon(this.plugin.getHost());
-        return NewTheme.I().getIcon(IconKey.ICON_LOGO_DBC, size);
+        // TODO: Review this
+        return DomainInfo.getInstance(plugin.getHost());
     }
 
     @Override

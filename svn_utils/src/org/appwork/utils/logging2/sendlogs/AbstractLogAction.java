@@ -86,14 +86,14 @@ public abstract class AbstractLogAction extends BasicAction {
 
             @Override
             public String getString() {
-                return T.T.LogAction_getString_uploading_();
+                return _LogsTranslation.T.LogAction_getString_uploading_();
             }
 
             @Override
             public void run() throws Exception {
                 AbstractLogAction.this.create();
             }
-        }, UIOManager.BUTTONS_HIDE_OK, T.T.LogAction_actionPerformed_zip_title_(), T.T.LogAction_actionPerformed_wait_(), null, null, null);
+        }, UIOManager.BUTTONS_HIDE_OK, _LogsTranslation.T.LogAction_actionPerformed_zip_title_(), _LogsTranslation.T.LogAction_actionPerformed_wait_(), null, null, null);
         try {
             Dialog.getInstance().showDialog(p);
         } catch (final Throwable e1) {
@@ -152,7 +152,7 @@ public abstract class AbstractLogAction extends BasicAction {
 
             @Override
             public String getString() {
-                return T.T.LogAction_getString_uploading_();
+                return _LogsTranslation.T.LogAction_getString_uploading_();
             }
 
             @Override
@@ -163,7 +163,7 @@ public abstract class AbstractLogAction extends BasicAction {
                     throw new InterruptedException();
                 }
             }
-        }, UIOManager.BUTTONS_HIDE_OK, T.T.LogAction_actionPerformed_zip_title_(), T.T.LogAction_actionPerformed_wait_(), null, null, null);
+        }, UIOManager.BUTTONS_HIDE_OK, _LogsTranslation.T.LogAction_actionPerformed_zip_title_(), _LogsTranslation.T.LogAction_actionPerformed_wait_(), null, null, null);
         Dialog.getInstance().showDialog(p);
     }
 

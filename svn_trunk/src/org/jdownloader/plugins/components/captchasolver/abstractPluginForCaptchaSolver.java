@@ -48,9 +48,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, Account account) throws Exception {
-        if (!canHandle(c)) {
-            return null;
-        }
         final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
         plugin.setBrowser(plugin.createNewBrowserInstance());
         return new PluginChallengeSolver<T>(plugin, account);

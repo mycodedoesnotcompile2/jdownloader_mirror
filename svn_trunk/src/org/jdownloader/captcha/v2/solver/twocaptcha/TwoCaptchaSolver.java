@@ -6,9 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -36,6 +33,9 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_TWO_CAPTCHA;
+
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
 
 public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     private static final TwoCaptchaSolver     INSTANCE           = new TwoCaptchaSolver();
@@ -94,7 +94,8 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
 
     @Override
     protected boolean isChallengeSupported(final Challenge<?> c) {
-        if (c instanceof RecaptchaV2Challenge || c instanceof HCaptchaChallenge || c instanceof BasicCaptchaChallenge) {
+        /* 2025-12-22: hCaptcha is not supported anymore */
+        if (c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
             return true;
         } else if (c instanceof CutCaptchaChallenge) {
             return true;
@@ -134,7 +135,8 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
                 }
                 if (challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
                     /**
-                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results. <br>
+                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results.
+                     * <br>
                      * Is: https://2captcha.com/api-docs/recaptcha-v2-enterprise#recaptcha-v2-enterprise <br>
                      * Should be: https://2captcha.com/api-docs/recaptcha-v3
                      */

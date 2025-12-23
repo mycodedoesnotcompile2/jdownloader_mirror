@@ -257,6 +257,11 @@ public class CaptchaType {
             public String getDomain() {
                 return "geetest.com";
             }
+
+            @Override
+            public boolean isJDownloaderSupported() {
+                return false;
+            }
         },
         GEETEST_V4 {
             @Override
@@ -282,6 +287,11 @@ public class CaptchaType {
             @Override
             public String getDomain() {
                 return "geetest.com";
+            }
+
+            @Override
+            public boolean isJDownloaderSupported() {
+                return false;
             }
         },
         CLOUDFLARE_TURNSTILE {
@@ -311,7 +321,6 @@ public class CaptchaType {
             }
         },
         MT_CAPTCHA {
-            /* https://www.mtcaptcha.com/ */
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return false;
@@ -335,6 +344,42 @@ public class CaptchaType {
             @Override
             public String getDomain() {
                 return "mtcaptcha.com";
+            }
+
+            @Override
+            public boolean isJDownloaderSupported() {
+                return false;
+            }
+        },
+        FRIENDLY_CAPTCHA {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return false;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "Friendly Captcha";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://friendlycaptcha.com/#demo";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Friendly Captcha 'Truly Invisible CAPTCHA, Privacy-First, Bot Protection'";
+            }
+
+            @Override
+            public String getDomain() {
+                return "friendlycaptcha.com";
+            }
+
+            @Override
+            public boolean isJDownloaderSupported() {
+                return false;
             }
         };
 
@@ -376,6 +421,16 @@ public class CaptchaType {
         public abstract String getDomain();
 
         /**
+         * Checks if this captcha type is supported by JDownloader. This method can be used to collect captchas available in captcha solving
+         * services, including those that JDownloader itself does not yet support.
+         *
+         * @return true if this captcha type is supported by JDownloader, false otherwise. Defaults to true for all types unless overridden.
+         */
+        public boolean isJDownloaderSupported() {
+            return true;
+        }
+
+        /**
          * Retrieves the captcha type that can handle the given challenge.
          *
          * @param c
@@ -395,9 +450,9 @@ public class CaptchaType {
         }
     }
 
-    private Boolean           enabled     = null;
-    private AccountInfo       accountInfo = null;
-    final CAPTCHA_TYPE ctype;
+    private Boolean     enabled     = null;
+    private AccountInfo accountInfo = null;
+    final CAPTCHA_TYPE  ctype;
 
     public AccountInfo getAccountInfo() {
         return accountInfo;

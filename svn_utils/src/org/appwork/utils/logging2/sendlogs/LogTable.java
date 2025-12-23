@@ -84,7 +84,7 @@ public class LogTable extends ExtTable<LogFolder> {
     protected JPopupMenu onContextMenu(final JPopupMenu popup, final LogFolder contextObject, final java.util.List<LogFolder> selection, final ExtColumn<LogFolder> column, final MouseEvent mouseEvent) {
         popup.add(new BasicAction() {
             {
-                setName(T.T.LogTable_onContextMenu_enable_());
+                setName(_LogsTranslation.T.LogTable_onContextMenu_enable_());
             }
 
             @Override
@@ -97,7 +97,7 @@ public class LogTable extends ExtTable<LogFolder> {
         });
         popup.add(new BasicAction() {
             {
-                setName(T.T.LogTable_onContextMenu_disable_());
+                setName(_LogsTranslation.T.LogTable_onContextMenu_disable_());
             }
 
             @Override

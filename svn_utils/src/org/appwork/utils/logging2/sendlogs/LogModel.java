@@ -80,7 +80,7 @@ public class LogModel extends ExtTableModel<LogFolder> {
 
     @Override
     protected void initColumns() {
-        this.addColumn(new ExtCheckColumn<LogFolder>(T.T.LogModel_initColumns_check_upload_()) {
+        this.addColumn(new ExtCheckColumn<LogFolder>(_LogsTranslation.T.LogModel_initColumns_check_upload_()) {
 
             @Override
             protected boolean getBooleanValue(final LogFolder value) {
@@ -113,7 +113,7 @@ public class LogModel extends ExtTableModel<LogFolder> {
             }
         });
 
-        this.addColumn(new ExtTextColumn<LogFolder>(T.T.LogModel_initColumns_time_()) {
+        this.addColumn(new ExtTextColumn<LogFolder>(_LogsTranslation.T.LogModel_initColumns_time_()) {
             {
                 this.setRowSorter(new ExtDefaultRowSorter<LogFolder>() {
 
@@ -139,10 +139,10 @@ public class LogModel extends ExtTableModel<LogFolder> {
             public String getStringValue(final LogFolder value) {
                 final String from = DateFormat.getInstance().format(new Date(value.getCreated()));
                 if (value.isCurrent()) {
-                    return T.T.LogModel_current(from);
+                    return _LogsTranslation.T.LogModel_current(from);
                 } else {
                     final String to = DateFormat.getInstance().format(new Date(value.getLastModified()));
-                    final String stringValue = T.T.LogModel_getStringValue_between_(from, to);
+                    final String stringValue = _LogsTranslation.T.LogModel_getStringValue_between_(from, to);
                     return stringValue;
                 }
             }

@@ -1044,10 +1044,11 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         return true;
     }
 
-    public static final String PACKAGETAG = "<jd:" + PackagizerController.PACKAGENAME + ">";
-    public static final String DATETAG    = "<jd:" + PackagizerController.SIMPLEDATE + ":";
-    public static final String INDEXOFTAG = "<jd:" + PackagizerController.INDEXOF + ">";
-    public static final String ENVTAG     = "<jd:" + PackagizerController.ENV + ":";
+    public static final String PACKAGETAG      = "<jd:" + PackagizerController.PACKAGENAME + ">";
+    public static final String DATETAG         = "<jd:" + PackagizerController.SIMPLEDATE + ":";
+    public static final String INDEXOFTAG_OPEN = "<jd:" + PackagizerController.INDEXOF;
+    public static final String INDEXOFTAG      = INDEXOFTAG_OPEN + ">";
+    public static final String ENVTAG          = "<jd:" + PackagizerController.ENV + ":";
 
     private final static int padLength(final int size) {
         if (size < 10) {
@@ -1118,11 +1119,11 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 ret = ret.replace(PACKAGETAG, LinknameCleaner.cleanPackagename(packageName, true));
             }
         }
-        if (ret.contains(INDEXOFTAG) && (replaceTags == null || replaceTags.contains(INDEXOFTAG))) {
+        if (ret.contains(INDEXOFTAG_OPEN) && (replaceTags == null || replaceTags.contains(INDEXOFTAG))) {
             modifyFlag.set(true);
             AbstractPackageNode parentNode = null;
             if (!(node instanceof AbstractPackageChildrenNode) || (parentNode = ((AbstractPackageChildrenNode<AbstractPackageNode>) node).getParentNode()) == null) {
-                ret = ret.replace(INDEXOFTAG, "");
+                ret = ret.replaceAll(INDEXOFTAG_OPEN + "[^>]*>", "");
             } else {
                 final ModifyLock modifyLock = parentNode.getModifyLock();
                 final int index;
@@ -1135,10 +1136,15 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                     modifyLock.readUnlock(readL);
                 }
                 if (index >= 0) {
-                    final String replacement = String.format(Locale.ROOT, "%0" + padLength(size) + "d", index + 1);
-                    ret = ret.replace(INDEXOFTAG, replacement);
+                    int padLength = padLength(size);
+                    final String customPadLength = new Regex(ret, INDEXOFTAG_OPEN + "[^>]*pad=(\\d+)[^>]*>").getMatch(0);
+                    if (customPadLength != null) {
+                        padLength = Math.max(padLength, Integer.parseInt(customPadLength));
+                    }
+                    final String replacement = String.format(Locale.ROOT, "%0" + padLength + "d", index + 1);
+                    ret = ret.replaceAll(INDEXOFTAG_OPEN + "[^>]*>", replacement);
                 } else {
-                    ret = ret.replace(INDEXOFTAG, "");
+                    ret = ret.replaceAll(INDEXOFTAG_OPEN + "[^>]*>", "");
                 }
             }
         }

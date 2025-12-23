@@ -2437,54 +2437,56 @@ public abstract class PluginForHost extends Plugin {
                 final InputDialogInterface ret = UIOManager.I().show(InputDialogInterface.class, new InputDialog(0, " " + downloadLink.getName(), _GUI.T.lit_change_url(), downloadLink.getPluginPatternMatcher(), icon, null, null));
                 try {
                     ret.throwCloseExceptions();
-                    final String url = ret.getText();
-                    if (!StringUtils.equals(downloadLink.getPluginPatternMatcher(), url)) {
-                        if (checkableLink instanceof CrawledLink) {
-                            LinkCollector.getInstance().getQueue().add(new QueueAction<Void, RuntimeException>() {
-                                @Override
-                                protected Void run() throws RuntimeException {
-                                    updateDownloadLink(checkableLink, url);
-                                    return null;
-                                }
-                            });
-                        } else {
-                            DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
-                                @Override
-                                public boolean isHighPriority() {
-                                    return false;
-                                }
-
-                                @Override
-                                public void interrupt() {
-                                }
-
-                                @Override
-                                public void execute(DownloadSession currentSession) {
-                                    final SingleDownloadController con = downloadLink.getDownloadLinkController();
-                                    if (con == null) {
-                                        updateDownloadLink(checkableLink, url);
-                                    } else {
-                                        con.getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                                            @Override
-                                            public void execute(DownloadSession currentSession) {
-                                                updateDownloadLink(checkableLink, url);
-                                            }
-
-                                            @Override
-                                            public void interrupt() {
-                                            }
-
-                                            @Override
-                                            public boolean isHighPriority() {
-                                                return false;
-                                            }
-                                        });
-                                    }
-                                }
-                            });
-                        }
-                    }
                 } catch (DialogNoAnswerException ignore) {
+                    return;
+                }
+                final String url = ret.getText();
+                if (StringUtils.equals(downloadLink.getPluginPatternMatcher(), url)) {
+                    return;
+                }
+                if (checkableLink instanceof CrawledLink) {
+                    LinkCollector.getInstance().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                        @Override
+                        protected Void run() throws RuntimeException {
+                            updateDownloadLink(checkableLink, url);
+                            return null;
+                        }
+                    });
+                } else {
+                    DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
+                        @Override
+                        public boolean isHighPriority() {
+                            return false;
+                        }
+
+                        @Override
+                        public void interrupt() {
+                        }
+
+                        @Override
+                        public void execute(DownloadSession currentSession) {
+                            final SingleDownloadController con = downloadLink.getDownloadLinkController();
+                            if (con == null) {
+                                updateDownloadLink(checkableLink, url);
+                            } else {
+                                con.getJobsAfterDetach().add(new DownloadWatchDogJob() {
+                                    @Override
+                                    public void execute(DownloadSession currentSession) {
+                                        updateDownloadLink(checkableLink, url);
+                                    }
+
+                                    @Override
+                                    public void interrupt() {
+                                    }
+
+                                    @Override
+                                    public boolean isHighPriority() {
+                                        return false;
+                                    }
+                                });
+                            }
+                        }
+                    });
                 }
             }
         });
@@ -3754,6 +3756,7 @@ public abstract class PluginForHost extends Plugin {
         /* Determine default visibility states for some columns */
         boolean shouldShowDomainColumn = false;
         boolean shouldShowDemoUrlColumn = false;
+        boolean shouldShowJDownloaderSupportedColumn = false;
         for (final CaptchaType ctype : ctypes) {
             final CAPTCHA_TYPE stype_static = ctype.getCAPTCHA_TYPE_STATIC();
             if (stype_static.getDomain() != null) {
@@ -3762,12 +3765,19 @@ public abstract class PluginForHost extends Plugin {
             if (stype_static.getDemoUrl() != null) {
                 shouldShowDemoUrlColumn = true;
             }
-            if (shouldShowDomainColumn && shouldShowDemoUrlColumn) {
+            if (!stype_static.isJDownloaderSupported()) {
+                /*
+                 * Allow this column only if captcha solver service supports at least one captcha type that is not supported by JDownloader.
+                 */
+                shouldShowJDownloaderSupportedColumn = true;
+            }
+            if (shouldShowDomainColumn && shouldShowDemoUrlColumn && shouldShowJDownloaderSupportedColumn) {
                 break;
             }
         }
         final boolean final_shouldShowDomainColumn = shouldShowDomainColumn;
         final boolean final_shouldShowDemoUrlColumn = shouldShowDemoUrlColumn;
+        final boolean final_shouldShowJDownloaderSupportedColumn = shouldShowJDownloaderSupportedColumn;
         final ExtTableModel<CaptchaType> tableModel = new ExtTableModel<CaptchaType>("CaptchaTypeTable") {
             @Override
             protected void initColumns() {
@@ -3827,7 +3837,7 @@ public abstract class PluginForHost extends Plugin {
                         }
                     }
                 });
-                if (final_shouldShowDomainColumn) {
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && final_shouldShowDomainColumn) {
                     addColumn(new ExtTextColumn<CaptchaType>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
                         @Override
                         public String getStringValue(final CaptchaType captchaType) {
@@ -3877,6 +3887,55 @@ public abstract class PluginForHost extends Plugin {
                             }
                             return false;
                         }
+                    });
+                }
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && final_shouldShowJDownloaderSupportedColumn) {
+                    addColumn(new ExtCheckColumn<CaptchaType>("JDownloader Support") {
+                        @Override
+                        public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
+                            final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
+                                private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
+
+                                @Override
+                                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                                    super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                                    setIcon(ok);
+                                    setHorizontalAlignment(CENTER);
+                                    setText(null);
+                                    return this;
+                                }
+                            };
+                            return ret;
+                        }
+
+                        @Override
+                        public int getMaxWidth() {
+                            return 30;
+                        }
+
+                        @Override
+                        protected boolean getBooleanValue(final CaptchaType captchaType) {
+                            return captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported();
+                        }
+
+                        @Override
+                        public boolean isEditable(CaptchaType captchaType) {
+                            return false;
+                        }
+
+                        @Override
+                        protected void setBooleanValue(final boolean value, final CaptchaType captchaType) {
+                            // Not editable, do nothing
+                        }
+                        // TODO: Maybe add icon though if this column remains IDE-only, this is not relevant.
+                        // @Override
+                        // public Icon getIcon(CaptchaType captchaType) {
+                        // if (captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported()) {
+                        // return NewTheme.I().getIcon(IconKey.ICON_OK, 16);
+                        // } else {
+                        // return NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
+                        // }
+                        // }
                     });
                 }
             }

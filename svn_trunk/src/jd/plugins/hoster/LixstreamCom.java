@@ -23,12 +23,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -42,7 +36,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51568 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52035 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,9 +79,10 @@ public class LixstreamCom extends PluginForHost {
          * See "Choose domain" <br>
          * Current list of domains can be obtained from here: https://api.luxsioab.com/user_share_domains --> "X-Token" header is required!
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org", "lix0.org", "doey07sto.com", "doey07s.com", "videyii.co", "vdey.org" });
+        ret.add(new String[] { "lixstream.com", "boxlinkqrr.com", "filevideopmk.com", "vidcloudkix.com", "lix0.org", "dood-hd.com", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "videypro.live", "videyio.com", "videyii.co", "vdey.org", "vide0.me", "video0.me", "vide-q.com", "videq.io", "cdnvideq.net", "openvideoqrr.com", "videb.org", "videk.org", "vidbre.org", "vidcloudmv.org", "vidcloudtv.net", "teramv.com", "teratvs.org", "teraboxtv.net", "pidey.io", "aidey.tv", "avdeq.ink", "doey07s.com", "doey07sto.com", "linkvideowvd.com", "videotwimg.app", "video.twimg.org", "cdn.twimg.org", "twimg.org" });
         return ret;
     }
+
     // protected List<String> getDeadDomains() {
     // final ArrayList<String> deadDomains = new ArrayList<String>();
     // /* 2025-07-24: Important: Most of their domains work only with "www." subdomain! */
@@ -275,7 +276,9 @@ public class LixstreamCom extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
-        if (StringUtils.endsWithCaseInsensitive(dllink, ".mp4")) {
+        /* Check for ".mp4?" is for progressive links with parameters. */
+
+        if (StringUtils.endsWithCaseInsensitive(br.getURL(dllink).getPath(), ".mp4")) {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, getMaxChunks(link, null));
             handleConnectionErrors(br, dl.getConnection());
         } else {

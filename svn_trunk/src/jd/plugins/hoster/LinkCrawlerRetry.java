@@ -40,7 +40,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-@HostPlugin(revision = "$Revision: 51816 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52037 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     private final static String ON_LINKCHECK = "onlinkcheck";
 
@@ -157,7 +157,7 @@ public class LinkCrawlerRetry extends PluginForHost {
                     return null;
                 }
             });
-        } else {
+        } else if (pv.getChildren().get(0) instanceof CrawledLink) {
             LinkCollector.getInstance().getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
                 @Override
                 protected Void run() throws RuntimeException {

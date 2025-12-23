@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51517 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52031 $", interfaceVersion = 3, names = {}, urls = {})
 /**
  * This is a dummy plugin only used to provide login functionality. There is a crawler plugin using this plugin to login in order to be able
  * to crawl links to other websites.
@@ -124,16 +124,15 @@ public class F95zoneTo extends PluginForHost {
                         account.saveCookies(this.br.getCookies(this.getHost()), "");
                     }
                     return true;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(null);
-                    account.clearCookies("");
-                    if (userCookies != null) {
-                        if (account.hasEverBeenValid()) {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                        } else {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                        }
+                }
+                logger.info("Cookie login failed");
+                br.clearCookies(null);
+                account.clearCookies("");
+                if (userCookies != null) {
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
                 }
             }
@@ -173,7 +172,7 @@ public class F95zoneTo extends PluginForHost {
     }
 
     private boolean isLoggedin(final Browser br) {
-        return br.containsHTML("logout/");
+        return br.containsHTML("logout/?\\?");
     }
 
     @Override

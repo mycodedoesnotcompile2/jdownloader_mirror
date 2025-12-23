@@ -36,6 +36,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     protected boolean validateLogins() {
+        // TODO: Remove this in the future as logins are controlled by the plugin in the future.
         return true;
     }
 

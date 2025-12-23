@@ -10,12 +10,6 @@ import java.util.Map;
 import javax.swing.Icon;
 import javax.swing.JLabel;
 
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
-import jd.http.Browser;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
@@ -27,6 +21,12 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
+
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
+import jd.http.Browser;
 
 public final class AntiCaptchaComConfigPanel extends AbstractCaptchaSolverConfigPanel {
     /**
@@ -49,7 +49,7 @@ public final class AntiCaptchaComConfigPanel extends AbstractCaptchaSolverConfig
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                CrossSystem.openURL("http://getcaptchasolution.com/pue5rd7req");
+                CrossSystem.openURL("https://getcaptchasolution.com/pue5rd7req");
             }
         }), "gapleft 37,spanx,pushx,growx");
         apiKey = new TextInput(CFG_ANTICAPTCHA_COM.API_KEY);
