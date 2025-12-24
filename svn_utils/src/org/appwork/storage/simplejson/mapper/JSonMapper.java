@@ -53,6 +53,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 
@@ -750,20 +752,24 @@ public class JSonMapper {
      * @return
      * @throws MapperException
      */
-    protected Class<?> mapClasses(final Class<?> class1) throws MapperException {
-        if (class1.isInterface()) {
-            if (List.class.isAssignableFrom(class1)) {
+    protected Class<?> mapClasses(final Class<?> clazz) throws MapperException {
+        if (clazz.isInterface()) {
+            if (List.class.isAssignableFrom(clazz)) {
                 return ArrayList.class;
-            } else if (Map.class.isAssignableFrom(class1)) {
+            } else if (ConcurrentMap.class.isAssignableFrom(clazz)) {
+                return ConcurrentHashMap.class;
+            } else if (Map.class.isAssignableFrom(clazz)) {
                 return LinkedHashMap.class;
-            } else if (Set.class.isAssignableFrom(class1)) {
+            } else if (Set.class.isAssignableFrom(clazz)) {
                 // more lightweight in memory consumption than LinkedHashSet
                 return CopyOnWriteArraySet.class;
+            } else if (Collection.class.isAssignableFrom(clazz)) {
+                return ArrayList.class;
             } else {
-                throw new WTFException("Interface not supported: " + class1);
+                throw new WTFException("Interface not supported: " + clazz);
             }
         }
-        return class1;
+        return clazz;
     }
 
     private boolean collectExceptions = false;

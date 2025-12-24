@@ -3,15 +3,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52038 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52050 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -36,6 +36,7 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.MULTI_CLICK_CAPTCHA);
+        // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);

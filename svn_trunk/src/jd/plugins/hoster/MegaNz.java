@@ -114,7 +114,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 51808 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52044 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -122,12 +122,12 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
 
     public MegaNz(PluginWrapper wrapper) {
         super(wrapper);
-        enablePremium("https://mega.nz/#register");
+        enablePremium("https://" + getHost() + "/#register");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://mega.co.nz/#terms";
+        return "https://" + getHost() + "/#terms";
     }
 
     public static List<String[]> getPluginDomains() {

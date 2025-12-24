@@ -34,7 +34,19 @@
 package org.appwork.storage.tests;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.storage.JSONMapper;
 import org.appwork.storage.SimpleTypeRef;
@@ -43,6 +55,7 @@ import org.appwork.testframework.AWTest;
 
 public abstract class AbstractMapperTest extends AWTest {
     public void runWith(JSONMapper mapper) throws Exception {
+        testInstanceClass(mapper);
         final Locale def = Locale.getDefault();
         try {
             String[] systems = { "arab", "arabext", "bali", "beng", "deva", "fullwide", "gujr", "guru", "hanidec", "khmr", "knda", "latn", "mlym", "mymr", "orya", "tamldec", "telu", "thai", "tibt" };
@@ -90,6 +103,21 @@ public abstract class AbstractMapperTest extends AWTest {
         } finally {
             Locale.setDefault(def);
         }
+    }
+
+    public void testInstanceClass(final JSONMapper mapper) throws Exception {
+        assertTrue(mapper.stringToObject("[true,false]", Set.class) instanceof Set);
+        assertTrue(mapper.stringToObject("[true,false]", HashSet.class) instanceof HashSet);
+        assertTrue(mapper.stringToObject("[true,false]", CopyOnWriteArraySet.class) instanceof CopyOnWriteArraySet);
+        assertTrue(mapper.stringToObject("[true,false]", List.class) instanceof List);
+        assertTrue(mapper.stringToObject("[true,false]", ArrayList.class) instanceof ArrayList);
+        assertTrue(mapper.stringToObject("[true,false]", LinkedList.class) instanceof LinkedList);
+        assertTrue(mapper.stringToObject("[true,false]", CopyOnWriteArrayList.class) instanceof CopyOnWriteArrayList);
+        assertTrue(mapper.stringToObject("{\"test\":false}", Map.class) instanceof Map);
+        assertTrue(mapper.stringToObject("{\"test\":false}", ConcurrentMap.class) instanceof ConcurrentMap);
+        assertTrue(mapper.stringToObject("{\"test\":false}", ConcurrentHashMap.class) instanceof ConcurrentHashMap);
+        assertTrue(mapper.stringToObject("{\"test\":false}", HashMap.class) instanceof HashMap);
+        assertTrue(mapper.stringToObject("{\"test\":false}", LinkedHashMap.class) instanceof LinkedHashMap);
     }
 
     public void undefinedTests(final JSONMapper mapper) throws Exception {

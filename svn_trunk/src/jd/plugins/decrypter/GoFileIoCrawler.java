@@ -6,6 +6,15 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Hash;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.parser.UrlQuery;
+
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.requests.GetRequest;
@@ -21,16 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GofileIo;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Hash;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 51958 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 52052 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -140,14 +140,12 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         } else if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
             throw new AccountRequiredException("Private link");
         }
-
         String currentFolderName = response_data.get("name").toString();
         String path = this.getAdoptedCloudFolderStructure();
         if (path == null && (currentFolderName.matches("^quickUpload_.+") || currentFolderName.equals(folderID) || currentFolderName.equals("root"))) {
             /* Invalid value */
             currentFolderName = null;
         }
-        FilePackage fp = null;
         if (path == null) {
             if (!StringUtils.isEmpty(currentFolderName)) {
                 /* No path given yet --> Use current folder name as root folder name */
@@ -157,10 +155,6 @@ public class GoFileIoCrawler extends PluginForDecrypt {
             if (!StringUtils.isEmpty(currentFolderName)) {
                 path += "/" + currentFolderName;
             }
-        }
-        if (path != null) {
-            fp = FilePackage.getInstance();
-            fp.setName(path);
         }
         final String parentFolderShortID = response_data.get("code").toString();
         Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("contents");
@@ -185,7 +179,6 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 /* Do not set path/FilePackage for single files. */
                 if (path != null && (!StringUtils.equals(file.getName(), path) || children.size() > 1)) {
                     file.setRelativeDownloadFolderPath(path);
-                    file._setFilePackage(fp);
                 }
                 ret.add(file);
             } else if (type.equalsIgnoreCase("folder")) {
@@ -203,6 +196,19 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 logger.warning("Unsupported type: " + type);
                 continue;
             }
+        }
+        final FilePackage fp;
+        if (path != null) {
+            fp = FilePackage.getInstance();
+            fp.setName(path);
+        } else if (ret.size() > 1) {
+            fp = FilePackage.getInstance();
+            fp.setName(response_data.get("name").toString());
+        } else {
+            fp = null;
+        }
+        if (fp != null) {
+            fp.addLinks(ret);
         }
         return ret;
     }

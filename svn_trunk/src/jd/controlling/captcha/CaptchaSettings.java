@@ -2,6 +2,7 @@ package jd.controlling.captcha;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
@@ -9,9 +10,11 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.storage.config.annotations.DefaultJsonObject;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LookUpKeys;
 import org.appwork.storage.config.annotations.SpinnerValidator;
+import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
 import org.jdownloader.captcha.v2.CaptchaQualityEnsuranceRule;
 
 public interface CaptchaSettings extends ConfigInterface {
@@ -134,4 +137,11 @@ public interface CaptchaSettings extends ConfigInterface {
     HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>> getQualityEnsuranceRules();
 
     void setQualityEnsuranceRules(HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>> map);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("List of last used captcha type/domain. This information is used in JDownloader GUI for example for captcha solver recommendations or as a cache to know in beforehand, which plugin will request which type of captcha.")
+    @DefaultJsonObject("[]")
+    CopyOnWriteArrayList<CaptchaHistoryEntry> getCaptchaHistoryEntries();
+
+    void setCaptchaHistoryEntries(CopyOnWriteArrayList<CaptchaHistoryEntry> entry);
 }

@@ -10,6 +10,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
@@ -57,13 +65,6 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -243,6 +244,10 @@ public class ChallengeResponseController {
                 UpdateController.getInstance().addFeedback("tc");
             }
         }
+        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        final CaptchaHistoryEntry captcha_history_entry = new CaptchaHistoryEntry(c.getHost(), ctype);
+        final List<CaptchaHistoryEntry> captcha_history_entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
+        captcha_history_entries.add(captcha_history_entry);
         LogSource logger = LogController.getInstance().getPreviousThreadLogSource();
         if (logger == null) {
             logger = this.logger;

@@ -84,6 +84,18 @@ public interface User32Ext extends com.sun.jna.platform.win32.User32 {
      * Sent when the user releases the right mouse button.
      */
     public static final int WM_RBUTTONUP = 0x0205;
+    
+    /**
+     * Left mouse button double-click message (for System Tray double-click detection).
+     * Sent when the user double-clicks the left mouse button.
+     */
+    public static final int WM_LBUTTONDBLCLK = 0x0203;
+    
+    /**
+     * Right mouse button double-click message (for System Tray double-click detection).
+     * Sent when the user double-clicks the right mouse button.
+     */
+    public static final int WM_RBUTTONDBLCLK = 0x0206;
 
     final static User32Ext  INSTANCE         = Native.load("user32", User32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
 

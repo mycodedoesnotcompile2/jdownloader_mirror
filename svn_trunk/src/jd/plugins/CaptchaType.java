@@ -89,6 +89,66 @@ public class CaptchaType {
                 return null;
             }
         },
+        RECAPTCHA_V3 {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                if (!(c instanceof RecaptchaV2Challenge)) {
+                    return false;
+                }
+                final RecaptchaV2Challenge cl = (RecaptchaV2Challenge) c;
+                return cl.isV3() && !cl.isEnterprise();
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "reCAPTCHA v3";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.google.com/recaptcha/api2/demo";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Google's reCAPTCHA v3 that runs in the background without user interaction";
+            }
+
+            @Override
+            public String getDomain() {
+                return "google.com";
+            }
+        },
+        RECAPTCHA_V3_ENTERPRISE {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                if (!(c instanceof RecaptchaV2Challenge)) {
+                    return false;
+                }
+                final RecaptchaV2Challenge cl = (RecaptchaV2Challenge) c;
+                return cl.isV3() && cl.isEnterprise();
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "reCAPTCHA v3 Enterprise";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.google.com/recaptcha/api2/demo";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Google's reCAPTCHA v3 Enterprise that runs in the background without user interaction";
+            }
+
+            @Override
+            public String getDomain() {
+                return "google.com";
+            }
+        },
         RECAPTCHA_V2_INVISIBLE {
             @Override
             public boolean canHandle(Challenge<?> c) {

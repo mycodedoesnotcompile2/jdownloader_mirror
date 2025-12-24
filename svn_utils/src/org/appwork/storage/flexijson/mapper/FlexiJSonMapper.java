@@ -51,12 +51,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
@@ -181,12 +183,16 @@ public class FlexiJSonMapper {
     protected final ArrayList<FlexiTypeMapper> typeMapper;
     protected CompiledType                     autoMapFlexiJSonObjectClass   = CompiledType.create(new TypeRef<LinkedHashMap<String, Object>>() {
                                                                              });
-    protected CompiledType                     autoMapFlexiJSonArrayclass    = CompiledType.create(new TypeRef<LinkedList<Object>>() {
+    protected CompiledType                     autoMapFlexiJSonArrayclass    = CompiledType.create(new TypeRef<ArrayList<Object>>() {
                                                                              });
     protected CompiledType                     autoMapCollectionInterface    = this.autoMapFlexiJSonArrayclass;
     protected CompiledType                     autoMapMapInterface           = this.autoMapFlexiJSonObjectClass;
-    protected CompiledType                     autoMapSetInterface           = CompiledType.create(new TypeRef<LinkedHashSet<Object>>() {
-                                                                             });;
+    protected CompiledType                     autoMapConcurrentMapClass     = CompiledType.create(new TypeRef<ConcurrentHashMap<String, Object>>() {
+                                                                             });
+    protected CompiledType                     autoMapConcurrentMapInterface = this.autoMapConcurrentMapClass;
+    // more lightweight in memory consumption than LinkedHashSet
+    protected CompiledType                     autoMapSetInterface           = CompiledType.create(new TypeRef<CopyOnWriteArraySet<Object>>() {
+                                                                             });                                 ;
     private ArrayList<FlexiMapperException>    exceptions;
     private boolean                            ignoreDefaultValuesEnabled;
     private boolean                            tagDefaultValuesEnabled;
@@ -387,7 +393,7 @@ public class FlexiJSonMapper {
                 }
             }
             return ret;
-        } else/* if (obj instanceof Storable) */ {
+        } else/* if (obj instanceof Storable) */{
             InterfaceStorage<Object> is = null;
             if (obj instanceof Proxy && this.isIncludeInterfaceStorageBackendNode()) {
                 is = InterfaceStorage.get(obj);
@@ -586,7 +592,8 @@ public class FlexiJSonMapper {
     /**
      * @param obj
      * @param g
-     * @param context TODO
+     * @param context
+     *            TODO
      * @return
      * @throws IllegalAccessException
      * @throws InvocationTargetException
@@ -802,7 +809,6 @@ public class FlexiJSonMapper {
         // DebugMode.debugger();
         // man brächte hier die Obj klasse, aber mit den component types vom context
         CompiledType ret = CompiledType.create(obj.getClass());
-
         return ret;
     }
 
@@ -959,7 +965,6 @@ public class FlexiJSonMapper {
      */
     protected KeyValueElement methodOrFieldAnnotationsToComments(final Getter g, final DefaultObjectToJsonContext context, final KeyValueElement create, final Object defaultValue, final boolean addDefaultValueAnnotation) throws FlexiMapperException {
         // / move comments to KeyValueElement
-
         FlexiJSonComments comments = create.getValue().getCommentsBefore();
         final Class<?> cls = g.classCache.getCachedClass();
         create.getValue().setCommentsBefore(null);
@@ -1215,9 +1220,7 @@ public class FlexiJSonMapper {
                 try {
                     docs = gen.newInstance().getDocs(context.getLast(), obj);
                     if (StringUtils.isNotEmpty(docs)) {
-
                         comments = this.pushComment(comments, docs, FlexiMapperTags.DOCS);
-
                     }
                 } catch (final InstantiationException e) {
                     LogV3.exception(this, e);
@@ -2399,7 +2402,11 @@ public class FlexiJSonMapper {
                 // return a type of type autoMapCollectionInterface, but with the generic Collection component types of class1
                 return CompiledType.create(this.autoMapCollectionInterface.type, class1.getAssignableSuperClass(Collection.class).type);
             } else if (class1.isMap()) {
-                return CompiledType.create(this.autoMapMapInterface.type, class1.getAssignableSuperClass(Map.class).type);
+                if (class1.isAnyOf(ConcurrentMap.class)) {
+                    return CompiledType.create(this.autoMapConcurrentMapInterface.type, class1.getAssignableSuperClass(Map.class).type);
+                } else {
+                    return CompiledType.create(this.autoMapMapInterface.type, class1.getAssignableSuperClass(Map.class).type);
+                }
             }
         }
         return class1;

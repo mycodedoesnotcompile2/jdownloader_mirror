@@ -20,6 +20,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -40,21 +45,16 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-
-@HostPlugin(revision = "$Revision: 50520 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52051 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastShareCz extends PluginForHost {
     public FastShareCz(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://fastshare.cz/cenik_cs");
+        this.enablePremium("https://" + getHost() + "/cenik_cs");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.fastshare.cz/podminky";
+        return "https://www." + getHost() + "/podminky";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -66,8 +66,8 @@ public class FastShareCz extends PluginForHost {
     @Override
     public String rewriteHost(final String host) {
         /**
-         * 2023-04-11: Main domain has changed from fastshare.cz to fastshare.live. </br> 2024-03-21: Use fastshare.cloud as main domain
-         * because some users got problems reaching fastshare.live.
+         * 2023-04-11: Main domain has changed from fastshare.cz to fastshare.live. </br>
+         * 2024-03-21: Use fastshare.cloud as main domain because some users got problems reaching fastshare.live.
          */
         return this.rewriteHost(getPluginDomains(), host);
     }
@@ -170,18 +170,18 @@ public class FastShareCz extends PluginForHost {
         br.setCookie(this.getHost(), "lang", "cs");
         br.setCustomCharset("utf-8");
         /**
-         * 2023-08-20: The following information only applies for users of specific countries such as Germany: </br> When a user is not
-         * logged in, all files appear to be offline so effectively a linkcheck is only possible when an account is given.
+         * 2023-08-20: The following information only applies for users of specific countries such as Germany: </br>
+         * When a user is not logged in, all files appear to be offline so effectively a linkcheck is only possible when an account is
+         * given.
          */
         final boolean linkcheckOnlyPossibleWhenLoggedIn = false;
         if (linkcheckOnlyPossibleWhenLoggedIn && account == null) {
-            throw new AccountRequiredException();
+            throw new AccountRequiredException("Account required to check links and download from this website");
         }
         if (account != null) {
             this.login(account, false);
         }
         br.setFollowRedirects(true);
-        final String directurlproperty = getDirecturlProperty(account);
         final String contenturl = getContentURL(link);
         final URLConnectionAdapter con = br.openGetConnection(contenturl);
         try {
@@ -198,7 +198,7 @@ public class FastShareCz extends PluginForHost {
                 if (filename != null) {
                     link.setFinalFileName(filename);
                 }
-                link.setProperty(directurlproperty, con.getURL().toExternalForm());
+                link.setProperty(getDirecturlProperty(account), con.getURL().toExternalForm());
                 return AvailableStatus.TRUE;
             } else {
                 br.followConnection();
@@ -208,16 +208,20 @@ public class FastShareCz extends PluginForHost {
         }
         final String htmlRefresh = getRedirectLocation(br);
         if (htmlRefresh != null) {
-            if (htmlRefresh.matches("^https?://[^/]+/?$")) {
-                /* Redirect to mainpage */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            if (htmlRefresh.matches("(?i)^https?://[^/]+/?$")) {
+                /* Redirect to main page */
+                if (account == null) {
+                    throw new AccountRequiredException("Free account required to check & download this link");
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
             } else {
                 br.getPage(htmlRefresh);
             }
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)(<title>\\s*FastShare\\.[a-z]+\\s*</title>|>\\s*Tento soubor byl smazán na základě požadavku vlastníka autorských)")) {
+        } else if (br.containsHTML("(<title>\\s*FastShare\\.[a-z]+\\s*</title>|>\\s*Tento soubor byl smazán na základě požadavku vlastníka autorských)")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Soubor byl smazán")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -270,24 +274,32 @@ public class FastShareCz extends PluginForHost {
         final String directurlproperty = getDirecturlProperty(account);
         final String storedDirecturl = link.getStringProperty(directurlproperty);
         String dllink = null;
-        if (storedDirecturl != null) {
-            logger.info("Re-using stored directurl: " + storedDirecturl);
-            dllink = storedDirecturl;
-        } else {
-            /* First check if linkcheck found a direct-url */
-            dllink = link.getStringProperty(directurlproperty);
-            if (dllink == null) {
+        directLink: {
+            if (storedDirecturl != null) {
+                if (account != null) {
+                    this.login(account, false);
+                }
+                logger.info("Re-using stored directurl: " + storedDirecturl);
+                dllink = storedDirecturl;
+                break directLink;
+            } else {
+                // requestFileInformation calls login method
                 requestFileInformation(link, account);
+                dllink = link.getStringProperty(directurlproperty);
+                if (dllink != null) {
+                    break directLink;
+                }
                 this.checkErrors(br, link, account);
                 if (this.isPremiumAccount(account)) {
-                    dllink = br.getRegex("\"(https?://[a-z0-9]+\\." + Pattern.quote(br.getHost()) + "/download\\.php[^<>\"]*?)\"").getMatch(0);
+                    final String host_quoted = Pattern.quote(br.getHost());
+                    dllink = br.getRegex("\"(https?://[a-z0-9]+\\." + host_quoted + "/download\\.php[^<>\"]*?)\"").getMatch(0);
                     if (dllink == null) {
-                        dllink = br.getRegex("class\\s*=\\s*\"speed\">\\s*<a href\\s*=\\s*\"(https?://[^/]*" + Pattern.quote(br.getHost()) + "/[^<>\"]*?)\"").getMatch(0);
+                        dllink = br.getRegex("class\\s*=\\s*\"speed\">\\s*<a href\\s*=\\s*\"(https?://[^/]*" + host_quoted + "/[^<>\"]*?)\"").getMatch(0);
                     }
                 } else {
                     br.setFollowRedirects(false);
                     final String captchaLink = br.getRegex("\"(/securimage_show\\.php\\?sid=[a-z0-9]+)\"").getMatch(0);
-                    String action = br.getRegex("=\\s*\"(/free/[^<>\"]*?)\"").getMatch(0);
+                    String action = br.getRegex("=\\s*\"(/free/[^\"]*?)\"").getMatch(0);
                     if (action == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
@@ -343,44 +355,36 @@ public class FastShareCz extends PluginForHost {
 
     private void login(final Account account, boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    setCookies(br, cookies);
-                    if (!force) {
-                        /* Do not validate cookies. */
-                        return;
-                    }
-                    logger.info("Attempting cookie login...");
-                    br.getPage("https://" + this.getHost() + "/user");
-                    if (this.isLoggedIN(br)) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                    }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                setCookies(br, cookies);
+                if (!force) {
+                    /* Do not validate cookies. */
+                    return;
                 }
-                logger.info("Performing full login");
-                br.setFollowRedirects(true);
-                br.postPage("https://" + this.getHost() + "/sql.php", "login=" + Encoding.urlEncode(account.getUser()) + "&heslo=" + Encoding.urlEncode(account.getPass()));
-                final String redirect = br.getRequest().getHTMLRefresh();
-                if (redirect != null) {
-                    br.getPage(redirect);
+                logger.info("Attempting cookie login...");
+                br.getPage("https://" + this.getHost() + "/user");
+                if (this.isLoggedIN(br)) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
                 }
-                if (!isLoggedIN(br)) {
-                    throw new AccountInvalidException();
-                }
-                final Cookies freshCookies = br.getCookies(br.getHost());
-                account.saveCookies(freshCookies, "");
-                setCookies(br, freshCookies);
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
+                logger.info("Cookie login failed");
             }
+            logger.info("Performing full login");
+            br.setFollowRedirects(true);
+            br.postPage("https://" + this.getHost() + "/sql.php", "login=" + Encoding.urlEncode(account.getUser()) + "&heslo=" + Encoding.urlEncode(account.getPass()));
+            final String redirect = br.getRequest().getHTMLRefresh();
+            if (redirect != null) {
+                br.getPage(redirect);
+            }
+            if (!isLoggedIN(br)) {
+                throw new AccountInvalidException();
+            }
+            final Cookies freshCookies = br.getCookies(br.getHost());
+            account.saveCookies(freshCookies, "");
+            setCookies(br, freshCookies);
         }
     }
 
@@ -417,7 +421,7 @@ public class FastShareCz extends PluginForHost {
         if (trafficLeftStr != null) {
             trafficLeftStr = trafficLeftStr.trim().replace(" ", "");
         }
-        final boolean userHasUnlimitedTraffic = br.containsHTML("(?i)href\\s*=\\s*\"/user\">\\s*Neomezené stahování\\s*</span>");
+        final boolean userHasUnlimitedTraffic = br.containsHTML("href\\s*=\\s*\"/user\">\\s*Neomezené stahování\\s*</span>");
         final String unlimitedTrafficInfo = br.getRegex("(?:Neomezené stahování)\\s*:\\s*</td>\\s*<td>\\s*<span[^>]*>\\s*(.*?)\\s*<").getMatch(0);
         final boolean isPremiumUnlimitedTrafficUser = (unlimitedTrafficInfo != null && !StringUtils.equalsIgnoreCase(unlimitedTrafficInfo, "Neaktivní")) || userHasUnlimitedTraffic;
         if (trafficLeftStr == null && !isPremiumUnlimitedTrafficUser) {
@@ -456,15 +460,15 @@ public class FastShareCz extends PluginForHost {
     private void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         final String errortextMaxConcurrentDownloadsLimit = "Reached max concurrent downloads limit";
         /* [Premium-] account related error messages */
-        if (br.containsHTML("(?i)máte dostatečný kredit pro stažení tohoto souboru")) {
+        if (br.containsHTML("máte dostatečný kredit pro stažení tohoto souboru")) {
             throw new AccountUnavailableException("Traffic limit reached", 5 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)(>\\s*100% FREE slotů je plných|>\\s*Využijte PROFI nebo zkuste později)")) {
+        } else if (br.containsHTML("(>\\s*100% FREE slotů je plných|>\\s*Využijte PROFI nebo zkuste později)")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available", 10 * 60 * 1000l);
         } else if (br.containsHTML("Přes FREE můžete stahovat jen jeden soubor současně|Pres FREE muzete stahovat jen jeden soubor najednou")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, errortextMaxConcurrentDownloadsLimit, 3 * 60 * 1000l);
         } else if (br.containsHTML("<script>alert\\(")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error #1", 30 * 60 * 1000l);
-        } else if (br.getRequest().getHtmlCode().length() <= 100) {
+        } else if (StringUtils.valueOrEmpty(br.getRequest().getHtmlCode()).length() <= 100) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error #2 (blank page)", 30 * 60 * 1000l);
         } else if (br.containsHTML("/free-stahovani")) {
             /* Free downloadlimit reached or message "As a free user you can download max 1 file at a time" */
@@ -478,20 +482,12 @@ public class FastShareCz extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
-    }
-
-    @Override
-    public void reset() {
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return 1;
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override
