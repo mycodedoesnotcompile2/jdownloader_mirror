@@ -395,6 +395,7 @@ lit_expired=已过期
 lit_file_container=文件类型
 lit_hide=隐藏
 lit_host=主机
+lit_image_quality=图像质量
 lit_no=否
 lit_please_wait=请稍等…
 lit_plugin_defect_pls_contact_support=插件缺陷。请联系 support@jdownloader.org
