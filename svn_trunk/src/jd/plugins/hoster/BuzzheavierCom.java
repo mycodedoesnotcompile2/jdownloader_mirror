@@ -24,6 +24,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.HTMLSearch;
@@ -37,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BuzzheavierComFolder;
 
-@HostPlugin(revision = "$Revision: 51916 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52054 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BuzzheavierComFolder.class })
 public class BuzzheavierCom extends PluginForHost {
     public BuzzheavierCom(PluginWrapper wrapper) {
@@ -144,12 +145,22 @@ public class BuzzheavierCom extends PluginForHost {
             dl = null;
             final String hxRedirect = br.getRequest().getResponseHeader("Hx-Redirect");
             if (hxRedirect == null) {
+                this.handleConnectionErrors(br, dl.getConnection());
+                /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, hxRedirect, this.isResumeable(link, null), this.getMaxChunks(link, null));
         }
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    @Override
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (br.getHttpConnection().getResponseCode() == 500) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500");
+        }
+        super.handleConnectionErrors(br, con);
     }
 
     @Override

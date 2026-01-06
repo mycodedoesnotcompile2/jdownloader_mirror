@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,10 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BuzzheavierCom;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-
-@DecrypterPlugin(revision = "$Revision: 51915 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52054 $", interfaceVersion = 3, names = {}, urls = {})
 public class BuzzheavierComFolder extends PluginForDecrypt {
     public BuzzheavierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,22 +129,23 @@ public class BuzzheavierComFolder extends PluginForDecrypt {
                 link.setAvailable(true);
                 ret.add(link);
             }
-            if (ret.isEmpty()) {
+            lastResortFallback: if (ret.isEmpty()) {
                 /* Last resort fallback */
                 final String[] urls = br.getRegex("(/[a-z0-9]{12})\"").getColumn(0);
-                if (urls != null && urls.length > 0) {
-                    for (String url : urls) {
-                        if (!dupes.add(url)) {
-                            continue;
-                        } else if (url.contains(folderID)) {
-                            continue;
-                        }
-                        url = br.getURL(url).toExternalForm();
-                        final DownloadLink link = createDownloadlink(url);
-                        link.setDefaultPlugin(hosterplugin);
-                        link.setHost(this.getHost());
-                        ret.add(link);
+                if (urls == null || urls.length == 0) {
+                    break lastResortFallback;
+                }
+                for (String url : urls) {
+                    if (!dupes.add(url)) {
+                        continue;
+                    } else if (url.contains(folderID)) {
+                        continue;
                     }
+                    url = br.getURL(url).toExternalForm();
+                    final DownloadLink link = createDownloadlink(url);
+                    link.setDefaultPlugin(hosterplugin);
+                    link.setHost(this.getHost());
+                    ret.add(link);
                 }
             }
             if (title != null) {
