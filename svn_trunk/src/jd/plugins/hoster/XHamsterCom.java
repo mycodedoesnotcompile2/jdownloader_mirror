@@ -76,7 +76,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52014 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52061 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -1482,6 +1482,9 @@ public class XHamsterCom extends PluginForHost {
             } else if (br.containsHTML("\"ageVerificationNeeded\"\\s*:\\s*true")) {
                 throw new AccountRequiredException(ageVerificationText);
             } else if (br.containsHTML("ageVerificationBannerProps")) {
+                throw new AccountRequiredException(ageVerificationText);
+            } else if (br.containsHTML("class=\"trailer-sfw-notice__action\"")) {
+                /* 2026-01-06: faphouse.com "Verify your age to watch this trailer" e.g. /videos/Y5oa3v */
                 throw new AccountRequiredException(ageVerificationText);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

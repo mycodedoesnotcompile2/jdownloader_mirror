@@ -17,6 +17,11 @@ package jd.plugins.hoster;
 
 import java.util.Locale;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -27,6 +32,7 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -36,16 +42,18 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/view/(\\d+)" })
+@HostPlugin(revision = "$Revision: 52062 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/view/(\\d+)" })
 public class FuraffinityNet extends PluginForHost {
     public FuraffinityNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.furaffinity.net/register");
+        this.enablePremium("https://www." + getHost() + "/register");
         /* 2020-08-19: Try to avoid 503 errors */
         this.setStartIntervall(1000l);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
     }
 
     /* DEV NOTES */
@@ -54,7 +62,6 @@ public class FuraffinityNet extends PluginForHost {
     /* Connection stuff */
     private static final boolean free_resume                = true;
     private static final int     free_maxchunks             = 0;
-    private static final int     free_maxdownloads          = -1;
     private String               dllink                     = null;
     private boolean              accountRequired            = false;
     private boolean              enableAdultContentRequired = false;
@@ -159,51 +166,57 @@ public class FuraffinityNet extends PluginForHost {
 
     public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setFollowRedirects(true);
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    logger.info("Attempting cookie login");
-                    this.br.setCookies(this.getHost(), cookies);
-                    if (!force) {
-                        /* Do not validate cookies. */
-                        return false;
-                    }
-                    br.getPage("https://" + this.getHost() + "/");
-                    if (this.isLoggedin(br)) {
-                        logger.info("Cookie login successful");
-                        /* Refresh cookie timestamp */
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            final Cookies userCookies = account.loadUserCookies();
+            if (cookies != null || userCookies != null) {
+                logger.info("Attempting cookie login");
+                if (userCookies != null) {
+                    this.br.setCookies(userCookies);
+                } else {
+                    this.br.setCookies(cookies);
+                }
+                if (!force) {
+                    /* Do not validate cookies. */
+                    return false;
+                }
+                br.getPage("https://" + this.getHost() + "/");
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    /* Refresh cookie timestamp */
+                    if (userCookies == null) {
                         account.saveCookies(this.br.getCookies(br.getHost()), "");
-                        return true;
+                    }
+                    return true;
+                }
+                logger.info("Cookie login failed");
+                if (userCookies != null) {
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                     } else {
-                        logger.info("Cookie login failed");
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
                 }
-                logger.info("Performing full login");
-                br.getPage("https://www." + this.getHost() + "/login");
-                final Form loginform = br.getFormbyProperty("id", "login-form");
-                if (loginform == null) {
-                    logger.warning("Failed to find loginform");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                /* Handle login-captcha if required */
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                loginform.put("name", Encoding.urlEncode(account.getUser()));
-                loginform.put("pass", Encoding.urlEncode(account.getPass()));
-                br.submitForm(loginform);
-                if (!isLoggedin(br)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                account.saveCookies(this.br.getCookies(br.getHost()), "");
-                return true;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Performing full login");
+            br.getPage("https://www." + this.getHost() + "/login");
+            final Form loginform = br.getFormbyProperty("id", "login-form");
+            if (loginform == null) {
+                logger.warning("Failed to find loginform");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            /* Handle login captcha */
+            final String captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+            loginform.put("cf-turnstile-response", Encoding.urlEncode(captchaResponse));
+            loginform.put("name", Encoding.urlEncode(account.getUser()));
+            loginform.put("pass", Encoding.urlEncode(account.getPass()));
+            br.submitForm(loginform);
+            if (!isLoggedin(br)) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            account.saveCookies(this.br.getCookies(br.getHost()), "");
+            return true;
         }
     }
 
@@ -217,6 +230,19 @@ public class FuraffinityNet extends PluginForHost {
         login(account, true);
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
+        if (account.loadUserCookies() != null) {
+            /*
+             * User could enter anything into username field when cookie login is used -> Try to ensure unique usernames in JD to avoid that
+             * users can add the same account twice.
+             */
+            String username = br.getRegex("\"/user/([^\"/]+)/?\">\\s*My Userpage").getMatch(0);
+            if (username != null) {
+                username = Encoding.htmlDecode(username).trim();
+                account.setUser(username);
+            } else {
+                logger.warning("Failed to extract username from html code");
+            }
+        }
         return ai;
     }
 
@@ -240,18 +266,6 @@ public class FuraffinityNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

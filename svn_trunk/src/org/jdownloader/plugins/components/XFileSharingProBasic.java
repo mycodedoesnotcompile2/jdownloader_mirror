@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51934 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52060 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1546,14 +1546,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return URL_TYPE.SHORT;
         } else if (new Regex(path, PATTERN_OFFICIAL_VIDEO_DOWNLOAD).patternFind()) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
+        } else if (new Regex(path, PATTERN_FILE).patternFind()) {
+            return URL_TYPE.FILE;
         } else if (new Regex(path, PATTERN_NORMAL).patternFind()) {
             return URL_TYPE.NORMAL;
         } else if (new Regex(path, PATTERN_EMBED_VIDEO).patternFind()) {
             return URL_TYPE.EMBED_VIDEO;
         } else if (new Regex(path, PATTERN_EMBED_VIDEO_2).patternFind()) {
             return URL_TYPE.EMBED_VIDEO_2;
-        } else if (new Regex(path, PATTERN_FILE).patternFind()) {
-            return URL_TYPE.FILE;
         } else if (isImagehoster() && new Regex(path, PATTERN_IMAGE).patternFind()) {
             return URL_TYPE.IMAGE;
         } else {
@@ -2559,7 +2559,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (isDownload) {
             /* Allow extra step in download mode */
             final String fuid = this.getFUIDFromURL(link);
-            final String download_button_url = br.getRegex("(/d/" + fuid + ")").getMatch(0);
+            /**
+             * Important: The negative-ookahead part of the following regex is important: <br>
+             * Some websites do now have a dedicated download overview page so the html of the embedded video will also contain the single
+             * quality download-urls e.g. "/d/xxxxxxyyyyyy_n". In this case there is no download overview links for us to access! Example:
+             * 2026-01-06: xvideosharing.com
+             */
+            final String download_button_url = br.getRegex("(/d/" + fuid + ")(?!_)").getMatch(0);
             if (download_button_url != null && !br.getURL().contains(download_button_url)) {
                 logger.info("Accessing download page: " + download_button_url);
                 this.getPage(br, download_button_url);
@@ -3592,13 +3598,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             dllink = regexVideoStreamDownloadURL(src);
         }
         if (StringUtils.isEmpty(dllink)) {
-            final String check = new Regex(src, "file\\s*:\\s*\"(https?[^<>\"]*?\\.(?:mp4|flv))\"").getMatch(0);
-            if (StringUtils.isNotEmpty(check) && !StringUtils.containsIgnoreCase(check, "/images/")) {
-                // jwplayer("flvplayer").onError(function()...
-                dllink = check;
-            }
-        }
-        if (StringUtils.isEmpty(dllink)) {
             /* Official video download */
             /*
              * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
@@ -3611,11 +3610,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Generic RegEx to find common XFS stream download URLs */
     private final String regexVideoStreamDownloadURL(final String src) {
         String dllink = new Regex(src, Pattern.compile("(https?://[^/]+[^\"]+[a-z0-9]{60}/v\\.mp4)", Pattern.CASE_INSENSITIVE)).getMatch(0);
-        if (StringUtils.isEmpty(dllink)) {
-            /* Wider attempt */
-            dllink = new Regex(src, Pattern.compile("\"(https?://[^/]+/[a-z0-9]{60}/[^\"]+)\"", Pattern.CASE_INSENSITIVE)).getMatch(0);
+        if (dllink != null) {
+            return dllink;
         }
-        return dllink;
+        /* Wider attempt */
+        dllink = new Regex(src, Pattern.compile("\"(https?://[^/]+/[a-z0-9]{60}/[^\"]+)\"", Pattern.CASE_INSENSITIVE)).getMatch(0);
+        if (dllink != null) {
+            return dllink;
+        }
+        final String check = new Regex(src, "file\\s*:\\s*\"(https?[^\"]+\\.(?:mp4|flv|m3u8)[^\"]*)\"").getMatch(0);
+        if (StringUtils.isNotEmpty(check) && !StringUtils.containsIgnoreCase(check, "/images/")) {
+            // jwplayer("flvplayer").onError(function()...
+            return check;
+        }
+        return null;
     }
 
     protected Class<? extends XFSConfigVideo> getVideoConfigInterface() {

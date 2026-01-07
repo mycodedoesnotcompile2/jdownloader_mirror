@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52055 $", interfaceVersion = 3, names = {}, urls = {})
 public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
     public XFileSharingProBasicSpecialFilejoker(final PluginWrapper wrapper) {
         super(wrapper);
@@ -210,7 +210,7 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
         }
     }
 
-    protected boolean internal_useAPIZeusCloudManager(final DownloadLink link, final Account account) {
+    protected final boolean internal_useAPIZeusCloudManager(final DownloadLink link, final Account account) {
         return (link == null || !URL_TYPE.FILE.equals(getURLType(link))) && useAPIZeusCloudManager(account) && !isAPITempDisabled(account);
     }
 
@@ -365,7 +365,6 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
         if (expireStr != null && expireStr.matches("\\d{4}\\-\\d{2}\\-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
             expire_milliseconds_precise_to_the_second = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
         }
-        boolean isPremium = false;
         if (expire_milliseconds_precise_to_the_second <= currentTime) {
             if (expire_milliseconds_precise_to_the_second > 0) {
                 /*
@@ -377,7 +376,6 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
             /* Expired premium or no expire date given --> It is usually a Free Account */
             setAccountLimitsByType(account, AccountType.FREE);
         } else {
-            isPremium = true;
             /* Expire date is in the future --> It is a premium account */
             ai.setValidUntil(expire_milliseconds_precise_to_the_second);
             setAccountLimitsByType(account, AccountType.PREMIUM);
@@ -505,37 +503,34 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
      * download via website right away.
      */
     protected boolean convertSpecialAPICookiesToWebsiteCookiesAndSaveThem(final Account account, final String sessionid) {
-        if (account != null && StringUtils.isNotEmpty(sessionid)) {
-            synchronized (account) {
-                final Cookies cookies = new Cookies();
-                if (br != null) {
-                    cookies.add(br.getCookies(account.getHoster()));
-                }
-                cookies.remove("xfss");
-                cookies.add(new Cookie(account.getHoster(), "xfss", sessionid));
-                final String email = account.getStringProperty(PROPERTY_EMAIL, null);
-                final String username = account.getStringProperty(PROPERTY_USERNAME, null);
-                if (!StringUtils.isEmpty(email)) {
-                    /* 2019-09-12: E.g. required for filejoker.net */
-                    cookies.remove("email");
-                    cookies.add(new Cookie(account.getHoster(), "email", email));
-                }
-                if (!StringUtils.isEmpty(username)) {
-                    /* 2019-09-12: E.g. required for novafile.com */
-                    cookies.remove("login");
-                    cookies.add(new Cookie(account.getHoster(), "login", username));
-                }
-                /*
-                 * 2019-09-12: E.g.filejoker.net website needs xfss and email cookies, novafile.com needs xfss and login cookies. Both
-                 * websites will also work when xfss, email AND login cookies are present all together!
-                 */
-                account.saveCookies(cookies, "");
-                account.saveCookies(cookies, PROPERTY_COOKIES_API);
-                account.setProperty(PROPERTY_SESSIONID, sessionid);
-                return true;
-            }
-        } else {
+        if (account == null || StringUtils.isEmpty(sessionid)) {
             return false;
+        }
+        synchronized (account) {
+            final Cookies cookies = new Cookies();
+            cookies.add(br.getCookies(account.getHoster()));
+            cookies.remove("xfss");
+            cookies.add(new Cookie(account.getHoster(), "xfss", sessionid));
+            final String email = account.getStringProperty(PROPERTY_EMAIL, null);
+            if (!StringUtils.isEmpty(email)) {
+                /* 2019-09-12: E.g. required for filejoker.net */
+                cookies.remove("email");
+                cookies.add(new Cookie(account.getHoster(), "email", email));
+            }
+            final String username = account.getStringProperty(PROPERTY_USERNAME, null);
+            if (!StringUtils.isEmpty(username)) {
+                /* 2019-09-12: E.g. required for novafile.com */
+                cookies.remove("login");
+                cookies.add(new Cookie(account.getHoster(), "login", username));
+            }
+            /*
+             * 2019-09-12: E.g.filejoker.net website needs xfss and email cookies, novafile.com needs xfss and login cookies. Both websites
+             * will also work when xfss, email AND login cookies are present all together!
+             */
+            account.saveCookies(cookies, "");
+            account.saveCookies(cookies, PROPERTY_COOKIES_API);
+            account.setProperty(PROPERTY_SESSIONID, sessionid);
+            return true;
         }
     }
 

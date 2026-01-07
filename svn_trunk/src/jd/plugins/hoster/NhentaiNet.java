@@ -35,7 +35,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51336 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52057 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -145,16 +145,21 @@ public class NhentaiNet extends PluginForHost {
     private String getDirecturl(final DownloadLink link, final Browser br) throws IOException {
         String dllink = link.getStringProperty(CACHED_URL);
         if (br.getRequest() != null && dllink == null) {
-            dllink = br.getRegex("(https?://[^/]+/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))").getMatch(0);
+            final String ext_part = "+\\.(?:jpe?g|png|webp|gif)";
+            dllink = br.getRegex("(https?://[^/]+/galleries/\\d+/\\d+" + ext_part + ")").getMatch(0);
             if (dllink == null) {
                 /* 2022-08-11 */
                 dllink = br.getRegex("href=\"/g/\\d+/\\d+/?\">\\s*<img src=\"(https?://[^\"]+)\"").getMatch(0);
                 if (dllink == null) {
                     /* 2025-07-31 */
-                    dllink = br.getRegex("href=\"/g/\\d+/\\d+/?\">\\s*<img src=\"([^\"]*/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))\"").getMatch(0);
+                    dllink = br.getRegex("href=\"/g/\\d+/\\d+/?\">\\s*<img src=\"([^\"]*/galleries/\\d+/\\d+" + ext_part + ")\"").getMatch(0);
+                    if (dllink == null) {
+                        /* 2026-01-06: nhentai.net, same regex as previous one but wider, typically needed for last image of a gallery */
+                        dllink = br.getRegex("href=\"/g/\\d+/?\">\\s*<img src=\"([^\"]*/galleries/\\d+/\\d+" + ext_part + ")\"").getMatch(0);
+                    }
                     if (dllink == null) {
                         /* nhentai.xxx */
-                        dllink = br.getRegex("data-src\\s*=\\s*\"([^\"]*/\\d+\\.(?:jpe?g|png|webp|gif))\"").getMatch(0);
+                        dllink = br.getRegex("data-src\\s*=\\s*\"([^\"]*/\\d+" + ext_part + ")\"").getMatch(0);
                     }
                 }
             }
@@ -190,14 +195,6 @@ public class NhentaiNet extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 
     @Override

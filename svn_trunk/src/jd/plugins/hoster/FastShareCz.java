@@ -45,7 +45,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52051 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52059 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastShareCz extends PluginForHost {
     public FastShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class FastShareCz extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(\\d+|[a-f0-9]{32,})/?[^<>\"#]*");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(\\d+|[a-f0-9]{32,})(/[^<>\"#/]+)?");
         }
         return ret.toArray(new String[0]);
     }
@@ -285,6 +285,7 @@ public class FastShareCz extends PluginForHost {
             } else {
                 // requestFileInformation calls login method
                 requestFileInformation(link, account);
+                /* Check for direct url found during linkcheck and take that if possible. */
                 dllink = link.getStringProperty(directurlproperty);
                 if (dllink != null) {
                     break directLink;

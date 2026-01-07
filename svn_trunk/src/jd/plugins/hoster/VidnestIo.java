@@ -26,31 +26,25 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52060 $", interfaceVersion = 3, names = {}, urls = {})
-public class WavehdCom extends XFileSharingProBasic {
-    public WavehdCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 52061 $", interfaceVersion = 3, names = {}, urls = {})
+public class VidnestIo extends XFileSharingProBasic {
+    public VidnestIo(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(super.getPurchasePremiumURL());
+        // this.enablePremium(super.getPurchasePremiumURL());
     }
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null 4dignumreCaptchaV2, hcaptcha<br />
+     * captchatype-info: null 4dignum, reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "tenstream.net", "wavehd.com", "bigwings.io" });
+        ret.add(new String[] { "vidnest.io" });
         return ret;
-    }
-
-    @Override
-    public String rewriteHost(final String host) {
-        /* 2026-01-06: Main domain has changed from wavehd.com to tenstream.net */
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

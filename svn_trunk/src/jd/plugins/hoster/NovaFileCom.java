@@ -42,7 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52055 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -226,7 +226,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public void checkServerErrors(final Browser br, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2020-05-19: Special */
         super.checkServerErrors(br, link, account);
-        if (new Regex(br.getRequest().getHtmlCode().trim(), ">\\s*Wrong IP").matches()) {
+        if (new Regex(br.getRequest().getHtmlCode().trim(), ">\\s*Wrong IP").patternFind()) {
             /*
              * 2020-05-19: May happen when user uses a VPN - this can then especially happen in premium mode for all downloads (via API?!).
              */
@@ -338,7 +338,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
 
     public void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), EXPERIMENTALHANDLING, "Activate reconnect workaround for freeusers: Prevents having to enter additional captchas in between downloads.").setDefaultValue(default_eh));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), XFileSharingProBasicSpecialFilejoker.PROPERTY_SETTING_USE_API, "Use API? (Recommended!)\r\nIf turned off, website will be used and you might have to enter captchas even in premium mode!").setDefaultValue(default_PROPERTY_SETTING_USE_API));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), XFileSharingProBasicSpecialFilejoker.PROPERTY_SETTING_USE_API, "Use API for account related actions? (Recommended!)\r\nIf turned off, website will be used and you might have to enter captchas even in premium mode!").setDefaultValue(default_PROPERTY_SETTING_USE_API));
     }
 
     /* *************************** SPECIAL API STUFF STARTS HERE *************************** */

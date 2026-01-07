@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51874 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52060 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosharingCom extends XFileSharingProBasic {
     public XvideosharingCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -169,13 +169,19 @@ public class XvideosharingCom extends XFileSharingProBasic {
         }
         return loggedIN;
     }
-
     /* 2019-08-22: Commented-out - this was only for testing! */
     // @Override
     // protected boolean supports_api_only_mode() {
     // /* 2019-07-10: Special: For testing purposes */
     // return true;
     // }
+
+    @Override
+    protected Boolean requiresCaptchaForOfficialVideoDownload() {
+        // 2026-01-06
+        return Boolean.FALSE;
+    }
+
     @Override
     public Class<? extends XFSConfigVideoXvideosharingCom> getConfigInterface() {
         return XFSConfigVideoXvideosharingCom.class;

@@ -19,6 +19,23 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.RFC2047;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
+import org.jdownloader.captcha.blacklist.CaptchaBlackList;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.Keep2shareConfig;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.captcha.SkipRequest;
@@ -48,23 +65,6 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 import jd.plugins.download.DownloadInterface;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.RFC2047;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
-import org.jdownloader.captcha.blacklist.CaptchaBlackList;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.Keep2shareConfig;
-import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
-import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 /**
  * Abstract class supporting tezfiles.com/keep2share.cc (k2s.cc)/fileboom(fboom.me)/publish2.me <br>
  * <a href="https://github.com/keep2share/api/">Github documentation</a>
@@ -72,7 +72,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51761 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52056 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -284,7 +284,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 51761 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 52056 $"));
     }
 
     /**
@@ -355,8 +355,8 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     /**
-     * There are special long fileIDs most likely used for tracking. </br> There can be multiple of those IDs available for the same file so
-     * those special IDs can't be reliably used for duplicate-checking.
+     * There are special long fileIDs most likely used for tracking. </br>
+     * There can be multiple of those IDs available for the same file so those special IDs can't be reliably used for duplicate-checking.
      */
     public static boolean isSpecialFileID(final String fuid) {
         if (fuid != null && (fuid.contains("-") || fuid.contains("_"))) {
@@ -430,8 +430,8 @@ public abstract class K2SApi extends PluginForHost {
     public boolean internal_supportsMassLinkcheck() {
         /**
          * The need to have a setting for the mass-linkcheck behavior is mainly due to a serverside API bug in mass-linkcheck which leads to
-         * files being displayed as online while they actually don't exist anymore (abused/deleted). </br> More detailed description:
-         * https://board.jdownloader.org/showthread.php?t=95537
+         * files being displayed as online while they actually don't exist anymore (abused/deleted). </br>
+         * More detailed description: https://board.jdownloader.org/showthread.php?t=95537
          */
         final Keep2shareConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         final LinkcheckMode mode = cfg.getFileLinkcheckMode();
@@ -513,8 +513,8 @@ public abstract class K2SApi extends PluginForHost {
                                 final Boolean isFolder = (Boolean) fileInfo.get("is_folder");
                                 if (Boolean.TRUE.equals(isFolder)) {
                                     /**
-                                     * Check if somehow a fileID has managed to go into the hoster plugin handling. </br> This should never
-                                     * happen.
+                                     * Check if somehow a fileID has managed to go into the hoster plugin handling. </br>
+                                     * This should never happen.
                                      */
                                     link.setAvailable(false);
                                     if (link.getComment() == null) {
@@ -529,8 +529,8 @@ public abstract class K2SApi extends PluginForHost {
                             if (StringUtils.equals((String) root.get("message"), "Invalid request params")) {
                                 /**
                                  * 2022-02-25: Workaround for when checking only one <b>invalid</b> fileID e.g.
-                                 * "2ahUKEwiUlaOqlZv2AhWLyIUKHXOjAmgQuZ0HegQIARBG". </br> This may also happen when there are multiple
-                                 * fileIDs to check and all of them are invalid.
+                                 * "2ahUKEwiUlaOqlZv2AhWLyIUKHXOjAmgQuZ0HegQIARBG". </br>
+                                 * This may also happen when there are multiple fileIDs to check and all of them are invalid.
                                  */
                                 for (final DownloadLink dl : links) {
                                     dl.setAvailable(false);
@@ -861,7 +861,8 @@ public abstract class K2SApi extends PluginForHost {
             final String free_download_key = (String) geturlResponse.get("free_download_key");
             if (!StringUtils.isEmpty(free_download_key)) {
                 /**
-                 * Free and free-account download </br> In some rare cases, the API wants us to wait again even though we've already waited.
+                 * Free and free-account download </br>
+                 * In some rare cases, the API wants us to wait again even though we've already waited.
                  */
                 /*
                  * {"status":"success","code":200,"message":"Captcha accepted, please wait","free_download_key":"homeHash","time_wait":30}
@@ -996,9 +997,10 @@ public abstract class K2SApi extends PluginForHost {
         if (StringUtils.startsWithCaseInsensitive(captchaAddress, "http://")) {
             /**
              * 2020-02-03: Possible workaround for this issues reported here: board.jdownloader.org/showthread.php?t=82989 and 2020-04-23:
-             * board.jdownloader.org/showthread.php?t=83927 </br> and board.jdownloader.org/showthread.php?t=83781 </br> Explanation: This
-             * filehost will block the users' IP if too many un-answered captcha requests are taking place. </br> This method is here to try
-             * to avoid this.
+             * board.jdownloader.org/showthread.php?t=83927 </br>
+             * and board.jdownloader.org/showthread.php?t=83781 </br>
+             * Explanation: This filehost will block the users' IP if too many un-answered captcha requests are taking place. </br>
+             * This method is here to try to avoid this.
              */
             logger.info("login-captcha_url is not https --> Changing it to https");
             captchaAddress = captchaAddress.replaceFirst("(?i)http://", "https://");
@@ -1312,227 +1314,251 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     protected Map<String, Object> handleErrorsAPI(final Account account, final DownloadLink link, final Browser br) throws PluginException {
-        if (br != null && br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 400) {
-            /* 2019-07-17: This may happen after any request even if the request itself is done right. */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 400", 5 * 60 * 1000l);
-        } else if (br != null && br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 429) {
-            /* 2019-07-23: This may happen after any request e.g. after '/requestcaptcha' RE log 4772186935451 */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 429 - too many requests", 3 * 60 * 1000l);
-        }
+        Map<String, Object> entries = null;
         try {
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            /* E.g. {"message":"Invalid login or password","status":"error","code":406,"errorCode":70} */
-            final String status = (String) entries.get("status");
-            Object errCodeO = entries.get("errorCode");
-            if (errCodeO == null || !(errCodeO instanceof Number)) {
-                // subErrors
-                errCodeO = entries.get("code");
-            }
-            if (errCodeO == null) {
-                /* No errors */
-                return entries;
-            }
-            // if (errCode == null && isSubErrors) {
-            // // subErrors
-            // errCode = (Number) entries.get("code");
-            // }
-            int errorcode = ((Number) errCodeO).intValue();
-            if (errorcode == 200 && StringUtils.equalsIgnoreCase(status, "success")) {
-                /*
-                 * No error e.g.
-                 * {"status":"success","code":200,"challenge":"blabla","captcha_url":"http://k2s.cc/api/v2/reCaptcha.html?id=blabla"}
-                 */
-                return entries;
-            }
-            String serversideErrormessage = (String) entries.get("message");
-            String timeRemaining = null;
-            final List<Map<String, Object>> subErrorsList = (List<Map<String, Object>>) entries.get("errors");
-            /* For some errors, we prefer to handle the subError(s) TODO: Remove/simplify this. */
-            if (errorcode == 21 || errorcode == 22 || errorcode == 42) {
-                if (subErrorsList != null && !subErrorsList.isEmpty()) {
-                    final Map<String, Object> subError0 = subErrorsList.get(0);
-                    errorcode = ((Number) subError0.get("code")).intValue();
-                    /* Can be missing -> null */
-                    serversideErrormessage = (String) subError0.get("message");
-                    timeRemaining = (String) subError0.get("timeRemaining");
-                }
-            }
-            String msgForUser = getErrorMessageForUser(errorcode);
-            if (StringUtils.isEmpty(msgForUser)) {
-                /* No language String available for errormessage? Fallback to provided errormessage */
-                msgForUser = serversideErrormessage;
-            }
-            try {
-                /* Check text errors first */
-                if (StringUtils.equalsIgnoreCase(serversideErrormessage, "File not available")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                switch (errorcode) {
-                case 1:
-                    // DOWNLOAD_COUNT_EXCEEDED = 1; "Download count files exceed"
-                    // assume non account/free account
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msgForUser);
-                case 2:
-                    // {"message":"Invalid request params","status":"error","code":400,"errorCode":2}
-                    // IP temp. blocked on login
-                    // DOWNLOAD_TRAFFIC_EXCEEDED = 2; "Traffic limit exceed"
-                    // assume all types
-                    ipBlockedOrAccountLimit(link, account, msgForUser, FREE_RECONNECTWAIT_MILLIS);
-                    /* This code should never be reached (exception should happen before). */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                case 3:
-                case 7:
-                    // DOWNLOAD_FILE_SIZE_EXCEEDED = 3; "Free user can't download large files. Upgrade to PREMIUM and forget about limits."
-                    // PREMIUM_ONLY = 7; "This download available only for premium users"
-                    // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":7}]}
-                    premiumDownloadRestriction(msgForUser);
-                case 4:
-                    // DOWNLOAD_NO_ACCESS = 4; "You no can access to this file"
-                    // not sure about this...
-                    throw new PluginException(LinkStatus.ERROR_FATAL, msgForUser);
-                case 5:
-                    // DOWNLOAD_WAITING = 5; "Please wait to download this file"
-                    // {"message":"Download not
-                    // available","status":"error","code":406,"errorCode":42,"errors":[{"code":5,"timeRemaining":"2521.000000"}]}
-                    // think timeRemaining is in seconds
-                    final long waitMillis;
-                    if (!StringUtils.isEmpty(timeRemaining) && timeRemaining.matches("[\\d\\.]+")) {
-                        final String time = timeRemaining.substring(0, timeRemaining.indexOf("."));
-                        waitMillis = Long.parseLong(time) * 1000;
-                    } else {
-                        waitMillis = 15 * 60 * 1000l;
-                    }
-                    ipBlockedOrAccountLimit(link, account, msgForUser, waitMillis);
-                    /* This code should never be reached (exception should happen before). */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                case 6:
-                    // DOWNLOAD_FREE_THREAD_COUNT_TO_MANY = 6; "Free account does not allow to download more than one file at the same time"
-                    ipBlockedOrAccountLimit(link, account, msgForUser, 15 * 60 * 1000l);
-                    /* This code should never be reached (exception should happen before). */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                case 9:
-                    /*
-                     * {"status":"error","code":406,"message":"Download is not available","errorCode":21,"errors":[{"code":9,
-                     * "message":"This download available only for store subscribers"}]}
-                     */
-                    throw new AccountRequiredException(msgForUser);
-                case 8:
-                    // PRIVATE_ONLY = 8; //'This is private file',
-                    privateDownloadRestriction(msgForUser);
-                case 10:
-                    // Bad/invalid token? {"message":"You are not authorized for this action","status":"error","code":403,"errorCode":10}
-                    dumpAuthToken(account);
-                    /* Token is expired -> Do not permanently disable account as login credentials can still be valid. */
-                    throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
-                case 11:
-                case 42:
-                    /* 2020-11-26: E.g. "File is available for premium users only" AFTER captcha in free mode. */
-                    /* Old comments below */
-                    // ERROR_NEED_WAIT_TO_FREE_DOWNLOAD = 41;
-                    // ERROR_DOWNLOAD_NOT_AVAILABLE = 42;
-                    // {"message":"Download is not
-                    // available","status":"error","code":406,"errorCode":21,"errors":[{"code":2,"message":"Traffic limit exceed"}]}
-                    // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":3}]}
-                    // {"message":"Download not
-                    // available","status":"error","code":406,"errorCode":42,"errors":[{"code":5,"timeRemaining":"2521.000000"}]}
-                    // {"message":"Download is not available","status":"error","code":406,"errorCode":42,"errors":[{"code":6,"message":"
-                    // Free account does not allow to download more than one file at the same time"}]}
-                    // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":6}]}
-                    // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":7}]}
-                    // sub error, pass it back into itself.
-                    throw new AccountRequiredException();
-                case 75:
-                    // ERROR_YOU_ARE_NEED_AUTHORIZED = 10;
-                    // ERROR_AUTHORIZATION_EXPIRED = 11;
-                    // ERROR_ILLEGAL_SESSION_IP = 75;
-                    // {"message":"This token not allow access from this IP address","status":"error","code":403,"errorCode":75}
-                    // this should never happen, as its handled within postPage and auth_token should be valid for download
-                    dumpAuthToken(account);
-                    throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
-                case 20:
-                    // ERROR_FILE_NOT_FOUND = 20;
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msgForUser);
-                case 21:
-                case 22:
-                    // ERROR_FILE_IS_NOT_AVAILABLE = 21;
-                    // {"message":"Download is not
-                    // available","status":"error","code":406,"errorCode":21,"errors":[{"code":2,"message":"Traffic limit exceed"}]}
-                    // sub error, pass it back into itself.
-                    // ERROR_FILE_IS_BLOCKED = 22;
-                    // what does this mean? premium only link ? treating as 'file not found'
-                    /* 2020-01-29: {"status":"error","code":406,"message":"File is blocked","errorCode":22} */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msgForUser);
-                case 23:
-                    // {"message":"file_id is folder","status":"error","code":406,"errorCode":23}
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msgForUser);
-                case 33:
-                    // CAPTCHA.REQUESTRECAPTCHA
-                case 30:
-                    // ERROR_CAPTCHA_REQUIRED = 30;
-                    // this shouldn't happen in dl method.. beware website can contain captcha on login, api not of yet.
-                    if (link == null && account != null) {
-                        // {"message":"You need send request for free download with captcha
-                        // fields","status":"error","code":406,"errorCode":30}
-                        // false positive for invalid auth_token (work around)! dump cookies and retry
-                        dumpAuthToken(account);
-                        throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
-                    }
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                case 31:
-                    // ERROR_CAPTCHA_INVALID = 31;
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, msgForUser);
-                case 40:
-                    // ERROR_WRONG_FREE_DOWNLOAD_KEY = 40;
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
-                case 41:
-                case 70:
-                case 72:
-                    // ERROR_INCORRECT_USERNAME_OR_PASSWORD = 70;
-                    // ERROR_ACCOUNT_BANNED = 72;
-                    dumpAuthToken(account);
-                    throw new AccountInvalidException(msgForUser);
-                case 71:
-                    // ERROR_LOGIN_ATTEMPTS_EXCEEDED = 71;
-                    // This is actually an IP restriction!
-                    // 30min wait time.... since wait time isn't respected (throw new PluginException(LinkStatus.ERROR_PREMIUM, msg, time)),
-                    // we need to set value like this and then throw temp disable.
-                    // new one
-                    // {"message":"Login attempt was exceed, please wait or verify your request via captcha
-                    // challenge","status":"error","code":406,"errorCode":71}
-                    throw new AccountUnavailableException(msgForUser, 31 * 60 * 1000l);
-                case 73:
-                    // ERROR_NO_ALLOW_ACCESS_FROM_NETWORK = 73;
-                    if (account != null) {
-                        throw new AccountUnavailableException("No allow access from network", 6 * 60 * 60 * 1000l);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, msgForUser);
-                    }
-                case 74:
-                    // ERROR_UNKNOWN_LOGIN_ERROR = 74;
-                    if (account != null) {
-                        throw new AccountInvalidException("Account has been banned");
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, msgForUser);
-                    }
-                case 76:
-                    // ERROR_ACCOUNT_STOLEN = 76;
-                    throw new AccountInvalidException(msgForUser);
-                default:
-                    logger.warning("Unknown errorcode: " + errorcode);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            } catch (final PluginException p) {
-                logger.warning(getRevisionInfo());
-                logger.warning("ERROR :: " + msgForUser);
-                throw p;
-            }
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException jse) {
+            /* No valid json json -> Check for response code errors */
+            checkResponseCodeErrors(account, link, br);
             final String msg = "Invalid API response";
             if (account != null) {
                 throw new AccountUnavailableException(msg, 3 * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, 3 * 60 * 1000l);
             }
+        }
+        /* Example responses: */
+        /* {"message":"Invalid login or password","status":"error","code":406,"errorCode":70} */
+        /* {"status":"error","code":400,"message":"captcha need wait daily","errorCode":"captcha_need_wait_daily"} */
+        final String status = (String) entries.get("status");
+        Object errCodeO = entries.get("errorCode");
+        if (errCodeO instanceof String) {
+            final String error_enum = errCodeO.toString();
+            if (error_enum.equalsIgnoreCase("captcha_need_wait")) {
+                /* See: https://board.jdownloader.org/showthread.php?p=495752#post495752 */
+                throw new AccountUnavailableException("IP temporarily banned due to many captcha errors", 1 * 60 * 1000l);
+            } else if (error_enum.equalsIgnoreCase("captcha_need_wait_daily")) {
+                /* See: https://board.jdownloader.org/showthread.php?p=495752#post495752 */
+                throw new AccountUnavailableException("IP permanently banned due to many captcha errors", 30 * 60 * 1000l);
+            } else {
+                logger.info("Unknown error ENUM string: " + error_enum);
+            }
+        }
+        if (errCodeO == null || !(errCodeO instanceof Number)) {
+            // subErrors
+            errCodeO = entries.get("code");
+        }
+        if (errCodeO == null) {
+            /* No errors in json -> Check for response code errors */
+            checkResponseCodeErrors(account, link, br);
+            /* No error at all */
+            return entries;
+        }
+        // if (errCode == null && isSubErrors) {
+        // // subErrors
+        // errCode = (Number) entries.get("code");
+        // }
+        int errorcode = ((Number) errCodeO).intValue();
+        if (errorcode == 200 && StringUtils.equalsIgnoreCase(status, "success")) {
+            /*
+             * No error e.g.
+             * {"status":"success","code":200,"challenge":"blabla","captcha_url":"http://k2s.cc/api/v2/reCaptcha.html?id=blabla"}
+             */
+            return entries;
+        }
+        String serversideErrormessage = (String) entries.get("message");
+        String timeRemaining = null;
+        final List<Map<String, Object>> subErrorsList = (List<Map<String, Object>>) entries.get("errors");
+        /* For some errors, we prefer to handle the subError(s) TODO: Remove/simplify this. */
+        if (errorcode == 21 || errorcode == 22 || errorcode == 42) {
+            if (subErrorsList != null && !subErrorsList.isEmpty()) {
+                final Map<String, Object> subError0 = subErrorsList.get(0);
+                errorcode = ((Number) subError0.get("code")).intValue();
+                /* Can be missing -> null */
+                serversideErrormessage = (String) subError0.get("message");
+                timeRemaining = (String) subError0.get("timeRemaining");
+            }
+        }
+        String msgForUser = getErrorMessageForUser(errorcode);
+        if (StringUtils.isEmpty(msgForUser)) {
+            /* No language String available for errormessage? Fallback to provided errormessage */
+            msgForUser = serversideErrormessage;
+        }
+        try {
+            /* Check text errors first */
+            if (StringUtils.equalsIgnoreCase(serversideErrormessage, "File not available")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            switch (errorcode) {
+            case 1:
+                // DOWNLOAD_COUNT_EXCEEDED = 1; "Download count files exceed"
+                // assume non account/free account
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msgForUser);
+            case 2:
+                // {"message":"Invalid request params","status":"error","code":400,"errorCode":2}
+                // IP temp. blocked on login
+                // DOWNLOAD_TRAFFIC_EXCEEDED = 2; "Traffic limit exceed"
+                // assume all types
+                ipBlockedOrAccountLimit(link, account, msgForUser, FREE_RECONNECTWAIT_MILLIS);
+                /* This code should never be reached (exception should happen before). */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            case 3:
+            case 7:
+                // DOWNLOAD_FILE_SIZE_EXCEEDED = 3; "Free user can't download large files. Upgrade to PREMIUM and forget about limits."
+                // PREMIUM_ONLY = 7; "This download available only for premium users"
+                // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":7}]}
+                premiumDownloadRestriction(msgForUser);
+            case 4:
+                // DOWNLOAD_NO_ACCESS = 4; "You no can access to this file"
+                // not sure about this...
+                throw new PluginException(LinkStatus.ERROR_FATAL, msgForUser);
+            case 5:
+                // DOWNLOAD_WAITING = 5; "Please wait to download this file"
+                // {"message":"Download not
+                // available","status":"error","code":406,"errorCode":42,"errors":[{"code":5,"timeRemaining":"2521.000000"}]}
+                // think timeRemaining is in seconds
+                final long waitMillis;
+                if (!StringUtils.isEmpty(timeRemaining) && timeRemaining.matches("[\\d\\.]+")) {
+                    final String time = timeRemaining.substring(0, timeRemaining.indexOf("."));
+                    waitMillis = Long.parseLong(time) * 1000;
+                } else {
+                    waitMillis = 15 * 60 * 1000l;
+                }
+                ipBlockedOrAccountLimit(link, account, msgForUser, waitMillis);
+                /* This code should never be reached (exception should happen before). */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            case 6:
+                // DOWNLOAD_FREE_THREAD_COUNT_TO_MANY = 6; "Free account does not allow to download more than one file at the same time"
+                ipBlockedOrAccountLimit(link, account, msgForUser, 15 * 60 * 1000l);
+                /* This code should never be reached (exception should happen before). */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            case 9:
+                /*
+                 * {"status":"error","code":406,"message":"Download is not available","errorCode":21,"errors":[{"code":9,
+                 * "message":"This download available only for store subscribers"}]}
+                 */
+                throw new AccountRequiredException(msgForUser);
+            case 8:
+                // PRIVATE_ONLY = 8; //'This is private file',
+                privateDownloadRestriction(msgForUser);
+            case 10:
+                // Bad/invalid token? {"message":"You are not authorized for this action","status":"error","code":403,"errorCode":10}
+                dumpAuthToken(account);
+                /* Token is expired -> Do not permanently disable account as login credentials can still be valid. */
+                throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
+            case 11:
+            case 42:
+                /* 2020-11-26: E.g. "File is available for premium users only" AFTER captcha in free mode. */
+                /* Old comments below */
+                // ERROR_NEED_WAIT_TO_FREE_DOWNLOAD = 41;
+                // ERROR_DOWNLOAD_NOT_AVAILABLE = 42;
+                // {"message":"Download is not
+                // available","status":"error","code":406,"errorCode":21,"errors":[{"code":2,"message":"Traffic limit exceed"}]}
+                // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":3}]}
+                // {"message":"Download not
+                // available","status":"error","code":406,"errorCode":42,"errors":[{"code":5,"timeRemaining":"2521.000000"}]}
+                // {"message":"Download is not available","status":"error","code":406,"errorCode":42,"errors":[{"code":6,"message":"
+                // Free account does not allow to download more than one file at the same time"}]}
+                // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":6}]}
+                // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":7}]}
+                // sub error, pass it back into itself.
+                throw new AccountRequiredException();
+            case 75:
+                // ERROR_YOU_ARE_NEED_AUTHORIZED = 10;
+                // ERROR_AUTHORIZATION_EXPIRED = 11;
+                // ERROR_ILLEGAL_SESSION_IP = 75;
+                // {"message":"This token not allow access from this IP address","status":"error","code":403,"errorCode":75}
+                // this should never happen, as its handled within postPage and auth_token should be valid for download
+                dumpAuthToken(account);
+                throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
+            case 20:
+                // ERROR_FILE_NOT_FOUND = 20;
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msgForUser);
+            case 21:
+            case 22:
+                // ERROR_FILE_IS_NOT_AVAILABLE = 21;
+                // {"message":"Download is not
+                // available","status":"error","code":406,"errorCode":21,"errors":[{"code":2,"message":"Traffic limit exceed"}]}
+                // sub error, pass it back into itself.
+                // ERROR_FILE_IS_BLOCKED = 22;
+                // what does this mean? premium only link ? treating as 'file not found'
+                /* 2020-01-29: {"status":"error","code":406,"message":"File is blocked","errorCode":22} */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msgForUser);
+            case 23:
+                // {"message":"file_id is folder","status":"error","code":406,"errorCode":23}
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msgForUser);
+            case 33:
+                // CAPTCHA.REQUESTRECAPTCHA
+            case 30:
+                // ERROR_CAPTCHA_REQUIRED = 30;
+                // this shouldn't happen in dl method.. beware website can contain captcha on login, api not of yet.
+                if (link == null && account != null) {
+                    // {"message":"You need send request for free download with captcha
+                    // fields","status":"error","code":406,"errorCode":30}
+                    // false positive for invalid auth_token (work around)! dump cookies and retry
+                    dumpAuthToken(account);
+                    throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            case 31:
+                // ERROR_CAPTCHA_INVALID = 31;
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, msgForUser);
+            case 40:
+                // ERROR_WRONG_FREE_DOWNLOAD_KEY = 40;
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
+            case 41:
+            case 70:
+            case 72:
+                // ERROR_INCORRECT_USERNAME_OR_PASSWORD = 70;
+                // ERROR_ACCOUNT_BANNED = 72;
+                dumpAuthToken(account);
+                throw new AccountInvalidException(msgForUser);
+            case 71:
+                // ERROR_LOGIN_ATTEMPTS_EXCEEDED = 71;
+                // This is actually an IP restriction!
+                // 30min wait time.... since wait time isn't respected (throw new PluginException(LinkStatus.ERROR_PREMIUM, msg, time)),
+                // we need to set value like this and then throw temp disable.
+                // new one
+                // {"message":"Login attempt was exceed, please wait or verify your request via captcha
+                // challenge","status":"error","code":406,"errorCode":71}
+                throw new AccountUnavailableException(msgForUser, 31 * 60 * 1000l);
+            case 73:
+                // ERROR_NO_ALLOW_ACCESS_FROM_NETWORK = 73;
+                if (account != null) {
+                    throw new AccountUnavailableException("No allow access from network", 6 * 60 * 60 * 1000l);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, msgForUser);
+                }
+            case 74:
+                // ERROR_UNKNOWN_LOGIN_ERROR = 74;
+                if (account != null) {
+                    throw new AccountInvalidException("Account has been banned");
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, msgForUser);
+                }
+            case 76:
+                // ERROR_ACCOUNT_STOLEN = 76;
+                throw new AccountInvalidException(msgForUser);
+            default:
+                logger.warning("Unknown errorcode: " + errorcode);
+                /* No known errors in json -> Check for response code errors */
+                checkResponseCodeErrors(account, link, br);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        } catch (final PluginException p) {
+            logger.warning(getRevisionInfo());
+            logger.warning("ERROR :: " + msgForUser);
+            throw p;
+        }
+    }
+
+    private void checkResponseCodeErrors(final Account account, final DownloadLink link, final Browser br) throws PluginException {
+        if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 400) {
+            /* 2019-07-17: This may happen after any request even if the request itself is done right. */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 400", 5 * 60 * 1000l);
+        } else if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 429) {
+            /* 2019-07-23: This may happen after any request e.g. after '/requestcaptcha' RE log 4772186935451 */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 429 - too many requests", 3 * 60 * 1000l);
         }
     }
 
@@ -1885,9 +1911,9 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     /**
-     * Check single file via single linkcheck using another API call. </br> Can be used as a workaround for this problem:
-     * https://board.jdownloader.org/showthread.php?t=95537 </br> API call used here:
-     * https://keep2share.github.io/api/#resources:/getFileStatus:post
+     * Check single file via single linkcheck using another API call. </br>
+     * Can be used as a workaround for this problem: https://board.jdownloader.org/showthread.php?t=95537 </br>
+     * API call used here: https://keep2share.github.io/api/#resources:/getFileStatus:post
      */
     private AvailableStatus requestFileInformationViaSingleLinkcheck_GetfilestatusAPICall(final DownloadLink link) throws Exception {
         final HashMap<String, Object> postdataGetfilestatus = new HashMap<String, Object>();
@@ -2213,7 +2239,6 @@ public abstract class K2SApi extends PluginForHost {
             return true;
         }
     }
-
     // @Override
     // public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
     // final boolean isAvailableForFree = link.getBooleanProperty(PROPERTY_isAvailableForFree, true);

@@ -23,7 +23,6 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -37,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52058 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -155,33 +154,17 @@ public class UploadyIo extends XFileSharingProBasic {
             this.checkErrorsLastResort(br, link, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* 2024-06-17: Disabled for now as the captcha is now happening after the wait time (also hCaptcha instead of reCaptchaV2). */
-        final boolean handleCaptchaDuringWait = false;
+        /*
+         * 2024-06-17: Disabled for now as the captcha is now happening after the wait time also it's now hCaptcha instead of reCaptchaV2.
+         */
         final Browser br3 = br.cloneBrowser();
         /* Wait time is counting serverside now */
         getPage(br3, br._getURL().getPath() + "?start_countdown=1");
         final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
         final Map<String, Object> entries = restoreFromString(br3.getRequest().getHtmlCode(), TypeRef.MAP);
-        final String innerhtml = (String) entries.get("ihtml");
+        // final String innerhtml = (String) entries.get("ihtml");
         final String rand = entries.get("rand").toString();
         download1.put("rand", Encoding.urlEncode(rand));
-        String recaptchaV2Response = null;
-        if (handleCaptchaDuringWait) {
-            /* Solve captcha "during" wait time */
-            final String waitSecondsStr = this.regexWaittime(br);
-            long waitMillis = 0;
-            if (waitSecondsStr != null) {
-                waitMillis = Long.parseLong(waitSecondsStr) * 1001;
-            }
-            if (innerhtml != null) {
-                // Small hack
-                br3.getRequest().setHtmlCode(innerhtml);
-            }
-            // this.handleCaptcha(link, br, dummyform);
-            final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br3);
-            this.waitBeforeInteractiveCaptcha(link, waitMillis, rc2.getSolutionTimeout());
-            recaptchaV2Response = rc2.getToken();
-        }
         /* Wait remaining time if needed */
         this.waitTime(link, timeBefore);
         submitForm(download1);
@@ -191,12 +174,7 @@ public class UploadyIo extends XFileSharingProBasic {
             this.checkErrorsLastResort(br, link, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (handleCaptchaDuringWait) {
-            /* Captcha has already been solved */
-            download2.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-        } else {
-            this.handleCaptcha(link, br, download2);
-        }
+        this.handleCaptcha(link, br, download2);
         submitForm(download2);
         String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
@@ -232,6 +210,10 @@ public class UploadyIo extends XFileSharingProBasic {
         final String ipWaitMinutes = br.getRegex("Delay between downloads must not be less than (\\d+) minutes?").getMatch(0);
         if (ipWaitMinutes != null) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(ipWaitMinutes) * 60 * 1000);
+        }
+        final String ipWaitSeconds = br.getRegex("id=\"secleft\"[^<]*left=\"(\\d+)").getMatch(0);
+        if (ipWaitSeconds != null) {
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(ipWaitSeconds) * 1000);
         }
         super.checkErrors(br, html, link, account);
     }
