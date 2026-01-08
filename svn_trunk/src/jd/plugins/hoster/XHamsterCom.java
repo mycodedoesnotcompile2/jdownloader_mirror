@@ -76,7 +76,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52061 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -102,6 +102,7 @@ public class XHamsterCom extends PluginForHost {
                 br.setCookie(domain, "video_titles_translation", "0");
             }
         }
+        /* Set cookies on premium domains */
         for (final String domain : new String[] { "xhamsterpremium.com", "faphouse.com" }) {
             br.setCookie(domain, "locale", "en");
             br.setCookie(domain, "translate-video-titles", "0");
@@ -223,13 +224,14 @@ public class XHamsterCom extends PluginForHost {
         return "https://" + getHost() + "/info/terms";
     }
 
-    public static final String  TYPE_MOBILE    = "(?i).+m\\.xhamster\\.+";
-    public static final String  TYPE_EMBED     = "(?i)^https?://[^/]+/(?:x?embed\\.php\\?video=|embed/)([A-Za-z0-9\\-]+)";
-    private static final String TYPE_PREMIUM   = "(?i).+(xhamsterpremium\\.com|faphouse\\.com).+";
-    private static final String NORESUME       = "NORESUME";
-    private final String        recaptchav2    = "<div class=\"text\">\\s*In order to watch this video please prove you are a human";
-    private String              dllink         = null;
-    public static final String  DOMAIN_CURRENT = "xhamster.com";
+    public static final String   TYPE_MOBILE    = "(?i).+m\\.xhamster\\.+";
+    public static final String   TYPE_EMBED     = "(?i)^https?://[^/]+/(?:x?embed\\.php\\?video=|embed/)([A-Za-z0-9\\-]+)";
+    /* Important: Keep this up2date! */
+    private static final Pattern TYPE_PREMIUM   = Pattern.compile(".+(xhamsterpremium\\.com|faphouse\\.com|faphouse2\\.com).+", Pattern.CASE_INSENSITIVE);
+    private static final String  NORESUME       = "NORESUME";
+    private final String         recaptchav2    = "<div class=\"text\">\\s*In order to watch this video please prove you are a human";
+    private String               dllink         = null;
+    public static final String   DOMAIN_CURRENT = "xhamster.com";
 
     public static String getCorrectedURL(String url) {
         /*
@@ -260,7 +262,7 @@ public class XHamsterCom extends PluginForHost {
     private boolean isPremiumURL(final String url) {
         if (url == null) {
             return false;
-        } else if (url.matches(TYPE_PREMIUM)) {
+        } else if (new Regex(url, TYPE_PREMIUM).patternFind()) {
             return true;
         } else {
             return false;
@@ -502,7 +504,10 @@ public class XHamsterCom extends PluginForHost {
                 /* Free / Free-Account users can only download trailers. */
                 dllink = br.getRegex("id=\"video-trailer\"[^<]*data-fallback=\"(http[^<>\"]+)\"").getMatch(0); // Progressive
                 if (dllink == null) {
-                    dllink = br.getRegex("id=\"video-trailer\"[^<]*src=\"(http[^<>\"]+)\"").getMatch(0); // HLS
+                    dllink = br.getRegex("id=\"video-trailer\"[^<]*src=\"(http[^\"]+)\"").getMatch(0); // HLS
+                }
+                if (dllink == null) {
+                    logger.info("Trailer unavailable or age verification required");
                 }
             }
             if (title != null) {

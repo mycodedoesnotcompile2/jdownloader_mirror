@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52058 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52065 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -216,5 +216,28 @@ public class UploadyIo extends XFileSharingProBasic {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(ipWaitSeconds) * 1000);
         }
         super.checkErrors(br, html, link, account);
+    }
+
+    @Override
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex("(As a Guest user, you can download files up to(\\s*<strong>)?\\d+ MB)").getMatch(0);
+        if (msg != null) {
+            /* Remove html tags from msg. */
+            msg = msg.replaceAll("\\s*<strong>", " ");
+            /* Mimic message from website so user gets the same msg in JD GUI. */
+            if (br.containsHTML("Upgrade to Premium to download larger files instantly and without limits")) {
+                msg += "Upgrade to Premium to download larger files instantly and without limits.";
+            }
+            return msg;
+        }
+        msg = br.getRegex(">\\s*(This file is only available to Premium users\\.)").getMatch(0);
+        if (msg != null) {
+            /* Mimic message from website so user gets the same msg in JD GUI. */
+            if (br.containsHTML("Unlock full access by upgrading your account")) {
+                msg += "Unlock full access by upgrading your account.";
+            }
+            return msg;
+        }
+        return super.getPremiumOnlyErrorMessage(br);
     }
 }

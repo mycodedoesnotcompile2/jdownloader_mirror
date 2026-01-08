@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 2, names = {}, urls = {})
 public class UpfilesIo extends PluginForHost {
     public UpfilesIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -158,7 +158,7 @@ public class UpfilesIo extends PluginForHost {
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
         }
-        final String filesize = br.getRegex("(?i)<h3>\\s*Download\\s*: [^<]* \\(([0-9\\.]+ [A-Za-z]{1,5})\\)</h3>").getMatch(0);
+        final String filesize = br.getRegex("<h3>\\s*Download\\s*: [^<]* \\(([0-9\\.]+ [A-Za-z]{1,5})\\)</h3>").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
@@ -226,7 +226,7 @@ public class UpfilesIo extends PluginForHost {
         query.add("ccp", "1");
         query.add("action", "continue");
         br.postPage(br.getURL(), query);
-        // final Regex fileInfo = br.getRegex("(?i)<h3>\\s*Download\\s*:\\s*([^<]+) \\(([^\\)]+)\\)\\s*</h3>");
+        // final Regex fileInfo = br.getRegex("<h3>\\s*Download\\s*:\\s*([^<]+) \\(([^\\)]+)\\)\\s*</h3>");
         // if (fileInfo.matches()) {
         // link.setName(Encoding.htmlDecode(fileInfo.getMatch(0)).trim());
         // link.setDownloadSize(SizeFormatter.getSize(fileInfo.getMatch(1)));

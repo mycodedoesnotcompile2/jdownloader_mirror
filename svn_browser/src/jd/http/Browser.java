@@ -3484,6 +3484,39 @@ public class Browser {
                 return null;
             }
         },
+        NETWORK_SECURITY_VERCEL {
+            @Override
+            public String getLabel() {
+                return "Vercel.com/security Web Application Firewall";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else if (con.getResponseCode() == 429 && StringUtils.equalsIgnoreCase(request.getResponseHeader("server"), "Vercel")) {
+                    return this;
+                } else {
+                    return null;
+                }
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         FIREWALL_BITDEFENDER {
             @Override
             public String getLabel() {

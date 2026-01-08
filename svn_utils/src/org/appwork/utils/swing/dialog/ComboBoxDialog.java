@@ -33,12 +33,15 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.swing.dialog;
 
+import java.awt.Component;
+import java.awt.TextComponent;
 import java.util.Arrays;
 
 import javax.swing.Icon;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JTextPane;
 import javax.swing.ListCellRenderer;
@@ -51,27 +54,27 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
     /**
      * The Comboxbox to display the options
      */
-    private JComboBox              box;
+    private JComboBox        box;
     /**
      * Stores an additional message
      */
-    private final String           message;
+    private final String     message;
     /**
      * Textpane to display th {@link #message}
      */
-    private JTextPane              textpane;
+    private JTextPane        textpane;
     /**
      * Defaultanswer. Answers are given as optionindex
      */
-    private final int              defaultAnswer;
+    private final int        defaultAnswer;
     /**
      * Available options
      */
-    private final Object[]         options;
+    private final Object[]   options;
     /**
      * Listrenderer to render the optionobjects
      */
-    private final ListCellRenderer renderer;
+    private ListCellRenderer renderer;
 
     @Override
     public boolean isRemoteAPIEnabled() {
@@ -87,6 +90,7 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
         getLogger().fine("Dialog    [" + okText + "][" + cancelText + "]\r\nflag:  " + Integer.toBinaryString(flag) + "\r\ntitle: " + title + "\r\nmsg:   \r\n" + question + "\r\noptions:   \r\n" + Arrays.toString(options) + "\r\ndef:" + defaultSelection);
         message = question;
         this.renderer = renderer;
+
         defaultAnswer = defaultSelection < 0 ? 0 : defaultSelection;
         this.options = options;
     }
@@ -110,6 +114,26 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
         final ListCellRenderer rend = getRenderer(ret.getRenderer());
         if (rend != null) {
             ret.setRenderer(rend);
+        } else {
+            final ListCellRenderer org = ret.getRenderer();
+
+            ret.setRenderer(new ListCellRenderer<Object>() {
+                /**
+                 * @see javax.swing.DefaultListCellRenderer#getListCellRendererComponent(javax.swing.JList, java.lang.Object, int, boolean,
+                 *      boolean)
+                 */
+                @Override
+                public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                    Component comp = org.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+                    if (value instanceof LabelInterface && comp instanceof TextComponent) {
+                        ((TextComponent) comp).setText(((LabelInterface) value).getLabel());
+                    } else if (value instanceof LabelInterface && comp instanceof JLabel) {
+                        ((JLabel) comp).setText(((LabelInterface) value).getLabel());
+                    }
+                    return comp;
+                }
+            });
         }
         try {
             if (defaultAnswer < options.length && defaultAnswer >= 0) {
@@ -125,7 +149,8 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
      * @param renderer2
      * @return
      */
-    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {        
+    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
+
         return renderer;
     }
 
@@ -211,7 +236,7 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
      * @see org.appwork.uio.ComboBoxDialogInterface#getPreSelectedIndex()
      */
     @Override
-    public int getPreSelectedIndex() {        
+    public int getPreSelectedIndex() {
         return defaultAnswer;
     }
 }

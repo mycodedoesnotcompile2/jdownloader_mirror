@@ -42,7 +42,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52062 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/view/(\\d+)" })
+@HostPlugin(revision = "$Revision: 52065 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/view/(\\d+)" })
 public class FuraffinityNet extends PluginForHost {
     public FuraffinityNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,6 +87,9 @@ public class FuraffinityNet extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        /* Nullify/reset global variables */
+        this.accountRequired = false;
+        this.enableAdultContentRequired = false;
         /* Website is hosting mostly picture content but sometimes also audio snippets. */
         // link.setMimeHint(CompiledFiletypeFilter.ImageExtensions.JPG);
         if (!link.isNameSet()) {
@@ -106,6 +109,10 @@ public class FuraffinityNet extends PluginForHost {
             return AvailableStatus.TRUE;
         } else if (br.containsHTML(">\\s*This submission contains Mature or Adult content")) {
             /* Content is online but we can't view/download it! */
+            this.enableAdultContentRequired = true;
+            return AvailableStatus.TRUE;
+        } else if (br.containsHTML(">\\s*This content is rated Mature or Adult")) {
+            /* 2026-01-07 e.g./view/30020132 */
             this.enableAdultContentRequired = true;
             return AvailableStatus.TRUE;
         }

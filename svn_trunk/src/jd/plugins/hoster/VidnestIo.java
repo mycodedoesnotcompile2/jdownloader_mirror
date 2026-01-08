@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52061 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52063 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidnestIo extends XFileSharingProBasic {
     public VidnestIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +104,24 @@ public class VidnestIo extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_alt() {
+        return false;
+    }
+
+    @Override
+    protected boolean isVideohoster_enforce_video_filename() {
+        return true;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*Download video") && br.containsHTML("<title>Watch\\s*</title>") && !br.containsHTML("/d/[a-z0-9]{12}")) {
+            /* 2026-01-07: Empty video page without error message, example: /e1rpvcuz2umj */
+            return true;
+        }
+        return super.isOffline(link, br);
     }
 }

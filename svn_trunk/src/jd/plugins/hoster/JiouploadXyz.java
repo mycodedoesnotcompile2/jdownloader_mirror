@@ -24,6 +24,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
@@ -41,8 +42,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 @HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 3, names = {}, urls = {})
-public class SwiftuploadsCom extends PluginForHost {
-    public SwiftuploadsCom(PluginWrapper wrapper) {
+public class JiouploadXyz extends PluginForHost {
+    public JiouploadXyz(PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -50,24 +51,19 @@ public class SwiftuploadsCom extends PluginForHost {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        // br.setCookie(getHost(), "adb", "0");
-        br.setCookie(getHost(), "adb", "1");
-        br.setCookie(getHost(), "gdpr_cookie", "1");
         return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost() + "/terms-conditions";
+        return "https://" + getHost();
     }
 
-    public static List<String[]> getPluginDomains() {
+    private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "swiftuploads.com" });
-        ret.add(new String[] { "uploadzap.com" });
-        ret.add(new String[] { "akirabox.com", "akirabox.to" });
-        ret.add(new String[] { "filearn.top" });
+        /* Similar to: SwiftuploadsCom */
+        ret.add(new String[] { "jioupload.xyz", "ajdown.space" });
         return ret;
     }
 
@@ -83,18 +79,9 @@ public class SwiftuploadsCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)/file");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]{10,})");
         }
         return ret.toArray(new String[0]);
-    }
-
-    @Override
-    public boolean isResumeable(final DownloadLink link, final Account account) {
-        return true;
-    }
-
-    public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
     }
 
     @Override
@@ -111,62 +98,40 @@ public class SwiftuploadsCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    /** Docs: https://akirabox.com/api */
-    private boolean supports_linkcheck_api() {
-        return getHost().equals("akirabox.com");
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 0;
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (this.getPluginEnvironment() == PluginEnvironment.LINK_CHECK && this.supports_linkcheck_api()) {
-            return requestFileInformationAPI(link);
-        } else {
-            return requestFileInformationWebsite(link);
-        }
-    }
-
-    private AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("span class=\"text-break h3\"[^>]*>([^<]+)").getMatch(0);
-        String filesize = br.getRegex(">\\s*Size\\s*:\\s*</span>([^<]+)</p>").getMatch(0);
+        String filename = br.getRegex("File name:\\s*</b>\\s*</span>\\s*<span class=\"detail-value\"[^>]*>([^<]+)</span>").getMatch(0);
+        if (filename == null) {
+            filename = br.getRegex("<h5 class=\"text-secondary mb-3\"[^>]*>\\s*(?:About )?([^<]+)</h5>").getMatch(0);
+        }
+        String filesize = br.getRegex("File size:\\s*</b>\\s*</span>\\s*<span class=\"detail-value\"[^>]*>([^<]+)</span>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
         } else {
-            logger.warning("Failerd to find filename");
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
-        } else {
-            logger.warning("Failed to find filesize");
-        }
-        return AvailableStatus.TRUE;
-    }
-
-    private AvailableStatus requestFileInformationAPI(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
-        this.setBrowserExclusive();
-        br.getPage("https://" + getHost() + "/api/files?url=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            /* E.g. {"status":404,"message":"File not found"} */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        link.setFinalFileName(entries.get("name").toString());
-        String filesizeStr = (String) entries.get("size");
-        if (filesizeStr != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
         } else {
             logger.warning("Failed to find filesize");
         }
@@ -187,6 +152,7 @@ public class SwiftuploadsCom extends PluginForHost {
             dllink = storedDirecturl;
         } else {
             requestFileInformation(link);
+            final String realContentURL = br.getURL();
             final Form continueform = br.getFormbyKey("method");
             if (continueform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -194,6 +160,18 @@ public class SwiftuploadsCom extends PluginForHost {
             br.setCookie(br.getHost(), "adb", "1");
             br.getHeaders().put("Origin", "https://www." + br.getHost());
             br.submitForm(continueform);
+            /* Redirect to a fake blog style ad website via google.com. */
+            final String redirect = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)").getMatch(0);
+            if (redirect == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String urlToFakeBlog = UrlQuery.parse(redirect).get("url");
+            if (urlToFakeBlog == null || !urlToFakeBlog.startsWith("http")) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            /* Skip google.com + two fake blog ad pages and just pretend that we have visited these. */
+            br.getHeaders().put("Referer", urlToFakeBlog);
+            br.getPage(realContentURL);
             Form dlform2 = br.getFormbyProperty("id", "down_2Form");
             if (dlform2 == null) {
                 /* Fallback */
@@ -212,7 +190,6 @@ public class SwiftuploadsCom extends PluginForHost {
             final Map<String, Object> dlconfig = JSonStorage.restoreFromString(downloadConfigJson, TypeRef.MAP);
             final Number dlconfig_captcha = (Number) dlconfig.get("captcha");
             if (dlconfig_captcha != null && dlconfig_captcha.intValue() == 1) {
-                // e.g. uptoearn.xyz
                 if (br.containsHTML("class=\"h-captcha\"")) {
                     /* 2025-01-07: uploadzap.com */
                     final String hcaptchaResponse = new CaptchaHelperHostPluginHCaptcha(this, br).getToken();
@@ -270,19 +247,35 @@ public class SwiftuploadsCom extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
-        return true;
+        return false;
+    }
+
+    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty) throws Exception {
+        final String url = link.getStringProperty(directlinkproperty);
+        if (StringUtils.isEmpty(url)) {
+            return false;
+        }
+        try {
+            final Browser brc = br.cloneBrowser();
+            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, null), this.getMaxChunks(link, null));
+            if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                return true;
+            } else {
+                brc.followConnection(true);
+                throw new IOException();
+            }
+        } catch (final Throwable e) {
+            logger.log(e);
+            try {
+                dl.getConnection().disconnect();
+            } catch (Throwable ignore) {
+            }
+            return false;
+        }
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
