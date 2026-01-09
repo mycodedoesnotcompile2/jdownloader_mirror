@@ -27,6 +27,23 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.RedditConfig;
+import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
+import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -53,24 +70,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.simplejson.MinimalMemoryMap;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.RedditConfig;
-import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
-import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52068 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -93,8 +93,8 @@ public class RedditComCrawler extends PluginForDecrypt {
     public int getMaxConcurrentProcessingInstances() {
         /**
          * 2023-08-07: Try not to run into API rate-limits RE:
-         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br> IMPORTANT: Dev: If you want to set
-         * this to a value higher than 1, first check API rate-limit handling and implement locks!!
+         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br>
+         * IMPORTANT: Dev: If you want to set this to a value higher than 1, first check API rate-limit handling and implement locks!!
          */
         return 1;
     }
@@ -390,8 +390,15 @@ public class RedditComCrawler extends PluginForDecrypt {
                 /* This should never happen! */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            /**
+             * This map may contain information that enables us to: <br>
+             * - Download a video via progressive download - Download a video in higher quality than max quality available via HLS and DASH,
+             * typically it provides 1080p while HLS and DASH provide 720p max.
+             */
+            Map<String, Object> videoFallbackMap = null;
             final ArrayList<DownloadLink> thisCrawledLinks = new ArrayList<DownloadLink>();
             final ArrayList<DownloadLink> thisCrawledExternalLinks = new ArrayList<DownloadLink>();
+            final ArrayList<DownloadLink> thisCrawledPreviewVideoLinks = new ArrayList<DownloadLink>();
             try {
                 if (fp == null) {
                     /* No packagename given? Set FilePackage with name of comment/post. */
@@ -421,6 +428,61 @@ public class RedditComCrawler extends PluginForDecrypt {
                 /* Look for single URLs e.g. single pictures (e.g. often imgur.com URLs, can also be selfhosted content) */
                 boolean addedRedditSelfhostedVideo = false;
                 String maybeExternalURL = (String) data.get("url");
+                final Map<String, Object> preview = (Map<String, Object>) data.get("preview");
+                final Map<String, Object> reddit_video_preview = preview != null ? (Map<String, Object>) preview.get("reddit_video_preview") : null;
+                if (reddit_video_preview != null && reddit_video_preview.get("fallback_url") instanceof String) {
+                    videoFallbackMap = new MinimalMemoryMap<String, Object>();
+                    videoFallbackMap.put("fallback_url", reddit_video_preview.get("fallback_url"));
+                    /* Cast numbers to trigger exception if fields contain non-number values. */
+                    videoFallbackMap.put("height", ((Number) reddit_video_preview.get("height")).intValue());
+                    videoFallbackMap.put("width", ((Number) reddit_video_preview.get("width")).intValue());
+                    videoFallbackMap.put("bitrate_kbps", ((Number) reddit_video_preview.get("bitrate_kbps")).intValue());
+                }
+                collect_reddit_preview_video_items_and_video_fallback_map: {
+                    final String[] mediaTypes = new String[] { "media", "secure_media" };
+                    for (final String mediaType : mediaTypes) {
+                        final Map<String, Object> mediaInfo = (Map<String, Object>) data.get(mediaType);
+                        if (mediaInfo == null || mediaInfo.isEmpty()) {
+                            continue;
+                        }
+                        /* This is not always given */
+                        final Map<String, Object> redditVideo = (Map<String, Object>) mediaInfo.get("reddit_video");
+                        if (redditVideo == null) {
+                            continue;
+                        }
+                        String hls_url = (String) redditVideo.get("hls_url");
+                        if (StringUtils.isEmpty(hls_url)) {
+                            continue;
+                        }
+                        hls_url = Encoding.htmlOnlyDecode(hls_url);
+                        if (videoFallbackMap == null && redditVideo.get("fallback_url") instanceof String) {
+                            videoFallbackMap = new MinimalMemoryMap<String, Object>();
+                            /* Cast to trigger exception if fields contain unexpected data types. */
+                            videoFallbackMap.put("fallback_url", redditVideo.get("fallback_url").toString());
+                            videoFallbackMap.put("height", ((Number) redditVideo.get("height")).intValue());
+                            videoFallbackMap.put("width", ((Number) redditVideo.get("width")).intValue());
+                            videoFallbackMap.put("bitrate_kbps", ((Number) redditVideo.get("bitrate_kbps")).intValue());
+                        }
+                        /* TODO: 2022-01-12: Check filenames for such URLs (apply user preferred FilenameScheme) */
+                        final String videoID = new Regex(hls_url, PATTERN_SELFHOSTED_VIDEO).getMatch(0);
+                        if (videoID != null) {
+                            final DownloadLink video = this.createDownloadlink(generateRedditSelfhostedVideoURL(videoID));
+                            video.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_video);
+                            video.setAvailable(true);
+                            if (videoFallbackMap != null) {
+                                video.setProperty(RedditCom.PROPERTY_VIDEO_FALLBACK, videoFallbackMap);
+                            }
+                            thisCrawledPreviewVideoLinks.add(video);
+                            addedRedditSelfhostedVideo = true;
+                        } else {
+                            /* Most likely directurl */
+                            final DownloadLink dl = this.createDownloadlink(hls_url);
+                            thisCrawledPreviewVideoLinks.add(dl);
+                        }
+                        /* Stop once one media type has been found as the rest are usually duplicates/mirrors. */
+                        break;
+                    }
+                }
                 if (!StringUtils.isEmpty(maybeExternalURL)) {
                     maybeExternalURL = Encoding.htmlOnlyDecode(maybeExternalURL);
                     /* The following if statement is not needed is is only here because that field rarely contains a relative URL. */
@@ -439,10 +501,13 @@ public class RedditComCrawler extends PluginForDecrypt {
                         if (maybeExternalURL.matches(PATTERN_SELFHOSTED_VIDEO)) {
                             dl.setProperty(RedditCom.PROPERTY_SERVER_FILENAME_WITHOUT_EXT, serverFilenameWithoutExt);
                             dl.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_video);
-                            addedRedditSelfhostedVideo = true;
+                            if (videoFallbackMap != null) {
+                                dl.setProperty(RedditCom.PROPERTY_VIDEO_FALLBACK, videoFallbackMap);
+                            }
                             /* Skip availablecheck as we know that this content is online and it is a directurl. */
                             dl.setAvailable(true);
                             thisCrawledLinks.add(dl);
+                            addedRedditSelfhostedVideo = true;
                         } else {
                             /* PATTERN_SELFHOSTED_IMAGE */
                             dl.setProperty(RedditCom.PROPERTY_SERVER_FILENAME_WITHOUT_EXT, serverFilenameWithoutExt);
@@ -477,7 +542,6 @@ public class RedditComCrawler extends PluginForDecrypt {
                         logger.info("Ignoring URL found in 'url' field: " + maybeExternalURL);
                     }
                 }
-                final Map<String, Object> preview = (Map<String, Object>) data.get("preview");
                 if (preview != null && crawlPreview) {
                     final List<Map<String, Object>> images = (List<Map<String, Object>>) preview.get("images");
                     for (final Map<String, Object> image : images) {
@@ -508,7 +572,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 if (StringUtils.endsWithCaseInsensitive(filenameFromURL, ".gif")) {
                                     /*
                                      * Filename from URL contains .gif extension but this is a .mp4 file
-                                     * 
+                                     *
                                      * -> Correct that but keep .gif to signal source of the mp4
                                      */
                                     direct.setFinalFileName(this.applyFilenameExtension(filenameFromURL, ".gif.mp4"));
@@ -522,9 +586,9 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                     /**
                      * Return "preview video" because e.g. in some cases original video is hosted on imgur.com but it is offline while
-                     * content on reddit is still online e.g.: </br> /r/Bellissima/comments/151ruli/brit_manuela/
+                     * content on reddit is still online e.g.: </br>
+                     * /r/Bellissima/comments/151ruli/brit_manuela/
                      */
-                    final Map<String, Object> reddit_video_preview = (Map<String, Object>) preview.get("reddit_video_preview");
                     if (reddit_video_preview != null && !addedRedditSelfhostedVideo) {
                         final String hls_url = reddit_video_preview.get("hls_url").toString();
                         final String videoID = new Regex(hls_url, PATTERN_SELFHOSTED_VIDEO).getMatch(0);
@@ -532,13 +596,8 @@ public class RedditComCrawler extends PluginForDecrypt {
                             final DownloadLink video = this.createDownloadlink(generateRedditSelfhostedVideoURL(videoID));
                             video.setProperty(RedditCom.PROPERTY_SERVER_FILENAME_WITHOUT_EXT, videoID);
                             video.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_video);
-                            final Object fallback_url = reddit_video_preview.get("fallback_url");
-                            if (fallback_url != null) {
-                                final Map<String, Object> videoFallback = new MinimalMemoryMap<String, Object>();
-                                videoFallback.put("fallback_url", fallback_url);
-                                videoFallback.put("height", reddit_video_preview.get("height"));
-                                videoFallback.put("bitrate_kbps", reddit_video_preview.get("bitrate_kbps"));
-                                video.setProperty(RedditCom.PROPERTY_VIDEO_FALLBACK, videoFallback);
+                            if (videoFallbackMap != null) {
+                                video.setProperty(RedditCom.PROPERTY_VIDEO_FALLBACK, videoFallbackMap);
                             }
                             /* Skip availablecheck as we know that this content is online and it is a directurl. */
                             video.setAvailable(true);
@@ -594,58 +653,21 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 } else {
                     /**
-                     * No image gallery </br> --> Look for embedded content from external sources - the object is always given but can be
-                     * empty
+                     * No image gallery </br>
+                     * --> Look for embedded content from external sources - the object is always given but can be empty
                      */
-                    final Object embeddedMediaO = data.get("media_embed");
-                    if (embeddedMediaO != null) {
-                        final Map<String, Object> embeddedMediaInfo = (Map<String, Object>) embeddedMediaO;
-                        if (!embeddedMediaInfo.isEmpty()) {
-                            logger.info("Found media_embed");
-                            String mediaEmbedStr = (String) embeddedMediaInfo.get("content");
-                            final String[] urls = HTMLParser.getHttpLinks(mediaEmbedStr, this.br.getURL());
-                            for (final String url : urls) {
-                                final DownloadLink dl = this.createDownloadlink(url);
-                                thisCrawledExternalLinks.add(dl);
-                            }
+                    final Map<String, Object> embeddedMediaInfo = (Map<String, Object>) data.get("media_embed");
+                    if (embeddedMediaInfo != null && !embeddedMediaInfo.isEmpty()) {
+                        logger.info("Found media_embed");
+                        String mediaEmbedStr = (String) embeddedMediaInfo.get("content");
+                        final String[] urls = HTMLParser.getHttpLinks(mediaEmbedStr, this.br.getURL());
+                        for (final String url : urls) {
+                            final DownloadLink dl = this.createDownloadlink(url);
+                            thisCrawledExternalLinks.add(dl);
                         }
                     }
-                    /* Look for selfhosted video content. Prefer content without https */
                     if (!addedRedditSelfhostedVideo) {
-                        final String[] mediaTypes = new String[] { "media", "secure_media" };
-                        for (final String mediaType : mediaTypes) {
-                            final Object mediaO = data.get(mediaType);
-                            if (mediaO != null) {
-                                final Map<String, Object> mediaInfo = (Map<String, Object>) mediaO;
-                                if (!mediaInfo.isEmpty()) {
-                                    logger.info("Found mediaType '" + mediaType + "'");
-                                    /* This is not always given */
-                                    final Object redditVideoO = mediaInfo.get("reddit_video");
-                                    if (redditVideoO != null) {
-                                        final Map<String, Object> redditVideo = (Map<String, Object>) redditVideoO;
-                                        /* TODO: 2022-01-12: Check filenames for such URLs (apply user preferred FilenameScheme) */
-                                        String hls_url = (String) redditVideo.get("hls_url");
-                                        if (!StringUtils.isEmpty(hls_url)) {
-                                            hls_url = Encoding.htmlOnlyDecode(hls_url);
-                                            final String videoID = new Regex(hls_url, PATTERN_SELFHOSTED_VIDEO).getMatch(0);
-                                            if (videoID != null) {
-                                                final DownloadLink video = this.createDownloadlink(generateRedditSelfhostedVideoURL(videoID));
-                                                video.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_video);
-                                                video.setAvailable(true);
-                                                thisCrawledLinks.add(video);
-                                                addedRedditSelfhostedVideo = true;
-                                            } else {
-                                                /* Most likely directurl */
-                                                final DownloadLink dl = this.createDownloadlink(hls_url);
-                                                thisCrawledLinks.add(dl);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            /* Stop once one media type has been found as the rest are usually mirrors. */
-                            break;
-                        }
+                        thisCrawledLinks.addAll(thisCrawledPreviewVideoLinks);
                     }
                     /* Look for selfhosted photo content, Only add image if nothing else is found */
                     if (thisCrawledLinks.isEmpty()) {

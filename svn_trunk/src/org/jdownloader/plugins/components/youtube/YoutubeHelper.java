@@ -1799,6 +1799,14 @@ public class YoutubeHelper {
         if (map != null) {
             final Map<String, Object> liveBroadcastDetails = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "microformat/playerMicroformatRenderer/liveBroadcastDetails");
             if (liveBroadcastDetails != null) {
+                /**
+                 * 2026-01-08: Videos that were a "premiere" when they were released first may also contain this livestream information
+                 * although technically they've never been a livestream. <br>
+                 * I was unable to find a boolean or date field clearly stating "this video was a premiere" but you can find it out by
+                 * comparing the dates: <br>
+                 * If the uploadDate is smaller than the livestreamStartTimestamp, the item has most likely been a premiere. <br>
+                 * Reference: https://board.jdownloader.org/showthread.php?p=554017#post554017
+                 */
                 vid.isLiveNow = (Boolean) liveBroadcastDetails.get("isLiveNow");
                 final String startTimestampStr = (String) liveBroadcastDetails.get("startTimestamp");
                 if (startTimestampStr != null) {

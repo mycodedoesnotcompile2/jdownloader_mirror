@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51314 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52069 $", interfaceVersion = 2, names = {}, urls = {})
 public class PrimewireTf extends PluginForDecrypt {
     public PrimewireTf(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,8 +42,18 @@ public class PrimewireTf extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "primewire.tf" });
+        ret.add(new String[] { "primewire.tf", "primewire.zip", "primewire.si", "primewire.mov", "primewire.nexus" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        /* 2026-01-08: Collection of dead domains, function is not used atm. */
+        /* Domain status can be found here: primewire.nexus */
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("primewire.li");
+        deadDomains.add("primewire.ag");
+        deadDomains.add("primewire.vc");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

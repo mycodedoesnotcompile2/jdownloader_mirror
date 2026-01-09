@@ -22,14 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -43,7 +35,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51950 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
+@HostPlugin(revision = "$Revision: 52072 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,7 @@ public class MixdropCo extends antiDDoSForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd", "mixdrop.cv", "mixdrop23.net", "mxdrop.to" });
+        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd", "mixdrop.cv", "mixdrop23.net", "mxdrop.to", "m1xdrop.net" });
         return ret;
     }
 

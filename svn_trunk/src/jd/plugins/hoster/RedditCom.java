@@ -62,7 +62,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.RedditComCrawler;
 
-@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52068 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -204,10 +204,7 @@ public class RedditCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
-    }
-
-    public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
         this.setBrowserExclusive();
         br.setAllowedResponseCodes(new int[] { 400 });
         if (link.hasProperty(PROPERTY_CRAWLER_FILENAME)) {
@@ -257,36 +254,48 @@ public class RedditCom extends PluginForHost {
                 }
             } else {
                 /* DASH */
-                br.getPage(getVideoDASHPlaylistUrl(link));
-                this.connectionErrorhandling(br, br.getHttpConnection());
-                /* Very cheap method to find highest DASH quality without real DASH parser... */
-                final String[] dashRepresentations = br.getRegex("<Representation(.*?)</Representation>").getColumn(0);
+                String fallback_url = null;
                 String highestQualityVideoDownloadurl = null;
                 int highestBandwidth = -1;
-                final Map<String, Object> videoFallBack = getVideoFallback(link);
-                if (videoFallBack != null) {
-                    final String fallback_url = StringUtils.valueOfOrNull(videoFallBack.get("fallback_url"));
+                int fallback_height = -1;
+                final Map<String, Object> videoFallbackMap = getVideoFallbackMap(link);
+                if (videoFallbackMap != null) {
+                    fallback_url = StringUtils.valueOfOrNull(videoFallbackMap.get("fallback_url"));
                     if (fallback_url != null && StringUtils.containsIgnoreCase(fallback_url, "DASH_")) {
                         highestQualityVideoDownloadurl = fallback_url;
-                        final String bitrate_kbps = StringUtils.valueOfOrNull(videoFallBack.get("bitrate_kbps"));
+                        final String bitrate_kbps = StringUtils.valueOfOrNull(videoFallbackMap.get("bitrate_kbps"));
                         highestBandwidth = bitrate_kbps != null ? Integer.parseInt(bitrate_kbps) * 1000 : -1;
+                        fallback_height = ((Number) videoFallbackMap.get("height")).intValue();
                     }
                 }
-                for (final String dashRepresentation : dashRepresentations) {
-                    final String framerateStr = new Regex(dashRepresentation, "frameRate=\"(\\d+)\"").getMatch(0);
-                    final String heightStr = new Regex(dashRepresentation, "height=\"(\\d+)\"").getMatch(0);
-                    if (framerateStr == null && heightStr == null) {
-                        /* Skip audio-only items */
-                        continue;
-                    }
-                    final int bandwidth = Integer.parseInt(new Regex(dashRepresentation, "bandwidth=\"(\\d+)\"").getMatch(0));
-                    if (highestBandwidth == -1 || bandwidth > highestBandwidth) {
-                        highestBandwidth = bandwidth;
-                        highestQualityVideoDownloadurl = new Regex(dashRepresentation, "<BaseURL>([^<]+)</BaseURL>").getMatch(0);
+                boolean log_prefer_fallback_url = true;
+                if (fallback_url != null && fallback_height >= 1080) {
+                    logger.info("Assuming that fallback_url with 1080p is the best quality -> Refrain from accessing DASH playlist");
+                    log_prefer_fallback_url = false;
+                } else {
+                    br.getPage(getVideoDASHPlaylistUrl(link));
+                    this.connectionErrorhandling(br, br.getHttpConnection());
+                    /* Very cheap method to find highest DASH quality without real DASH parser... */
+                    final String[] dashRepresentations = br.getRegex("<Representation(.*?)</Representation>").getColumn(0);
+                    for (final String dashRepresentation : dashRepresentations) {
+                        final String framerateStr = new Regex(dashRepresentation, "frameRate=\"(\\d+)\"").getMatch(0);
+                        final String heightStr = new Regex(dashRepresentation, "height=\"(\\d+)\"").getMatch(0);
+                        if (framerateStr == null && heightStr == null) {
+                            /* Skip audio-only items */
+                            continue;
+                        }
+                        final int bandwidth = Integer.parseInt(new Regex(dashRepresentation, "bandwidth=\"(\\d+)\"").getMatch(0));
+                        if (highestBandwidth == -1 || bandwidth > highestBandwidth) {
+                            highestBandwidth = bandwidth;
+                            highestQualityVideoDownloadurl = new Regex(dashRepresentation, "<BaseURL>([^<]+)</BaseURL>").getMatch(0);
+                        }
                     }
                 }
                 if (highestQualityVideoDownloadurl != null) {
                     highestQualityVideoDownloadurl = br.getURL(highestQualityVideoDownloadurl).toString();
+                    if (log_prefer_fallback_url && fallback_url != null && highestQualityVideoDownloadurl.equals(fallback_url)) {
+                        logger.fine("fallback_url contains the best quality");
+                    }
                     link.setProperty(PROPERTY_DIRECTURL_LAST_USED, highestQualityVideoDownloadurl);
                     if (!isDownload) {
                         checkHttpDirecturlAndSetFilesize(highestQualityVideoDownloadurl, link);
@@ -306,7 +315,7 @@ public class RedditCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private Map<String, Object> getVideoFallback(final DownloadLink link) {
+    private Map<String, Object> getVideoFallbackMap(final DownloadLink link) {
         final Object ret = link.getProperty(PROPERTY_VIDEO_FALLBACK);
         if (ret instanceof Map) {
             return (Map<String, Object>) ret;
@@ -399,7 +408,7 @@ public class RedditCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (link.getPluginPatternMatcher().matches(PATTERN_TEXT)) {
             /* Write text to file */
             final String text = link.getStringProperty(PROPERTY_POST_TEXT);

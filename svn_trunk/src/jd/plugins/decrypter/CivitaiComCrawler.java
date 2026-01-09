@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.components.config.CivitaiComConfig.ModelCrawlMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
@@ -47,9 +49,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51677 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52070 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
+    public static final String API_BASE = "https://civitai.com/api/v1";
+
     public CivitaiComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -101,7 +105,6 @@ public class CivitaiComCrawler extends PluginForDecrypt {
          * Using API: https://github.com/civitai/civitai/wiki/REST-API-Reference,
          * https://wiki.civitai.com/wiki/Civitai_API#GET_/api/v1/images
          */
-        final String apiBase = "https://civitai.com/api/v1";
         final List<Map<String, Object>> modelVersions = new ArrayList<Map<String, Object>>();
         /**
          * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be returned but that is
@@ -110,19 +113,20 @@ public class CivitaiComCrawler extends PluginForDecrypt {
          * 2024-07-18: Issue has been reported to civitai: https://github.com/civitai/civitai/issues/1277
          */
         final String special_api_params = "&nsfw=X";
+        boolean crawlModelPostsBeforeEnd = false;
         String modelName = null;
         if (itemType.equals("models")) {
             /* Crawl all versions of a model */
             /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1modelsmodelid */
-            br.getPage(apiBase + "/models/" + itemID);
+            br.getPage(API_BASE + "/models/" + itemID);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             modelName = entries.get("name").toString();
             final List<Map<String, Object>> _modelVersions_ = (List<Map<String, Object>>) entries.get("modelVersions");
-            modelVersions.addAll(_modelVersions_);
-            if (modelVersionId != null) {
+            if (modelVersionId != null && _modelVersions_.size() > 1) {
+                /* User wants specific model version -> Ignore/delete all others */
                 final Iterator<Map<String, Object>> it = modelVersions.iterator();
                 while (it.hasNext()) {
                     final Map<String, Object> next = it.next();
@@ -131,12 +135,17 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                     }
                 }
             }
+            modelVersions.addAll(_modelVersions_);
+            final ModelCrawlMode mode = cfg.getModelCrawlerMode();
+            if (mode == ModelCrawlMode.MODEL_DATA_AND_POSTS) {
+                crawlModelPostsBeforeEnd = true;
+            }
         } else if (itemType.equals("posts")) {
             /**
              * Handles such links: https://civitai.com/posts/1234567 <br>
              * https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images
              */
-            br.getPage(apiBase + "/images?postId=" + itemID + special_api_params);
+            br.getPage(API_BASE + "/images?postId=" + itemID + special_api_params);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -173,89 +182,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 ret.add(link);
             }
         } else if (itemType.equals("user")) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(itemID);
-            fp.setPackageKey("civitai://user/" + itemID);
-            /* Handles such links: https://civitai.com/user/test */
-            /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images */
-            /* 2024-07-17: use small limit/pagination size to avoid timeout issues */
-            final int maxItemsPerPage = cfg.getProfileCrawlerMaxPaginationItems();
-            final int paginationSleepMillis = cfg.getProfileCrawlerPaginationSleepMillis();
-            String nextpage = apiBase + "/images?username=" + itemID + "&limit=" + maxItemsPerPage + special_api_params;
-            if (modelVersionId != null) {
-                nextpage += "&modelVersionId=" + modelVersionId;
-            }
-            int page = 1;
-            final HashSet<String> dupes = new HashSet<String>();
-            pagination: while (nextpage != null && !isAbort()) {
-                URLConnectionAdapter con = br.openGetConnection(nextpage);
-                final Map<String, Object> entries;
-                try {
-                    if (con.getResponseCode() == 404) {
-                        br.followConnection();
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    }
-                    entries = JSonStorage.restoreFromInputStream(con.getInputStream(), TypeRef.MAP);
-                } finally {
-                    con.disconnect();
-                }
-                final List<Map<String, Object>> images = (List<Map<String, Object>>) entries.get("items");
-                if (images == null || images.isEmpty()) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                int numberofNewItems = 0;
-                for (final Map<String, Object> image : images) {
-                    final String imageurl = image.get("url").toString();
-                    final String imageid = image.get("id").toString();
-                    if (!dupes.add(imageid)) {
-                        continue;
-                    }
-                    numberofNewItems++;
-                    final DownloadLink link = this.createDownloadlink(br.getURL("/images/" + imageid).toExternalForm());
-                    link.setProperty(CivitaiCom.PROPERTY_DATE, image.get("createdAt"));
-                    link.setProperty(CivitaiCom.PROPERTY_USERNAME, image.get("username"));
-                    link.setProperty(CivitaiCom.PROPERTY_DIRECTURL, imageurl);
-                    link.setProperty(CivitaiCom.PROPERTY_TYPE, image.get("type"));
-                    link._setFilePackage(fp);
-                    final String tempName;
-                    if (cfg.isUseIndexIDForImageFilename()) {
-                        if ("video".equals(image.get("type"))) {
-                            tempName = imageid + getFileNameExtensionFromURL(imageurl, ".mp4");
-                        } else {
-                            tempName = imageid + ".jpg";
-                        }
-                    } else {
-                        tempName = getFileNameFromURL(new URL(imageurl));
-                    }
-                    if (tempName != null) {
-                        link.setName(tempName);
-                    }
-                    link.setAvailable(true);
-                    ret.add(link);
-                    distribute(link);
-                }
-                logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + " | New items on this page: " + numberofNewItems + " | Max items per page: " + maxItemsPerPage + " | Pagination sleep millis: " + paginationSleepMillis);
-                final Map<String, Object> metadata = (Map<String, Object>) entries.get("metadata");
-                if (metadata == null) {
-                    logger.info("Stopping because: Metadata map doesnt exist");
-                    break pagination;
-                }
-                nextpage = (String) metadata.get("nextPage");
-                if (nextpage == null) {
-                    logger.info("Stopping because: Failed to find nextPage");
-                    break pagination;
-                }
-                if (numberofNewItems == 0) {
-                    /* Fail-safe */
-                    logger.info("Stopping because: Current page did not contain any new items -> Reached end?");
-                    break pagination;
-                } else {
-                    /* Continue to next page */
-                    page++;
-                    this.sleep(paginationSleepMillis, param);
-                    continue pagination;
-                }
-            }
+            this.crawlImages(param, itemID, null, null);
         } else {
             /* Unsupported link */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -330,11 +257,135 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             for (final DownloadLink result : thisRet) {
                 result._setFilePackage(fp);
                 ret.add(result);
+                distribute(result);
+            }
+            /*
+             * Do this as last step so that items crawled previously are returned first since an exception could happen during image
+             * crawling.
+             */
+            if (crawlModelPostsBeforeEnd) {
+                this.crawlImages(param, null, itemID, modelVersionId);
             }
         }
-        // if(ret.isEmpty()) {
-        // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        // }
+        return ret;
+    }
+
+    /** See: https://developer.civitai.com/docs/api/public-rest#get-apiv1images */
+    private ArrayList<DownloadLink> crawlImages(final CryptedLink param, final String username, final String modelId, final String modelVersionId) throws PluginException, IOException, InterruptedException {
+        // Parameter validation: All null or only modelVersionId provided
+        if ((username == null && modelId == null && modelVersionId == null) || (username == null && modelId == null && modelVersionId != null)) {
+            throw new IllegalArgumentException("Invalid parameter combination: username or modelId must be provided");
+        }
+        // Validation: modelId must be a valid number if not null
+        if (modelId != null) {
+            try {
+                Long.parseLong(modelId);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("modelId must be a valid number, got: " + modelId);
+            }
+        }
+        // Validation: modelVersionId must be a valid number if not null
+        if (modelVersionId != null) {
+            try {
+                Long.parseLong(modelVersionId);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("modelVersionId must be a valid number, got: " + modelVersionId);
+            }
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
+        final int maxItemsPerPage = cfg.getProfileCrawlerMaxPaginationItems();
+        final int paginationSleepMillis = cfg.getProfileCrawlerPaginationSleepMillis();
+        final UrlQuery query = new UrlQuery();
+        if (username != null) {
+            query.appendEncoded("username", username);
+        } else if (modelId != null) {
+            query.appendEncoded("modelId", modelId);
+        }
+        query.appendEncoded("limit", String.valueOf(maxItemsPerPage));
+        query.appendEncoded("nsfw", "X");
+        if (modelVersionId != null) {
+            query.appendEncoded("modelVersionId", modelVersionId);
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        if (username != null) {
+            fp.setName(username);
+            fp.setPackageKey("civitai://user/" + username);
+        } else {
+            fp.setName(modelId + " - images");
+            fp.setPackageKey("civitai://model/" + modelId + "/version/" + modelVersionId);
+        }
+        String nextpage = API_BASE + "/images?" + query.toString();
+        int page = 1;
+        final HashSet<String> dupes = new HashSet<String>();
+        pagination: while (!StringUtils.isEmpty(nextpage) && !isAbort()) {
+            URLConnectionAdapter con = br.openGetConnection(nextpage);
+            final Map<String, Object> entries;
+            try {
+                if (con.getResponseCode() == 404) {
+                    br.followConnection();
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                entries = JSonStorage.restoreFromInputStream(con.getInputStream(), TypeRef.MAP);
+            } finally {
+                con.disconnect();
+            }
+            final List<Map<String, Object>> images = (List<Map<String, Object>>) entries.get("items");
+            if (images == null || images.isEmpty()) {
+                if (page == 1) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                break pagination;
+            }
+            int numberofNewItems = 0;
+            for (final Map<String, Object> image : images) {
+                final String imageurl = image.get("url").toString();
+                final String imageid = image.get("id").toString();
+                if (!dupes.add(imageid)) {
+                    continue;
+                }
+                numberofNewItems++;
+                final DownloadLink link = this.createDownloadlink(br.getURL("/images/" + imageid).toExternalForm());
+                link.setProperty(CivitaiCom.PROPERTY_DATE, image.get("createdAt"));
+                link.setProperty(CivitaiCom.PROPERTY_USERNAME, image.get("username"));
+                link.setProperty(CivitaiCom.PROPERTY_DIRECTURL, imageurl);
+                link.setProperty(CivitaiCom.PROPERTY_TYPE, image.get("type"));
+                final String tempName;
+                if (cfg.isUseIndexIDForImageFilename()) {
+                    if ("video".equals(image.get("type"))) {
+                        tempName = imageid + getFileNameExtensionFromURL(imageurl, ".mp4");
+                    } else {
+                        tempName = imageid + ".jpg";
+                    }
+                } else {
+                    tempName = getFileNameFromURL(new URL(imageurl));
+                }
+                if (tempName != null) {
+                    link.setName(tempName);
+                }
+                link.setAvailable(true);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
+            }
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + " | New items on this page: " + numberofNewItems + " | Max items per page: " + maxItemsPerPage + " | Pagination sleep millis: " + paginationSleepMillis);
+            final Map<String, Object> metadata = (Map<String, Object>) entries.get("metadata");
+            if (metadata == null) {
+                logger.info("Stopping because: Metadata map doesn't exist");
+                break pagination;
+            }
+            nextpage = (String) metadata.get("nextPage");
+            if (nextpage == null) {
+                logger.info("Stopping because: Failed to find nextPage");
+                break pagination;
+            }
+            if (numberofNewItems == 0) {
+                logger.info("Stopping because: Current page did not contain any new items -> Reached end?");
+                break pagination;
+            }
+            page++;
+            this.sleep(paginationSleepMillis, param);
+        }
         return ret;
     }
 

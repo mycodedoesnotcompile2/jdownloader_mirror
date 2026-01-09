@@ -2,9 +2,11 @@ package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
@@ -22,6 +24,10 @@ public interface CivitaiComConfig extends PluginConfigInterface {
 
         public String getProfileCrawlerPaginationSleepMillis_label() {
             return "Profile crawler: Wait time between pagination requests";
+        }
+
+        public String getModelCrawlerMode_label() {
+            return "Model crawler: Choose what to crawl";
         }
     }
 
@@ -52,4 +58,32 @@ public interface CivitaiComConfig extends PluginConfigInterface {
     boolean isUseIndexIDForImageFilename();
 
     void setUseIndexIDForImageFilename(boolean b);
+
+    public static enum ModelCrawlMode implements LabelInterface {
+        DEFAULT {
+            @Override
+            public String getLabel() {
+                return "Default: Auto";
+            }
+        },
+        MODEL_DATA {
+            @Override
+            public String getLabel() {
+                return "Model data";
+            }
+        },
+        MODEL_DATA_AND_POSTS {
+            @Override
+            public String getLabel() {
+                return "Model data and related post images";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("DEFAULT")
+    @Order(40)
+    ModelCrawlMode getModelCrawlerMode();
+
+    void setModelCrawlerMode(final ModelCrawlMode mode);
 }

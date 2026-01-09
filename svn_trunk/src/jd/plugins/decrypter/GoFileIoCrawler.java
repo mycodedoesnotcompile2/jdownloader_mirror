@@ -23,6 +23,8 @@ import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -30,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GofileIo;
 
-@DecrypterPlugin(revision = "$Revision: 52052 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 52067 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -88,9 +90,9 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         int attempt = 0;
         Map<String, Object> response = null;
         Map<String, Object> response_data = null;
-        do {
+        passwordHandling: do {
             if (passwordRequired || passCode != null) {
-                /* Pre-given password was wrong -> Ask user for password */
+                /* Pre-given password was wrong or this is the 2nd+ attempt -> Ask user for password */
                 if (attempt > 0 || passCode == null) {
                     passCode = getUserInput("Password?", param);
                 }
@@ -115,13 +117,13 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 passCode = null;
                 attempt += 1;
                 if (attempt >= 3) {
-                    break;
+                    break passwordHandling;
                 } else {
-                    continue;
+                    continue passwordHandling;
                 }
             } else {
                 passwordCorrect = true;
-                break;
+                break passwordHandling;
             }
         } while (!this.isAbort());
         if (passwordRequired && !passwordCorrect) {
@@ -140,29 +142,15 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         } else if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
             throw new AccountRequiredException("Private link");
         }
-        String currentFolderName = response_data.get("name").toString();
-        String path = this.getAdoptedCloudFolderStructure();
-        if (path == null && (currentFolderName.matches("^quickUpload_.+") || currentFolderName.equals(folderID) || currentFolderName.equals("root"))) {
-            /* Invalid value */
-            currentFolderName = null;
-        }
-        if (path == null) {
-            if (!StringUtils.isEmpty(currentFolderName)) {
-                /* No path given yet --> Use current folder name as root folder name */
-                path = currentFolderName;
-            }
-        } else {
-            if (!StringUtils.isEmpty(currentFolderName)) {
-                path += "/" + currentFolderName;
-            }
+        final Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("children");
+        if (children.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         final String parentFolderShortID = response_data.get("code").toString();
-        Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("contents");
-        if (children == null) {
-            /* 2024-03-11 */
-            children = (Map<String, Map<String, Object>>) response_data.get("children");
-        }
+        String lastItemFilename = null;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        int numberofFiles = 0;
+        int numberofFolders = 0;
         for (final Entry<String, Map<String, Object>> item : children.entrySet()) {
             final Map<String, Object> entry = item.getValue();
             final String type = (String) entry.get("type");
@@ -173,42 +161,72 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 hosterplugin.parseFileInfo(file, account, entry);
                 file.setProperty(GofileIo.PROPERTY_PARENT_FOLDER_SHORT_ID, parentFolderShortID);
                 file.setAvailable(true);
-                if (passCode != null) {
-                    file.setDownloadPassword(passCode);
-                }
-                /* Do not set path/FilePackage for single files. */
-                if (path != null && (!StringUtils.equals(file.getName(), path) || children.size() > 1)) {
-                    file.setRelativeDownloadFolderPath(path);
-                }
                 ret.add(file);
+                lastItemFilename = file.getName();
+                numberofFiles++;
             } else if (type.equalsIgnoreCase("folder")) {
                 /* Subfolder containing more files/folders */
                 final DownloadLink folder = this.createDownloadlink("https://" + this.getHost() + "/d/" + entry.get("code"));
-                if (passCode != null) {
-                    folder.setDownloadPassword(passCode);
-                }
-                if (path != null) {
-                    folder.setRelativeDownloadFolderPath(path);
-                }
                 ret.add(folder);
+                numberofFolders++;
             } else {
                 /* This should never happen */
-                logger.warning("Unsupported type: " + type);
+                logger.warning("Unsupported resource type: " + type);
                 continue;
             }
         }
-        final FilePackage fp;
-        if (path != null) {
-            fp = FilePackage.getInstance();
-            fp.setName(path);
-        } else if (ret.size() > 1) {
-            fp = FilePackage.getInstance();
-            fp.setName(response_data.get("name").toString());
-        } else {
-            fp = null;
+        final String folderDescription = (String) response_data.get("description");
+        String currentFolderName = response_data.get("name").toString();
+        if (StringUtils.isEmpty(currentFolderName)) {
+            /* Fallback which should never be needed */
+            currentFolderName = folderID;
         }
-        if (fp != null) {
-            fp.addLinks(ret);
+        logger.info("FolderID: " + folderID + " | files: " + numberofFiles + " | folders: " + numberofFolders);
+        final String pathToParentFolder = this.getAdoptedCloudFolderStructure();
+        /*
+         * File is single loose file if we do not have a path of a previous folder structure && current folder contains exactly a single
+         * file item.
+         */
+        String path = pathToParentFolder;
+        final boolean isSingleLooseFile = pathToParentFolder == null && numberofFiles == 1 && numberofFolders == 0;
+        if (path != null) {
+            /*
+             * We are inside a subfolder of another folder -> Append name of current folder to path. Ignore "invalid" folder names otherwise
+             * our folder path would become invalid.
+             */
+            path += "/" + currentFolderName;
+        } else {
+            /* This is the root folder -> Set name of current folder as path */
+            path = currentFolderName;
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(path);
+        if (!StringUtils.isEmpty(folderDescription)) {
+            fp.setComment(folderDescription);
+        }
+        /* Set additional properties */
+        for (final DownloadLink result : ret) {
+            if (passCode != null) {
+                result.setDownloadPassword(passCode);
+            }
+            if (isSingleLooseFile) {
+                /*
+                 * Single file
+                 */
+                /*
+                 * Set folder description as single file comment since we do not set a FilePackage in this case so otherwise this
+                 * description would be lost.
+                 */
+                if (!StringUtils.isEmpty(folderDescription)) {
+                    result.setComment(folderDescription);
+                }
+            } else {
+                /* We got multiple files which might be a part of a larger file/subfolder structure. */
+                if (path != null) {
+                    result.setRelativeDownloadFolderPath(path);
+                }
+                result._setFilePackage(fp);
+            }
         }
         return ret;
     }
