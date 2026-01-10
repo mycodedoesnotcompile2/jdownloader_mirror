@@ -20,6 +20,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -39,16 +43,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediafireCom;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 51928 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52073 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static final Pattern TYPE_DIRECT                       = Pattern.compile("https?://download\\d+.mediafire(?:cdn)?\\.com/[^/]+/([a-z0-9]+)/([^/\"']+)", Pattern.CASE_INSENSITIVE);
+    private static final String PATTERN_CONTENT_ID                = "[a-z0-9]+";
+    public static final Pattern MEDIAFIRE_PROTOCOL_AND_SUBDOMAINS = Pattern.compile("https?://(?:(?:www|app)\\.)?");
+
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "mediafire.com", "mfi.re" });
@@ -64,15 +69,12 @@ public class MediafireComFolder extends PluginForDecrypt {
         return buildSupportedNames(getPluginDomains());
     }
 
-    public static final String  TYPE_DIRECT        = "(?i)https?://download\\d+.mediafire(?:cdn)?\\.com/[^/]+/([a-z0-9]+)/([^/\"']+)";
-    private static final String PATTERN_CONTENT_ID = "[a-z0-9]+";
-
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
             final String hostPatternPart = buildHostsPatternPart(domains);
-            String pattern = "https?://(?:www\\.)?" + hostPatternPart + "/.+";
-            pattern += "|" + TYPE_DIRECT;
+            String pattern = MEDIAFIRE_PROTOCOL_AND_SUBDOMAINS.pattern() + hostPatternPart + "/.+";
+            pattern += "|" + TYPE_DIRECT.pattern();
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);

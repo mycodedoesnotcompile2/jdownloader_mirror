@@ -20,6 +20,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -32,10 +36,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
-@DecrypterPlugin(revision = "$Revision: 51891 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52075 $", interfaceVersion = 2, names = {}, urls = {})
 public class AnimeFrenzy extends antiDDoSForDecrypt {
     public AnimeFrenzy(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +77,14 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String fpName = br.getRegex("<title>(?:Watch\\s+)?([^<]+)\\s+(?:- Watch Anime Online|English\\s+[SD]ub\\s+)").getMatch(0);
+        String title = br.getRegex("<title>(?:Watch\\s+)?([^<]+)\\s+(?:- Watch Anime Online|English\\s+[SD]ub\\s+)").getMatch(0);
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            fp.setName(Encoding.htmlDecode(title).trim());
+        } else {
+            fp.setName(br._getURL().getPath());
+        }
+        fp.addLinks(ret);
         final ArrayList<String> links = new ArrayList<String>();
         Collections.addAll(links, br.getRegex("<li[^>]*>\\s*<a[^>]+href\\s*=\\s*[\"']([^\"']+/watch/[^\"']+)[\"']").getColumn(0));
         Collections.addAll(links, br.getRegex("<a[^>]+class\\s*=\\s*[\"']noepia[\"'][^>]+href\\s*=\\s*[\"']([^\"']+)[\"']").getColumn(0));
@@ -134,14 +142,36 @@ public class AnimeFrenzy extends antiDDoSForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-            fpName = data.get("name").toString();
+            title = data.get("name").toString();
             final List<Map<String, Object>> videos = (List<Map<String, Object>>) data.get("videos");
             ret.addAll(crawlVideos(videos));
         }
-        if (fpName != null) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName).trim());
-            fp.addLinks(ret);
+        final String episodeID = UrlQuery.parse(br.getURL()).get("ep");
+        // TODO: Crawl all episodes of a series if there is no single episode id given inside URL
+        final String seriesID = new Regex(br.getURL(), "-(\\d+)$").getMatch(0);
+        if (episodeID != null) {
+            /* 2026-01-09 */
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("https://nine.mewcdn.online/ajax/episode/servers?episodeId=" + episodeID);
+            final Map<String, Object> epinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (!Boolean.TRUE.equals(epinfo.get("status"))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String html = epinfo.get("html").toString();
+            br.getRequest().setHtmlCode(html);
+            final String[] mirror_ids = br.getRegex("data-id=\"(\\d+)").getColumn(0);
+            for (final String mirror_id : mirror_ids) {
+                brc.getPage("/ajax/episode/sources?id=" + mirror_id);
+                final Map<String, Object> mirrorinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String url = mirrorinfo.get("link").toString();
+                final DownloadLink link = this.createDownloadlink(url);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
+            }
         }
         return ret;
     }

@@ -38,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51559 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52075 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidcloudStreameeeeee extends PluginForDecrypt {
     public VidcloudStreameeeeee(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +55,7 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         /* Formerly vidcloud.co, vidcloud.ru, vcstream.to */
+        // tags: rapid-cloud.co
         ret.add(new String[] { "streameeeeee.site" });
         return ret;
     }
@@ -123,7 +124,7 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
         final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) entries.get("tracks");
         final boolean is_encrypted = ((Boolean) entries.get("encrypted")).booleanValue();
         if (is_encrypted) {
-            logger.warning("Content is encrypted -> Ignoring video content");
+            logger.warning("Content is encrypted -> Ignoring video content and returning subtitles only, if subtitles exist");
             /* Continue and possible crawl subtitle */
             if (subtitles.isEmpty()) {
                 /* Video is encrypted and no subtitles there for us to crawl. */

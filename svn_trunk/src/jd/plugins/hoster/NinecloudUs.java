@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50554 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52076 $", interfaceVersion = 3, names = {}, urls = {})
 public class NinecloudUs extends PluginForHost {
     public NinecloudUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -145,7 +145,7 @@ public class NinecloudUs extends PluginForHost {
             String premiumOnlyMessage = br.getRegex("<div class=\"box_notice\"[^>]*>(.*?)</div>").getMatch(0);
             if (premiumOnlyMessage != null) {
                 /* E.g. This file contains XX pictures, and would make a zip of XXX.XMB. You cannot download it without a subscription. */
-                premiumOnlyMessage = premiumOnlyMessage.replaceAll("<[^>]*>", "");
+                premiumOnlyMessage = premiumOnlyMessage.replaceAll("<[^>]*>", "").trim();
                 throw new AccountRequiredException(premiumOnlyMessage);
             }
             dllink = br.getRegex("\"(https?://(downloads|slow).[^/]+/[^\"]+)\"").getMatch(0);

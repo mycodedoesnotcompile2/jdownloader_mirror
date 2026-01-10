@@ -12,6 +12,15 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.encoding.URLEncode.Decoder;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,16 +40,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.encoding.URLEncode.Decoder;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52074 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -799,6 +799,9 @@ public class Bunkr extends PluginForHost {
 
     private void handleConnectionErrors(final DownloadLink link, final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         final long parsedExpectedFilesize = link.getLongProperty(PROPERTY_PARSED_FILESIZE, -1);
+        final String media_under_maintenance_text = "Media temporarily not available due to ongoing server maintenance.";
+        final long media_under_maintenance_wait = 2 * 60 * 60 * 1000l;
+        final String path = con.getURL().getPath();
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             handleResponsecodeErrors(con);
@@ -807,7 +810,11 @@ public class Bunkr extends PluginForHost {
         } else if (con.getURL().getPath().equalsIgnoreCase("/maintenance-vid.mp4") || con.getURL().getPath().equalsIgnoreCase("/v/maintenance-kek-bunkr.webm") || con.getURL().getPath().equalsIgnoreCase("/maintenance.mp4")) {
             con.disconnect();
             /* https://bnkr.b-cdn.net/maintenance-vid.mp4 */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Media temporarily not available due to ongoing server maintenance.", 2 * 60 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, media_under_maintenance_text, media_under_maintenance_wait);
+        } else if (path.endsWith("/maint.mp4") && con.getCompleteContentLength() <= 322509l) {
+            /* 2026-01-09 */
+            /* https://3d09xl1.b-cdn.net/c4f36040-bdd1-40b6-aea1-034dfbe88ba2/maint.mp4 */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, media_under_maintenance_text, media_under_maintenance_wait);
         } else if (parsedExpectedFilesize > 0 && con.getCompleteContentLength() > 0 && con.getCompleteContentLength() < (parsedExpectedFilesize * 0.5)) {
             /*
              * Content-Type: image/jpeg
