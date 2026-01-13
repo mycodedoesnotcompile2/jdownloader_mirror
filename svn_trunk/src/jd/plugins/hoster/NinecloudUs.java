@@ -24,7 +24,6 @@ import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -36,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52076 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52084 $", interfaceVersion = 3, names = {}, urls = {})
 public class NinecloudUs extends PluginForHost {
     public NinecloudUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +72,7 @@ public class NinecloudUs extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/download/(\\d+/\\d+)/?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/download/(\\d+(/\\d+)?)");
         }
         return ret.toArray(new String[0]);
     }
@@ -102,23 +101,26 @@ public class NinecloudUs extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".zip";
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link) + ".zip");
-        }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* 2026-01-12: Filename is displayed in 2nd download step after 30 seconds of wait time which we can't do during availablecheck. */
+        final boolean expectFilenameInHtmlCodeOfFirstStep = false;
         String filename = br.getRegex(">\\s*Filename\\s*:\\s*([^<>\"]+)<").getMatch(0);
         String filesize = br.getRegex(">\\s*Size\\s*:\\s*([^<>\"]+)<").getMatch(0);
         /* 2021-02-17: Filename is not visible e.g. when limit is currently reached. */
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
-        } else {
+        } else if (expectFilenameInHtmlCodeOfFirstStep) {
             logger.warning("Failed to find filename");
         }
         if (filesize != null) {
@@ -136,25 +138,34 @@ public class NinecloudUs extends PluginForHost {
     }
 
     private void doFree(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
-        String dllink = checkDirectLink(link, directlinkproperty);
+        final String waitMinutesStr = br.getRegex("You cannot download until (\\d+) minutes? from now").getMatch(0);
+        if (waitMinutesStr != null) {
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(waitMinutesStr) * 60 * 1001l);
+        }
+        String premiumOnlyMessage = br.getRegex("<div class=\"box_notice\"[^>]*>(.*?)</div>").getMatch(0);
+        if (premiumOnlyMessage != null) {
+            /* E.g. This file contains XX pictures, and would make a zip of XXX.XMB. You cannot download it without a subscription. */
+            premiumOnlyMessage = premiumOnlyMessage.replaceAll("<[^>]*>", "").trim();
+            throw new AccountRequiredException(premiumOnlyMessage);
+        }
+        final String nextStepUrl = br.getRegex("\"(?:https?://)?(/download/fetch-buttons/[^\"]+)\"").getMatch(0);
+        if (nextStepUrl == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        br.getPage(nextStepUrl);
+        String filename = br.getRegex(">\\s*Filename:?\\s*</div>\\s*<div class=\"value\"[^>]*>([^<]+)</div>").getMatch(0);
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
+        }
+        String dllink = br.getRegex("\"(https?://(downloads|slow).[^/]+/[^\"]+)\"").getMatch(0);
         if (dllink == null) {
-            final String waitMinutesStr = br.getRegex("You cannot download until (\\d+) minutes? from now").getMatch(0);
-            if (waitMinutesStr != null) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(waitMinutesStr) * 60 * 1001l);
-            }
-            String premiumOnlyMessage = br.getRegex("<div class=\"box_notice\"[^>]*>(.*?)</div>").getMatch(0);
-            if (premiumOnlyMessage != null) {
-                /* E.g. This file contains XX pictures, and would make a zip of XXX.XMB. You cannot download it without a subscription. */
-                premiumOnlyMessage = premiumOnlyMessage.replaceAll("<[^>]*>", "").trim();
-                throw new AccountRequiredException(premiumOnlyMessage);
-            }
-            dllink = br.getRegex("\"(https?://(downloads|slow).[^/]+/[^\"]+)\"").getMatch(0);
-            if (dllink == null) {
-                dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download").getMatch(0);
-            }
-            if (StringUtils.isEmpty(dllink)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            dllink = br.getRegex("<a[^>]*href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Slow").getMatch(0);
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -167,30 +178,7 @@ public class NinecloudUs extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
-    }
-
-    private String checkDirectLink(final DownloadLink link, final String property) {
-        String dllink = link.getStringProperty(property);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                con = br2.openHeadConnection(dllink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    return dllink;
-                }
-            } catch (final Exception e) {
-                logger.log(e);
-                return null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
-                }
-            }
-        }
-        return null;
     }
 
     @Override

@@ -23,6 +23,8 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -32,6 +34,7 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
@@ -45,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52083 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -205,15 +208,6 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
-    public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
-        /* 2019-08-14: Special: This might increase downloadspeed for free users */
-        if (captchaForm != null && captchaForm.hasInputFieldByName("adblock_detected")) {
-            captchaForm.put("adblock_detected", "0");
-        }
-        super.handleCaptcha(link, br, captchaForm);
-    }
-
-    @Override
     protected String regExTrafficLeft(final Browser br) {
         /* 2019-11-03: Special */
         final String src = this.getCorrectBR(br);
@@ -237,6 +231,30 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
+    public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
+        /* 2019-08-14: Special: This might increase downloadspeed for free users */
+        if (captchaForm != null && captchaForm.hasInputFieldByName("adblock_detected")) {
+            captchaForm.put("adblock_detected", "0");
+        }
+        /* 2026-01-12: Test code down below */
+        final boolean enforceTurnstileCaptcha = false;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && link != null && enforceTurnstileCaptcha && containsHCaptcha(getCorrectBR(br))) {
+            final CaptchaHosterHelperInterface ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, "0x4AAAAAABm53D0OJNkESa1O");
+            logger.info("Detected captcha method \"CloudflareTurnstileCaptcha\" for this host");
+            this.waitBeforeInteractiveCaptcha(link, ts.getSolutionTimeout());
+            final String cfTurnstileResponse = ts.getToken();
+            // captchaForm.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+            captchaForm.put("h-captcha-response", Encoding.urlEncode(cfTurnstileResponse));
+            // if (containsRecaptchaV2Class(br) || true) {
+            if (containsRecaptchaV2Class(br)) {
+                captchaForm.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
+            }
+        } else {
+            super.handleCaptcha(link, br, captchaForm);
+        }
+    }
+
+    @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2020-05-17 */
         super.scanInfo(html, fileInfo);
@@ -257,7 +275,7 @@ public class DdownloadCom extends XFileSharingProBasic {
 
     @Override
     protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
-        /* 2024-11-28: Public file downloads via API were turned off by the admins. */
+        /* 2024-11-28: Public file downloads via API have been turned off by the admins. */
         return false;
     }
 

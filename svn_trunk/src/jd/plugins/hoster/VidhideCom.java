@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52075 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52081 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -402,7 +402,12 @@ public class VidhideCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilename = new Regex(html, "<h3[^>]*>\\s*Download([^<]*)</h3>").getMatch(0);
+        String betterFilename = new Regex(html, "<h3[^>]*>\\s*Download([^<]*)</h3>").getMatch(0);
+        final String url = br.getURL();
+        if (betterFilename == null && url.matches("https?://[^/]+/(e|v)/.+")) {
+            /* 2026-01-12 */
+            betterFilename = new Regex(html, "<META NAME=\"description\" CONTENT=\"([^\"]+)\">").getMatch(0);
+        }
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
         }

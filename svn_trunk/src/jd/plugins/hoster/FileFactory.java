@@ -26,6 +26,21 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -50,22 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51860 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52077 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -100,7 +100,7 @@ public class FileFactory extends PluginForHost {
 
     /** Returns true if this link shall be used with the older filefactory.com website accessible via classic.filefactory.com. */
     private boolean isClassicFile(final DownloadLink link) throws PluginException {
-        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */&& link.getPluginPatternMatcher().contains("classic.filefactory.com"));
+        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */ && link.getPluginPatternMatcher().contains("classic.filefactory.com"));
     }
 
     private String getContentURL(final DownloadLink link) throws PluginException {
@@ -338,9 +338,20 @@ public class FileFactory extends PluginForHost {
             throw new AccountRequiredException();
         }
         if (error_code != null) {
+            String msg = br.getRegex("id=\"wp-body-box-message\"[^>]*>\\s*<p>([^<]+)</p>").getMatch(0);
+            if (msg != null) {
+                msg = Encoding.htmlDecode(msg);
+                /* Add error code to error message. */
+                msg = "Error " + error_code + ": " + msg;
+            } else {
+                msg = "Error " + error_code;
+            }
             if ("251".equals(error_code)) {
                 /* "Invalid Download Link" */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msg);
+            } else if ("252".equals(error_code)) {
+                /* "File Unavailable - This file is no longer available due to an unexpected error." */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msg);
             } else if ("258".equals(error_code)) {
                 /* https://www.filefactory.com/error.php?code=258 */
                 throw new AccountRequiredException("The owner of this file has restricted it to members with a Premium Account. Please purchase a Premium account in order to download this file.");
@@ -358,18 +369,18 @@ public class FileFactory extends PluginForHost {
                  * https://www.filefactory.com/error.php?code=274 <br>
                  * This file cannot be downloaded at this time. Please let us know about this issue by using the contact link below.
                  */
-                throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
+                throw new PluginException(LinkStatus.ERROR_FATAL, msg);
             } else if ("300".equals(error_code)) {
                 /* Invalid folder link */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msg);
             } else if ("325".equals(error_code)) {
                 /* Invalid Share Link e.g. https://www.filefactory.com/share/fi:xxxyyy */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msg);
             } else if ("FILE_NOT_FOUND".equals(error_code)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msg);
             } else {
                 logger.info("Unknown error happened: " + error_code);
-                throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
+                throw new PluginException(LinkStatus.ERROR_FATAL, msg);
             }
         }
         /* Handle errors inside url parameters */
@@ -758,7 +769,8 @@ public class FileFactory extends PluginForHost {
                     accountType = AccountType.PREMIUM;
                 }
                 /**
-                 * Other possible values: </br> "expired" -> Free Account
+                 * Other possible values: </br>
+                 * "expired" -> Free Account
                  */
             }
             if (accountType == null) {
@@ -912,7 +924,6 @@ public class FileFactory extends PluginForHost {
                             ret.put("action", "SIGNIN");
                             return ret;
                         }
-
                     };
                     final String recaptchaV2Response = rc.getToken();
                     final Map<String, Object> postdata1 = new HashMap<String, Object>();

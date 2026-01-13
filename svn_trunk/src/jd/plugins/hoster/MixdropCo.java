@@ -22,6 +22,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -35,15 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
-@HostPlugin(revision = "$Revision: 52072 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52081 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -192,10 +192,14 @@ public class MixdropCo extends antiDDoSForHost {
             }
             final Object filesizeO = result.get("size");
             if (filesizeO != null) {
+                final long filesize;
                 if (filesizeO instanceof Number) {
-                    link.setDownloadSize(((Number) filesizeO).longValue());
+                    filesize = ((Number) filesizeO).longValue();
                 } else {
-                    link.setDownloadSize(Long.parseLong(filesizeO.toString()));
+                    filesize = Long.parseLong(filesizeO.toString());
+                }
+                if (filesize > 0) {
+                    link.setDownloadSize(filesize);
                 }
             }
             if ((Boolean) result.get("deleted") == Boolean.TRUE) {

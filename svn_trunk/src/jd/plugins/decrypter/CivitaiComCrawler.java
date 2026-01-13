@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52070 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52080 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public static final String API_BASE = "https://civitai.com/api/v1";
@@ -94,7 +94,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
-        final Regex urlregex = new Regex(param.getCryptedUrl(), "(?i)/(posts|models|user)/([^/]+)");
+        final Regex urlregex = new Regex(param.getCryptedUrl(), "(?i)/(posts|models|user)/([^/\\?]+)");
         final UrlQuery query = UrlQuery.parse(contenturl);
         final String modelVersionId = query.get("modelVersionId");
         final String itemType = urlregex.getMatch(0);
@@ -312,7 +312,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             fp.setName(username);
             fp.setPackageKey("civitai://user/" + username);
         } else {
-            fp.setName(modelId + " - images");
+            fp.setName("Model " + modelId + " - images");
             fp.setPackageKey("civitai://model/" + modelId + "/version/" + modelVersionId);
         }
         String nextpage = API_BASE + "/images?" + query.toString();

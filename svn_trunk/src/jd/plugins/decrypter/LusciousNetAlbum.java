@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50554 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 52084 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
 public class LusciousNetAlbum extends PluginForDecrypt {
     public LusciousNetAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class LusciousNetAlbum extends PluginForDecrypt {
         final String albumID = new Regex(contenturl, this.getSupportedLinks()).getMatch(1);
         /* 2024-10-23: That particular API method doesn't work anymore for albums? */
         final boolean useAPI = false;
-        final String api_base = "https://apicdn.luscious.net/graphql";
+        final String api_base = "https://www.luscious.net/graphql";
         if (useAPI) {
             int page = 1;
             final FilePackage fp = FilePackage.getInstance();
@@ -130,12 +130,13 @@ public class LusciousNetAlbum extends PluginForDecrypt {
             final String title = albumSlug.replace("-", " ").trim();
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);
-            /*
+            /**
              * 2024-10-28: Disabled single image crawling as it doesn't work: It looks to be impossible to reliably generate full size URLs
-             * just by using their thumbnail URLs as a base.
+             * just by using their thumbnail URLs as a base. <br>
+             * 2026-01-12: This URL is not available via html code anymore -> XHR request is needed to find it.
              */
             String redirectURLPath = br.getRegex("\"(/download/r/\\d+/\\d+/?)\"").getMatch(0);
-            if (redirectURLPath == null && accountRequired) {
+            if (redirectURLPath == null) {
                 /* Workaround to get around the need to have an account :) */
                 try {
                     final Browser brc = br.cloneBrowser();
@@ -152,21 +153,25 @@ public class LusciousNetAlbum extends PluginForDecrypt {
                     redirectURLPath = "/download/r/" + userID + "/" + albumID + "/";
                 } catch (final Throwable e) {
                     logger.log(e);
+                    if (accountRequired) {
+                        throw new AccountRequiredException();
+                    }
                     logger.warning("Special handling failed");
                 }
             }
             if (redirectURLPath != null) {
+                /* Special handling to find single "download as .zip file" links. */
                 final Browser brc = br.cloneBrowser();
                 brc.setFollowRedirects(false);
                 brc.getPage("https://www." + br.getHost() + redirectURLPath);
                 /* Typically redirects to external file hoster 9cloud.us. */
-                final String redirect = brc.getRedirectLocation();
-                if (redirect == null) {
+                final String redirectUrl = brc.getRedirectLocation();
+                if (redirectUrl == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final PluginForHost plg = this.getNewPluginForHostInstance("9cloud.us");
-                final DownloadLink link = this.createDownloadlink(redirect);
-                if (plg.canHandle(redirect)) {
+                final DownloadLink link = this.createDownloadlink(redirectUrl);
+                if (plg.canHandle(redirectUrl)) {
                     link.setHost(plg.getHost());
                     link.setDefaultPlugin(plg);
                     /**
@@ -176,6 +181,8 @@ public class LusciousNetAlbum extends PluginForDecrypt {
                      */
                     link.setName(title + ".zip");
                     link.setAvailable(true);
+                } else {
+                    logger.warning("Found unexpected url zip type -> DEV: Check 9cloud.us plugin pattern!! Link: " + redirectUrl);
                 }
                 link._setFilePackage(fp);
                 ret.add(link);

@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52075 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52081 $", interfaceVersion = 3, names = {}, urls = {})
 public class DramaCoolVideo extends PluginForDecrypt {
     public DramaCoolVideo(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,10 @@ public class DramaCoolVideo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { DRAMACOOL_MAIN_DOMAIN, "dramacool.pa", "dramacool.cr", "dramacool.ch", "dramacool.bz", "dramacool.video", "dramacool.movie", "dramacool.so", "dramacool.link", "dramacool.vc", "dramacool.fo", "asianctv.com", "asianctv.net" });
+        /* 2026-01-12: Website is slightly different than other dramacool domains, thus I placed it in a separate array. */
+        ret.add(new String[] { "dramacool9.com.ro" });
         ret.add(new String[] { "gogoanime3.co", "gogoanime3.net", "gogoanime.tel", "gogoanime.tv", "gogoanime.io", "gogoanime.vc", "gogoanime.sh", "gogoanime.gg", "gogoanime.run" });
+        ret.add(new String[] { "kisskh.com.ro" }); // 2026-01-12
         return ret;
     }
 
@@ -123,6 +126,16 @@ public class DramaCoolVideo extends PluginForDecrypt {
         if (title == null) {
             /* Fallback */
             title = br._getURL().getPath().substring(1).replace("-", " ").trim();
+        }
+        {
+            /* 2026-01-12 */
+            final String[] vidbasic_embed_ids = br.getRegex("/streaming\\.php\\?id=([a-zA-Z0-9]{8,})").getColumn(0);
+            if (vidbasic_embed_ids != null && vidbasic_embed_ids.length > 0) {
+                for (final String vidbasic_embed_id : vidbasic_embed_ids) {
+                    ret.add(this.createDownloadlink("https://vidbasic.top/embed/" + vidbasic_embed_id));
+                }
+                return ret;
+            }
         }
         String[] links = br.getRegex("data-video=\"([^\"]+)\"\\s*>").getColumn(0);
         if (links == null || links.length == 0) {

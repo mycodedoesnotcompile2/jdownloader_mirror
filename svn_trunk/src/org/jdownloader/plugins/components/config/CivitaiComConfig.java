@@ -44,7 +44,7 @@ public interface CivitaiComConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 0, max = 20000, step = 1000)
     @DefaultIntValue(1000)
-    @DescriptionForConfigEntry("Wait time between pagination requests.")
+    @DescriptionForConfigEntry("Wait time in milliseconds between pagination requests.")
     @DefaultOnNull()
     @Order(20)
     int getProfileCrawlerPaginationSleepMillis();

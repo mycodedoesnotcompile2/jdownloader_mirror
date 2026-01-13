@@ -80,6 +80,7 @@ public abstract class AbstractTray implements TrayMouseListener {
 
     private void runTray() throws AWTException {
         final SystemTray systemTray = SystemTray.getSystemTray();
+
         this.trayIcon = initTray();
         this.ma = new TrayMouseAdapter(this, this.trayIcon);
         this.trayIcon.addMouseListener(this.ma);

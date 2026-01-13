@@ -2101,77 +2101,71 @@ public class YoutubeHelper {
         return parseDate(uploadedDate);
     }
 
-    private long parseDate(String dateString) {
-        if (dateString != null) {
-            final Date parsedDate = TimeFormatter.parseDateString(dateString);
-            if (parsedDate != null) {
-                // also supports timezones, eg 2008-12-11T20:53:49-08:00
-                final Calendar c = Calendar.getInstance();
-                c.setTimeInMillis(parsedDate.getTime());
-                c.set(Calendar.HOUR_OF_DAY, 0);
-                c.set(Calendar.MINUTE, 0);
-                c.set(Calendar.SECOND, 0);
-                final long result = c.getTimeInMillis();
-                logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
-                return result;
-            }
-            // time. just parse for the date pattern(s).
-            String date = new Regex(dateString, "([A-Za-z]+ \\d+, \\d{4})").getMatch(0);
-            if (date != null) {
-                // seen in MMM dd, yyyy
-                final SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH);
-                try {
-                    final long result = formatter.parse(date).getTime();
-                    logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
-                    return result;
-                } catch (final Exception e) {
-                    logger.log(e);
-                }
-            } else if (new Regex(dateString, "\\d{4}-\\d{2}-\\d{2}").matches()) {
-                final SimpleDateFormat formatter = new SimpleDateFormat("yyyy'-'MM'-'dd", Locale.ENGLISH);
-                try {
-                    final long result = formatter.parse(dateString).getTime();
-                    logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
-                    return result;
-                } catch (final Exception e) {
-                    logger.log(e);
-                }
-            } else if (new Regex(dateString, "\\d+\\s*(?:days?|hours?|minutes?|seconds?)").matches()) {
-                // Streamed live 3 hours ago
-                /*
-                 * streamed today.. x hours minutes etc. to keep it universal just show a day reference like above. parse, then construct
-                 * relative to users time. It should be equal to above as
-                 */
-                final String tmpdays = new Regex(dateString, "(\\d+)\\s+days?").getMatch(0);
-                final String tmphrs = new Regex(dateString, "(\\d+)\\s+hours?").getMatch(0);
-                final String tmpmin = new Regex(dateString, "(\\d+)\\s+minutes?").getMatch(0);
-                final String tmpsec = new Regex(dateString, "(\\d+)\\s+seconds?").getMatch(0);
-                long days = 0, hours = 0, minutes = 0, seconds = 0;
-                if (StringUtils.isNotEmpty(tmpdays)) {
-                    days = Integer.parseInt(tmpdays);
-                }
-                if (StringUtils.isNotEmpty(tmphrs)) {
-                    hours = Integer.parseInt(tmphrs);
-                }
-                if (StringUtils.isNotEmpty(tmpmin)) {
-                    minutes = Integer.parseInt(tmpmin);
-                }
-                if (StringUtils.isNotEmpty(tmpsec)) {
-                    seconds = Integer.parseInt(tmpsec);
-                }
-                final long time = System.currentTimeMillis() - ((days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
-                final Calendar c = Calendar.getInstance();
-                c.setTimeInMillis(time);
-                c.set(Calendar.HOUR_OF_DAY, 0);
-                c.set(Calendar.MINUTE, 0);
-                c.set(Calendar.SECOND, 0);
-                final long result = c.getTimeInMillis();
-                logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
-                return result;
-            } else {
-                logger.info("Unknown date format:" + dateString);
-            }
+    private long parseDate(final String dateString) {
+        if (dateString == null) {
+            return -1;
         }
+        final Date parsedDate = TimeFormatter.parseDateString(dateString);
+        if (parsedDate != null) {
+            // also supports timezones, eg 2008-12-11T20:53:49-08:00
+            final Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(parsedDate.getTime());
+            final long result = c.getTimeInMillis();
+            logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
+            return result;
+        }
+        // time. just parse for the date pattern(s).
+        String date = new Regex(dateString, "([A-Za-z]+ \\d+, \\d{4})").getMatch(0);
+        if (date != null) {
+            // seen in MMM dd, yyyy
+            final SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH);
+            try {
+                final long result = formatter.parse(date).getTime();
+                logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
+                return result;
+            } catch (final Exception e) {
+                logger.log(e);
+            }
+        } else if (new Regex(dateString, "\\d{4}-\\d{2}-\\d{2}").patternFind()) {
+            final SimpleDateFormat formatter = new SimpleDateFormat("yyyy'-'MM'-'dd", Locale.ENGLISH);
+            try {
+                final long result = formatter.parse(dateString).getTime();
+                logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
+                return result;
+            } catch (final Exception e) {
+                logger.log(e);
+            }
+        } else if (new Regex(dateString, "\\d+\\s*(?:days?|hours?|minutes?|seconds?)").patternFind()) {
+            // e.g. "Streamed live 3 hours ago"
+            /*
+             * streamed today.. x hours minutes etc. to keep it universal just show a day reference like above. parse, then construct
+             * relative to users time. It should be equal to above as
+             */
+            final String tmpdays = new Regex(dateString, "(\\d+)\\s+days?").getMatch(0);
+            final String tmphrs = new Regex(dateString, "(\\d+)\\s+hours?").getMatch(0);
+            final String tmpmin = new Regex(dateString, "(\\d+)\\s+minutes?").getMatch(0);
+            final String tmpsec = new Regex(dateString, "(\\d+)\\s+seconds?").getMatch(0);
+            long days = 0, hours = 0, minutes = 0, seconds = 0;
+            if (StringUtils.isNotEmpty(tmpdays)) {
+                days = Integer.parseInt(tmpdays);
+            }
+            if (StringUtils.isNotEmpty(tmphrs)) {
+                hours = Integer.parseInt(tmphrs);
+            }
+            if (StringUtils.isNotEmpty(tmpmin)) {
+                minutes = Integer.parseInt(tmpmin);
+            }
+            if (StringUtils.isNotEmpty(tmpsec)) {
+                seconds = Integer.parseInt(tmpsec);
+            }
+            final long time = System.currentTimeMillis() - ((days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
+            final Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(time);
+            final long result = c.getTimeInMillis();
+            logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
+            return result;
+        }
+        logger.info("Unknown date format:" + dateString);
         return -1;
     }
 
