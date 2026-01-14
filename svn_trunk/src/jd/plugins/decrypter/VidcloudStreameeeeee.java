@@ -38,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 52075 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52089 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidcloudStreameeeeee extends PluginForDecrypt {
     public VidcloudStreameeeeee(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,6 +57,7 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
         /* Formerly vidcloud.co, vidcloud.ru, vcstream.to */
         // tags: rapid-cloud.co
         ret.add(new String[] { "streameeeeee.site" });
+        ret.add(new String[] { "rapid-cloud.co" }); // typically "embed-2/v2"
         return ret;
     }
 
@@ -76,7 +77,7 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/embed-1/v3/e-1/([a-zA-Z0-9]+)\\?z=");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:embed-1/v3|embed-2/v2)/e-1/([a-zA-Z0-9]+)\\?z=");
         }
         return ret.toArray(new String[0]);
     }
@@ -97,7 +98,13 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
         } else {
             logger.warning("No referer given -> Crawl will most likely fail!");
         }
-        br.getPage(param.getCryptedUrl());
+        final boolean isV2 = StringUtils.containsIgnoreCase(param.getCryptedUrl(), "/v2/");
+        String contenturl = param.getCryptedUrl();
+        if (isV2) {
+            /* Important otherwise we will run into response code 404. */
+            contenturl += "&_debug=true";
+        }
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("/file-not-found\\.jpg")) {
@@ -116,9 +123,13 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
         if (key == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String content_id = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final String content_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        br.getPage("/embed-1/v3/e-1/getSources?id=" + content_id + "&_k=" + key);
+        if (isV2) {
+            br.getPage("/embed-2/v2/e-1/getSources?id=" + content_id);
+        } else {
+            br.getPage("/embed-1/v3/e-1/getSources?id=" + content_id + "&_k=" + key);
+        }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> sources = (List<Map<String, Object>>) entries.get("sources");
         final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) entries.get("tracks");
@@ -141,7 +152,7 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
                     video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
                 }
                 /* Without correct referer, mirror "UpCloud" which has internal server_id "29"will fail with Cloudflare error. */
-                video.setReferrerUrl("https://streameeeeee.site/");
+                video.setReferrerUrl("https://" + getHost() + "/");
                 ret.add(video);
             }
         }

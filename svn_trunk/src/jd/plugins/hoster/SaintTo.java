@@ -3,10 +3,13 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -21,7 +24,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52073 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52086 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,6 +51,8 @@ public class SaintTo extends PluginForHost {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "saint.to", "saint2.su", "saint2.cr" });
+        /* 2026-01-13: New domain on which a different system is running */
+        ret.add(new String[] { "turbovid.cr" });
         return ret;
     }
 
@@ -66,14 +71,15 @@ public class SaintTo extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern TYPE_EMBED        = Pattern.compile("/embed/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_API_DIRECT   = Pattern.compile("/api/download\\.php\\?file=([a-zA-Z0-9_/\\+\\=\\-%]+)/?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_API_INDIRECT = Pattern.compile("/d/([a-zA-Z0-9_/\\+\\=\\-%]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_EMBED          = Pattern.compile("/embed/([A-Za-z0-9-_]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_VIDEO_NEW_SITE = Pattern.compile("/v/([A-Za-z0-9-_]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_API_DIRECT     = Pattern.compile("/api/download\\.php\\?file=([a-zA-Z0-9_/\\+\\=\\-%]+)/?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_API_INDIRECT   = Pattern.compile("/d/([a-zA-Z0-9_/\\+\\=\\-%]+)", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_EMBED.pattern() + "|" + TYPE_API_DIRECT.pattern() + "|" + TYPE_API_INDIRECT.pattern() + ")");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_EMBED.pattern() + "|" + TYPE_VIDEO_NEW_SITE.pattern() + "|" + TYPE_API_DIRECT.pattern() + "|" + TYPE_API_INDIRECT.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -99,9 +105,18 @@ public class SaintTo extends PluginForHost {
 
     private String getFID(final DownloadLink link) {
         String fid = new Regex(link.getPluginPatternMatcher(), TYPE_EMBED).getMatch(0);
-        if (fid == null) {
-            fid = new Regex(link.getPluginPatternMatcher(), TYPE_API_DIRECT).getMatch(0);
+        if (fid != null) {
+            return fid;
         }
+        fid = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO_NEW_SITE).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), TYPE_API_INDIRECT).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), TYPE_API_DIRECT).getMatch(0);
         return fid;
     }
 
@@ -110,45 +125,116 @@ public class SaintTo extends PluginForHost {
         return this.getFID(link) + ".mp4";
     }
 
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        return requestFileInformation(link, false);
+    private boolean isNewWebsite(final DownloadLink link) {
+        /*
+         * At this moment we only check via domain but if they upgrade the system to be used for their other domains, this needs to be
+         * updated.
+         */
+        return this.getHost().equals("turbovid.cr");
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
         final Regex type_api_indirect;
-        if (new Regex(link.getPluginPatternMatcher(), TYPE_EMBED).patternFind()) {
-            this.setBrowserExclusive();
-            br.getPage(link.getPluginPatternMatcher());
+        final String contenturl = link.getPluginPatternMatcher();
+        final boolean isNewWebsite = this.isNewWebsite(link);
+        if (new Regex(contenturl, TYPE_EMBED).patternFind()) {
+            br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML("\"(Video not found|Video has been removed)")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             String filename = br.getRegex("<title>\\s*([^<]+)\\s*</title>").getMatch(0);
+            if (isNewWebsite) {
+                filename = br.getRegex("property=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
+            }
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
             }
-        } else if ((type_api_indirect = new Regex(link.getPluginPatternMatcher(), TYPE_API_INDIRECT)).patternFind()) {
+        } else if (new Regex(contenturl, TYPE_VIDEO_NEW_SITE).patternFind()) {
+            br.getPage(contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            String filename = br.getRegex("id=\"videoTitle\"[^>]*>([^<]+)<").getMatch(0);
+            if (filename != null) {
+                filename = Encoding.htmlDecode(filename).trim();
+                link.setName(filename);
+            } else {
+                logger.warning("Failed to find filename");
+            }
+            final String filesizeVagueStr = br.getRegex("id=\"videoSize\"[^>]*>(\\d+[^<]+)</span>").getMatch(0);
+            if (filesizeVagueStr != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesizeVagueStr));
+            } else {
+                logger.warning("Failed to find filesize");
+            }
+        } else if ((type_api_indirect = new Regex(contenturl, TYPE_API_INDIRECT)).patternFind()) {
             /* TYPE_API_INDIRECT */
-            final String filenameBase64 = type_api_indirect.getMatch(0);
-            final String filename = Encoding.Base64Decode(filenameBase64);
-            link.setName(filename);
-            br.getPage(link.getPluginPatternMatcher());
+            if (!isNewWebsite) {
+                final String filenameBase64 = type_api_indirect.getMatch(0);
+                final String filename = Encoding.Base64Decode(filenameBase64);
+                link.setName(filename);
+            }
+            br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML("File not found in the database")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            /* Only new website contains filename and md5 hash in html code */
+            String filename = br.getRegex("filename:\\s*\"([^\"]+)\"").getMatch(0);
+            if (filename == null) {
+                filename = br.getRegex("originalFilename:\\s*\"([^\"]+)\"").getMatch(0);
+            }
+            if (filename != null) {
+                link.setFinalFileName(filename);
+            } else if (isNewWebsite) {
+                /* Data should be available via new website */
+                logger.warning("Failed to find filename");
+            }
+            /**
+             * Set file size: There is a server side bug where for some files, the precise file size is wrong (1 byte) while the other size
+             * is correct. <br>
+             * If both sizes are given, we will take the bigger one.
+             */
+            final String filesizeBytesStr = br.getRegex("id=\"fileSizeBytes\">\\s*(\\d+)").getMatch(0);
+            final String filesizeVagueStr = br.getRegex(">\\s*Size\\s*</dt>\\s*<dd[^>]*>(\\d+[^<]+)</dd>").getMatch(0);
+            if (filesizeBytesStr != null && filesizeVagueStr != null) {
+                final long filesizeVague = SizeFormatter.getSize(filesizeVagueStr);
+                final long filesizeBytes = Long.parseLong(filesizeBytesStr);
+                if (filesizeBytes > filesizeVague) {
+                    link.setVerifiedFileSize(filesizeBytes);
+                } else {
+                    logger.fine("Server side precise filesize looks to be wrong: " + filesizeBytesStr);
+                    link.setDownloadSize(filesizeVague);
+                }
+            } else if (filesizeBytesStr != null) {
+                link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+            } else if (filesizeVagueStr != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesizeVagueStr));
+            } else if (isNewWebsite) {
+                /* Data should be available via new website */
+                logger.warning("Failed to find filesize");
+            }
+            final String md5 = br.getRegex("Checksum \\(MD5\\)\\s*</div>\\s*<div[^>]*>([a-f0-9]{32})").getMatch(0);
+            if (md5 != null) {
+                link.setMD5Hash(md5);
+            } else if (isNewWebsite) {
+                /* Data should be available via new website */
+                logger.warning("Failed to find md5");
+            }
         } else {
             /* TYPE_API_DIRECT */
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_API_DIRECT);
+            final Regex urlinfo = new Regex(contenturl, TYPE_API_DIRECT);
             final String filenameBase64 = urlinfo.getMatch(0);
             final String filename = Encoding.htmlDecode(filenameBase64);
             link.setName(filename);
             if (!isDownload) {
-                this.basicLinkCheck(br, br.createHeadRequest(link.getPluginPatternMatcher()), link, filename, ".mp4");
+                this.basicLinkCheck(br, br.createHeadRequest(contenturl), link, filename, ".mp4");
             }
         }
         return AvailableStatus.TRUE;
@@ -161,10 +247,12 @@ public class SaintTo extends PluginForHost {
 
     private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        final String contenturl = link.getPluginPatternMatcher();
+        final boolean isNewWebsite = this.isNewWebsite(link);
         String dllink = null;
         final boolean storeDirecturl;
-        if (new Regex(link.getPluginPatternMatcher(), TYPE_API_DIRECT).patternFind()) {
-            dllink = link.getPluginPatternMatcher();
+        if (new Regex(contenturl, TYPE_API_DIRECT).patternFind()) {
+            dllink = contenturl;
             storeDirecturl = false;
         } else if (storedDirecturl != null) {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
@@ -172,19 +260,32 @@ public class SaintTo extends PluginForHost {
             storeDirecturl = false;
         } else {
             /* TYPE_EMBED and TYPE_API_INDIRECT */
-            requestFileInformation(link, true);
+            requestFileInformation(link);
             dllink = br.getRegex("<source src\\s*=\\s*\"(https?://[^\"]+)\" type=\"video/mp4\">").getMatch(0);
-            if (StringUtils.isEmpty(dllink)) {
+            if (dllink == null) {
                 // TYPE_API_INDIRECT
                 dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Video").getMatch(0);
             }
-            if (StringUtils.isEmpty(dllink)) {
+            if (dllink == null && isNewWebsite) {
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("/api/sign?v=" + this.getFID(link));
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (Boolean.FALSE.equals(entries.get("success"))) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, entries.get("error").toString());
+                }
+                dllink = entries.get("url").toString();
+                final String filename = (String) entries.get("filename");
+                if (!StringUtils.isEmpty(filename)) {
+                    link.setFinalFileName(filename);
+                }
+            }
+            if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
             }
             storeDirecturl = true;
         }
         /* Important otherwise we can't re-use direct urls (hotlinking-block)! */
-        br.getHeaders().put("Referer", link.getPluginPatternMatcher());
+        br.getHeaders().put("Referer", contenturl);
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             handleConnectionErrors(br, dl.getConnection());

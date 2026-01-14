@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52084 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 52085 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
 public class LusciousNetAlbum extends PluginForDecrypt {
     public LusciousNetAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,6 +66,7 @@ public class LusciousNetAlbum extends PluginForDecrypt {
         final boolean useAPI = false;
         final String api_base = "https://www.luscious.net/graphql";
         if (useAPI) {
+            /* Crawl using API */
             int page = 1;
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(albumSlug);
@@ -113,11 +114,12 @@ public class LusciousNetAlbum extends PluginForDecrypt {
                     /* Fail-safe */
                     logger.info("Stopping because: Current page contains less items than: " + maxItemsPerPage);
                     break pagination;
-                } else {
-                    page += 1;
                 }
+                /* Continue to next page */
+                page += 1;
             } while (!this.isAbort());
         } else {
+            /* Crawl using a combination ob website + API */
             br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

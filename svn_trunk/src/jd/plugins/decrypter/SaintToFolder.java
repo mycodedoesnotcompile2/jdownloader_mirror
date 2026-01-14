@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SaintTo;
 
-@DecrypterPlugin(revision = "$Revision: 51740 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52087 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SaintTo.class })
 public class SaintToFolder extends PluginForDecrypt {
     public SaintToFolder(PluginWrapper wrapper) {
@@ -68,7 +68,7 @@ public class SaintToFolder extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/a/([a-zA-Z0-9\\-_]{5,})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/a/([a-zA-Z0-9-_]{5,})");
         }
         return ret.toArray(new String[0]);
     }
@@ -84,33 +84,64 @@ public class SaintToFolder extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("<title>([^<]+) - Saint Video Hosting</title>").getMatch(0);
+        final String[] htmls = br.getRegex("<tr class=\"file-list__file\">(.*?)</tr>").getColumn(0);
+        if (htmls != null && htmls.length > 0) {
+            /* Old website */
+            for (final String html : htmls) {
+                final String url = new Regex(html, "file_dwn\\('(https?://[^']+)'\\)").getMatch(0);
+                final String filename = new Regex(html, "class=\"filename\"[^>]*>([^<]+)</a>").getMatch(0);
+                final String filesizeBytesStr = new Regex(html, "class=\"fs\" data=\"(\\d+)\"").getMatch(0);
+                if (url == null || filename == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final DownloadLink file = createDownloadlink(url);
+                file.setName(Encoding.htmlDecode(filename).trim());
+                if (filesizeBytesStr != null) {
+                    file.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+                } else {
+                    logger.warning("Failed to find filesize for item: " + url);
+                }
+                file.setAvailable(true);
+                ret.add(file);
+            }
+        } else {
+            /* New website */
+            title = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
+            final String[] file_ids = br.getRegex("data-id=\"([a-zA-Z0-9-_]+)\"").getColumn(0);
+            if (file_ids == null || file_ids.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String[] filenames = br.getRegex("data-name=\"([^\"]+)\"").getColumn(0);
+            final String[] filesizes = br.getRegex("data-size=\"(\\d+)\"").getColumn(0);
+            int i = 0;
+            for (final String file_id : file_ids) {
+                final String url = "https://" + br.getHost() + "/d/" + file_id;
+                final DownloadLink link = this.createDownloadlink(url);
+                if (filenames != null && filenames.length == file_ids.length) {
+                    final String filename = filenames[i];
+                    link.setName(filename);
+                } else if (i == 0) {
+                    /* Log only once */
+                    logger.warning("Failed to find filename information");
+                }
+                if (filesizes != null && filesizes.length == file_ids.length) {
+                    final String filesizeBytesStr = filesizes[i];
+                    link.setDownloadSize(Long.parseLong(filesizeBytesStr));
+                } else if (i == 0) {
+                    /* Log only once */
+                    logger.warning("Failed to find filesize information");
+                }
+                link.setAvailable(true);
+                ret.add(link);
+                i++;
+            }
+        }
         if (title == null) {
             /* Fallback */
             logger.warning("Failed to find folder title");
             title = folderID;
         }
         title = Encoding.htmlDecode(title).trim();
-        final String[] htmls = br.getRegex("<tr class=\"file-list__file\">(.*?)</tr>").getColumn(0);
-        if (htmls == null || htmls.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        for (final String html : htmls) {
-            final String url = new Regex(html, "file_dwn\\('(https?://[^']+)'\\)").getMatch(0);
-            final String filename = new Regex(html, "class=\"filename\"[^>]*>([^<]+)</a>").getMatch(0);
-            final String filesizeBytesStr = new Regex(html, "class=\"fs\" data=\"(\\d+)\"").getMatch(0);
-            if (url == null || filename == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final DownloadLink file = createDownloadlink(url);
-            file.setName(Encoding.htmlDecode(filename).trim());
-            if (filesizeBytesStr != null) {
-                file.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-            } else {
-                logger.warning("Failed to find filesize for item: " + url);
-            }
-            file.setAvailable(true);
-            ret.add(file);
-        }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);
         fp.setPackageKey(this.getHost() + "://folder/" + folderID);

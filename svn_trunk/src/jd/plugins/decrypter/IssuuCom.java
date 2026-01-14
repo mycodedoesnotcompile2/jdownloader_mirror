@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50515 $", interfaceVersion = 2, names = { "issuu.com" }, urls = { "https?://(?:www\\.)?issuu\\.com/[a-z0-9\\-_\\.]+/docs/[a-z0-9\\-_\\.]+|https?://e\\.issuu\\.com/embed\\.html#\\d+/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 52085 $", interfaceVersion = 2, names = { "issuu.com" }, urls = { "https?://(?:www\\.)?issuu\\.com/[a-z0-9\\-_\\.]+/docs/[a-z0-9\\-_\\.]+|https?://e\\.issuu\\.com/embed\\.html#\\d+/\\d+" })
 public class IssuuCom extends PluginForDecrypt {
     public IssuuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class IssuuCom extends PluginForDecrypt {
         String documentID = null;
         final String ownerUsername;
         final String documentURI;
-        if (embed.matches()) {
+        if (embed.patternFind()) {
             /* 2021-11-22: This internal ID is now only given for embed objects! Also we don't really need it anymore. */
             documentID = embed.getMatch(1);
             final boolean useNewMethod = true;

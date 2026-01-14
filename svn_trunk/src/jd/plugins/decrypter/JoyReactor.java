@@ -16,7 +16,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51078 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52087 $", interfaceVersion = 2, names = {}, urls = {})
 public class JoyReactor extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -48,7 +48,7 @@ public class JoyReactor extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/post/\\d+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/post/(\\d+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -64,14 +64,17 @@ public class JoyReactor extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String reactor[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/full/.*?(jpe?g|png|gif))").getColumn(0);
-        if (reactor == null || reactor.length == 0) {
+        String directurls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/full/.*?(jpe?g|png|gif))").getColumn(0);
+        if (directurls == null || directurls.length == 0) {
+            /* 2026-01-13: For .webm/.mp4 items */
+            directurls = br.getRegex("data-src=\"(https://[^\"]+)\"").getColumn(0);
+        }
+        if (directurls == null || directurls.length == 0) {
             // Unsafe content - only for registered users (google translate)
-            if (br.containsHTML("Небезопасный контент - только для зарегистрированных пользователей|joyreactor\\.cc/images/unsafe_ru.gif")) {
+            if (br.containsHTML("Небезопасный контент - только для зарегистрированных пользователей|joyreactor\\.cc/images/unsafe_ru\\.gif")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                logger.info("Looks like this post doesn't contain any images (most likely text only)");
-                return ret;
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         String title = br.getRegex("<title>([^<]+)").getMatch(0);
@@ -83,12 +86,20 @@ public class JoyReactor extends PluginForDecrypt {
             /* Fallback */
             fp.setName(br._getURL().getPath());
         }
-        for (final String url : reactor) {
+        for (final String url : directurls) {
             final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url).toExternalForm()));
             file.setAvailable(true);
+            /* Important otherwise some direct-urls may not work. */
+            file.setReferrerUrl(br.getURL());
             file._setFilePackage(fp);
             ret.add(file);
         }
         return ret;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* 2026-01-13: Try to avoid rate limit (error 503) */
+        return 1;
     }
 }
