@@ -15,6 +15,7 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 
@@ -35,7 +36,7 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
     }
 
     public String getSiteUrl() {
-        return this.getPluginBrowser().getURL();
+        return ChallengeResponseController.getInstance().getSiteURL(this.getPluginBrowser().getURL());
     }
 
     public CutCaptchaChallenge(final Plugin plugin, final String siteKey, final String apiKey) throws PluginException {

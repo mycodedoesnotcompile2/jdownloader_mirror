@@ -22,6 +22,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -44,13 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 51875 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52090 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -95,7 +94,8 @@ public class JpgChurchCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         /* Modify URL so we will always start crawling from first page */
-        final UrlQuery firstQuery = UrlQuery.parse(param.getCryptedUrl());
+        final String addedurl = param.getCryptedUrl();
+        final UrlQuery firstQuery = UrlQuery.parse(addedurl);
         final String pageParamInAddedURL = firstQuery.get("page");
         if (pageParamInAddedURL != null) {
             logger.info("Changed page param inside URL from " + pageParamInAddedURL + " to 1");
@@ -103,11 +103,11 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         }
         firstQuery.remove("peek");
         firstQuery.remove("seek");
-        String contentURLCleaned;
+        String contentURLCleaned = addedurl;
+        /* Unsupported tab "Embed-Codes" */
+        contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
         if (firstQuery.toString().length() > 0) {
-            contentURLCleaned = URLHelper.getUrlWithoutParams(param.getCryptedUrl()) + "?" + firstQuery.toString();
-        } else {
-            contentURLCleaned = URLHelper.getUrlWithoutParams(param.getCryptedUrl());
+            contentURLCleaned += "?" + firstQuery.toString();
         }
         contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
         final boolean isProfileAlbumsOverview = contentURLCleaned.matches("(?i).+/albums/?$");
@@ -331,7 +331,9 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         } while (true);
         if (ret.isEmpty()) {
             if (StringUtils.equals(numberofImagesStr, "0")) {
-                logger.info("This profile contains zero images");
+                logger.info("This url contains zero images");
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            } else if (br.containsHTML("class=\"content-empty\"") || br.containsHTML(">\\s*There's nothing to show here")) {
                 throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

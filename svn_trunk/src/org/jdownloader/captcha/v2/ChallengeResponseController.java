@@ -10,14 +10,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
@@ -65,6 +57,15 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.CaptchaSettings.INTERACTIVE_CAPTCHA_PRIVACY_LEVEL;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.parser.Regex;
+import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -244,10 +245,7 @@ public class ChallengeResponseController {
                 UpdateController.getInstance().addFeedback("tc");
             }
         }
-        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
-        final CaptchaHistoryEntry captcha_history_entry = new CaptchaHistoryEntry(c.getHost(), ctype);
-        final List<CaptchaHistoryEntry> captcha_history_entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
-        captcha_history_entries.add(captcha_history_entry);
+        CaptchaHistoryManager.getInstance().addEntry(c);
         LogSource logger = LogController.getInstance().getPreviousThreadLogSource();
         if (logger == null) {
             logger = this.logger;
@@ -331,6 +329,21 @@ public class ChallengeResponseController {
             }
             c.onHandled();
         }
+    }
+
+    /**
+     * Wrapper function to be used when an interactive captcha challenge requests its siteURL. <br>
+     * This function is to be used before such URLs are used anywhere in case they need to be modified for example due to the users' privacy
+     * settings.
+     */
+    public String getSiteURL(String url) {
+        if (INTERACTIVE_CAPTCHA_PRIVACY_LEVEL.STRICT.equals(CAPTCHA_SETTINGS.getInteractiveCaptchaPrivacyLevel())) {
+            final String baseurl = new Regex(url, "(?i)(https?://[^/]+/?)").getMatch(0);
+            if (baseurl != null) {
+                url = baseurl;
+            }
+        }
+        return url;
     }
 
     protected final static AtomicLong TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new AtomicLong(-1);

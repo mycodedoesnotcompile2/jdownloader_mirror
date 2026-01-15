@@ -1,11 +1,12 @@
 package org.jdownloader.captcha.v2.challenge.cloudflareturnstile;
 
+import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
+
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
-
-import org.jdownloader.captcha.v2.AbstractResponse;
-import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 
 public abstract class CloudflareTurnstileChallenge extends AbstractBrowserChallenge {
     private final String siteKey;
@@ -15,7 +16,8 @@ public abstract class CloudflareTurnstileChallenge extends AbstractBrowserChalle
     }
 
     public String getSiteUrl() {
-        return this.getPluginBrowser().getURL();
+        final String url = this.getPluginBrowser().getURL();
+        return ChallengeResponseController.getInstance().getSiteURL(url);
     }
 
     public CloudflareTurnstileChallenge(final Plugin plugin, final String siteKey) throws PluginException {

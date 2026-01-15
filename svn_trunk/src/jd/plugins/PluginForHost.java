@@ -15,22 +15,15 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins;
 
-import java.awt.Color;
 import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,23 +35,17 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.ComboBoxModel;
-import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.SwingConstants;
-import javax.swing.Timer;
-import javax.swing.table.JTableHeader;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -66,17 +53,6 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
-import org.appwork.swing.exttable.ExtColumn;
-import org.appwork.swing.exttable.ExtComponentRowHighlighter;
-import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.swing.exttable.ExtTable;
-import org.appwork.swing.exttable.ExtTableHeaderRenderer;
-import org.appwork.swing.exttable.ExtTableModel;
-import org.appwork.swing.exttable.columns.ExtCheckColumn;
-import org.appwork.swing.exttable.columns.ExtFileSizeColumn;
-import org.appwork.swing.exttable.columns.ExtLongColumn;
-import org.appwork.swing.exttable.columns.ExtProgressColumn;
-import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TrackerJob;
 import org.appwork.uio.CloseReason;
@@ -84,7 +60,6 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
@@ -95,7 +70,6 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
@@ -149,7 +123,6 @@ import org.jdownloader.gui.views.SelectionInfo.PluginView;
 import org.jdownloader.gui.views.linkgrabber.columns.VariantColumn;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.BadgeIcon;
-import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.CaptchaStepProgress;
 import org.jdownloader.plugins.ConditionalSkipReasonException;
@@ -171,11 +144,8 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
@@ -184,7 +154,6 @@ import org.jdownloader.updatev2.UpdateHandler;
 import jd.PluginWrapper;
 import jd.captcha.JACMethod;
 import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
@@ -208,7 +177,6 @@ import jd.controlling.proxy.AbstractProxySelectorImpl;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
 import jd.controlling.reconnect.ipcheck.IPCheckException;
 import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
 import jd.http.Browser;
 import jd.http.Browser.BrowserException;
@@ -220,14 +188,12 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.Formatter;
 import jd.nutils.JDHash;
 import jd.plugins.Account.AccountError;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadInterfaceFactory;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
@@ -3176,554 +3142,8 @@ public abstract class PluginForHost extends Plugin {
         if (hosts == null || hosts.isEmpty()) {
             return;
         }
-        /* Determine default visibility states for some columns */
-        boolean shouldShowLinkLimitColumns = false;
-        boolean shouldShowTrafficLimitColumns = false;
-        boolean shouldShowTrafficCaculationColumn = false;
-        boolean shouldShowUnavailableForColumn = false;
-        boolean containsItemsWithCustomStatusText = false;
-        for (final MultiHostHost mhost : hosts) {
-            if (!shouldShowLinkLimitColumns && !mhost.isUnlimitedLinks()) {
-                shouldShowLinkLimitColumns = true;
-            }
-            if (!shouldShowTrafficLimitColumns && !mhost.isUnlimitedTraffic()) {
-                shouldShowTrafficLimitColumns = true;
-            }
-            if (!shouldShowTrafficCaculationColumn && mhost.getTrafficCalculationFactorPercent() != 100) {
-                shouldShowTrafficCaculationColumn = true;
-            }
-            if (!shouldShowUnavailableForColumn && mhost.getUnavailableTimeMillis() > 0) {
-                shouldShowUnavailableForColumn = true;
-            }
-            if (!containsItemsWithCustomStatusText && mhost.getStatusText() != null) {
-                containsItemsWithCustomStatusText = true;
-            }
-            if (shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCaculationColumn && shouldShowUnavailableForColumn) {
-                break;
-            }
-        }
-        final boolean shouldShowLinkLimitColumns_final = shouldShowLinkLimitColumns;
-        final boolean shouldShowTrafficLimitColumns_final = shouldShowTrafficLimitColumns;
-        final boolean shouldShowTrafficCaculationColumn_final = shouldShowTrafficCaculationColumn;
-        final boolean shouldShowUnavailableForColumn_final = shouldShowUnavailableForColumn;
-        final boolean shouldShowUInternalStatusColumn_final = containsItemsWithCustomStatusText;
-        final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
-        final Icon icon_warning = NewTheme.I().getIcon(IconKey.ICON_WARNING, 16);
-        final Icon icon_wait = NewTheme.I().getIcon(IconKey.ICON_WAIT, 16);
-        final Icon icon_filler = NewTheme.I().getIcon(IconKey.ICON_BEER, 16);
-        final ExtTableModel<MultiHostHost> tableModel = new ExtTableModel<MultiHostHost>("MultiHostHostTable_" + acc.getHoster()) {
-            @Override
-            protected void initColumns() {
-                addColumn(new ExtCheckColumn<MultiHostHost>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
-                    public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-                        final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-                            private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
-
-                            @Override
-                            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                                setIcon(ok);
-                                setHorizontalAlignment(CENTER);
-                                setText(null);
-                                return this;
-                            }
-                        };
-                        return ret;
-                    }
-
-                    @Override
-                    public int getMaxWidth() {
-                        return 30;
-                    }
-
-                    @Override
-                    protected boolean getBooleanValue(final MultiHostHost mhost) {
-                        return mhost.isEnabled();
-                    }
-
-                    @Override
-                    public boolean isEditable(MultiHostHost mhost) {
-                        return true;
-                    }
-
-                    @Override
-                    protected void setBooleanValue(final boolean enabled, final MultiHostHost mhost) {
-                        mhost.setEnabled(enabled);
-                        fireTableStructureChanged();
-                    }
-                });
-                addColumn(new ExtTextColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
-                    @Override
-                    public String getStringValue(final MultiHostHost mhost) {
-                        return mhost.getDomain();
-                    }
-
-                    @Override
-                    public Icon getIcon(MultiHostHost mhost) {
-                        final DomainInfo di = mhost.getDomainInfo();
-                        if (di != null) {
-                            return di.getFavIcon(false);
-                        } else {
-                            return icon_filler;
-                        }
-                    }
-
-                    @Override
-                    public boolean onDoubleClick(MouseEvent e, MultiHostHost mhost) {
-                        if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
-                            /* Host is not supported by JD -> It doesn't make sense to even try to open an affiliate link. */
-                            return false;
-                        }
-                        final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(mhost.getDomain());
-                        if (lazyHostPlugin != null && lazyHostPlugin.isPremium()) {
-                            AccountController.openAfflink(lazyHostPlugin, null, "MultiHostSupportedHostsDetailTable");
-                        }
-                        return false;
-                    }
-
-                    @Override
-                    protected String getTooltipText(final MultiHostHost mhost) {
-                        /* Display comma separated list of all known domains of this host as tooltip. */
-                        final StringBuilder sb = new StringBuilder();
-                        for (final String domain : mhost.getDomains()) {
-                            if (sb.length() > 0) {
-                                sb.append(", ");
-                            }
-                            sb.append(domain);
-                        }
-                        return sb.toString();
-                    }
-
-                    @Override
-                    public boolean isEnabled(final MultiHostHost mhost) {
-                        return mhost.isEnabled();
-                    }
-                });
-                addColumn(new ExtTextColumn<MultiHostHost>("Status") {
-                    @Override
-                    public String getStringValue(final MultiHostHost mhost) {
-                        final String text = mhost.getStatusText();
-                        if (mhost.getUnavailableTimeMillis() > 0) {
-                            return mhost.getUnavailableStatusText();
-                        } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
-                            return _GUI.T.account_error_no_links_left();
-                        } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
-                            return _GUI.T.account_error_no_traffic_left();
-                        } else if (text != null) {
-                            return text;
-                        } else {
-                            return mhost.getStatus().getLabel();
-                        }
-                    }
-
-                    @Override
-                    protected String getTooltipText(final MultiHostHost mhost) {
-                        if (mhost.getUnavailableTimeMillis() > 0) {
-                            // TODO: Add translation
-                            return "Host temporarily unavailable because of too many wrong download attempts";
-                        } else {
-                            return mhost.getStatus().getLabel();
-                        }
-                    }
-
-                    private final Color defaultColor;
-                    {
-                        renderer.setLayout(new MigLayout("ins 0", "[grow,fill][]", "[grow,fill]"));
-                        defaultColor = rendererField.getForeground();
-                    }
-
-                    @Override
-                    public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row, int column) {
-                        super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                        final MultihosterHostStatus status = value.getStatus();
-                        if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
-                            rendererField.setForeground(Color.RED);
-                        } else {
-                            rendererField.setForeground(defaultColor);
-                        }
-                    }
-
-                    @Override
-                    public Icon getIcon(MultiHostHost mhost) {
-                        final MultihosterHostStatus status = mhost.getStatus();
-                        if (mhost.getUnavailableTimeMillis() > 0) {
-                            return icon_wait;
-                        } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
-                            return icon_wait;
-                        } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
-                            return icon_wait;
-                        } else if (status == MultihosterHostStatus.WORKING) {
-                            return icon_okay;
-                        } else if (status == MultihosterHostStatus.WORKING_UNSTABLE) {
-                            return icon_warning;
-                        } else {
-                            return icon_error;
-                        }
-                    }
-
-                    @Override
-                    public boolean isEnabled(final MultiHostHost mhost) {
-                        return mhost.isEnabled();
-                    }
-                });
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && shouldShowUInternalStatusColumn_final) {
-                    /* This column exists for debugging purposes only! */
-                    addColumn(new ExtTextColumn<MultiHostHost>("Internal status") {
-                        @Override
-                        public String getStringValue(final MultiHostHost mhost) {
-                            return mhost.getStatus().getLabel();
-                        }
-
-                        private final Color defaultColor;
-                        {
-                            renderer.setLayout(new MigLayout("ins 0", "[grow,fill][]", "[grow,fill]"));
-                            defaultColor = rendererField.getForeground();
-                        }
-
-                        @Override
-                        public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row, int column) {
-                            super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                            final MultihosterHostStatus status = value.getStatus();
-                            if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
-                                rendererField.setForeground(Color.RED);
-                            } else {
-                                rendererField.setForeground(defaultColor);
-                            }
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                }
-                if (shouldShowUnavailableForColumn_final) {
-                    addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_unavailable_for()) {
-                        @Override
-                        protected long getLong(MultiHostHost mhost) {
-                            return mhost.getUnavailableTimeMillis();
-                        }
-
-                        private final AtomicReference<Timer> timerReference = new AtomicReference<Timer>();
-
-                        @Override
-                        public boolean isVisible(boolean savedValue) {
-                            final boolean ret = super.isVisible(savedValue);
-                            final ExtLongColumn<MultiHostHost> thisColumn = this;
-                            if (ret && timerReference.get() == null) {
-                                final Timer countdownTimer = new Timer(1000, new ActionListener() {
-                                    @Override
-                                    public void actionPerformed(ActionEvent e) {
-                                        final ExtTable<MultiHostHost> table = getTable();
-                                        if (table == null) {
-                                            // no table set yet
-                                            return;
-                                        }
-                                        if (!table.isShowing() || !getModel().isColumnVisible(thisColumn) || timerReference.get() != e.getSource()) {
-                                            ((Timer) e.getSource()).stop();
-                                            return;
-                                        }
-                                        table.getModel().fireTableDataChanged();
-                                    }
-                                }) {
-                                    private static final long serialVersionUID = -8818019184160268747L;
-
-                                    @Override
-                                    public void stop() {
-                                        super.stop();
-                                        timerReference.compareAndSet(this, null);
-                                    };
-                                };
-                                countdownTimer.start();
-                                timerReference.set(countdownTimer);
-                            }
-                            return ret;
-                        }
-
-                        @Override
-                        protected String getLongFormatted(MultiHostHost mhost) {
-                            final long unavailableFor = getLong(mhost);
-                            if (unavailableFor > 0) {
-                                return TimeFormatter.formatMilliSeconds(unavailableFor, 0);
-                            } else {
-                                return "---";
-                            }
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                }
-                if (shouldShowLinkLimitColumns_final) {
-                    addColumn(new ExtProgressColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_left_max()) {
-                        @Override
-                        public int getMinWidth() {
-                            return 50;
-                        }
-
-                        @Override
-                        protected boolean isIndeterminated(final MultiHostHost value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                            return false;
-                        }
-
-                        @Override
-                        protected String getString(MultiHostHost mhost, long current, long total) {
-                            if (mhost.isUnlimitedLinks()) {
-                                return _GUI.T.lit_unlimited();
-                            } else {
-                                return mhost.getLinksLeft() + "/" + mhost.getLinksMax();
-                            }
-                        }
-
-                        @Override
-                        protected long getMax(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedLinks()) {
-                                return Long.MAX_VALUE;
-                            } else {
-                                return mhost.getLinksMax();
-                            }
-                        }
-
-                        @Override
-                        protected long getValue(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedLinks()) {
-                                return Long.MAX_VALUE;
-                            } else {
-                                return mhost.getLinksLeft();
-                            }
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                    addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_left()) {
-                        @Override
-                        protected long getLong(MultiHostHost mhost) {
-                            return mhost.getLinksLeft();
-                        }
-
-                        @Override
-                        protected String getLongFormatted(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedLinks()) {
-                                return _GUI.T.lit_unlimited();
-                            } else {
-                                return StringUtils.toString(formatter, getLong(mhost));
-                            }
-                        }
-
-                        @Override
-                        public boolean isDefaultVisible() {
-                            return false;
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                    addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_max()) {
-                        @Override
-                        protected long getLong(MultiHostHost mhost) {
-                            return mhost.getLinksMax();
-                        }
-
-                        @Override
-                        protected String getLongFormatted(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedLinks()) {
-                                return _GUI.T.lit_unlimited();
-                            } else {
-                                return StringUtils.toString(formatter, getLong(mhost));
-                            }
-                        }
-
-                        @Override
-                        public boolean isDefaultVisible() {
-                            return false;
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                }
-                if (shouldShowTrafficLimitColumns_final) {
-                    addColumn(new ExtProgressColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left_max()) {
-                        {
-                            setRowSorter(new ExtDefaultRowSorter<MultiHostHost>() {
-                                @Override
-                                public int compare(final MultiHostHost o1, final MultiHostHost o2) {
-                                    final long v1 = getValue(o1);
-                                    final long v2 = getValue(o2);
-                                    if (v1 == v2) {
-                                        return 0;
-                                    }
-                                    if (this.getSortOrderIdentifier() != ExtColumn.SORT_ASC) {
-                                        return v1 > v2 ? -1 : 1;
-                                    } else {
-                                        return v2 > v1 ? -1 : 1;
-                                    }
-                                }
-                            });
-                        }
-                        private final SIZEUNIT      maxSizeUnit = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit();
-                        private final DecimalFormat formatter   = new DecimalFormat();
-
-                        @Override
-                        public int getMinWidth() {
-                            return 140;
-                        }
-
-                        @Override
-                        protected boolean isIndeterminated(final MultiHostHost value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                            return false;
-                        }
-
-                        @Override
-                        protected String getString(MultiHostHost mhost, long current, long total) {
-                            if (mhost.isUnlimitedTraffic()) {
-                                return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
-                            } else {
-                                return getSizeString(mhost.getTrafficLeft()) + "/" + getSizeString(mhost.getTrafficMax());
-                            }
-                        }
-
-                        private final String getSizeString(final long fileSize) {
-                            return SIZEUNIT.formatValue(maxSizeUnit, formatter, fileSize);
-                        }
-
-                        @Override
-                        protected long getMax(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedTraffic()) {
-                                return Long.MAX_VALUE;
-                            } else {
-                                return mhost.getTrafficMax();
-                            }
-                        }
-
-                        @Override
-                        protected long getValue(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedTraffic()) {
-                                return Long.MAX_VALUE;
-                            } else {
-                                return mhost.getTrafficLeft();
-                            }
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                    addColumn(new ExtFileSizeColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left()) {
-                        @Override
-                        public String getStringValue(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedTraffic()) {
-                                return _GUI.T.lit_unlimited();
-                            } else {
-                                return getSizeString(mhost.getTrafficLeft());
-                            }
-                        }
-
-                        @Override
-                        protected long getBytes(MultiHostHost val) {
-                            return val.getTrafficLeft();
-                        }
-
-                        @Override
-                        public boolean isDefaultVisible() {
-                            return false;
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                    addColumn(new ExtFileSizeColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_max()) {
-                        @Override
-                        public String getStringValue(MultiHostHost mhost) {
-                            if (mhost.isUnlimitedTraffic()) {
-                                return _GUI.T.lit_unlimited();
-                            } else {
-                                return getSizeString(mhost.getTrafficMax());
-                            }
-                        }
-
-                        @Override
-                        protected long getBytes(MultiHostHost val) {
-                            return val.getTrafficMax();
-                        }
-
-                        @Override
-                        public boolean isDefaultVisible() {
-                            return false;
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                }
-                if (shouldShowTrafficCaculationColumn_final) {
-                    addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_calculation_factor_percent()) {
-                        @Override
-                        protected long getLong(MultiHostHost mhost) {
-                            return mhost.getTrafficCalculationFactorPercent();
-                        }
-
-                        @Override
-                        protected String getLongFormatted(MultiHostHost mhost) {
-                            return getLong(mhost) + "%";
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                }
-            }
-        };
-        if (shouldShowLinkLimitColumns_final || shouldShowTrafficLimitColumns_final || shouldShowUnavailableForColumn_final) {
-            /* Add highlighter if needed */
-            tableModel.addExtComponentRowHighlighter(new ExtComponentRowHighlighter<MultiHostHost>(null, Color.YELLOW, null) {
-                @Override
-                public boolean accept(ExtColumn<MultiHostHost> column, MultiHostHost mhost, boolean selected, boolean focus, int row) {
-                    if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
-                        return true;
-                    } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
-                        return true;
-                    } else if (mhost.getUnavailableTimeMillis() > 0) {
-                        return true;
-                    } else {
-                        return false;
-                    }
-                }
-            });
-        }
-        tableModel._fireTableStructureChanged(hosts, false);
-        final BasicJDTable<MultiHostHost> table = new BasicJDTable<MultiHostHost>(tableModel);
-        table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
-        table.setSearchEnabled(true);
-        table.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseWheelMoved(MouseWheelEvent e) {
-                /*
-                 * Forward event to upper panel so that the scrolling happens in it and not in our table which is always full-size and has
-                 * no vertical scrollbar.
-                 */
-                panel.dispatchEvent(e);
-            }
-        });
-        final JScrollPane scrollPane = new JScrollPane(table);
-        panel.add(scrollPane);
+        new MultiHostAccountSettingsPanelBuilder(acc).build(panel);
+        return;
     }
 
     public void extendCaptchaSolverAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {
@@ -3740,212 +3160,7 @@ public abstract class PluginForHost extends Plugin {
             /* Not a captcha solver plugin */
             return;
         }
-        final AccountInfo ai = acc.getAccountInfo();
-        if (ai == null) {
-            return;
-        }
-        final abstractPluginForCaptchaSolver captchaSolverPlugin = (abstractPluginForCaptchaSolver) plg;
-        final List<CaptchaType> ctypes = new ArrayList<CaptchaType>();
-        for (final CAPTCHA_TYPE ctype_static : captchaSolverPlugin.getSupportedCaptchaTypes()) {
-            final CaptchaType ctype = new CaptchaType(ctype_static);
-            ctype.setAccountInfo(ai);
-            ctypes.add(ctype);
-        }
-        // TODO: Add meaningful default sort
-        // TODO: Maybe always add all types of captchas and mark the ones not supported by a solver as red.
-        /* Determine default visibility states for some columns */
-        boolean shouldShowDomainColumn = false;
-        boolean shouldShowDemoUrlColumn = false;
-        boolean shouldShowJDownloaderSupportedColumn = false;
-        for (final CaptchaType ctype : ctypes) {
-            final CAPTCHA_TYPE stype_static = ctype.getCAPTCHA_TYPE_STATIC();
-            if (stype_static.getDomain() != null) {
-                shouldShowDomainColumn = true;
-            }
-            if (stype_static.getDemoUrl() != null) {
-                shouldShowDemoUrlColumn = true;
-            }
-            if (!stype_static.isJDownloaderSupported()) {
-                /*
-                 * Allow this column only if captcha solver service supports at least one captcha type that is not supported by JDownloader.
-                 */
-                shouldShowJDownloaderSupportedColumn = true;
-            }
-            if (shouldShowDomainColumn && shouldShowDemoUrlColumn && shouldShowJDownloaderSupportedColumn) {
-                break;
-            }
-        }
-        final boolean final_shouldShowDomainColumn = shouldShowDomainColumn;
-        final boolean final_shouldShowDemoUrlColumn = shouldShowDemoUrlColumn;
-        final boolean final_shouldShowJDownloaderSupportedColumn = shouldShowJDownloaderSupportedColumn;
-        final ExtTableModel<CaptchaType> tableModel = new ExtTableModel<CaptchaType>("CaptchaTypeTable") {
-            @Override
-            protected void initColumns() {
-                addColumn(new ExtCheckColumn<CaptchaType>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
-                    @Override
-                    public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-                        final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-                            private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
-
-                            @Override
-                            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                                setIcon(ok);
-                                setHorizontalAlignment(CENTER);
-                                setText(null);
-                                return this;
-                            }
-                        };
-                        return ret;
-                    }
-
-                    @Override
-                    public int getMaxWidth() {
-                        return 30;
-                    }
-
-                    @Override
-                    protected boolean getBooleanValue(final CaptchaType captchaType) {
-                        return captchaType.isEnabled();
-                    }
-
-                    @Override
-                    public boolean isEditable(CaptchaType captchaType) {
-                        return true;
-                    }
-
-                    @Override
-                    protected void setBooleanValue(final boolean enabled, final CaptchaType captchaType) {
-                        captchaType.setEnabled(enabled);
-                        fireTableDataChanged();
-                    }
-                });
-                addColumn(new ExtTextColumn<CaptchaType>("Name") {
-                    @Override
-                    public String getStringValue(final CaptchaType captchaType) {
-                        return captchaType.getCAPTCHA_TYPE_STATIC().getDisplayName();
-                    }
-
-                    @Override
-                    public Icon getIcon(CaptchaType captchaType) {
-                        final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
-                        if (domain != null) {
-                            return DomainInfo.getInstance(domain).getFavIcon();
-                        } else {
-                            final Icon dummyIcon = NewTheme.I().getIcon(IconKey.ICON_BEER, 16);
-                            return dummyIcon;
-                        }
-                    }
-                });
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && final_shouldShowDomainColumn) {
-                    addColumn(new ExtTextColumn<CaptchaType>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
-                        @Override
-                        public String getStringValue(final CaptchaType captchaType) {
-                            final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
-                            return domain != null ? domain : "";
-                        }
-
-                        @Override
-                        protected String getTooltipText(final CaptchaType captchaType) {
-                            final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
-                            return domain != null ? domain : null;
-                        }
-                    });
-                }
-                addColumn(new ExtTextColumn<CaptchaType>("Description") {
-                    @Override
-                    public String getStringValue(final CaptchaType captchaType) {
-                        final String description = captchaType.getCAPTCHA_TYPE_STATIC().getDescription();
-                        return description != null ? description : "";
-                    }
-
-                    @Override
-                    protected String getTooltipText(final CaptchaType captchaType) {
-                        final String description = captchaType.getCAPTCHA_TYPE_STATIC().getDescription();
-                        return description != null ? description : null;
-                    }
-                });
-                if (final_shouldShowDemoUrlColumn) {
-                    addColumn(new ExtTextColumn<CaptchaType>("Demo URL") {
-                        @Override
-                        public String getStringValue(final CaptchaType captchaType) {
-                            final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
-                            return demoUrl != null ? demoUrl : "";
-                        }
-
-                        @Override
-                        protected String getTooltipText(final CaptchaType captchaType) {
-                            final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
-                            return demoUrl != null ? demoUrl : null;
-                        }
-
-                        @Override
-                        public boolean onDoubleClick(MouseEvent e, CaptchaType captchaType) {
-                            final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
-                            if (demoUrl != null && !demoUrl.isEmpty()) {
-                                // TODO: URL öffnen
-                            }
-                            return false;
-                        }
-                    });
-                }
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && final_shouldShowJDownloaderSupportedColumn) {
-                    addColumn(new ExtCheckColumn<CaptchaType>("JDownloader Support") {
-                        @Override
-                        public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-                            final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-                                private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
-
-                                @Override
-                                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                                    super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                                    setIcon(ok);
-                                    setHorizontalAlignment(CENTER);
-                                    setText(null);
-                                    return this;
-                                }
-                            };
-                            return ret;
-                        }
-
-                        @Override
-                        public int getMaxWidth() {
-                            return 30;
-                        }
-
-                        @Override
-                        protected boolean getBooleanValue(final CaptchaType captchaType) {
-                            return captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported();
-                        }
-
-                        @Override
-                        public boolean isEditable(CaptchaType captchaType) {
-                            return false;
-                        }
-
-                        @Override
-                        protected void setBooleanValue(final boolean value, final CaptchaType captchaType) {
-                            // Not editable, do nothing
-                        }
-                        // TODO: Maybe add icon though if this column remains IDE-only, this is not relevant.
-                        // @Override
-                        // public Icon getIcon(CaptchaType captchaType) {
-                        // if (captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported()) {
-                        // return NewTheme.I().getIcon(IconKey.ICON_OK, 16);
-                        // } else {
-                        // return NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-                        // }
-                        // }
-                    });
-                }
-            }
-        };
-        tableModel._fireTableStructureChanged(ctypes, false);
-        final BasicJDTable<CaptchaType> table = new BasicJDTable<CaptchaType>(tableModel);
-        table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
-        table.setSearchEnabled(true);
-        final JScrollPane scrollPane = new JScrollPane(table);
-        panel.add(scrollPane);
+        new CaptchaSolverAccountSettingsPanelBuilder(acc).build(panel);
     }
 
     public void extendAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {

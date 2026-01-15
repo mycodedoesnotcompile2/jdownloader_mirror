@@ -32,7 +32,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 51067 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52095 $", interfaceVersion = 2, names = {}, urls = {})
 public class JustPasteIt extends AbstractPastebinCrawler {
     public JustPasteIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,22 +106,29 @@ public class JustPasteIt extends AbstractPastebinCrawler {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final PastebinMetadata metadata = new PastebinMetadata(param, contentID);
+        final String json = br.getRegex("window\\.barOptions\\s*=\\s*(\\{.*?\\});").getMatch(0);
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(json, TypeRef.MAP);
+        } catch (final Throwable e) {
+            logger.log(e);
+            logger.info("Failed to parse pastebin json");
+        }
+        if (entries != null) {
+            // TODO: Add support for password protected items
+            if (Boolean.TRUE.equals(entries.get("isPasswordProtected"))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Password protected items are not yet supported");
+            }
+            final String createdText = entries.get("createdText").toString();
+            metadata.setDate(new Date(TimeFormatter.getMilliSeconds(createdText.substring(0, createdText.lastIndexOf(":")), "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH)));
+        }
         metadata.setPastebinText(pastebinText);
         // metadata.setUsername("@anonymous");
-        final String json = br.getRegex("window\\.barOptions\\s*=\\s*(\\{.*?\\});").getMatch(0);
         final String title = br.getRegex("class=\"articleFirstTitle\"[^>]*>([^<>\"]+)</h1>").getMatch(0);
         if (title != null) {
             metadata.setTitle(title);
         } else {
             logger.warning("Failed to find pastebin title");
-        }
-        try {
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            final String createdText = entries.get("createdText").toString();
-            metadata.setDate(new Date(TimeFormatter.getMilliSeconds(createdText.substring(0, createdText.lastIndexOf(":")), "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH)));
-        } catch (final Throwable e) {
-            logger.log(e);
-            logger.info("Failed to find pastebin create date");
         }
         return metadata;
     }

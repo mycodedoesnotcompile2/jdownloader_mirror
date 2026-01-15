@@ -1,5 +1,7 @@
 package jd.plugins;
 
+import java.util.List;
+
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
@@ -8,6 +10,7 @@ import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 public class CaptchaType {
     public enum CAPTCHA_TYPE {
@@ -558,6 +561,30 @@ public class CaptchaType {
 
     public CAPTCHA_TYPE getCAPTCHA_TYPE_STATIC() {
         return this.ctype;
+    }
+
+    public boolean isSupported() {
+        final AccountInfo ai = getAccountInfo();
+        if (ai == null) {
+            return false;
+        }
+        final Account acc = ai.getAccount();
+        if (acc == null) {
+            return false;
+        }
+        final PluginForHost plg = acc.getPlugin();
+        if (!(plg instanceof abstractPluginForCaptchaSolver)) {
+            return false;
+        }
+        final abstractPluginForCaptchaSolver captchaSolverPlugin = (abstractPluginForCaptchaSolver) plg;
+        final List<CAPTCHA_TYPE> supportedTypes = captchaSolverPlugin.getSupportedCaptchaTypes();
+        if (supportedTypes == null) {
+            return false;
+        }
+        if (supportedTypes.contains(this.ctype)) {
+            return true;
+        }
+        return false;
     }
 
     @Override

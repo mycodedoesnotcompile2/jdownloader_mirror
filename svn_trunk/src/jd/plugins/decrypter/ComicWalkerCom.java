@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Locale;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -28,21 +30,25 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "comic-walker.com" }, urls = { "https?://(www\\.)?comic-walker\\.com/(viewer|contents/detail)/.+" })
-public class ComicWalkerCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 52090 $", interfaceVersion = 2, names = { "comic-walker.com" }, urls = { "https?://(www\\.)?comic-walker\\.com/(viewer|contents/detail)/.+" })
+public class ComicWalkerCom extends PluginForDecrypt {
     public ComicWalkerCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        getPage(param.getCryptedUrl());
+        return br;
+    }
+
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -51,13 +57,13 @@ public class ComicWalkerCom extends antiDDoSForDecrypt {
             final String[] links = br.getRegex("<a[^>]+href\\s*=\\s*\"([^\"]*/viewer/[^\"]+)\"").getColumn(0);
             if (links != null && links.length > 0) {
                 for (String link : links) {
-                    decryptedLinks.add(createDownloadlink(br.getURL(Encoding.htmlDecode(link)).toString()));
+                    ret.add(createDownloadlink(br.getURL(Encoding.htmlDecode(link)).toString()));
                 }
             }
             if (fpName != null) {
                 final FilePackage fp = FilePackage.getInstance();
                 fp.setName(Encoding.htmlDecode(fpName.trim()));
-                fp.addLinks(decryptedLinks);
+                fp.addLinks(ret);
             }
         } else if (param.getCryptedUrl().contains("/viewer/")) {
             final String apiBaseURL = br.getRegex("data-api-endpoint-urls?\\s*=\\s*\\'\\{\"nc\":\"(https?://[^\"]+)\"").getMatch(0);
@@ -74,7 +80,7 @@ public class ComicWalkerCom extends antiDDoSForDecrypt {
             }
             final String apiURL = apiBaseURL + "/api/v1/comicwalker/episodes/" + Encoding.htmlDecode(episode_id) + "/frames";
             final Browser br2 = br.cloneBrowser();
-            getPage(br2, apiURL);
+            br2.getPage(apiURL);
             final String[] images = br2.getRegex("\\s*\"source_url\"\\s*:\\s*\"([^\"]+)\"").getColumn(0);
             final int padlength = StringUtils.getPadLength(images.length);
             String ext = null;
@@ -92,11 +98,11 @@ public class ComicWalkerCom extends antiDDoSForDecrypt {
                 dl.setFinalFileName(filename);
                 dl.setLinkID(this.getHost() + "://" + filename);
                 dl.setAvailable(true);
-                decryptedLinks.add(dl);
+                ret.add(dl);
                 distribute(dl);
                 page++;
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 }

@@ -32,6 +32,12 @@ public interface CaptchaSettings extends ConfigInterface {
         ASK
     }
 
+    public static enum INTERACTIVE_CAPTCHA_PRIVACY_LEVEL {
+        AUTO,
+        NORMAL,
+        STRICT
+    }
+
     public static final CaptchaSettings CFG = JsonConfig.create(CaptchaSettings.class);
 
     @AboutConfig
@@ -94,7 +100,7 @@ public interface CaptchaSettings extends ConfigInterface {
     void setAutoCaptchaPriorityThreshold(int value);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Captcha Mode")
+    @DescriptionForConfigEntry("Captcha Mode: Normal = JD will ask for captchas, SKIP ALL = JDownloader will not ask for captchas. Items that require a captcha to be solved will be skipped.")
     @DefaultEnumValue("NORMAL")
     MODE getCaptchaMode();
 
@@ -144,4 +150,11 @@ public interface CaptchaSettings extends ConfigInterface {
     CopyOnWriteArrayList<CaptchaHistoryEntry> getCaptchaHistoryEntries();
 
     void setCaptchaHistoryEntries(CopyOnWriteArrayList<CaptchaHistoryEntry> entry);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Privacy level for interactive captchas ('Browser captchas'). For such captchas, the URL of the website where the captcha needs to be solved might be opened in your browser or sent to your configured captcha solver services. This URL may contain information about the file you are about to download e.g. 'https://example.com/file/123456/test.rar'. Set this to strict then only the base URL will be used instead e.g. 'https://example.com/'. WARNING: This can cause problems with captcha solving such as invalid captcha responses or make the captchas harder to solve in your browser.")
+    @DefaultEnumValue("AUTO")
+    INTERACTIVE_CAPTCHA_PRIVACY_LEVEL getInteractiveCaptchaPrivacyLevel();
+
+    void setInteractiveCaptchaPrivacyLevel(INTERACTIVE_CAPTCHA_PRIVACY_LEVEL mode);
 }
