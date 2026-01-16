@@ -1,6 +1,8 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
@@ -8,6 +10,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -24,6 +27,7 @@ import jd.plugins.PluginForHost;
 public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
     protected boolean enoughBalanceFor(final Challenge<?> c, final Account account) throws Exception {
+        // TODO: Implement logic
         return true;
     }
 
@@ -117,25 +121,88 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return true if the user should be notified on low balance, false otherwise
      */
     protected boolean notifyOnLowBalance(final Account account) {
-        // TODO: Implement setting and logic
-        return true;
+        // TODO: Implement logic
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return true;
+        }
+        return cfg.isWarnOnLowCredits();
     }
 
     /** Returns interval used for polling when waiting for captcha solution from solver. */
     public int getPollingIntervalMillis(final Account account) {
-        return 5000;
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return 5000;
+        }
+        return cfg.getPollingIntervalSeconds() * 1000;
     }
 
     protected int getMaxSimultaneousCaptchas(final Account account) {
-        return Integer.MAX_VALUE;
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return Integer.MAX_VALUE;
+        }
+        return cfg.getMaxParallelCaptchas();
     }
 
     protected List<String> getBlacklistedDomains(final Account account) {
-        return null;
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return null;
+        }
+        return commaSeparatedDomainsToList(cfg.getDomainBlacklist());
     }
 
     protected List<String> getWhitelistedDomains(final Account account) {
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return null;
+        }
+        return commaSeparatedDomainsToList(cfg.getDomainWhitelist());
+    }
+
+    private List<String> commaSeparatedDomainsToList(final String input) {
+        final List<String> ret = new ArrayList<String>();
+        if (input == null || input.trim().length() == 0) {
+            return null;
+        }
+        final String[] parts = input.split(",");
+        for (int i = 0; i < parts.length; i++) {
+            final String domain = parts[i].trim().toLowerCase(Locale.ROOT);
+            if (isValidDomain(domain) && !ret.contains(domain)) {
+                ret.add(domain);
+            }
+        }
+        if (ret.size() > 0) {
+            return ret;
+        }
         return null;
+    }
+
+    private boolean isValidDomain(final String domain) {
+        if (domain == null || domain.length() == 0) {
+            return false;
+        }
+        // TODO: Move this function somewhere else
+        // Domain must contain at least one dot
+        if (!domain.contains(".")) {
+            return false;
+        }
+        // Regex pattern for domain validation
+        // Allows: letters, numbers, hyphens; must not start or end with hyphen
+        final String domainPattern = "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?$";
+        return domain.matches(domainPattern);
+    }
+
+    /** Returns interval used for polling when waiting for captcha solution from solver. */
+    public int getMaxCaptchasPerHour(final Account account) {
+        // TODO: Implement functionality
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return 1000;
+        }
+        return cfg.getMaxCaptchasPerHour();
     }
 
     /**
@@ -154,7 +221,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public abstract void solve(CESSolverJob<?> job, Account account) throws Exception;
 
     public boolean validateBlackWhite(Challenge<?> c) {
-        // TODO: Add functionality
+        // TODO: Add functionality or use the existing one in ChallengeResponseController
         return true;
     }
 
@@ -174,5 +241,18 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public void handleFree(DownloadLink link) throws Exception {
         /* Must override but should never be called. */
         throw new WTFException();
+    }
+
+    private CaptchaSolverPluginConfig getDefaultConfig() {
+        final Object cfgO = this.getConfigInterface();
+        if (cfgO == null) {
+            logger.warning("Solver has no config");
+        }
+        if (!(cfgO instanceof CaptchaSolverPluginConfig)) {
+            logger.warning("Unexpected solver config type");
+            return null;
+        }
+        final CaptchaSolverPluginConfig cfg = (CaptchaSolverPluginConfig) cfgO;
+        return cfg;
     }
 }

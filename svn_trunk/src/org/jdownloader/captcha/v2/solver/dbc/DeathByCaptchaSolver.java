@@ -11,10 +11,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import jd.http.Browser;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -44,6 +40,10 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_DBC;
+
+import jd.http.Browser;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
 
 public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     private DeathByCaptchaSettings            config;
@@ -114,7 +114,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
             }
             final String type;
             if (challenge instanceof HCaptchaChallenge) {
-                /* 205-02-24: Not supported anymore, see isChallengeSupported and: https://deathbycaptcha.com/api#supported_captchas */
+                /* 2025-02-24: Not supported anymore, see isChallengeSupported and: https://deathbycaptcha.com/api#supported_captchas */
                 type = "HCaptcha";
                 final HCaptchaChallenge hc = (HCaptchaChallenge) challenge;
                 r.addFormData(new FormData("type", "7"));
@@ -184,7 +184,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 r.addFormData(new FormData("captchafile", "captcha", "application/octet-stream", bytes));
             } else {
                 /* This should never happen */
-                type = "None";
+                throw new IllegalArgumentException("Got unexpected captcha type!");
             }
             br.setAllowedResponseCodes(200, 400);
             br.getPage(r);
@@ -377,5 +377,4 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         br.getHeaders().put("User-Agent", "JDownloader");
         return br;
     }
-
 }

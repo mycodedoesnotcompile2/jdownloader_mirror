@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KsharedCom;
 
-@DecrypterPlugin(revision = "$Revision: 50542 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52102 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KsharedCom.class })
 public class KsharedComFolder extends PluginForDecrypt {
     public KsharedComFolder(PluginWrapper wrapper) {
@@ -123,6 +123,12 @@ public class KsharedComFolder extends PluginForDecrypt {
         if (ret.isEmpty()) {
             if (br.containsHTML("0 files")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Empty folder");
+            } else if (!br.containsHTML("class=\"folder-view")) {
+                /**
+                 * 2026-01-15: offline folder with empty page -> No error message but also no file links <br>
+                 * Exsample folder ID: RdjObNpQLe
+                 */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

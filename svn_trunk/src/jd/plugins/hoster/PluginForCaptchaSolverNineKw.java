@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52106 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -105,7 +105,6 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
 
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        br.getPage(getBaseURL() + "/index.cgi?action=usercaptchaguthaben&apikey=" + account.getPass());
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("action", "usercaptchaguthaben");
         final Map<String, Object> entries = this.callAPI(query, account);

@@ -20,9 +20,12 @@ import static java.lang.String.format;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -40,22 +43,27 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.StringUtils;
-
-@DecrypterPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52102 $", interfaceVersion = 3, names = {}, urls = {})
 public class KinoxTo extends PluginForDecrypt {
     public KinoxTo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private static final Pattern TYPE_SERIES       = Pattern.compile("/Stream/[A-Za-z0-9\\-_]+\\.html", Pattern.CASE_INSENSITIVE);
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private static final Pattern TYPE_SERIES       = Pattern.compile("/Stream/[A-Za-z0-9-_]+\\.html", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_SINGLE_VIDEO = Pattern.compile("/(\\d+)-([\\w-]+)\\.html", Pattern.CASE_INSENSITIVE);
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        final String[] names = new String[] { "kinox", "kinoy", "kinoz", "kinos" };
-        final String[] tlds = new String[] { "ai", "af", "am", "click", "cloud", "club", "digital", "direct", "express", "fun", "fyi", "gratis", "gs", "gy", "io", "li", "lol", "me", "mobi", "ms", "nu", "pe", "party", "pub", "sg", "si", "space", "sx", "to", "tube", "tv", "wtf", "tel" };
+        final String[] names = new String[] { "kinos", "kinox", "kinoy", "kinoz" };
+        final String[] tlds = new String[] { "af", "ai", "am", "click", "cloud", "club", "digital", "direct", "express", "fan", "fun", "fyi", "gratis", "gs", "gy", "io", "li", "lol", "me", "mobi", "ms", "nu", "pe", "party", "pub", "sg", "si", "space", "sx", "tel", "to", "tube", "tv", "wtf" };
         final String[] stringarray = new String[names.length * tlds.length];
         int index = 0;
         for (final String name : names) {
@@ -96,6 +104,7 @@ public class KinoxTo extends PluginForDecrypt {
         }
         final Regex singlevideoregex = new Regex(br._getURL().getPath(), TYPE_SINGLE_VIDEO);
         if (singlevideoregex.patternFind()) {
+            final boolean allowReturnTrailerOnAdsOnly = false;
             final String video_id = singlevideoregex.getMatch(0);
             final String url_slug = singlevideoregex.getMatch(1);
             String title = url_slug.replace("-", " ").trim();
@@ -108,24 +117,47 @@ public class KinoxTo extends PluginForDecrypt {
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);
             fp.setPackageKey("kinox://movie/" + video_id);
-            for (String url : urls) {
-                url = br.getURL(url).toExternalForm();
-                if (StringUtils.containsIgnoreCase(url, "youtube.com/")) {
-                    /* Do not include trailer */
+            final HashSet<String> dupes = new HashSet<String>();
+            final ArrayList<DownloadLink> trailers = new ArrayList<DownloadLink>();
+            int numberofSkippedAds = 0;
+            for (final String url : urls) {
+                if (!dupes.add(url)) {
+                    continue;
+                }
+                if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
+                    /* Typically "server HD" */
+                    numberofSkippedAds++;
                     continue;
                 }
                 final DownloadLink link = this.createDownloadlink(url);
                 link._setFilePackage(fp);
-                ret.add(link);
+                if (StringUtils.containsIgnoreCase(url, "youtube.com/")) {
+                    /* Collect trailers separately */
+                    trailers.add(link);
+                } else {
+                    ret.add(link);
+                }
+            }
+            if (ret.isEmpty() && numberofSkippedAds > 0 && trailers.size() > 0 && !allowReturnTrailerOnAdsOnly) {
+                /* e.g. /18887-black-dog-stream-deutsch-kostenlos.html */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (ret.isEmpty() && trailers.size() > 0) {
+                logger.info("Only trailers are available -> Returning them");
+                ret.addAll(trailers);
+            }
+            if (ret.isEmpty() && numberofSkippedAds > 0) {
+                /* Ads only -> Item is not downloadable -> Offline */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         } else {
             addr_id = br.getRegex("Addr=([^<>\"\\&]*?)&").getMatch(0);
             final String url_name = new Regex(contenturl, "kino\\w\\.\\w+/Stream/([A-Za-z0-9\\-_]+)\\.html").getMatch(0);
             final String series_id = br.getRegex("SeriesID=(\\d+)").getMatch(0);
-            String fpName = br.getRegex("<h1><span style=\"display: inline-block\">([^<>\"]*?)</span>").getMatch(0);
-            fpName = Encoding.htmlDecode(fpName.trim());
-            if (fpName == null) {
-                fpName = url_name;
+            String title = br.getRegex("<h1><span style=\"display: inline-block\">([^<>\"]*?)</span>").getMatch(0);
+            title = Encoding.htmlDecode(title.trim());
+            if (title == null) {
+                title = url_name;
             }
             if (addr_id == null) {
                 addr_id = url_name;
@@ -166,13 +198,16 @@ public class KinoxTo extends PluginForDecrypt {
                         br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
                         br2.getPage("/aGET/MirrorByEpisode/?Addr=" + addr_id + "&SeriesID=" + series_id + "&Season=" + season_number + "&Episode=" + episode);
                         /* Crawl Episode --> Find mirrors */
-                        crawlMirrors(param, ret, br2, fpName, season_number, episode);
+                        crawlMirrors(param, ret, br2, title, season_number, episode);
                     }
                 }
             } else {
                 /* Crawl all Mirrors of a movie */
-                crawlMirrors(param, ret, br2, fpName, null, null);
+                crawlMirrors(param, ret, br2, title, null, null);
             }
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
     }

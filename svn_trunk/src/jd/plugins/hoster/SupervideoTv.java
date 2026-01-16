@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51577 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52101 $", interfaceVersion = 3, names = {}, urls = {})
 public class SupervideoTv extends XFileSharingProBasic {
     public SupervideoTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -221,7 +221,7 @@ public class SupervideoTv extends XFileSharingProBasic {
         if (url == null || type == null) {
             return null;
         }
-        return new Regex(url, "/([a-z0-9]{12})$").getMatch(0);
+        return new Regex(url, "/(((d|e|v)/)|embed-)([a-z0-9]{12})(\\.html)?$").getMatch(3);
     }
 
     @Override

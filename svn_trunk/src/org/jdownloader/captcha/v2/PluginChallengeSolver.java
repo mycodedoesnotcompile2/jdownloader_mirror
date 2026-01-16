@@ -35,9 +35,15 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
+    public boolean isEnabled() {
+        return this.account.isEnabled();
+    }
+
+    @Override
     protected boolean validateLogins() {
         // TODO: Remove this in the future as logins are controlled by the plugin in the future.
-        return true;
+        // return true;
+        return this.isEnabled();
     }
 
     @Override
