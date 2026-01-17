@@ -1,5 +1,7 @@
 package org.jdownloader.captcha.v2;
 
+import java.util.List;
+
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
@@ -8,6 +10,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 
 import jd.controlling.captcha.SkipException;
 import jd.plugins.Account;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.PluginException;
 
 /**
@@ -25,9 +28,22 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     // }
 
     public PluginChallengeSolver(abstractPluginForCaptchaSolver plugin, Account account) {
+        if (plugin == null || account == null) {
+            throw new IllegalArgumentException();
+        }
         this.service = new PluginForCaptchaSolverSolverService(plugin);
         this.account = account;
         this.plugin = plugin;
+    }
+
+    /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
+    protected boolean enoughBalanceFor(final Challenge<?> c, final Account account) throws Exception {
+        return plugin.enoughBalanceFor(c, account);
+    }
+
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return plugin.getSupportedCaptchaTypes();
     }
 
     public Account getAccount() {
@@ -48,11 +64,40 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public boolean canHandle(Challenge<?> c) {
-        return plugin.canHandle(c);
+        // TODO: Only call plugin.canHandle if there is an override or always call both
+        if (!plugin.canHandle(c, account)) {
+            return false;
+        } else {
+            return super.canHandle(c);
+        }
+    }
+
+    @Override
+    public boolean isDomainBlacklistEnabled() {
+        return plugin.isDomainBlacklistEnabled();
+    }
+
+    @Override
+    public List<String> getBlacklistedDomains() {
+        return plugin.getBlacklistedDomains(account);
+    }
+
+    @Override
+    public boolean isDomainWhitelistEnabled() {
+        return plugin.isDomainWhitelistEnabled();
+    }
+
+    @Override
+    public List<String> getWhitelistedDomains() {
+        return plugin.getWhitelistedDomains(account);
     }
 
     @Override
     public boolean setValid(AbstractResponse<?> response) {
+        /*
+         * TODO: Find a good place where to check if captcha feedback is disabled in plugin settings, then possibly don't call the feedback
+         * method.
+         */
         try {
             return this.plugin.setValid(response, account);
         } catch (Exception e) {
@@ -64,6 +109,10 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response) {
+        /*
+         * TODO: Find a good place where to check if captcha feedback is disabled in plugin settings, then possibly don't call the feedback
+         * method.
+         */
         try {
             return this.plugin.setInvalid(response, account);
         } catch (Exception e) {
@@ -74,6 +123,10 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     public boolean setUnused(AbstractResponse<?> response) {
+        /*
+         * TODO: Find a good place where to check if captcha feedback is disabled in plugin settings, then possibly don't call the feedback
+         * method.
+         */
         try {
             return this.plugin.setUnused(response, account);
         } catch (Exception e) {

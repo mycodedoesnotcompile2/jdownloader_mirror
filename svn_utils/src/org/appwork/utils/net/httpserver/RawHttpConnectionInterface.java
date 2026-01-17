@@ -61,4 +61,5 @@ public interface RawHttpConnectionInterface {
     public void setHook(ConnectionHook hook);
 
     public ConnectionHook getHook();
+
 }

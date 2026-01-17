@@ -132,11 +132,22 @@ public class YoutubeHelper {
     public static final String  YT_ATID                                    = "YT_@ID";
     public static final String  YT_CHANNEL_SIZE                            = "YT_CHANNEL_SIZE";
     public static final String  YT_DURATION                                = "YT_DURATION";
+    public static final String  YT_DATE                                    = "YT_DATE";
     public static final String  YT_DATE_UPLOAD                             = "YT_DATE_UPDATE";
     public static final String  YT_DATE_LIVESTREAM_START                   = "YT_DATE_LIVESTREAM_START";
     public static final String  YT_DATE_LIVESTREAM_END                     = "YT_DATE_LIVESTREAM_END";
     public static final String  YT_GOOGLE_PLUS_ID                          = "YT_GOOGLE_PLUS_ID";
     public static final String  YT_VIEWS                                   = "YT_VIEWS";
+    public static final String  YT_TITLE                                   = "YT_TITLE";
+    public static final String  YT_TITLE_ALTERNATIVE                       = "YT_TITLE_ALTERNATIVE";
+    public static final String  YT_CATEGORY                                = "YT_CATEGORY";
+    public static final String  YT_ID                                      = "YT_ID";
+    public static final String  YT_CHAPTERS                                = "YT_CHAPTERS";
+    public static final String  YT_CHANNEL_TITLE                           = "YT_CHANNEL";
+    public static final String  YT_CHANNEL_TITLE_ALTERNATIVE               = "YT_CHANNEL_ALTERNATIVE";
+    public static final String  YT_VARIANTS                                = "YT_VARIANTS";
+    public static final String  YT_VARIANT                                 = "YT_VARIANT";
+    private static final String REGEX_HLSMPD_FROM_JSPLAYER_SETUP           = "\"hlsvp\"\\s*:\\s*(\".*?\")";
     private Browser             br;
     private String              channelPlaylistCrawlerContainerUrlOverride = null;
 
@@ -1251,33 +1262,6 @@ public class YoutubeHelper {
             }
         });
     }
-    public static final String  YT_TITLE                         = "YT_TITLE";
-    public static final String  YT_TITLE_ALTERNATIVE             = "YT_TITLE_ALTERNATIVE";
-    public static final String  YT_CATEGORY                      = "YT_CATEGORY";
-    public static final String  YT_ID                            = "YT_ID";
-    public static final String  YT_CHAPTERS                      = "YT_CHAPTERS";
-    public static final String  YT_CHANNEL_TITLE                 = "YT_CHANNEL";
-    public static final String  YT_CHANNEL_TITLE_ALTERNATIVE     = "YT_CHANNEL_ALTERNATIVE";
-    public static final String  YT_DATE                          = "YT_DATE";
-    public static final String  YT_VARIANTS                      = "YT_VARIANTS";
-    public static final String  YT_VARIANT                       = "YT_VARIANT";
-    /**
-     * @deprecated use {@link #YT_VARIANT_INFO}
-     */
-    public static final String  YT_STREAMURL_VIDEO               = "YT_STREAMURL_VIDEO";
-    /**
-     * @deprecated use {@link #YT_VARIANT_INFO}
-     */
-    public static final String  YT_STREAMURL_AUDIO               = "YT_STREAMURL_AUDIO";
-    /**
-     * @deprecated use {@link #YT_VARIANT_INFO}
-     */
-    public static final String  YT_STREAMURL_VIDEO_SEGMENTS      = "YT_STREAMURL_VIDEO_SEGMENTS";
-    /**
-     * @deprecated use {@link #YT_VARIANT_INFO}
-     */
-    public static final String  YT_STREAMURL_AUDIO_SEGMENTS      = "YT_STREAMURL_AUDIO_SEGMENTS";
-    private static final String REGEX_HLSMPD_FROM_JSPLAYER_SETUP = "\"hlsvp\"\\s*:\\s*(\".*?\")";
 
     public YoutubeHelper(final Browser br, final LogInterface logger) {
         this.setBr(br);

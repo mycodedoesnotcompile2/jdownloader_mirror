@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 
 /**
  * @author daniel
@@ -49,7 +50,7 @@ public class HttpServerController {
     public HttpServerController() {
     }
 
-    public synchronized HttpServer getServer(final int port) {
+    public synchronized HttpServerInterface getServer(final int port) {
         for (final HttpServer s : servers) {
             if ((port == 0 && s.getWishedPort() == port) || s.getPort() == port) {
                 return s;

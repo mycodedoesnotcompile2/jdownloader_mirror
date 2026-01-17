@@ -75,34 +75,35 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.BasicHTTP.ReadIOException;
 import org.appwork.utils.net.BasicHTTP.WriteIOException;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
 import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 
 public class HttpClient {
     // maybe add a factory System property someday
     private static final HttpClient DEFAULT_HTTP_CLIENT = new HttpClient();
 
     public static class RequestContext implements Interruptible {
-        private Boolean             addedToInterruptible;
-        private HttpClient          client;
-        private HTTPConnection      connection;
-        private DownloadProgress    downloadProgress;
-        private CountingInputStream inputStream;
-        private RequestMethod       method;
-        private OutputStream        target          = new ByteArrayOutputStream();
-        private int                 postDataLength;
-        private InputStream         postDataStream;
-        private int                 readTimeout     = 0;
-        public URL                  redirectTo;
-        private long                resumePosition  = -1;
-        private DownloadProgress    uploadProgress;
-        private String              url;
-        public long                 redirectsStarted;
-        private volatile boolean    executed        = false;
-        private int                 redirectCounter = 0;
+        private Boolean                 addedToInterruptible;
+        private HttpClient              client;
+        private HTTPConnection          connection;
+        private DownloadProgress        downloadProgress;
+        private CountingInputStream     inputStream;
+        private RequestMethod           method;
+        private OutputStream            target          = new ByteArrayOutputStream();
+        private int                     postDataLength;
+        private InputStream             postDataStream;
+        private int                     readTimeout     = 0;
+        public URL                      redirectTo;
+        private long                    resumePosition  = -1;
+        private DownloadProgress        uploadProgress;
+        private String                  url;
+        public long                     redirectsStarted;
+        private volatile boolean        executed        = false;
+        private int                     redirectCounter = 0;
+        private HashMap<String, String> requestHeaders;
 
         public int getRedirectCounter() {
             return this.redirectCounter;
@@ -354,7 +355,7 @@ public class HttpClient {
             }
         }
 
-        private void setConnection(final HTTPConnection connection) {
+        public void setConnection(final HTTPConnection connection) {
             this.connection = connection;
             connection.setProfiler(new HTTPConnectionProfilerAdapter() {
                 @Override
@@ -412,6 +413,33 @@ public class HttpClient {
         public RequestContext setUrl(final String url) {
             this.url = url;
             return this;
+        }
+
+        /**
+         * Adds a custom header that will only apply to this specific request. Request-specific headers override global headers set on the
+         * HttpClient instance.
+         *
+         * @param key
+         *            The header name
+         * @param value
+         *            The header value
+         * @return This RequestContext instance for method chaining
+         */
+        public RequestContext addHeader(final String key, final String value) {
+            if (this.requestHeaders == null) {
+                this.requestHeaders = new HashMap<String, String>();
+            }
+            this.requestHeaders.put(key, value);
+            return this;
+        }
+
+        /**
+         * Gets the request-specific headers for this context.
+         *
+         * @return The map of request-specific headers, or null if none have been set
+         */
+        public HashMap<String, String> getRequestHeaders() {
+            return this.requestHeaders;
         }
 
         /**
@@ -786,6 +814,12 @@ public class HttpClient {
         for (final Entry<String, String> next : this.getRequestHeader().entrySet()) {
             context.connection.setRequestProperty(next.getKey(), next.getValue());
         }
+        // Apply request-specific headers (these override global headers)
+        if (context.requestHeaders != null) {
+            for (final Entry<String, String> next : context.requestHeaders.entrySet()) {
+                context.connection.setRequestProperty(next.getKey(), next.getValue());
+            }
+        }
     }
 
     public void putRequestHeader(final String key, final String value) {
@@ -799,7 +833,7 @@ public class HttpClient {
             private void onDone() throws IOException {
                 this.close();
                 if (context.getConnection().getCompleteContentLength() >= 0 && !RequestMethod.HEAD.equals(context.getMethod())) {
-                    final long completeLength = Math.max(0, context.getResumePosition()) + ((CountingConnection) is).transferedBytes();
+                    final long completeLength = Math.max(0, context.getResumePosition()) + is.transferedBytes();
                     if (completeLength != context.getConnection().getCompleteContentLength()) {
                         throw new IncompleteResponseException(context, completeLength);
                     }

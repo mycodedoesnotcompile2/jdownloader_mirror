@@ -289,6 +289,26 @@ public class HTTPConstants {
     public static final String           HEADER_REQUEST_X_FORWARDED_FOR                = "X-Forwarded-For";
     public static final String           HEADER_REQUEST_X_CLIENT_IP                    = "X-Client-IP";
     /**
+     * Sec-Fetch-Site header indicates the relationship between the origin of the resource and the origin of the request.
+     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site
+     */
+    public static final String           HEADER_REQUEST_SEC_FETCH_SITE                 = "Sec-Fetch-Site";
+    /**
+     * Sec-Fetch-Mode header indicates the request's mode.
+     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Mode
+     */
+    public static final String           HEADER_REQUEST_SEC_FETCH_MODE                 = "Sec-Fetch-Mode";
+    /**
+     * Sec-Fetch-User header indicates whether the request was initiated by a user action.
+     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-User
+     */
+    public static final String           HEADER_REQUEST_SEC_FETCH_USER                 = "Sec-Fetch-User";
+    /**
+     * Sec-Fetch-Dest header indicates the destination of the request (what the fetched resource will be used for).
+     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest
+     */
+    public static final String           HEADER_REQUEST_SEC_FETCH_DEST                = "Sec-Fetch-Dest";
+    /**
      * Implementation-specific headers that may have various effects anywhere along the request-response chain. Pragma: no-cache
      */
     public static final String           HEADER_REQUEST_WARNING                        = "Warning";
@@ -370,4 +390,8 @@ public class HTTPConstants {
     public static final String           HEADER_VALUE_ENCODING_DEFLATE                 = "deflate";
     public static final String           HEADER_RESPONSE_LAST_MODFIED                  = "Last-Modified";
     public static final String           HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS      = "Upgrade-Insecure-Requests";
+    /**
+     * 
+     */
+    public static final String X_APPWORK = "x-appwork";
 }

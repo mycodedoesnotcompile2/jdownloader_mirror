@@ -49,19 +49,39 @@ import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.ChunkedInputStream;
+import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.LimitedInputStream;
 import org.appwork.utils.net.StreamValidEOF;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.CountingGZIPInputStream;
+import org.appwork.utils.net.httpconnection.CountingInflaterInputStream;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.HttpConnection;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpserver.LimitedInputStreamWithException;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
+import org.appwork.utils.net.httpserver.RequestSizeLimits;
 
 /**
- * @author daniel
+ * HTTP POST request handler.
  *
+ * <p>
+ * POST is used to submit an entity to the specified resource.
+ * </p>
+ *
+ * <p>
+ * Note: This class extends {@link HttpRequest} directly and provides body handling functionality including input stream management, content
+ * encoding (gzip, deflate), chunked transfer encoding, and parameter parsing (form-urlencoded and JSON). POST requests always have a
+ * request body. According to the RequestMethod enum, POST has requiresOutputStream=true.
+ * </p>
+ *
+ * <p>
+ * This class serves as a base class for other request types that require body handling (e.g., PUT, PATCH, DELETE, WebDAV methods like
+ * PROPFIND, PROPPATCH, COPY, MOVE, LOCK).
+ * </p>
+ *
+ * @author daniel
  */
-public class PostRequest extends HttpRequest {
+public abstract class PostRequest extends HttpRequest {
     public static enum CONTENT_TYPE {
         X_WWW_FORM_URLENCODED,
         JSON,
@@ -140,7 +160,7 @@ public class PostRequest extends HttpRequest {
     public synchronized InputStream getInputStream() throws IOException {
         if (this.inputStream == null) {
             final HTTPHeader transferEncoding = this.getRequestHeaders().get(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING);
-            final InputStream inputStream;
+            InputStream inputStream;
             if (transferEncoding != null) {
                 if ("chunked".equalsIgnoreCase(transferEncoding.getValue())) {
                     inputStream = new ChunkedInputStream(this.connection.getInputStream());
@@ -155,6 +175,32 @@ public class PostRequest extends HttpRequest {
                     inputStream = new LimitedInputStream(this.connection.getInputStream(), Long.parseLong(contentLength.getValue()));
                 }
             }
+
+            // Handle Content-Encoding (gzip, deflate)
+            final HTTPHeader contentEncoding = this.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_CONTENT_ENCODING);
+            if (contentEncoding != null) {
+                final String encoding = contentEncoding.getValue();
+                if (encoding != null) {
+                    if ("gzip".equalsIgnoreCase(encoding) || "x-gzip".equalsIgnoreCase(encoding)) {
+                        // GZIP encoding
+                        inputStream = new CountingGZIPInputStream(inputStream);
+                    } else if ("deflate".equalsIgnoreCase(encoding) || "x-deflate".equalsIgnoreCase(encoding)) {
+                        // Deflate encoding
+                        inputStream = new CountingInflaterInputStream(inputStream instanceof CountingInputStream ? (CountingInputStream) inputStream : new CountingInputStream(inputStream));
+                    }
+                    // Note: "identity" or "none" means no encoding, so we don't wrap
+                }
+            }
+
+            // Apply post-processing limit AFTER decompression (if enabled)
+            RequestSizeLimits limits = getBridge().getRequestSizeLimits();
+            if (limits != null) {
+                long maxPostProcessing = limits.getMaxPostProcessedSize();
+                if (maxPostProcessing > 0) {
+                    inputStream = new LimitedInputStreamWithException(inputStream, maxPostProcessing);
+                }
+            }
+
             this.inputStream = new PostRequestInputStream(inputStream);
         }
         return this.inputStream;
@@ -246,9 +292,11 @@ public class PostRequest extends HttpRequest {
 
     protected List<KeyValuePair> readPostParameters(final CONTENT_TYPE content_type, final String charSet) throws IOException, UnsupportedEncodingException {
         if (content_type != null) {
+            InputStream inputStream = this.getInputStream();
+
             switch (content_type) {
             case JSON: {
-                final byte[] jsonBytes = IO.readStream(-1, this.getInputStream());
+                final byte[] jsonBytes = IO.readStream(-1, inputStream);
                 String jsonString = new String(jsonBytes, charSet);
                 jsonString = modifyByContentType(content_type, jsonString);
                 // try to parse JSonRequest object
@@ -284,7 +332,7 @@ public class PostRequest extends HttpRequest {
             }
                 break;
             case X_WWW_FORM_URLENCODED: {
-                final byte[] formBytes = IO.readStream(-1, this.getInputStream());
+                final byte[] formBytes = IO.readStream(-1, inputStream);
                 String formString = new String(formBytes, charSet);
                 formString = modifyByContentType(content_type, formString);
                 return HttpConnection.parseParameterList(formString);
@@ -352,12 +400,6 @@ public class PostRequest extends HttpRequest {
     /**
      * @return
      */
-    protected RequestMethod getRequestMethod() {
-        return RequestMethod.POST;
-    }
+    public abstract RequestMethod getRequestMethod();
 
-    @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.POST;
-    }
 }

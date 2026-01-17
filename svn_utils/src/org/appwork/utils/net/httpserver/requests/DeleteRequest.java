@@ -33,11 +33,25 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver.requests;
 
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
-public class DeleteRequest extends PostRequest {
+/**
+ * HTTP DELETE request handler.
+ * 
+ * <p>
+ * DELETE is used to delete a resource at the specified URI.
+ * </p>
+ * 
+ * <p>
+ * Note: This class extends {@link GetRequest} because DELETE requests do not have
+ * a request body according to HTTP standards (body is not standard-compliant).
+ * According to the RequestMethod enum, DELETE has requiresOutputStream=false.
+ * </p>
+ *
+ * @author AppWork
+ */
+public class DeleteRequest extends GetRequest {
     /**
      * @param connection
      */
@@ -46,12 +60,8 @@ public class DeleteRequest extends PostRequest {
     }
 
     @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.DELETE;
-    }
-
-    @Override
-    protected RequestMethod getRequestMethod() {
+    public RequestMethod getRequestMethod() {
         return RequestMethod.DELETE;
     }
+
 }

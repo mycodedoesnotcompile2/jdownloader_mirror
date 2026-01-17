@@ -33,13 +33,22 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver.requests;
 
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
- * @author daniel
+ * HTTP OPTIONS request handler.
  *
+ * <p>
+ * OPTIONS is used to describe the communication options for the target resource.
+ * </p>
+ *
+ * <p>
+ * Note: This class extends {@link GetRequest} because OPTIONS requests do not have a request body. According to the RequestMethod enum,
+ * OPTIONS has requiresOutputStream=false.
+ * </p>
+ *
+ * @author daniel
  */
 public class OptionsRequest extends GetRequest {
     /**
@@ -50,21 +59,7 @@ public class OptionsRequest extends GetRequest {
     }
 
     @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("\r\n----------------Request-------------------------\r\n");
-        sb.append("OPTIONS ").append(this.getRequestedURL()).append(" HTTP/1.1\r\n");
-        for (final HTTPHeader key : this.getRequestHeaders()) {
-            sb.append(key.getKey());
-            sb.append(": ");
-            sb.append(key.getValue());
-            sb.append("\r\n");
-        }
-        return sb.toString();
-    }
-
-    @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.OPTIONS;
+    public RequestMethod getRequestMethod() {
+        return RequestMethod.OPTIONS;
     }
 }

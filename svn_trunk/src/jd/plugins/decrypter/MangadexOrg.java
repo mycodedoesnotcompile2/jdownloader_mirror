@@ -6,8 +6,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -16,13 +23,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "mangadex.org" }, urls = { "https?://(?:www\\.)?mangadex\\.(?:org|cc)/(chapter/[a-f0-9\\-]+|title/[a-f0-9\\-]+)(/[^/]*\\?tab=(art|chapters))?" })
+@DecrypterPlugin(revision = "$Revision: 52107 $", interfaceVersion = 2, names = {}, urls = {})
 public class MangadexOrg extends antiDDoSForDecrypt {
     public MangadexOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -30,7 +31,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
 
     private static final String TYPE_CHAPTER = "^https?://[^/]+/chapter/([a-f0-9\\-]+).*";
     private static final String TYPE_LEGACY  = "^https?://[^/]+/chapter/(\\d+)$";
-    private static final String TYPE_TITLE   = "^https?://[^/]+/title/([a-f0-9\\-]+).*";
+    private static final String TYPE_TITLE   = "^https?://[^/]+/title/([a-f0-9-]+).*";
     private final String        apiBase      = "https://api.mangadex.org/";
 
     @Override
@@ -39,8 +40,42 @@ public class MangadexOrg extends antiDDoSForDecrypt {
     }
 
     @Override
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        return br;
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "mangadex.org", "mangadex.cc" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(chapter/[a-f0-9\\-]+|title/[a-f0-9\\-]+)(/[^/]*\\?tab=(art|chapters))?");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (param.getCryptedUrl().matches(TYPE_LEGACY)) {
             /* Handling for older URLs */
@@ -62,7 +97,11 @@ public class MangadexOrg extends antiDDoSForDecrypt {
             if (!"ok".equals(root.get("result"))) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final String title = (String) JavaScriptEngineFactory.walkJson(root, "data/attributes/title/en");
+            String title = (String) JavaScriptEngineFactory.walkJson(root, "data/attributes/title/en");
+            if (title == null) {
+                /* English title is not always given -> Fallback to first element in map of titles. */
+                title = (String) JavaScriptEngineFactory.walkJson(root, "data/attributes/title/{0}");
+            }
             final FilePackage fp;
             if (title != null) {
                 fp = FilePackage.getInstance();
@@ -84,32 +123,37 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                     final List<Map<String, Object>> data = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(root, "data");
                     int count = 0;
                     for (final Map<String, Object> dataEntry : data) {
-                        if ("cover_art".equals(dataEntry.get("type"))) {
-                            final String volume = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(dataEntry, "attributes/volume"));
-                            final String fileName = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(dataEntry, "attributes/fileName"));
-                            if (fileName == null) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                            } else if (dups.add(fileName)) {
-                                final String url = "https://uploads.mangadex.org/covers/" + mangaID + "/" + fileName;
-                                final DownloadLink link = createDownloadlink("directhttp://" + url);
-                                link.setReferrerUrl(param.getCryptedUrl());
-                                link.setAvailable(true);
-                                final String volumeString;
-                                if (volume == null) {
-                                    volumeString = String.format(Locale.ROOT, "-V%0" + StringUtils.getPadLength(data.size()) + "d", count);
-                                } else if (volume.matches("\\d+")) {
-                                    volumeString = String.format(Locale.ROOT, "-V%0" + StringUtils.getPadLength(data.size()) + "d", Integer.parseInt(volume));
-                                } else {
-                                    volumeString = volume;
-                                }
-                                link.setFinalFileName(title + "-V" + volumeString + Plugin.getFileNameExtensionFromURL(url));
-                                link.setContentUrl(param.getCryptedUrl() + "?tab=art");
-                                ret.add(link);
-                                fp.add(link);
-                                distribute(link);
-                                count++;
-                            }
+                        if (!"cover_art".equals(dataEntry.get("type"))) {
+                            continue;
                         }
+                        final String volume = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(dataEntry, "attributes/volume"));
+                        final String fileName = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(dataEntry, "attributes/fileName"));
+                        if (fileName == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        if (!dups.add(fileName)) {
+                            continue;
+                        }
+                        final String url = "https://uploads.mangadex.org/covers/" + mangaID + "/" + fileName;
+                        final DownloadLink link = createDownloadlink("directhttp://" + url);
+                        link.setReferrerUrl(param.getCryptedUrl());
+                        link.setAvailable(true);
+                        final String volumeString;
+                        if (volume == null) {
+                            volumeString = String.format(Locale.ROOT, "-V%0" + StringUtils.getPadLength(data.size()) + "d", count);
+                        } else if (volume.matches("\\d+")) {
+                            volumeString = String.format(Locale.ROOT, "-V%0" + StringUtils.getPadLength(data.size()) + "d", Integer.parseInt(volume));
+                        } else {
+                            volumeString = volume;
+                        }
+                        link.setFinalFileName(title + "-V" + volumeString + Plugin.getFileNameExtensionFromURL(url));
+                        link.setContentUrl(param.getCryptedUrl() + "?tab=art");
+                        if (fp != null) {
+                            link._setFilePackage(fp);
+                        }
+                        ret.add(link);
+                        distribute(link);
+                        count++;
                     }
                     if (count != limit) {
                         break;

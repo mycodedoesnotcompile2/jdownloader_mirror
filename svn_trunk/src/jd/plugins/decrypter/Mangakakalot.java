@@ -18,8 +18,10 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -36,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50795 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52107 $", interfaceVersion = 2, names = {}, urls = {})
 public class Mangakakalot extends PluginForDecrypt {
     public Mangakakalot(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,9 +51,9 @@ public class Mangakakalot extends PluginForDecrypt {
         return br;
     }
 
-    private static final Pattern TYPE_MANGA             = Pattern.compile("/manga-([a-z0-9\\-]+)/?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_MANGA_CHAPTER_OLD = Pattern.compile("/(?:manga-|chapter/)([a-z0-9\\-_]+)/chapter[\\-_](\\d+(\\.\\d+)?)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_MANGA_CHAPTER_NEW = Pattern.compile("/manga/([\\w-]+)/chapter[\\-_](\\d+([.-]\\d+)?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MANGA             = Pattern.compile("/manga[-/]([a-z0-9-]+)/?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MANGA_CHAPTER_OLD = Pattern.compile("/(?:manga-|chapter/)([a-z0-9-_]+)/chapter[-_](\\d+(\\.\\d+)?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MANGA_CHAPTER_NEW = Pattern.compile("/manga/([\\w-]+)/chapter[-_](\\d+([.-]\\d+)?)$", Pattern.CASE_INSENSITIVE);
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
@@ -60,8 +62,6 @@ public class Mangakakalot extends PluginForDecrypt {
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "manganato.info", "manganelo.com", "manganato.com", "manganelo.com", "chapmanganato.com", "chapmanganato.to", "readmanganato.com" });
         ret.add(new String[] { "mangakakalot.gg", "mangakakalot.com" });
         return ret;
     }
@@ -69,12 +69,6 @@ public class Mangakakalot extends PluginForDecrypt {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("mangakakalot.com");
-        deadDomains.add("manganelo.com");
-        deadDomains.add("manganato.com");
-        deadDomains.add("manganelo.com");
-        deadDomains.add("chapmanganato.com");
-        deadDomains.add("chapmanganato.to");
-        deadDomains.add("readmanganato.com");
         return deadDomains;
     }
 
@@ -122,17 +116,60 @@ public class Mangakakalot extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         final Regex chapterurl_old = new Regex(contenturl, TYPE_MANGA_CHAPTER_OLD);
         final Regex chapterurl_new = new Regex(contenturl, TYPE_MANGA_CHAPTER_NEW);
-        if (new Regex(contenturl, TYPE_MANGA).patternFind()) {
+        final Regex type_manga = new Regex(contenturl, TYPE_MANGA);
+        if (type_manga.patternFind()) {
             /* Find all chapters of a manga */
-            final String[] chapters = br.getRegex("<a[^>]+class\\s*=\\s*\"chapter-name[^\"]*\"[^>]+href\\s*=\\s*\"([^\"]+)\"").getColumn(0);
-            if (chapters == null || chapters.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            final String manga_slug = type_manga.getMatch(0);
+            final boolean useAPI = true;
+            if (useAPI) {
+                /* 2026-01-16: new */
+                final HashSet<String> dupes = new HashSet<String>();
+                int page = 1;
+                int offset = 0;
+                pagination: while (!this.isAbort()) {
+                    br.getPage("/api/manga/" + manga_slug + "/chapters?limit=50&offset=" + offset);
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    if (!Boolean.TRUE.equals(entries.get("success"))) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+                    final List<Map<String, Object>> chapters = (List<Map<String, Object>>) data.get("chapters");
+                    final Map<String, Object> pagination = (Map<String, Object>) data.get("pagination");
+                    int newItems = 0;
+                    for (final Map<String, Object> chapter : chapters) {
+                        final String chapter_slug = chapter.get("chapter_slug").toString();
+                        if (!dupes.add(chapter_slug)) {
+                            continue;
+                        }
+                        final String url = br.getURL("/manga/" + manga_slug + "/" + chapter_slug).toExternalForm();
+                        final DownloadLink link = this.createDownloadlink(url);
+                        ret.add(link);
+                        distribute(link);
+                        newItems++;
+                    }
+                    logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + pagination.get("total"));
+                    if (!Boolean.TRUE.equals(pagination.get("has_more"))) {
+                        logger.info("Stopping because: has_more==false");
+                        break pagination;
+                    } else if (newItems == 0) {
+                        logger.info("Stopping because: newItems==0");
+                        break pagination;
+                    }
+                    /* Continue to next page */
+                    page++;
+                    offset += chapters.size();
+                }
+            } else {
+                final String[] chaptersurls = br.getRegex("/manga/" + manga_slug + "/chapter-(\\d+(\\.\\d+)?)").getColumn(-1);
+                if (chaptersurls == null || chaptersurls.length == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                for (String url : chaptersurls) {
+                    url = br.getURL(url).toExternalForm();
+                    final DownloadLink dd = createDownloadlink(url);
+                    ret.add(dd);
+                }
             }
-            for (String chapter : chapters) {
-                final DownloadLink dd = createDownloadlink(Encoding.htmlDecode(chapter).trim());
-                ret.add(dd);
-            }
-            fp.addLinks(ret);
         } else if (chapterurl_old.patternFind()) {
             /* e.g. manganato.info */
             /* Find all images of a chapter */

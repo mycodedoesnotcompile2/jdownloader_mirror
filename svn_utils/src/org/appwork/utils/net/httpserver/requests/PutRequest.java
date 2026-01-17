@@ -33,10 +33,24 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver.requests;
 
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
+/**
+ * HTTP PUT request handler.
+ * 
+ * <p>
+ * PUT is used to create or update a resource at the specified URI.
+ * </p>
+ * 
+ * <p>
+ * Note: This class extends {@link PostRequest} because PUT requests always have
+ * a request body containing the resource representation to be stored. According to
+ * the RequestMethod enum, PUT has requiresOutputStream=true.
+ * </p>
+ *
+ * @author AppWork
+ */
 public class PutRequest extends PostRequest {
     /**
      * @param connection
@@ -46,12 +60,7 @@ public class PutRequest extends PostRequest {
     }
 
     @Override
-    protected RequestMethod getRequestMethod() {
+    public RequestMethod getRequestMethod() {
         return RequestMethod.PUT;
-    }
-
-    @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.PUT;
     }
 }

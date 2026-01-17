@@ -357,6 +357,7 @@ public class AccountController implements AccountControllerListener, AccountProp
                     return ai;
                 }
                 if (plugin.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                    // TODO: This overwrites any status text set in plugins -> Fix this
                     ai.setStatus("Balance: " + ai.getAccountBalanceFormatted());
                     if (ai.getAccountBalance() <= 0) {
                         account.setError(AccountError.INVALID, -1, "Zero balance");

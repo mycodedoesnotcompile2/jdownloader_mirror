@@ -33,13 +33,22 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver.requests;
 
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
- * @author daniel
+ * HTTP HEAD request handler.
  *
+ * <p>
+ * HEAD is used to retrieve the headers that would be returned if the resource was requested with GET, without the response body.
+ * </p>
+ *
+ * <p>
+ * Note: This class extends {@link GetRequest} because HEAD requests do not have a request body and behave similarly to GET requests.
+ * According to the RequestMethod enum, HEAD has requiresOutputStream=false.
+ * </p>
+ *
+ * @author daniel
  */
 public class HeadRequest extends GetRequest {
     /**
@@ -50,21 +59,8 @@ public class HeadRequest extends GetRequest {
     }
 
     @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.HEAD;
+    public RequestMethod getRequestMethod() {
+        return RequestMethod.HEAD;
     }
 
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("\r\n----------------Request-------------------------\r\n");
-        sb.append("HEAD ").append(this.getRequestedURL()).append(" HTTP/1.1\r\n");
-        for (final HTTPHeader key : this.getRequestHeaders()) {
-            sb.append(key.getKey());
-            sb.append(": ");
-            sb.append(key.getValue());
-            sb.append("\r\n");
-        }
-        return sb.toString();
-    }
 }

@@ -185,6 +185,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 final String status = entries.get("status").toString();
                 if (status.equalsIgnoreCase("processing")) {
                     /* Not yet ready */
+                    // TODO: Use other, more responsive sleep method
                     Thread.sleep(getPollingIntervalMillis(account));
                     continue;
                 }
@@ -223,9 +224,10 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 } else {
                     resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, solutionmap.get("text").toString(), 0);
                 }
-                if (resp == null) {
-                    throw new IllegalArgumentException();
-                }
+                /**
+                 * TODO: Correct answer leads to exception in PluginForHost -> Line 676 check why this happens <br>
+                 * if (!c.isSolved()) { throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                 */
                 resp.setCaptchaSolverTaskID(id);
                 job.setAnswer(resp);
                 return;

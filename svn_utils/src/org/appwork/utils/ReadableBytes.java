@@ -165,6 +165,7 @@ public class ReadableBytes {
         long b = bytes;
         if (b < 0) {
             sb.append("-");
+            b *= -1;
         }
         boolean k = isKibi();
         for (Unit u : Unit.values()) {
@@ -241,6 +242,9 @@ public class ReadableBytes {
             index++;
             negative = true;
         }
+        if (index >= value.length()) {
+            throw new ReadableBytesParseException("Parsing Error. No numeric value");
+        }
         while (index < value.length()) {
             Matcher matcher = PATTERN.matcher(value);
             if (!matcher.find(index)) {
@@ -261,7 +265,7 @@ public class ReadableBytes {
             index = matcher.end();
         }
         if (negative) {
-            result += -1;
+            result *= -1;
         }
         return fromBytes(result, hasKibi);
     }

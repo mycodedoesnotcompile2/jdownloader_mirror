@@ -14,7 +14,8 @@ import jd.plugins.Account;
 
 /** Class designed to migrate existing captcha solver config to new captcha solver plugin system. */
 public class CaptchaSolverSettingsMigration {
-    final AccountController ac = AccountController.getInstance();
+    final AccountController ac                                  = AccountController.getInstance();
+    private List<String>    namesOfServicesWithMigratedAccounts = new ArrayList<String>();
 
     public ArrayList<Account> getExistingAccounts(final String domain) {
         return ac.list(domain);
@@ -109,10 +110,10 @@ public class CaptchaSolverSettingsMigration {
         boolean userHasAccount = false;
         boolean userHasEnabledExistingAccount = false;
         if (apikey != null && apikey.matches("[a-zA-Z0-9]{10,}")) {
-            final List<Account> accs = this.getExistingAccounts("9kw.eu");
             final Account existingAccount = getExistingAccount("9kw.eu", apikey);
-            if (accs != null) {
+            if (existingAccount != null) {
                 // TODO: Check if an account with same apikey already exists
+                System.out.print("Same 9kw.eu account already exists");
             } else {
                 final Account acc = new Account(null, apikey);
                 if (!cfgOld.isEnabledGlobally() && !cfgOld.isEnabled()) {
@@ -122,6 +123,7 @@ public class CaptchaSolverSettingsMigration {
                     userHasEnabledExistingAccount = true;
                 }
                 ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add("9kw.eu");
             }
             userHasAccount = true;
         }
@@ -151,6 +153,19 @@ public class CaptchaSolverSettingsMigration {
             if (!cfgOld.isfeedback()) {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
+        }
+        /* Old default was 1 which makes no sense -> Only migrate it if user has changed that setting */
+        if (cfgOld.getThreadpoolSize() > 1) {
+            cfgNew.setLimitMaxSimultaneousCaptchasEnabled(true);
+            cfgNew.setMaxSimultaneousCaptchas(cfgOld.getThreadpoolSize());
+        }
+        /* Old default was true -> Migrate if user has changed it. */
+        /*
+         * TODO: Check if it makes sense to migrate this setting -> I think low credits warning should be on by default, even after this
+         * migration
+         */
+        if (!cfgOld.getlowcredits()) {
+            cfgNew.setWarnOnLowCredits(false);
         }
         System.out.print("9kw migration successful");
     }

@@ -41,13 +41,14 @@ import java.util.List;
 import org.appwork.remoteapi.exceptions.ApiCommandNotAvailable;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.utils.net.HeaderCollection;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.session.HttpSession;
 
 /**
  * @author daniel
- * 
+ *
  */
 public class SessionRemoteAPIRequest<T extends HttpSession> extends RemoteAPIRequest {
     private final T                session;
@@ -67,11 +68,11 @@ public class SessionRemoteAPIRequest<T extends HttpSession> extends RemoteAPIReq
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {        
+    public String toString() {
         return "SessionAPIRequest_" + (session == null ? null : session.getSessionID()) + "\r\n" + apiRequest;
     }
 
@@ -135,7 +136,7 @@ public class SessionRemoteAPIRequest<T extends HttpSession> extends RemoteAPIReq
     }
 
     @Override
-    public REQUESTTYPE getRequestType() {
+    public RequestMethod getRequestType() {
         return this.apiRequest.getRequestType();
     }
 

@@ -44,13 +44,10 @@ import org.appwork.remoteapi.exceptions.BadParameterException;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.net.HeaderCollection;
-import org.appwork.utils.net.httpserver.requests.ConnectRequest;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
-import org.appwork.utils.net.httpserver.requests.HeadRequest;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequestInterface;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
-import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 
 /**
@@ -58,14 +55,14 @@ import org.appwork.utils.net.httpserver.requests.PostRequest;
  *
  */
 public class RemoteAPIRequest implements HttpRequestInterface {
-    public static enum REQUESTTYPE {
-        CONNECT,
-        HEAD,
-        POST,
-        OPTIONS,
-        GET,
-        UNKNOWN
-    }
+    // public static enum REQUESTTYPE {
+    // CONNECT,
+    // HEAD,
+    // POST,
+    // OPTIONS,
+    // GET,
+    // UNKNOWN
+    // }
 
     private final InterfaceHandler<?> iface;
     private final String[]            parameters;
@@ -80,7 +77,7 @@ public class RemoteAPIRequest implements HttpRequestInterface {
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {        
+    public String toString() {
         return request + "\r\n" + "Method: " + method + "\r\nParameters:" + JSonStorage.serializeToJson(parameters);
     }
 
@@ -211,20 +208,8 @@ public class RemoteAPIRequest implements HttpRequestInterface {
         return -1;
     }
 
-    public REQUESTTYPE getRequestType() {
-        if (this.request instanceof OptionsRequest) {
-            return REQUESTTYPE.OPTIONS;
-        } else if (this.request instanceof HeadRequest) {
-            return REQUESTTYPE.HEAD;
-        } else if (this.request instanceof PostRequest) {
-            return REQUESTTYPE.POST;
-        } else if (this.request instanceof GetRequest) {
-            return REQUESTTYPE.GET;
-        } else if (this.request instanceof ConnectRequest) {
-            return REQUESTTYPE.CONNECT;
-        } else {
-            return REQUESTTYPE.UNKNOWN;
-        }
+    public RequestMethod getRequestType() {
+        return this.request.getRequestMethod();
     }
 
     /**
@@ -251,7 +236,7 @@ public class RemoteAPIRequest implements HttpRequestInterface {
      * @see org.appwork.utils.net.httpserver.requests.HttpRequestInterface#getID()
      */
     @Override
-    public long getId() {        
+    public long getId() {
         return request.getId();
     }
 }

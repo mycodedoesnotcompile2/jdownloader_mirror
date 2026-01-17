@@ -23,6 +23,7 @@ import javax.swing.event.TableModelListener;
 import org.appwork.swing.components.tooltips.PanelToolTip;
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.components.tooltips.TooltipPanel;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.locator.AbstractLocator;
 import org.jdownloader.DomainInfo;
@@ -149,7 +150,13 @@ public class AccountTooltip extends PanelToolTip {
                 if (supported_captcha_types == null) {
                     continue;
                 }
-                dis.addAll(supported_captcha_types);
+                for (final CAPTCHA_TYPE ctype : supported_captcha_types) {
+                    if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && !ctype.isJDownloaderSupported()) {
+                        /* In stable, skip items which are not supported by JDownloader to avoid confusing our users. */
+                        continue;
+                    }
+                    dis.add(ctype);
+                }
             }
             final JList list = new JList(dis.toArray(new CAPTCHA_TYPE[] {}));
             // list.setPreferredSize(new Dimension(400, 750));

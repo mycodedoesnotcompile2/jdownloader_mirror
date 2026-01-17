@@ -65,10 +65,10 @@ import org.appwork.utils.net.DownloadProgress;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.UploadProgress;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 
 public class BasicHTTP implements Interruptible {
     protected final static Charset          UTF8           = Charset.forName("UTF-8");

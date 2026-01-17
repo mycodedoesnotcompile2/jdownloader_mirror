@@ -16,14 +16,15 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import jd.controlling.captcha.SkipException;
-import jd.plugins.Plugin;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+
+import jd.controlling.captcha.SkipException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.Plugin;
 
 public abstract class ChallengeSolver<T> {
     public static final ChallengeSolver EXTERN = new ChallengeSolver<Object>() {
@@ -34,6 +35,20 @@ public abstract class ChallengeSolver<T> {
     };
 
     protected ChallengeSolver() {
+    }
+
+    /**
+     * Returns the list of captcha types supported by this solver. <br>
+     * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
+     * !
+     *
+     *
+     *
+     * @return List of supported captcha types
+     */
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        // TODO: Make this abstract
+        return null;
     }
 
     public boolean setInvalid(AbstractResponse<?> response) {
@@ -151,10 +166,6 @@ public abstract class ChallengeSolver<T> {
         }
     }
 
-    public String toString() {
-        return getClass().getSimpleName();
-    }
-
     private void initThreadPool(int i) {
         if (i <= 0) {
             return;
@@ -176,6 +187,15 @@ public abstract class ChallengeSolver<T> {
     protected boolean isChallengeSupported(final Challenge<?> c) {
         if (c instanceof AbstractBrowserChallenge) {
             return false;
+        } else if (this.getSupportedCaptchaTypes() != null) {
+            // TODO: Change this to return false if list of supported types is null
+            final List<CAPTCHA_TYPE> supportedTypes = this.getSupportedCaptchaTypes();
+            for (final CAPTCHA_TYPE supportedType : supportedTypes) {
+                if (supportedType.canHandle(c)) {
+                    return true;
+                }
+            }
+            return false;
         } else {
             return true;
         }
@@ -193,6 +213,24 @@ public abstract class ChallengeSolver<T> {
         }
     }
 
+    public boolean isDomainBlacklistEnabled() {
+        // TODO: Migrate to new captcha solver config system
+        return getService().getConfig().isBlackWhiteListingEnabled();
+    }
+
+    public List<String> getBlacklistedDomains() {
+        return getService().getConfig().getBlacklistEntries();
+    }
+
+    public boolean isDomainWhitelistEnabled() {
+        // TODO: Migrate to new captcha solver config system
+        return getService().getConfig().isBlackWhiteListingEnabled();
+    }
+
+    public List<String> getWhitelistedDomains() {
+        return getService().getConfig().getWhitelistEntries();
+    }
+
     /**
      * returns true for whitelisted and false for blacklisted
      *
@@ -200,7 +238,7 @@ public abstract class ChallengeSolver<T> {
      * @return
      */
     public boolean validateBlackWhite(final Challenge<?> c) {
-        if (!getService().getConfig().isBlackWhiteListingEnabled()) {
+        if (!this.isDomainWhitelistEnabled() && !this.isDomainBlacklistEnabled()) {
             /* Black/Whitelist disabled by user -> No need to check */
             return true;
         }
@@ -212,25 +250,27 @@ public abstract class ChallengeSolver<T> {
             hosts.addAll(Arrays.asList(siteSupportedNames));
         }
         Boolean result = null;
-        final ArrayList<String> whiteListEntries = getService().getConfig().getWhitelistEntries();
-        whiteListHandling: if (whiteListEntries != null && whiteListEntries.size() > 0) {
-            for (final String whiteListEntry : whiteListEntries) {
-                try {
-                    final Pattern whiteListPattern = Pattern.compile(whiteListEntry, Pattern.CASE_INSENSITIVE);
-                    for (final String host : hosts) {
-                        final Boolean matches = match(c, host, whiteListPattern);
-                        if (Boolean.TRUE.equals(matches)) {
-                            result = Boolean.TRUE;
-                            break whiteListHandling;
+        if (this.isDomainWhitelistEnabled()) {
+            final List<String> whiteListEntries = getWhitelistedDomains();
+            whiteListHandling: if (whiteListEntries != null && whiteListEntries.size() > 0) {
+                for (final String whiteListEntry : whiteListEntries) {
+                    try {
+                        final Pattern whiteListPattern = Pattern.compile(whiteListEntry, Pattern.CASE_INSENSITIVE);
+                        for (final String host : hosts) {
+                            final Boolean matches = match(c, host, whiteListPattern);
+                            if (Boolean.TRUE.equals(matches)) {
+                                result = Boolean.TRUE;
+                                break whiteListHandling;
+                            }
                         }
+                    } catch (Throwable e) {
+                        c.getPlugin().getLogger().log(e);
                     }
-                } catch (Throwable e) {
-                    c.getPlugin().getLogger().log(e);
                 }
             }
         }
-        if (result == null) {
-            final ArrayList<String> blackListEntries = getService().getConfig().getBlacklistEntries();
+        if (result == null && this.isDomainBlacklistEnabled()) {
+            final List<String> blackListEntries = getBlacklistedDomains();
             if (blackListEntries != null && blackListEntries.size() > 0) {
                 blackListHandling: for (final String blackListEntry : blackListEntries) {
                     try {
@@ -296,5 +336,9 @@ public abstract class ChallengeSolver<T> {
         }
         waitForMap = Collections.synchronizedMap(map);
         return waitForMap;
+    }
+
+    public String toString() {
+        return getClass().getSimpleName();
     }
 }

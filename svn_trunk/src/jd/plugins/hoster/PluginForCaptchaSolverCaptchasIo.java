@@ -10,7 +10,7 @@ import jd.plugins.HostPlugin;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52050 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52110 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -31,8 +31,8 @@ public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSo
         // TODO: 2025-12-22: Re-check supported captcha types before this plugin can be used in prod
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
-        types.add(CAPTCHA_TYPE.SINGLE_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.MULTI_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);

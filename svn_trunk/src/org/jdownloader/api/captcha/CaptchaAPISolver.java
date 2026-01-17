@@ -7,10 +7,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.DownloadLink;
-
 import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
@@ -31,11 +27,15 @@ import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountLoginOAuthChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserSolver;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
+
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink;
 
 public class CaptchaAPISolver extends ChallengeSolver<Object> implements CaptchaAPI, ChallengeResponseListener {
     private static final CaptchaAPISolver INSTANCE = new CaptchaAPISolver();
@@ -49,15 +49,34 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     }
 
     private final CaptchaAPIEventPublisher                 eventPublisher;
+    /* TODO: Why does this exist but is not used? */
     private final CaptchaMyJDownloaderRemoteSolverSettings config;
 
     @Override
     protected boolean isChallengeSupported(final Challenge<?> c) {
         if (AbstractBrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
+            /* Special false case */
             return false;
+        } else if (c instanceof AccountLoginOAuthChallenge) {
+            /* Special true case */
+            return true;
         } else {
-            return c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof AccountLoginOAuthChallenge || c instanceof ImageCaptchaChallenge;
+            return super.isChallengeSupported(c);
         }
+    }
+
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        types.add(CAPTCHA_TYPE.IMAGE);
+        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        types.add(CAPTCHA_TYPE.HCAPTCHA);
+        return types;
     }
 
     private final RemoteAPIConfig remoteAPIConfig = JsonConfig.create(RemoteAPIConfig.class);

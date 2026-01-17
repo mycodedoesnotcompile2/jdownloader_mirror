@@ -26,7 +26,7 @@ import jd.plugins.PluginForHost;
  */
 public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
-    protected boolean enoughBalanceFor(final Challenge<?> c, final Account account) throws Exception {
+    public boolean enoughBalanceFor(final Challenge<?> c, final Account account) {
         // TODO: Implement logic
         return true;
     }
@@ -38,17 +38,11 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The challenge to check
      * @return true if this solver can handle the challenge, false otherwise
      */
-    public final boolean canHandle(final Challenge<?> c) {
-        if (!validateBlackWhite(c)) {
+    public final boolean canHandle(final Challenge<?> c, Account account) {
+        if (!this.enoughBalanceFor(c, account)) {
             return false;
         }
-        final List<CAPTCHA_TYPE> supportedTypes = this.getSupportedCaptchaTypes();
-        for (final CAPTCHA_TYPE supportedType : supportedTypes) {
-            if (supportedType.canHandle(c)) {
-                return true;
-            }
-        }
-        return false;
+        return true;
     }
 
     public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, Account account) throws Exception {
@@ -113,7 +107,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *
      * @return List of supported captcha types
      */
-    public abstract java.util.List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+    public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
     /**
      * Determines whether the user should be notified when the account balance is low.
@@ -143,10 +137,18 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         if (cfg == null) {
             return Integer.MAX_VALUE;
         }
-        return cfg.getMaxParallelCaptchas();
+        return cfg.getMaxSimultaneousCaptchas();
     }
 
-    protected List<String> getBlacklistedDomains(final Account account) {
+    public boolean isDomainBlacklistEnabled() {
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return false;
+        }
+        return cfg.isDomainBlacklistEnabled();
+    }
+
+    public List<String> getBlacklistedDomains(final Account account) {
         final CaptchaSolverPluginConfig cfg = getDefaultConfig();
         if (cfg == null) {
             return null;
@@ -154,7 +156,15 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return commaSeparatedDomainsToList(cfg.getDomainBlacklist());
     }
 
-    protected List<String> getWhitelistedDomains(final Account account) {
+    public boolean isDomainWhitelistEnabled() {
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return false;
+        }
+        return cfg.isDomainWhitelistEnabled();
+    }
+
+    public List<String> getWhitelistedDomains(final Account account) {
         final CaptchaSolverPluginConfig cfg = getDefaultConfig();
         if (cfg == null) {
             return null;
@@ -180,7 +190,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return null;
     }
 
-    private boolean isValidDomain(final String domain) {
+    private final boolean isValidDomain(final String domain) {
         if (domain == null || domain.length() == 0) {
             return false;
         }
@@ -220,11 +230,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
 
     public abstract void solve(CESSolverJob<?> job, Account account) throws Exception;
 
-    public boolean validateBlackWhite(Challenge<?> c) {
-        // TODO: Add functionality or use the existing one in ChallengeResponseController
-        return true;
-    }
-
     protected static void checkInterruption() throws InterruptedException {
         if (Thread.interrupted()) {
             throw new InterruptedException();
@@ -244,9 +249,11 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     private CaptchaSolverPluginConfig getDefaultConfig() {
+        // TODO: Maybe ensure that every captcha solver plugin has a config or throw exception
         final Object cfgO = this.getConfigInterface();
         if (cfgO == null) {
             logger.warning("Solver has no config");
+            return null;
         }
         if (!(cfgO instanceof CaptchaSolverPluginConfig)) {
             logger.warning("Unexpected solver config type");

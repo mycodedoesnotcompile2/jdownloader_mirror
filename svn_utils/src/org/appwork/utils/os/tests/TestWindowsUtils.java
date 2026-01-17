@@ -142,7 +142,7 @@ public class TestWindowsUtils extends AWTest {
         INT_PTR processHandle = null;
         while (true) {
             try {
-                processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "heise.de" }, null, false);
+                processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "appwork.org" }, null, false);
                 break;
             } catch (com.sun.jna.platform.win32.Win32Exception e) {
                 if (timeout.isAlive() && 1223 == e.getErrorCode()) {

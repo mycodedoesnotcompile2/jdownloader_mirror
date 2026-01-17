@@ -36,6 +36,7 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
         if (isSpecialReCaptchaEnterpriseChallenge(c)) {
+            /* Special return false */
             return false;
         } else {
             return c instanceof AbstractBrowserChallenge;
@@ -44,6 +45,7 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
 
     @Override
     public boolean canHandle(Challenge<?> c) {
+        /* TODO: Explicitely check for supported types or add override of getSupportedCaptchaTypes */
         if (c instanceof CutCaptchaChallenge) {
             /* 2024-09-10: Handling for CutCaptcha is unfinished thus only CES solvers like 2captcha.com can handle CutCaptcha captchas. */
             return false;

@@ -35,6 +35,7 @@ package org.appwork.utils.net.httpserver;
 
 import java.io.IOException;
 
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
@@ -44,7 +45,7 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  */
 public class EmptyRequestException extends IOException implements HttpConnectionExceptionHandler {
     @Override
-    public boolean handle(HttpResponse response) throws IOException {
+    public boolean handle(HttpRequest request, HttpResponse response) throws IOException {
         return true;
     }
 }

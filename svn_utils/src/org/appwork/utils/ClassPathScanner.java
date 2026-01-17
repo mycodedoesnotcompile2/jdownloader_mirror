@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -187,7 +187,10 @@ public abstract class ClassPathScanner<E extends Throwable> {
      * @return
      */
     protected boolean skip(String classname) {
-        if (classname.startsWith("sun.")) {
+        if (classname.startsWith("net.miginfocom.")) {
+            return true;
+        }
+          if (classname.startsWith("sun.")) {
             return true;
         }
         if (classname.startsWith("org.slf4j.")) {
@@ -239,9 +242,6 @@ public abstract class ClassPathScanner<E extends Throwable> {
             return true;
         }
         if (classname.startsWith("org.antlr.")) {
-            return true;
-        }
-        if (classname.startsWith("dorkbox.")) {
             return true;
         }
         if (classname.startsWith("jsyntaxpane.")) {

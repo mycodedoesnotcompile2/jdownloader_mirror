@@ -39,8 +39,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.HeaderCollection;
-import org.appwork.utils.net.httpserver.HttpConnection;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
@@ -52,7 +53,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
     protected HeaderCollection requestHeaders = null;
     protected String           requestedPath  = null;
 
-    public abstract HttpConnection.HttpConnectionType getHttpConnectionType();
+    public abstract RequestMethod getRequestMethod();
 
     public boolean isHttps() {
         return https;
@@ -66,7 +67,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
     protected List<KeyValuePair>               requestedURLParameters = null;
     private List<String>                       remoteAddress          = new ArrayList<String>();
     protected final RawHttpConnectionInterface connection;
-    private HTTPBridge                         bridge;
+    private HttpServerInterface                         bridge;
     private final long                         id;
 
     public RawHttpConnectionInterface getConnection() {
@@ -149,6 +150,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
      *            {@link #setRequestedURL(String)} the requestedPath to set
      */
     public void setRequestedPath(final String requestedPath) {
+        DebugMode.breakIf(requestedPath == null);
         this.requestedPath = requestedPath;
     }
 
@@ -159,6 +161,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
      *            normalized path use {@link #setRequestedPath(String)} the requestedURL to set
      */
     public void setRequestedURL(final String requestedURL) {
+        DebugMode.breakIf(requestedURL == null);
         this.requestedURL = requestedURL;
     }
 
@@ -196,7 +199,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
     /**
      * @param string
      */
-    public void setBridge(HTTPBridge bridge) {
+    public void setBridge(HttpServerInterface bridge) {
         this.bridge = bridge;
     }
 
@@ -205,7 +208,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
      *
      * @return
      */
-    public HTTPBridge getBridge() {
+    public HttpServerInterface getBridge() {
         return bridge;
     }
 

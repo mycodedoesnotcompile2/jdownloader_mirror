@@ -92,28 +92,6 @@ public interface HTTPConnection {
         }
     }
 
-    public static enum RequestMethod {
-        NOTIFY(false), // UPNP
-        MSEARCH(false), // UPNP
-        SUBSCRIBE(false), // UPNP
-        UNSUBSCRIBE(false), // UPNP
-        PUT(true), // HTTP 1.1/WebDAV
-        DELETE(true), // WebDAV
-        OPTIONS(false), // HTTP 1.1
-        GET(false), // HTTP 1.1
-        POST(true), // HTTP 1.1
-        HEAD(false), // HTTP 1.1
-        PROPFIND(true);// WebDAV
-        public final boolean requiresOutputStream;
-
-        /**
-         *
-         */
-        private RequestMethod(boolean requiresOutputStream) {
-            this.requiresOutputStream = requiresOutputStream;
-        }
-    }
-
     void setLegacyConnectEnabled(boolean enabled);
 
     boolean isLegacyConnectEnabled();

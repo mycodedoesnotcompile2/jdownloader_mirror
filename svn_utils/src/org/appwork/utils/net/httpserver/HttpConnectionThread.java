@@ -36,17 +36,19 @@ package org.appwork.utils.net.httpserver;
 import java.io.IOException;
 import java.net.Socket;
 
+import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
+
 /**
  * @author daniel
  *
  */
 public class HttpConnectionThread extends Thread {
 
-    private HttpConnection currentConnection = null;
-    private Socket         socket            = null;
-    private int            serverThreadID    = 0;
+    private volatile HttpConnection currentConnection = null;
+    private volatile Socket         socket            = null;
+    private int                     serverThreadID    = 0;
 
-    public HttpConnectionThread(final HttpServer server, final Runnable r) {
+    public HttpConnectionThread(final HttpServerInterface server, final Runnable r) {
         super(r);
         this.setDaemon(true);
     }

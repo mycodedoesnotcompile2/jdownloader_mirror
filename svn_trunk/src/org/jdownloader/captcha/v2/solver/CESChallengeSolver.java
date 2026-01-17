@@ -1,10 +1,5 @@
 package org.jdownloader.captcha.v2.solver;
 
-import jd.SecondLevelLaunch;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
-import jd.http.Browser;
-import jd.plugins.Plugin;
-
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -19,6 +14,12 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.plugins.SkipReason;
 
+import jd.SecondLevelLaunch;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.http.Browser;
+import jd.plugins.Plugin;
+
+/* TODO: Delete this once transition to new plugin based external captcha solvers is done. */
 public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
     // protected final static CaptchaSettings SETTINGS = JsonConfig.create(CaptchaSettings.class);
     protected int getDefaultWaitForOthersTimeout() {

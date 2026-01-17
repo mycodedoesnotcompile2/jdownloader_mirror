@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -174,7 +174,7 @@ public class JSonMapper {
             return createJsonValue(((Class<?>) obj).getName());
         } else if ((mapper = typeMapper.get(clazz)) != null) {
             return mapper.map(obj);
-        } else/* if (obj instanceof Storable) */{
+        } else/* if (obj instanceof Storable) */ {
             final JSonObject ret = createJSonObject(null);
             try {
                 final ClassCache cc = getClassCache(clazz);

@@ -40,11 +40,14 @@ import java.util.zip.GZIPOutputStream;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.storage.JSonStorage;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpserver.HttpConnectionExceptionHandler;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequestInterface;
+import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.net.httpserver.responses.HttpResponseInterface;
 
@@ -116,18 +119,33 @@ public class BasicRemoteAPIException extends Exception implements HttpConnection
     }
 
     /**
+     * WARNING: request might be null in case of FCGI Server
+     *
      * @param response
      * @throws IOException
      */
-    public boolean handle(final HttpResponse response) throws IOException {
-        return handle(response, false);
+    public boolean handle(HttpRequest request, HttpResponse response) throws IOException {
+
+        if (request instanceof OptionsRequest) {
+            // should actually not happen - exception in Options request!
+            DebugMode.debugger();
+            // new instance to be sure that there are no unwanted headers etc.
+            response = new HttpResponse(response.getConnection());
+            // we actually already handle this in HttpConnection.onException - we leave it here anyway - just to be sure
+            response.setResponseCode(this.getCode());
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
+            response.getOutputStream(true).flush();
+            return true;
+        } else {
+            return handle(request, response, false);
+        }
     }
 
     protected Object getErrorObject() {
         return new DeviceErrorResponse(this.getType(), getData());
     }
 
-    public boolean handle(final HttpResponse response, boolean gzip) throws IOException {
+    protected boolean handle(HttpRequest request, final HttpResponse response, boolean gzip) throws IOException {
         byte[] bytes;
         final String str = JSonStorage.serializeToJson(getErrorObject());
         bytes = str.getBytes("UTF-8");
@@ -140,8 +158,6 @@ public class BasicRemoteAPIException extends Exception implements HttpConnection
             bytes = baos.toByteArray();
         }
         response.setResponseCode(this.getCode());
-        /* needed for ajax/crossdomain */
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "*"));
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json; charset=UTF-8"));
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
         response.getOutputStream(true).write(bytes);
@@ -181,7 +197,7 @@ public class BasicRemoteAPIException extends Exception implements HttpConnection
         if (request == null) {
             logger.info("Exception in Request **\r\n" + Exceptions.getStackTrace(this) + "\r\ndata:" + data);
         } else {
-            logger.info("Exception in Request " + request.getId() + "/" + request.getRequestedURL() + "\r\n" + Exceptions.getStackTrace(this) + "\r\ndata:" + data);
+            logger.info("Exception in Request " + request.getId() + " " + request.getRequestedURL() + "\r\n" + Exceptions.getStackTrace(this) + "\r\ndata:" + data);
         }
     }
 }

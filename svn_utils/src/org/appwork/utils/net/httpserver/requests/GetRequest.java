@@ -39,14 +39,29 @@ import java.util.List;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
- * @author daniel
+ * HTTP GET request handler.
  *
+ * <p>
+ * GET is used to retrieve a representation of the specified resource.
+ * </p>
+ *
+ * <p>
+ * Note: This class extends {@link HttpRequest} directly and provides URL parameter handling functionality. GET requests do not have a
+ * request body. According to the RequestMethod enum, GET has requiresOutputStream=false.
+ * </p>
+ *
+ * <p>
+ * This class serves as a base class for other request types that do not require body handling but need URL parameter parsing (e.g., HEAD,
+ * OPTIONS, TRACE, UNLOCK).
+ * </p>
+ *
+ * @author daniel
  */
-public class GetRequest extends HttpRequest {
+public abstract class GetRequest extends HttpRequest {
     /**
      * @param connection
      */
@@ -90,15 +105,13 @@ public class GetRequest extends HttpRequest {
     }
 
     @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.GET;
-    }
+    public abstract RequestMethod getRequestMethod();
 
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("\r\n----------------Request " + getId() + "-------------------------\r\n");
-        sb.append("GET ").append(this.getRequestedURL()).append(" HTTP/1.1\r\n");
+        sb.append(getRequestMethod() + " ").append(this.getRequestedURL()).append(" HTTP/1.1\r\n");
         for (final HTTPHeader key : this.getRequestHeaders()) {
             sb.append(key.getKey());
             sb.append(": ");

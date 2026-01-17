@@ -34,6 +34,7 @@
 package org.appwork.utils.net.httpserver;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.BindException;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -45,7 +46,9 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -59,40 +62,67 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.HTTPBridge;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * @author daniel
  *
  */
-public class HttpServer implements Runnable, HTTPBridge {
+public class HttpServer implements Runnable, HttpServerInterface {
+    public static final String                             APP_WORK_GMB_H_HTTP_SERVER      = "AppWork GmbH HttpServer";
+
     private final int                                      wishPort;
-    private final AtomicReference<List<ServerSocket>>      controlSockets  = new AtomicReference<List<ServerSocket>>(null);
-    private volatile Thread                                serverThread    = null;
-    private boolean                                        localhostOnly   = false;
-    private boolean                                        debug           = false;
-    private final CopyOnWriteArrayList<HttpRequestHandler> requestHandlers = new CopyOnWriteArrayList<HttpRequestHandler>();
+    private final AtomicReference<List<ServerSocket>>      controlSockets                  = new AtomicReference<List<ServerSocket>>(null);
+    private volatile Thread                                serverThread                    = null;
+    private boolean                                        localhostOnly                   = true;
+    private boolean                                        debug                           = false;
+    private final CopyOnWriteArrayList<HttpRequestHandler> requestHandlers                 = new CopyOnWriteArrayList<HttpRequestHandler>();
+
+    private RequestSizeLimits                              requestSizeLimits               = null;
+    private HeaderValidationRules                          headerValidationRules           = null;
+    private Set<RequestMethod>                             allowedMethods                  = null;
+    private ResponseSecurityHeaders                        responseSecurityHeaders         = null;
+    private CorsHandler                                    corsHandler                     = null;
+    private ConnectionTimeouts                             connectionTimeouts              = null;
+    private String                                         responseServerHeader            = APP_WORK_GMB_H_HTTP_SERVER;
+
+    private ThreadPoolExecutor                             threadPool;
+
+    /** Default maximum header size: 16 KB */
+    private static final int                               DEFAULT_MAX_HEADER_SIZE         = 16 * 1024;
+    /** Default maximum POST body size: 10 MB */
+    private static final long                              DEFAULT_MAX_POST_BODY_SIZE      = 10 * 1024 * 1024;
+    /** Default maximum processed POST data size: 50 MB (after decompression, decryption, etc.) */
+    private static final long                              DEFAULT_MAX_POST_PROCESSED_SIZE = 50 * 1024 * 1024;
 
     public HttpServer(final int port) {
         this.wishPort = port;
+        // Set default size limits
+        this.requestSizeLimits = new RequestSizeLimits(DEFAULT_MAX_HEADER_SIZE, DEFAULT_MAX_POST_BODY_SIZE, DEFAULT_MAX_POST_PROCESSED_SIZE);
+
+        // Set default header validation rules
+        this.headerValidationRules = new HeaderValidationRules();
+        // Set default allowed methods (only GET allowed by default)
+        this.allowedMethods = EnumSet.of(RequestMethod.GET);
+        // Set default security headers config
+        this.responseSecurityHeaders = new ResponseSecurityHeaders();
+        // Set default connection timeouts config
+        this.connectionTimeouts = new ConnectionTimeouts();
+
     }
 
-    @Deprecated
-    protected Runnable createConnectionHandler(final Socket clientSocket) throws IOException {
-        return createPlainHttpConnection(clientSocket);
+    protected HttpConnectionRunnable createHttpConnection(Socket clientSocket) throws IOException {
+        InputStream inputStream = clientSocket.getInputStream();
+        HttpConnection con = new HttpConnection(this, clientSocket, inputStream, null);
+
+        return con;
     }
 
-    protected Runnable createConnectionHandler(ThreadPoolExecutor threadPool, final Socket clientSocket) throws IOException {
-        return createConnectionHandler(clientSocket);
-    }
-
-    protected HttpConnection createPlainHttpConnection(Socket clientSocket) throws IOException {
-        return new HttpConnection(this, clientSocket);
-    }
-
+    @Override
     public List<HttpRequestHandler> getHandler() {
         return this.requestHandlers;
     }
@@ -141,6 +171,20 @@ public class HttpServer implements Runnable, HTTPBridge {
      */
     public boolean isLocalhostOnly() {
         return this.localhostOnly;
+    }
+
+    /**
+     * Checks if the given IP address is a loopback (localhost) address.
+     *
+     * @param addr
+     *            The InetAddress to check
+     * @return true if the address is a loopback address, false otherwise
+     */
+    private boolean isFromLocalhost(final InetAddress addr) {
+        if (addr == null) {
+            return false;
+        }
+        return addr.isLoopbackAddress();
     }
 
     public boolean isRunning() {
@@ -211,7 +255,7 @@ public class HttpServer implements Runnable, HTTPBridge {
 
     public void run() {
         final List<ServerSocket> controlSockets = this.controlSockets.get();
-        ThreadPoolExecutor threadPool = null;
+
         try {
             if (controlSockets == null || controlSockets.size() == 0) {
                 return;
@@ -243,6 +287,7 @@ public class HttpServer implements Runnable, HTTPBridge {
                     /*
                      * WORKAROUND for stupid SUN /ORACLE way of "how a threadpool should work" !
                      */
+
                     final int active = threadPool.getPoolSize();
                     final int max = threadPool.getMaximumPoolSize();
                     if (active < max) {
@@ -260,12 +305,14 @@ public class HttpServer implements Runnable, HTTPBridge {
                         final Socket socket = (r instanceof HttpConnectionRunnable) ? ((HttpConnectionRunnable) r).getClientSocket() : null;
                         ((HttpConnectionThread) t).setCurrentConnection(connection, socket);
                         httpT.setName(HttpServer.this, socket);
+
                     }
+
                     super.beforeExecute(t, r);
                 }
             };
             threadPool.allowCoreThreadTimeOut(true);
-            final ThreadPoolExecutor finalThreadPool = threadPool;
+
             final List<Thread> controlSocketThreads = new ArrayList<Thread>();
             for (final ServerSocket controlSocket : controlSockets) {
                 final Thread controlSocketThread = new Thread(Thread.currentThread().getName() + ":Listener:" + controlSocket.getLocalSocketAddress()) {
@@ -276,20 +323,32 @@ public class HttpServer implements Runnable, HTTPBridge {
                                 final Socket clientSocket = controlSocket.accept();
                                 boolean closeSocket = true;
                                 try {
-                                    final Runnable runnable;
-                                    try {
-                                        runnable = HttpServer.this.createConnectionHandler(finalThreadPool, clientSocket);
-                                    } catch (Throwable e) {
-                                        throw new IOException(e);
+                                    // Check if connection is from localhost when server is bound to localhost only
+                                    if (HttpServer.this.localhostOnly) {
+                                        final InetAddress clientAddress = clientSocket.getInetAddress();
+                                        if (!HttpServer.this.isFromLocalhost(clientAddress)) {
+                                            // Non-loopback address on localhost-only server - reject connection
+                                            try {
+                                                LogV3.warning("Security: Non-loopback connection rejected | Remote: " + clientSocket.getRemoteSocketAddress() + " | LocalhostOnly: " + HttpServer.this.localhostOnly + " | Closing connection");
+                                                clientSocket.close();
+                                            } catch (final Throwable ignore) {
+                                            }
+                                            closeSocket = false;
+                                            continue;
+                                        }
                                     }
-                                    if (runnable != null) {
-                                        finalThreadPool.execute(runnable);
+
+                                    final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
+
+                                    if (connection != null) {
+                                        threadPool.execute(connection);
                                         closeSocket = false;
                                     }
-                                } catch (final IOException e) {
-                                    e.printStackTrace();
                                 } catch (final RejectedExecutionException e) {
-                                    e.printStackTrace();
+                                    LogV3.log(e);
+                                } catch (final Throwable e) {
+                                    LogV3.log(e);
+
                                 } finally {
                                     if (closeSocket && clientSocket != null) {
                                         try {
@@ -346,7 +405,7 @@ public class HttpServer implements Runnable, HTTPBridge {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Runnable#run()
      */
     /**
@@ -362,6 +421,10 @@ public class HttpServer implements Runnable, HTTPBridge {
     }
 
     private int lastPort = -1;
+
+    /**
+     *
+     */
 
     public synchronized void start() throws IOException {
         List<ServerSocket> serverSockets = new ArrayList<ServerSocket>();
@@ -466,13 +529,158 @@ public class HttpServer implements Runnable, HTTPBridge {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * org.appwork.utils.net.httpserver.requests.HTTPBridge#canHandleChunkedEncoding(org.appwork.utils.net.httpserver.requests.HttpRequest,
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean canHandleChunkedEncoding(HttpRequest request, HttpResponse response) {
+    public boolean isChunkedEncodedResponseAllowed(HttpRequest request, HttpResponse response) {
         return true;
     }
+
+    /**
+     * Sets the request size limits. Set to null to disable size limits.
+     *
+     * @param requestSizeLimits
+     *            The request size limits instance, or null to disable
+     */
+    public void setRequestSizeLimits(final RequestSizeLimits requestSizeLimits) {
+        this.requestSizeLimits = requestSizeLimits;
+    }
+
+    /**
+     * Returns the request size limits configuration.
+     *
+     * @return the request size limits or null if size limits are disabled
+     */
+    @Override
+    public RequestSizeLimits getRequestSizeLimits() {
+        return this.requestSizeLimits;
+    }
+
+    /**
+     * Sets the header validation rules. Set to null to disable header validation.
+     *
+     * @param headerValidationRules
+     *            The header validation rules instance, or null to disable
+     */
+    public void setHeaderValidationRules(final HeaderValidationRules headerValidationRules) {
+        this.headerValidationRules = headerValidationRules;
+    }
+
+    /**
+     * Returns the header validation rules configuration.
+     *
+     * @return the header validation rules or null if header validation is disabled
+     */
+    @Override
+    public HeaderValidationRules getHeaderValidationRules() {
+        return this.headerValidationRules;
+    }
+
+    /**
+     * Sets the allowed HTTP methods. Set to null to disable method validation.
+     *
+     * @param allowedMethods
+     *            Set of allowed HTTP methods. If null or empty, method validation is disabled.
+     */
+    public void setAllowedMethods(final Set<RequestMethod> allowedMethods) {
+        if (allowedMethods != null && !allowedMethods.isEmpty()) {
+            this.allowedMethods = EnumSet.copyOf(allowedMethods);
+        } else {
+            this.allowedMethods = null;
+        }
+    }
+
+    /**
+     * Returns the set of allowed HTTP methods.
+     *
+     * @return the set of allowed methods or null if method validation is disabled
+     */
+    @Override
+    public Set<RequestMethod> getAllowedMethods() {
+        return this.allowedMethods != null ? EnumSet.copyOf(this.allowedMethods) : null;
+    }
+
+    /**
+     * Sets the response security headers configuration. Set to null to disable default security headers.
+     *
+     * @param responseSecurityHeaders
+     *            The response security headers instance, or null to disable
+     */
+    public void setResponseSecurityHeaders(final ResponseSecurityHeaders responseSecurityHeaders) {
+        this.responseSecurityHeaders = responseSecurityHeaders;
+    }
+
+    /**
+     * Returns the response security headers configuration.
+     *
+     * @return the response security headers configuration or null if security headers are disabled
+     */
+    @Override
+    public ResponseSecurityHeaders getResponseSecurityHeaders() {
+        return this.responseSecurityHeaders;
+    }
+
+    /**
+     * Sets the connection timeouts configuration. Set to null to disable timeouts (not recommended).
+     *
+     * @param connectionTimeouts
+     *            The connection timeouts instance, or null to disable
+     */
+    public void setConnectionTimeouts(final ConnectionTimeouts connectionTimeouts) {
+        this.connectionTimeouts = connectionTimeouts;
+    }
+
+    /**
+     * Returns the connection timeouts configuration.
+     *
+     * @return the connection timeouts configuration or null if timeouts are disabled
+     */
+    @Override
+    public ConnectionTimeouts getConnectionTimeouts() {
+        return this.connectionTimeouts;
+    }
+
+    /**
+     * Sets the CORS handler. Set to null to disable CORS headers (default).
+     *
+     * @param corsHandler
+     *            The CORS handler instance, or null to disable CORS
+     */
+    public void setCorsHandler(final CorsHandler corsHandler) {
+        this.corsHandler = corsHandler;
+    }
+
+    /**
+     * Returns the CORS handler.
+     *
+     * @return the CORS handler or null if CORS is disabled
+     */
+    @Override
+    public CorsHandler getCorsHandler() {
+        return this.corsHandler;
+    }
+
+    /**
+     * Sets the Server response header value. Set to null to disable the Server header.
+     *
+     * @param responseServerHeader
+     *            The Server header value, or null to disable
+     */
+    public void setResponseServerHeader(final String responseServerHeader) {
+        this.responseServerHeader = responseServerHeader;
+    }
+
+    /**
+     * Returns the Server response header value.
+     *
+     * @return the Server header value, or null if disabled
+     */
+    @Override
+    public String getResponseServerHeader() {
+        return this.responseServerHeader;
+    }
+
 }

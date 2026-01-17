@@ -38,13 +38,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
+ * HTTP CONNECT request handler.
+ * 
+ * <p>
+ * CONNECT is used to establish a tunnel to the server identified by the target resource.
+ * This is typically used for HTTPS proxying.
+ * </p>
+ * 
+ * <p>
+ * Note: This class extends {@link HttpRequest} directly rather than {@link GetRequest}
+ * or {@link PostRequest} because CONNECT is a special method that establishes a tunnel
+ * and does not follow standard request/response semantics. According to the RequestMethod
+ * enum, CONNECT has requiresOutputStream=false.
+ * </p>
+ *
  * @author daniel
  * @date 21.11.2016
- *
  */
 public class ConnectRequest extends HttpRequest {
     /**
@@ -55,8 +68,8 @@ public class ConnectRequest extends HttpRequest {
     }
 
     @Override
-    public HttpConnectionType getHttpConnectionType() {
-        return HttpConnectionType.CONNECT;
+    public RequestMethod getRequestMethod() {
+        return RequestMethod.CONNECT;
     }
 
     @Override

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -456,6 +456,17 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
 
     public static JSPath fromPathElements(List<Object> elements) {
         return new JSPath(elements);
+    }
+
+    /**
+     * Alias for {@link #fromPathElements(Object...)} for convenience.
+     *
+     * @param elements
+     *            The path elements
+     * @return A new JSPath instance
+     */
+    public static JSPath fromElements(Object... elements) {
+        return fromPathElements(elements);
     }
 
     // /**

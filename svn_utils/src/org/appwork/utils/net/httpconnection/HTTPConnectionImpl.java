@@ -92,6 +92,20 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 
 public class HTTPConnectionImpl implements HTTPConnection {
+    /**
+     * @author thomas
+     * @date 08.12.2025
+     *
+     */
+    public static final class EmptyHttpResponseException extends EOFException {
+        /**
+         * @param s
+         */
+        private EmptyHttpResponseException() {
+            super("empty HTTP-Response");
+        }
+    }
+
     protected class TryNextConnectException extends IOException {
         protected TryNextConnectException(Throwable cause) {
             super(cause);
@@ -554,7 +568,8 @@ public class HTTPConnectionImpl implements HTTPConnection {
     protected boolean addHostHeader() {
         /* check if host entry does exist */
         for (final String key : this.requestProperties.keySet()) {
-            if ("Host".equalsIgnoreCase(key)) {
+
+            if (HTTPConstants.HEADER_REQUEST_HOST.equalsIgnoreCase(key)) {
                 return false;
             }
         }
@@ -565,7 +580,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         if (usedPort != -1 && defaultPort != -1 && usedPort != defaultPort) {
             appendPort = ":" + usedPort;
         }
-        this.requestProperties.put("Host", getHostname() + appendPort);
+        this.requestProperties.put(HTTPConstants.HEADER_REQUEST_HOST, getHostname() + appendPort);
         return true;
     }
 
@@ -1169,7 +1184,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     }
                 }, true);
                 if (header.limit() == 0) {
-                    throw new EOFException("empty HTTP-Response");
+                    throw new EmptyHttpResponseException();
                 }
             } catch (final IOException e) {
                 if (connectionSocket instanceof KeepAliveSocketStream) {
@@ -1793,7 +1808,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
     }
 
     protected boolean isRequiresOutputStream() {
-        return httpMethod.requiresOutputStream;
+        return httpMethod.mayHavePostBody;
     }
 
     protected void sendRequest() throws UnsupportedEncodingException, IOException {

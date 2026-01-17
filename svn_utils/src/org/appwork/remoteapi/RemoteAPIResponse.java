@@ -41,11 +41,11 @@ import java.util.zip.GZIPOutputStream;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.ResponseCodeInterface;
-import org.appwork.remoteapi.RemoteAPIRequest.REQUESTTYPE;
 import org.appwork.utils.Application;
 import org.appwork.utils.net.ChunkedOutputStream;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.HeaderCollection;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.net.httpserver.responses.HttpResponseInterface;
 
@@ -119,7 +119,7 @@ public class RemoteAPIResponse implements HttpResponseInterface {
         }
         final boolean gzip = RemoteAPI.gzip(request);
         final boolean deflate = RemoteAPI.gzip(request) && Application.getJavaVersion() >= Application.JAVA16;
-        final boolean isHeadRequest = REQUESTTYPE.HEAD.equals(request.getRequestType());
+        final boolean isHeadRequest = RequestMethod.HEAD.equals(request.getRequestType());
         if (gzip == false && deflate == false || bytes.length <= this.MAXUNCOMPRESSED) {
             this.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
             final OutputStream os = this.getOutputStream(true);

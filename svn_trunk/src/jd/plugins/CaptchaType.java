@@ -40,7 +40,7 @@ public class CaptchaType {
                 return null;
             }
         },
-        SINGLE_CLICK_CAPTCHA {
+        IMAGE_SINGLE_CLICK_CAPTCHA {
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof ClickCaptchaChallenge;
@@ -66,7 +66,7 @@ public class CaptchaType {
                 return null;
             }
         },
-        MULTI_CLICK_CAPTCHA {
+        IMAGE_MULTI_CLICK_CAPTCHA {
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof MultiClickCaptchaChallenge;

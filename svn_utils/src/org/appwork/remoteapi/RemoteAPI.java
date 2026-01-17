@@ -72,6 +72,7 @@ import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
@@ -79,10 +80,11 @@ import org.appwork.utils.net.ChunkedOutputStream;
 import org.appwork.utils.net.CountingOutputStream;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.NullOutputStream;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.RequestSizeLimitExceededException;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
-import org.appwork.utils.net.httpserver.requests.HTTPBridge;
+import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
@@ -163,7 +165,25 @@ public class RemoteAPI implements HttpRequestHandler {
         }
     }
 
-    protected HTTPBridge getHTTPBridge(final RemoteAPIRequest request, final RemoteAPIResponse response) {
+    /**
+     * @param request
+     * @param response
+     * @param originHeader
+     */
+    protected void setCorsHeaders(final HttpRequest request, final HttpResponse response) {
+        HTTPHeader originHeader = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ORIGIN);
+        HTTPHeader requestedHeaders = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_CONTROL_HEADERS);
+
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, originHeader.getValue()));
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, "30"));
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, GET, POST"));
+        if (requestedHeaders != null) {
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, requestedHeaders.getValue()));
+        }
+
+    }
+
+    protected HttpServerInterface getHTTPBridge(final RemoteAPIRequest request, final RemoteAPIResponse response) {
         if (request != null) {
             final HttpRequest httpRequest = request.getHttpRequest();
             if (httpRequest != null) {
@@ -177,9 +197,12 @@ public class RemoteAPI implements HttpRequestHandler {
     public static OutputStream getOutputStream(final RemoteAPIResponse response, final RemoteAPIRequest request, final boolean gzip, final boolean wrapJQuery) throws IOException {
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "no-store, no-cache"));
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json"));
-        final HTTPBridge bridge = response.getRemoteAPI().getHTTPBridge(request, response);
+        DebugMode.debugger();
+        // HttpLimitProviderInputStream server = HttpConnection.getInputStreamByType(request.getInputStream(),
+        // HttpLimitProviderInputStream.class);
+        // final HTTPBridge bridge = response.getRemoteAPI().getHTTPBridge(request, response);
         final boolean chunked;
-        if (bridge == null || bridge.canHandleChunkedEncoding(request.getHttpRequest(), response.getHttpResponse())) {
+        if (request.getHttpRequest().getBridge().isChunkedEncodedResponseAllowed(request.getHttpRequest(), response.getHttpResponse())) {
             chunked = true;
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
         } else {
@@ -332,8 +355,15 @@ public class RemoteAPI implements HttpRequestHandler {
             }
             if (methodHasResponseParameter && !methodHasReturnTypeAndAResponseParameter) {
                 /*
-                 * TODO: check for unhandled response, be aware of async responses!
+                 * Method has RemoteAPIResponse as parameter but no @AllowResponseAccess annotation.
+                 * We assume the method writes directly to the OutputStream via the response parameter.
+                 * If responseData is non-null, it will be ignored - log a warning.
                  */
+                if (responseData != null) {
+                    LogV3.warning("RemoteAPI: Method " + method.getDeclaringClass().getSimpleName() + "." + method.getName() + 
+                        " has RemoteAPIResponse parameter but returned non-null value (" + responseData.getClass().getSimpleName() + 
+                        "). Return value will be ignored. If you want to return data, use @AllowResponseAccess annotation or remove RemoteAPIResponse parameter.");
+                }
                 return;
             }
             this.writeStringResponse(responseData, method, request, response);
@@ -407,6 +437,8 @@ public class RemoteAPI implements HttpRequestHandler {
 
     public RemoteAPIRequest createRemoteAPIRequestObject(final HttpRequest request) throws BasicRemoteAPIException {
         Object preData = prepareRawRequest(request);
+        // Origin validation is handled by the server instance in HttpConnection.
+
         this.validateRequest(request);
         final RemoteAPIMethod remoteAPIMethod = this.getRemoteAPIMethod(request);
         if (remoteAPIMethod == null) {
@@ -476,7 +508,12 @@ public class RemoteAPI implements HttpRequestHandler {
                 if (e.getCause() instanceof BasicRemoteAPIException) {
                     throw (BasicRemoteAPIException) e.getCause();
                 }
-                throw new RuntimeException(e);
+                if (e instanceof RequestSizeLimitExceededException) {
+                    throw new BasicRemoteAPIException("Post Data Limit Exceeded", ResponseCode.REQUEST_ENTITY_TOO_LARGE);
+
+                }
+                throw new BasicRemoteAPIException(e, "Bad Request", ResponseCode.ERROR_BAD_REQUEST, null);
+
             }
         }
         return new ParsedParameters(parameters, jqueryCallback);
@@ -542,6 +579,7 @@ public class RemoteAPI implements HttpRequestHandler {
 
     protected String getRequestPathWithoutNamespace(final HttpRequest request) {
         final String requestPath = request.getRequestedPath();
+
         final int index = requestPath.lastIndexOf("/", requestPath.lastIndexOf("/") - 1);
         if (index > 0) {
             for (final String nameSpace : interfaces.keySet()) {
@@ -815,6 +853,21 @@ public class RemoteAPI implements HttpRequestHandler {
     }
 
     /**
+     * Validates the Origin header if present. Allows direct browser navigation (no Origin or localhost Origin), but rejects cross-origin
+     * requests.
+     *
+     * This method is called in createRemoteAPIRequestObject() before validateRequest(), ensuring that Origin validation happens even if
+     * onGetRequest() or onPostRequest() are overridden in subclasses.
+     *
+     * @param request
+     *            The HTTP request
+     * @param response
+     *            The HTTP response (may be null if called early in request processing)
+     * @throws BasicRemoteAPIException
+     *             Throws BasicRemoteAPIException with ERROR_FORBIDDEN if Origin header is present and not allowed
+     */
+
+    /**
      * @param request
      */
     protected void validateRequest(final HttpRequest request) throws BasicRemoteAPIException {
@@ -856,15 +909,15 @@ public class RemoteAPI implements HttpRequestHandler {
     public static void sendBytesCompressed(HttpRequest request, HttpResponse response, final InputStream is) throws IOException {
         final boolean gzip = RemoteAPI.gzip(request);
         final boolean deflate = RemoteAPI.deflate(request) && Application.getJavaVersion() >= Application.JAVA16;
-        final boolean isHeadRequest = HttpConnectionType.HEAD.equals(request.getHttpConnectionType());
+        final boolean isHeadRequest = RequestMethod.HEAD == request.getRequestMethod();
         if (deflate) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "deflate"));
         } else if (gzip) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
         }
         OutputStream os;
-        final HTTPBridge bridge = request != null ? request.getBridge() : null;
-        if (bridge == null || bridge.canHandleChunkedEncoding(request, response)) {
+        final HttpServerInterface bridge = request != null ? request.getBridge() : null;
+        if (bridge == null || bridge.isChunkedEncodedResponseAllowed(request, response)) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
             os = new ChunkedOutputStream(response.getOutputStream(true));
         } else {
@@ -896,7 +949,7 @@ public class RemoteAPI implements HttpRequestHandler {
     public static void sendBytesCompressed(HttpRequest request, HttpResponse response, byte[] bytes) throws IOException {
         final boolean gzip = RemoteAPI.gzip(request);
         final boolean deflate = RemoteAPI.deflate(request) && Application.getJavaVersion() >= Application.JAVA16;
-        final boolean isHeadRequest = HttpConnectionType.HEAD.equals(request.getHttpConnectionType());
+        final boolean isHeadRequest = RequestMethod.HEAD.equals(request.getRequestMethod());
         long contentLength = bytes.length;
         if ((gzip == false && deflate == false) || contentLength == 0) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, String.valueOf(bytes.length)));
@@ -942,8 +995,8 @@ public class RemoteAPI implements HttpRequestHandler {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
             }
             OutputStream os;
-            final HTTPBridge bridge = request != null ? request.getBridge() : null;
-            if (bridge == null || bridge.canHandleChunkedEncoding(request, response)) {
+            final HttpServerInterface bridge = request != null ? request.getBridge() : null;
+            if (bridge == null || bridge.isChunkedEncodedResponseAllowed(request, response)) {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
                 os = new ChunkedOutputStream(response.getOutputStream(true));
             } else {

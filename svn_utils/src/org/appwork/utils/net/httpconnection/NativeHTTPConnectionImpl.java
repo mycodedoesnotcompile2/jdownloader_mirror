@@ -834,7 +834,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     }
 
     protected boolean isRequiresOutputStream() {
-        return httpMethod.requiresOutputStream;
+        return httpMethod.mayHavePostBody;
     }
 
     @Override

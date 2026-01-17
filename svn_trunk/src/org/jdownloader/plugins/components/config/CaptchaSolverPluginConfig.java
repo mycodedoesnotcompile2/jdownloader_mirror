@@ -54,12 +54,12 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
             return "Max captchas per hour";
         }
 
-        public String getLimitMaxParallelCaptchasEnabled_label() {
-            return "Limit max parallel captchas?";
+        public String getLimitMaxSimultaneousCaptchasEnabled_label() {
+            return "Limit max simultaneous captchas?";
         }
 
-        public String getMaxParallelCaptchas_label() {
-            return "Max parallel captchas";
+        public String getMaxSimultaneousCaptchas_label() {
+            return "Max simultaneous captchas";
         }
 
         public String getPollingIntervalSeconds_label() {
@@ -128,18 +128,18 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
     @DescriptionForConfigEntry("Limits max number of parallel captchas")
     @DefaultBooleanValue(false)
     @Order(600)
-    boolean isLimitMaxParallelCaptchasEnabled();
+    boolean isLimitMaxSimultaneousCaptchasEnabled();
 
-    void setLimitMaxParallelCaptchasEnabled(boolean b);
+    void setLimitMaxSimultaneousCaptchasEnabled(boolean b);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Maximum number of captchas to solve in parallel")
+    @DescriptionForConfigEntry("Maximum number of captchas to solve at the same time")
     @SpinnerValidator(min = 1, max = 100, step = 1)
     @DefaultIntValue(100)
     @Order(601)
-    int getMaxParallelCaptchas();
+    int getMaxSimultaneousCaptchas();
 
-    void setMaxParallelCaptchas(int max);
+    void setMaxSimultaneousCaptchas(int max);
 
     @AboutConfig
     @DescriptionForConfigEntry("Limit max captchas per hour")

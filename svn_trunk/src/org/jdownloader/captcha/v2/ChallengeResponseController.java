@@ -443,12 +443,13 @@ public class ChallengeResponseController {
         }
         final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
         final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
+        /* Collect unavailable solver domains for logging purposes only */
         final HashSet<String> unavailableSolverDomains = new HashSet<String>();
         for (final Account solverAccount : solverAccounts) {
             boolean success = false;
             try {
                 final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
-                if (!plugin.canHandle(c)) {
+                if (!plugin.canHandle(c, solverAccount)) {
                     continue;
                 }
                 final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
