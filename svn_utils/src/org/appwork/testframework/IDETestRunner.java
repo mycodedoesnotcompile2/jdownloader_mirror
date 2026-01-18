@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -62,6 +62,8 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
 import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter;
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
@@ -184,63 +186,72 @@ public class IDETestRunner {
                 LogV3.log(e);
             }
         }
-        for (final URL url : ClassPathScanner.getClassPath()) {
-            // System.out.println(url);
-            final File root = new File(url.toURI());
-            if (root.isDirectory()) {
-                AWTest.logInfoAnyway("Scan " + root);
-                final List<File> files = Files.getFiles(true, true, root);
-                int testsFound = 0;
-                for (final File file : files) {
-                    final String rel = Files.getRelativePath(root, file);
-                    if (rel.matches("(?i).*(test|ide).*\\.class$")) {
-                        if (file.isFile()) {
-                            final String testClass = rel.replace("/", ".").substring(0, rel.length() - ".class".length());
-                            try {
-                                final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
-                                if (TestInterface.class.isAssignableFrom(cls) && TestInterface.class != cls && cls != AWTest.class) {
-                                    testClasses.add(testClass);
+        // testClasses.add("org.appwork.utils.net.httpserver.tests.HttpServerConnectionTimeoutsTest");
+
+        if (testClasses.size() == 0) {
+            for (final URL url : ClassPathScanner.getClassPath()) {
+                // System.out.println(url);
+                final File root = new File(url.toURI());
+                if (root.isDirectory()) {
+                    AWTest.logInfoAnyway("Scan " + root);
+                    final List<File> files = Files.getFiles(true, true, root);
+                    int testsFound = 0;
+                    for (final File file : files) {
+                        final String rel = Files.getRelativePath(root, file);
+                        if (rel.matches("(?i).*(test|ide).*\\.class$")) {
+                            if (file.isFile()) {
+                                final String testClass = rel.replace("/", ".").substring(0, rel.length() - ".class".length());
+                                try {
+                                    final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
+                                    if (TestInterface.class.isAssignableFrom(cls) && TestInterface.class != cls && cls != AWTest.class) {
+                                        testClasses.add(testClass);
+                                    }
+                                } catch (ClassNotFoundException e) {
+                                    AWTest.logInfoAnyway(e.toString());
                                 }
-                            } catch (ClassNotFoundException e) {
-                                AWTest.logInfoAnyway(e.toString());
                             }
                         }
                     }
+                    AWTest.logInfoAnyway("Scanned " + root + " and found " + files.size() + " files and " + testsFound + " test-related classes/files");
                 }
-                AWTest.logInfoAnyway("Scanned " + root + " and found " + files.size() + " files and " + testsFound + " test-related classes/files");
             }
         }
         final int testClassesFound = testClasses.size();
         int skippedTestClasses = 0;
-        {
-            final ListIterator<String> it = testClasses.listIterator();
-            Set<String> alreadyCollectedClasses = new HashSet<String>();
-            testClassLoop: while (it.hasNext()) {
-                final String next = it.next();
-                // AWTest.logInfoAnyway("collect classes for:" + next + " " + it.nextIndex());
-                final List<String> classes = new ArrayList<String>();
-                classes.add(next);
-                while (classes.size() > 0) {
-                    final String nextClass = classes.remove(0);
-                    final Map<String, String> refClasses = new ClassCollector().getClasses(nextClass, false);
-                    for (Entry<String, String> refClassEntry : refClasses.entrySet()) {
-                        final String refClass = refClassEntry.getKey();
-                        final String existing = knownClasses.get(refClass);
-                        if (existing == null) {
-                            // AWTest.logInfoAnyway("no class cache:" + refClass);
-                            continue testClassLoop;
-                        } else if (!StringUtils.equals(existing, refClassEntry.getValue())) {
-                            // AWTest.logInfoAnyway("outdated class cache:" + refClass);
-                            continue testClassLoop;
-                        } else if (alreadyCollectedClasses.add(refClass)) {
-                            classes.add(refClass);
+
+        if (false) {
+            {
+                final ListIterator<String> it = testClasses.listIterator();
+                Set<String> alreadyCollectedClasses = new HashSet<String>();
+                testClassLoop: while (it.hasNext()) {
+                    final String next = it.next();
+                    // DebugMode.breakIf(next.contains("HttpServer"), null);
+                    // AWTest.logInfoAnyway("collect classes for:" + next + " " + it.nextIndex());
+                    final List<String> classes = new ArrayList<String>();
+                    classes.add(next);
+                    while (classes.size() > 0) {
+                        final String nextClass = classes.remove(0);
+                        final Map<String, String> refClasses = new ClassCollector().getClasses(nextClass, false);
+                        for (Entry<String, String> refClassEntry : refClasses.entrySet()) {
+                            final String refClass = refClassEntry.getKey();
+                            final String existing = knownClasses.get(refClass);
+                            if (existing == null) {
+                                AWTest.logInfoAnyway("Run because " + next + ": New Class:" + refClass);
+                                continue testClassLoop;
+                            } else if (!StringUtils.equals(existing, refClassEntry.getValue())) {
+                                AWTest.logInfoAnyway("Run because " + next + ": Changed Class:" + refClass);
+                                continue testClassLoop;
+                            } else if (alreadyCollectedClasses.add(refClass)) {
+                                classes.add(refClass);
+                            }
                         }
                     }
+                    AWTest.logInfoAnyway("skip unchanged test-class:" + next);
+                    skippedTestClasses++;
+                    it.remove();
                 }
-                AWTest.logInfoAnyway("skip unchanged test-class:" + next);
-                skippedTestClasses++;
-                it.remove();
             }
+
         }
         {
             // shuffle test classes, tests must not rely on specific order of execution
@@ -258,11 +269,56 @@ public class IDETestRunner {
             }
         }
         AWTest.logInfoAnyway("Found  " + testClassesFound + " - Skipped Tests: " + skippedTestClasses);
-        for (final String testClass : testClasses) {
+        int count = 0;
+        nextTest: for (final String testClass : testClasses) {
+
+            count++;
+            AWTest.logInfoAnyway("Next  " + " - " + count + "/" + testClassesFound + " : " + testClass);
+            Map<String, String> references = new ClassCollector().getClasses(testClass, true);
+            File file = Application.getResource("cfg/testcache_" + testClass + ".cache");
+            HashMap<String, String> known = new HashMap<String, String>();
+
+            if (file.isFile()) {
+                known = Deser.fromByteArray(IO.readFile(file), TypeRef.HASHMAP_STRING);
+            } else {
+                AWTest.logInfoAnyway(testClass + " new TEST!");
+            }
+            boolean skip = true;
+            if (references.size() > known.size()) {
+                skip = false;
+            } else {
+                for (Entry<String, String> es : references.entrySet()) {
+                    if (IDETestRunner.class.getName().equals(es.getKey())) {
+                        // Maybe rmeove later....
+                        continue;
+                    }
+                    String cls = es.getKey();
+                    String knownHash = known.get(cls);
+                    if (knownHash == null) {
+                        AWTest.logInfoAnyway(testClass + " New File: " + cls + "(References: last known:" + known.size() + "/new:" + references.size() + ")");
+                        skip = false;
+                        break;
+                    }
+                    if (!StringUtils.equalsIgnoreCase(knownHash, es.getValue())) {
+                        AWTest.logInfoAnyway(testClass + " Changed File: " + cls + "(References: last known:" + known.size() + "/new:" + references.size() + ")");
+                        skip = false;
+                        break;
+                    }
+                }
+            }
+
+            if (skip) {
+                skippedTestClasses++;
+                AWTest.logInfoAnyway(testClass + " SKIPPED! Total: " + skippedTestClasses + " of " + testClassesFound);
+                continue;
+            }
+
             final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
             runTestInternal(cls);
-            final Map<String, String> refClasses = new ClassCollector().getClasses(testClass, true);
-            knownClasses.putAll(refClasses);
+
+            IO.secureWrite(file, Deser.toByteArray(references, SC.READABLE));
+            // final Map<String, String> refClasses = new ClassCollector().getClasses(testClass, true);
+            knownClasses.putAll(references);
             writeKnownClassesCache();
         }
         AWTest.logInfoAnyway("Finished IDE Build Tests");
