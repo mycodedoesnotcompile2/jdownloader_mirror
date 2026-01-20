@@ -84,9 +84,9 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.net.throttledconnection.MeteredThrottledInputStream;
 import org.appwork.utils.net.throttledconnection.ThrottledConnection;
@@ -1283,7 +1283,7 @@ public class HLSDownloader extends DownloadInterface {
         return ret;
     }
 
-    protected void handleFileRequest(final File file, GetRequest request, HttpResponse response) throws FileNotFoundException, IOException {
+    protected void handleFileRequest(final File file, AbstractGetRequest request, HttpResponse response) throws FileNotFoundException, IOException {
         final FileInputStream fis = new FileInputStream(file);
         try {
             final long fileSize = file.length();
@@ -1369,7 +1369,7 @@ public class HLSDownloader extends DownloadInterface {
         return "ts";
     }
 
-    protected boolean isSegmentDownload(GetRequest request) throws IOException {
+    protected boolean isSegmentDownload(AbstractGetRequest request) throws IOException {
         final String requestedPath = request.getRequestedPath();
         if (requestedPath == null) {
             return false;
@@ -1415,7 +1415,7 @@ public class HLSDownloader extends DownloadInterface {
             final byte[] readBuf = new byte[512];
 
             @Override
-            public boolean onPostRequest(PostRequest request, HttpResponse response) {
+            public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) {
                 requestsInProcess.incrementAndGet();
                 try {
                     logger.info(request.toString());
@@ -1495,7 +1495,7 @@ public class HLSDownloader extends DownloadInterface {
             }
 
             @Override
-            public boolean onGetRequest(GetRequest request, HttpResponse response) {
+            public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) {
                 boolean requestOkay = false;
                 final LogSource requestLogger = new LogSource(request.getRequestedURL());
                 requestsInProcess.incrementAndGet();

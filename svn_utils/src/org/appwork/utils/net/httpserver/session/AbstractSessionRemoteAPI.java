@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -50,10 +50,10 @@ import org.appwork.remoteapi.exceptions.SessionException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.reflection.Clazz;
 
@@ -96,8 +96,8 @@ public abstract class AbstractSessionRemoteAPI<T extends HttpSession> extends Re
             }
             request.setRequestedURLParameters(params);
         }
-        if (StringUtils.isEmpty(token) && request instanceof PostRequest) {
-            final List<KeyValuePair> post = ((PostRequest) request).getPostParameter();
+        if (StringUtils.isEmpty(token) && request instanceof AbstractPostRequest) {
+            final List<KeyValuePair> post = ((AbstractPostRequest) request).getPostParameter();
             params = new ArrayList<KeyValuePair>();
             for (final KeyValuePair next : post) {
                 if ("token".equalsIgnoreCase(next.key)) {
@@ -106,7 +106,7 @@ public abstract class AbstractSessionRemoteAPI<T extends HttpSession> extends Re
                     params.add(next);
                 }
             }
-            ((PostRequest) request).setPostParameter(params);
+            ((AbstractPostRequest) request).setPostParameter(params);
         }
         return token;
     }
@@ -154,7 +154,7 @@ public abstract class AbstractSessionRemoteAPI<T extends HttpSession> extends Re
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onGetRequest(final GetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onGetRequest(final AbstractGetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         return this.onRequest(request, response);
     }
 
@@ -165,7 +165,7 @@ public abstract class AbstractSessionRemoteAPI<T extends HttpSession> extends Re
      * (org.appwork.utils.net.httpserver.requests.PostRequest, org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onPostRequest(final PostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onPostRequest(final AbstractPostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         return this.onRequest(request, response);
     }
 

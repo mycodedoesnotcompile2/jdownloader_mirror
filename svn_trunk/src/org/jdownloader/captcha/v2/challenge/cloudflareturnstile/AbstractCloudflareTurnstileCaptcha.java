@@ -3,12 +3,7 @@ package org.jdownloader.captcha.v2.challenge.cloudflareturnstile;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
-
-import jd.http.Browser;
-import jd.parser.html.Form;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -18,8 +13,16 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.logging.LogController;
 
+import jd.http.Browser;
+import jd.parser.html.Form;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+
 /** https://www.cloudflare.com/products/turnstile/ */
 public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
+    private final static Pattern PATTERN_VALID_RESPONSE_TOKEN = Pattern.compile("^0\\.[a-zA-Z0-9_\\-\\.]{60,}$");
+
     public static boolean containsCloudflareTurnstileClass(final Browser br) {
         return br != null && containsCloudflareTurnstileClass(br.toString());
     }
@@ -181,7 +184,10 @@ public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
 
     public static boolean looksLikeValidToken(final String str) {
         /* E.g. 0.zTSnTXO0X0XwSjSCU8oyzbjEtD8p.d62306d4ee00c00dda690f959ebbd0bd90 */
-        return str != null && str.matches("0\\.[a-zA-Z0-9_\\-\\.]{60,}");
+        if (str == null) {
+            return false;
+        }
+        return new Regex(str, PATTERN_VALID_RESPONSE_TOKEN).matches();
     }
 
     /** Returns URL of the page where the captcha is displayed at. */

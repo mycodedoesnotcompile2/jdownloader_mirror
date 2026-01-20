@@ -71,8 +71,12 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof BasicCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof BasicCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     protected void solveBasicCaptchaChallenge(CESSolverJob<String> job, BasicCaptchaChallenge challenge) throws InterruptedException, SolverException {

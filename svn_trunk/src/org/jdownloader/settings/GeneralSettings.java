@@ -24,6 +24,7 @@ import org.appwork.storage.config.defaults.AbstractDefaultFactory;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.os.hardware.HardwareTypeInterface;
 import org.jdownloader.controlling.domainrules.DomainRule;
@@ -38,7 +39,7 @@ public interface GeneralSettings extends ConfigInterface {
     class DefaultDownloadFolder extends AbstractDefaultFactory<String> {
         @Override
         public String getDefaultValue(KeyHandler<String> keyHandler) {
-            if (CrossSystem.isWindows()) {
+            if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_VISTA)) {
                 try {
                     final String ret = com.sun.jna.platform.win32.Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Downloads);
                     if (CrossSystem.isAbsolutePath(ret) && new File(ret).isDirectory()) {

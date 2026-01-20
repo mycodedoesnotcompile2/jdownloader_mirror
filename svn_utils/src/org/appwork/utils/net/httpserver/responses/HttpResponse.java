@@ -58,13 +58,13 @@ import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
  */
 public class HttpResponse implements HttpResponseInterface {
     private final HeaderCollection             responseHeaders;
-    public static final byte[]                 NEWLINE                    = "\r\n".getBytes();
-    public static final byte[]                 HTTP11                     = "HTTP/1.1 ".getBytes();
-    public static final byte[]                 _0                         = "0".getBytes();
-    private ResponseCodeInterface              responseCode               = ResponseCode.SUCCESS_NO_CONTENT;
+    public static final byte[]                 NEWLINE       = "\r\n".getBytes();
+    public static final byte[]                 HTTP11        = "HTTP/1.1 ".getBytes();
+    public static final byte[]                 _0            = "0".getBytes();
+    private ResponseCodeInterface              responseCode  = ResponseCode.SUCCESS_NO_CONTENT;
     protected final RawHttpConnectionInterface connection;
-    protected OutputStream                     outputStream               = null;
-    protected boolean                          asyncResponse              = false;
+    protected OutputStream                     outputStream  = null;
+    protected boolean                          asyncResponse = false;
 
     public RawHttpConnectionInterface getConnection() {
         return connection;
@@ -75,7 +75,6 @@ public class HttpResponse implements HttpResponseInterface {
         this.responseHeaders = new HeaderCollection();
         this.responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CONNECTION, "close"));
         this.addDefaultServerHeader();
-
         // Add default security headers if not already present (allows overriding)
         this.addDefaultSecurityHeaders();
         // Add default CORS headers if not already present (allows overriding)
@@ -84,11 +83,9 @@ public class HttpResponse implements HttpResponseInterface {
 
     private void addDefaultServerHeader() {
         String serverHeader = null;
-
         if (this.connection instanceof HttpConnection) {
             final HttpServerInterface server = ((HttpConnection) this.connection).getServer();
             if (server != null) {
-
                 serverHeader = server.getResponseServerHeader();
             }
         }
@@ -106,7 +103,6 @@ public class HttpResponse implements HttpResponseInterface {
      */
     private void addDefaultSecurityHeaders() {
         ResponseSecurityHeaders securityHeaders = null;
-
         // Try to get security headers config from HttpServer via HttpConnection
         if (this.connection instanceof HttpConnection) {
             final HttpServerInterface server = ((HttpConnection) this.connection).getServer();
@@ -116,12 +112,10 @@ public class HttpResponse implements HttpResponseInterface {
         } else {
             DebugMode.debugger();
         }
-
         // Use default values if no config is available
         if (securityHeaders == null) {
             securityHeaders = new ResponseSecurityHeaders();
         }
-
         // Add security headers to response (only if not already present)
         securityHeaders.addSecurityHeaders(this.responseHeaders);
     }
@@ -132,7 +126,6 @@ public class HttpResponse implements HttpResponseInterface {
      */
     private void addDefaultCorsHeaders() {
         CorsHandler corsHandler = null;
-
         // Try to get CORS config from HttpServer via HttpConnection
         if (this.connection instanceof HttpConnection) {
             final HttpServerInterface server = ((HttpConnection) this.connection).getServer();
@@ -140,7 +133,6 @@ public class HttpResponse implements HttpResponseInterface {
                 corsHandler = server.getCorsHandler();
             }
         }
-
         // Only add CORS headers if CORS is enabled
         if (corsHandler != null) {
             final HttpRequest request = this.connection.getRequest();

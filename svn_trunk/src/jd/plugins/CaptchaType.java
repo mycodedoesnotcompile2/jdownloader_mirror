@@ -521,16 +521,12 @@ public class CaptchaType {
         return accountInfo;
     }
 
-    protected void setAccountInfo(AccountInfo accountInfo) {
+    public void setAccountInfo(AccountInfo accountInfo) {
         this.accountInfo = accountInfo;
     }
 
     public CaptchaType(final CAPTCHA_TYPE ctype) {
         this.ctype = ctype;
-    }
-
-    private boolean isEnabled(final Boolean booleanValue) {
-        return booleanValue == null || booleanValue.booleanValue();
     }
 
     private String getEnabledProperty() {
@@ -539,8 +535,10 @@ public class CaptchaType {
 
     public boolean isEnabled() {
         final Account ac = getAccount();
-        final boolean ret = ac == null ? isEnabled(enabled) : ac.getBooleanProperty(getEnabledProperty(), isEnabled(enabled));
-        return ret;
+        if (ac == null) {
+            return true;
+        }
+        return ac.getBooleanProperty(getEnabledProperty(), true);
     }
 
     protected Account getAccount() {

@@ -53,7 +53,7 @@ public class DummyTestAPIImpl implements DummyTestAPI {
         final org.appwork.utils.net.httpserver.requests.HttpRequest httpRequest = request.getHttpRequest();
         // Check if it's a GetRequest instance
         // warning: this includes all GET-Like requests as well.
-        if (!(httpRequest instanceof org.appwork.utils.net.httpserver.requests.GetRequest)) {
+        if (!(httpRequest instanceof org.appwork.utils.net.httpserver.requests.AbstractGetRequest)) {
             throw new BadRequestException("Request class " + httpRequest.getClass().getSimpleName() + " is not allowed for echo. Only GetRequest is allowed.");
         }
 
@@ -73,7 +73,7 @@ public class DummyTestAPIImpl implements DummyTestAPI {
         final org.appwork.utils.net.httpserver.requests.HttpRequest httpRequest = request.getHttpRequest();
         // Check if it's a PostRequest instance
         // warning - this includes all post like requests as well
-        if (!(httpRequest instanceof org.appwork.utils.net.httpserver.requests.PostRequest)) {
+        if (!(httpRequest instanceof org.appwork.utils.net.httpserver.requests.AbstractPostRequest)) {
             throw new BadRequestException("Request class " + httpRequest.getClass().getSimpleName() + " is not allowed for postData. Only PostRequest is allowed.");
         }
 

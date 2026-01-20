@@ -51,7 +51,6 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  *
  */
 public interface HttpServerInterface {
-
     // /**
     // * @return
     // */
@@ -66,7 +65,6 @@ public interface HttpServerInterface {
     // * @return
     // */
     // public long getMaxPostProcessingBytes();
-
     /**
      * @param httpRequest
      * @param httpResponse
@@ -124,5 +122,4 @@ public interface HttpServerInterface {
      * @return the Server header value, or null to disable the Server header
      */
     String getResponseServerHeader();
-
 }

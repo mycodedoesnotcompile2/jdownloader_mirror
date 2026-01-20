@@ -118,6 +118,12 @@ public class BasicRemoteAPIException extends Exception implements HttpConnection
         return this.type;
     }
 
+    @Deprecated
+    // will be removed by daniel
+    public boolean handle(HttpResponse response) throws IOException {
+        return this.handle(null, response);
+    }
+
     /**
      * WARNING: request might be null in case of FCGI Server
      *
@@ -125,7 +131,6 @@ public class BasicRemoteAPIException extends Exception implements HttpConnection
      * @throws IOException
      */
     public boolean handle(HttpRequest request, HttpResponse response) throws IOException {
-
         if (request instanceof OptionsRequest) {
             // should actually not happen - exception in Options request!
             DebugMode.debugger();

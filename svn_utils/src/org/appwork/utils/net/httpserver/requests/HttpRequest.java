@@ -37,12 +37,21 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.ConnectionTimeouts;
+import org.appwork.utils.net.httpserver.CorsHandler;
+import org.appwork.utils.net.httpserver.HeaderValidationRules;
+import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
+import org.appwork.utils.net.httpserver.RequestSizeLimits;
+import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
+import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * @author daniel
@@ -54,6 +63,23 @@ public abstract class HttpRequest implements HttpRequestInterface {
     protected String           requestedPath  = null;
 
     public abstract RequestMethod getRequestMethod();
+
+    @Deprecated
+    // will be removed by daniel
+    public HttpConnectionType getHttpConnectionType() {
+        switch (getRequestMethod()) {
+        case OPTIONS:
+            return HttpConnectionType.OPTIONS;
+        case GET:
+            return HttpConnectionType.GET;
+        case POST:
+            return HttpConnectionType.POST;
+        case HEAD:
+            return HttpConnectionType.HEAD;
+        default:
+            return HttpConnectionType.valueOf(getRequestMethod().name());
+        }
+    }
 
     public boolean isHttps() {
         return https;
@@ -67,7 +93,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
     protected List<KeyValuePair>               requestedURLParameters = null;
     private List<String>                       remoteAddress          = new ArrayList<String>();
     protected final RawHttpConnectionInterface connection;
-    private HttpServerInterface                         bridge;
+    private HttpServerInterface                bridge;
     private final long                         id;
 
     public RawHttpConnectionInterface getConnection() {
@@ -199,8 +225,66 @@ public abstract class HttpRequest implements HttpRequestInterface {
     /**
      * @param string
      */
-    public void setBridge(HttpServerInterface bridge) {
+    public void setBridge(final HttpServerInterface bridge) {
         this.bridge = bridge;
+    }
+
+    @Deprecated
+    public void setBridge(final HTTPBridge deprecatedBridge) {
+        final HttpServerInterface previousServerInterface = getBridge();
+        setBridge(new HttpServerInterface() {
+            @Override
+            public boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse) {
+                return deprecatedBridge.canHandleChunkedEncoding(httpRequest, httpResponse);
+            }
+
+            @Override
+            public String getResponseServerHeader() {
+                return null;
+            }
+
+            @Override
+            public ResponseSecurityHeaders getResponseSecurityHeaders() {
+                return null;
+            }
+
+            @Override
+            public RequestSizeLimits getRequestSizeLimits() {
+                return null;
+            }
+
+            @Override
+            public HeaderValidationRules getHeaderValidationRules() {
+                return null;
+            }
+
+            @Override
+            public List<HttpRequestHandler> getHandler() {
+                return previousServerInterface.getHandler();
+            }
+
+            private final CorsHandler corsHandler = new CorsHandler() {
+                @Override
+                public boolean isAllowHeadersFromRequest() {
+                    return true;
+                }
+            };
+
+            @Override
+            public CorsHandler getCorsHandler() {
+                return corsHandler;
+            }
+
+            @Override
+            public ConnectionTimeouts getConnectionTimeouts() {
+                return null;
+            }
+
+            @Override
+            public Set<RequestMethod> getAllowedMethods() {
+                return null;
+            }
+        });
     }
 
     /**

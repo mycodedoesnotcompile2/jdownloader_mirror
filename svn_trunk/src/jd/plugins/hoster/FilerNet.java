@@ -30,7 +30,6 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -58,7 +57,7 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52023 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52124 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -384,42 +383,22 @@ public class FilerNet extends PluginForHost {
                     }
                 };
             }
-            String captchaResponseToken = null;
-            String token = null;
-            handle_pre_download_wait: {
-                /* Pre download wait time */
-                final boolean allowSolveCaptchaDuringWaitTime = true;
+            String ticket = null;
+            handle_pre_download_wait_and_captcha: {
+                final String captchaResponseToken = captchaHelper.getToken();
                 /* The following API call starts the server side pre download wait time. */
-                data = (Map<String, Object>) callAPI(null, "/api/file/request/" + fid);
-                token = data.get("t").toString();
+                data = (Map<String, Object>) callAPI(null, "/api/file/request/" + fid + "?hCaptchaToken=" + captchaResponseToken);
+                ticket = data.get("t").toString();
                 final int waitSeconds = ((Number) data.get("wt")).intValue();
                 long waitMillis = waitSeconds * 1000l;
-                if (allowSolveCaptchaDuringWaitTime) {
-                    /* 2025-10-27: Special: Solve captcha "during" wait time. */
-                    final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-                    if (waitMillis > captchaHelper.getSolutionTimeout()) {
-                        final long prePrePreDownloadWaitMillis = waitMillis - captchaHelper.getSolutionTimeout();
-                        logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid captcha-token-timeout");
-                        logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWaitMillis / 1000));
-                        this.sleep(prePrePreDownloadWaitMillis, link);
-                    }
-                    captchaResponseToken = captchaHelper.getToken();
-                    final long passedMillis = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
-                    waitMillis = waitMillis - passedMillis;
-                }
                 /* Wait if any wait time is left */
                 if (waitMillis > 0) {
                     sleep(waitMillis, link);
                 }
             }
-            handle_captcha_send: {
-                /* Solve captcha if it hasn't been solved before. */
-                if (captchaResponseToken == null) {
-                    captchaResponseToken = captchaHelper.getToken();
-                }
+            handle_ticket_send: {
                 final Map<String, Object> postdata = new HashMap<String, Object>();
-                postdata.put("recaptcha", captchaResponseToken);
-                postdata.put("ticket", token);
+                postdata.put("ticket", ticket);
                 br.postPageRaw("/api/file/download", JSonStorage.serializeToJson(postdata));
                 data = (Map<String, Object>) this.checkErrorsAPI(account);
                 dllink = data.get("downloadUrl").toString();

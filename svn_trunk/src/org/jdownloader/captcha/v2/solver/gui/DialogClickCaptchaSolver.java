@@ -1,9 +1,5 @@
 package org.jdownloader.captcha.v2.solver.gui;
 
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.ClickCaptchaDialogHandler;
-import jd.controlling.captcha.SkipException;
-
 import org.appwork.storage.config.JsonConfig;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
@@ -12,6 +8,10 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.ClickCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
+
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.ClickCaptchaDialogHandler;
+import jd.controlling.captcha.SkipException;
 
 public class DialogClickCaptchaSolver extends AbstractDialogSolver<ClickedPoint> {
     private CaptchaSettings           config;
@@ -30,8 +30,12 @@ public class DialogClickCaptchaSolver extends AbstractDialogSolver<ClickedPoint>
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof ClickCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof ClickCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     public void requestFocus(Challenge<?> challenge) {

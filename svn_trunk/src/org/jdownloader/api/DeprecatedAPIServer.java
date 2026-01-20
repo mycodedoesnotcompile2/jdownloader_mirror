@@ -38,9 +38,12 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.httpserver.HttpConnection;
 import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpserver.HttpConnectionRunnable;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HeadRequest;
 import org.appwork.utils.net.httpserver.requests.OptionsRequest;
@@ -181,7 +184,7 @@ public class DeprecatedAPIServer extends HttpServer {
             super(server, clientSocket, is, os);
         }
 
-        protected GetRequest buildGetRequest() {
+        protected AbstractGetRequest buildGetRequest() {
             return new DeprecatedGetRequest(this);
         }
 
@@ -193,7 +196,7 @@ public class DeprecatedAPIServer extends HttpServer {
             return new DeprecatedOptionsRequest(this);
         }
 
-        protected PostRequest buildPostRequest() {
+        protected AbstractPostRequest buildPostRequest() {
             return new DeprecatedPostRequest(this);
         }
 
@@ -466,8 +469,8 @@ public class DeprecatedAPIServer extends HttpServer {
     }
 
     @Override
-    protected Runnable createConnectionHandler(final Socket clientSocket) throws IOException {
-        return new Runnable() {
+    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket) throws IOException {
+        return new HttpConnectionRunnable() {
             @Override
             public void run() {
                 try {
@@ -483,6 +486,11 @@ public class DeprecatedAPIServer extends HttpServer {
                 } catch (Throwable e) {
                     LogController.CL(DeprecatedAPIServer.class).log(e);
                 }
+            }
+
+            @Override
+            public Socket getClientSocket() {
+                return clientSocket;
             }
         };
     }

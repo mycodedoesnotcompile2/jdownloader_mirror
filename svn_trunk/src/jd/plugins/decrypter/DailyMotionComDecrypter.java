@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -58,7 +59,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DailyMotionCom;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 51302 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52123 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +89,8 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         String contenturl = param.getCryptedUrl().replace("embed/video/", "video/").replaceAll("\\.com/swf(/video)?/", ".com/video/").replace("http://", "https://");
+        // embedded video player -> rewrite URL
+        contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player/[a-z0-9]+.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
         br.setFollowRedirects(true);
         DailyMotionCom.prepBrowser(this.br);
         synchronized (ctrlLock) {

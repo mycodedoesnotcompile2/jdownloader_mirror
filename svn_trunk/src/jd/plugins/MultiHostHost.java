@@ -5,9 +5,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.packagecontroller.AbstractNode;
-
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
@@ -15,6 +12,9 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.controlling.download.DownloadControllerListener;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.packagecontroller.AbstractNode;
 
 public class MultiHostHost implements DownloadControllerListener {
     public enum MultihosterHostStatus implements LabelInterface {
@@ -133,7 +133,7 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     /**
-     * Returns the name of this item e.g. "Rapidgator". If no name was explicitely set, this will return the first domain in the list of
+     * Returns the name of this item e.g. "Rapidgator". If no name was explicitly set, this will return the first domain in the list of
      * domains.
      */
     public String getName() {
@@ -230,8 +230,8 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     /**
-     * How much traffic is needed- and credited from the account when downloading from this host? </br> 500 = 5 times the size of the
-     * downloaded file.
+     * How much traffic is needed- and credited from the account when downloading from this host? </br>
+     * 500 = 5 times the size of the downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
         if (trafficCalculationFactorPercent == null) {
@@ -270,8 +270,8 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     /**
-     * Returns custom set status text. </br> Typically used to describe why this host is currently not working but can also be used as an
-     * informative field.
+     * Returns custom set status text. </br>
+     * Typically used to describe why this host is currently not working but can also be used as an informative field.
      */
     public String getStatusText() {
         return statusText;
@@ -394,7 +394,8 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     /**
-     * Returns time this item is unavailable for. </br> This can return negative values.
+     * Returns time this item is unavailable for. </br>
+     * This can return negative values.
      */
     public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();

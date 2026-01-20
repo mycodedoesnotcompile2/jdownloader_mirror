@@ -11,7 +11,7 @@ import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
@@ -21,7 +21,7 @@ import org.jdownloader.api.RemoteAPIConfig;
 public class ExternInterface {
     private class ExternInterfaceRemoteAPI extends RemoteAPI implements ExtendedHttpRequestHandler, ConnectionHook {
         @Override
-        public boolean onGetRequest(GetRequest request, HttpResponse response) throws BasicRemoteAPIException {
+        public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
             if (request instanceof OptionsRequest) {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
                 response.setResponseCode(ResponseCode.SUCCESS_OK);

@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51879 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52124 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafilesCc extends YetiShareCore {
     public MediafilesCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,6 +57,11 @@ public class MediafilesCc extends YetiShareCore {
         deadDomains.add("mediafile.cloud");
         deadDomains.add("mediafiles.club");
         return deadDomains;
+    }
+
+    @Override
+    protected boolean requiresWWW() {
+        return false;
     }
 
     @Override

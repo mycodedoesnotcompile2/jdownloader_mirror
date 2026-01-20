@@ -74,14 +74,12 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  */
 public class HttpServer implements Runnable, HttpServerInterface {
     public static final String                             APP_WORK_GMB_H_HTTP_SERVER      = "AppWork GmbH HttpServer";
-
     private final int                                      wishPort;
     private final AtomicReference<List<ServerSocket>>      controlSockets                  = new AtomicReference<List<ServerSocket>>(null);
     private volatile Thread                                serverThread                    = null;
     private boolean                                        localhostOnly                   = true;
     private boolean                                        debug                           = false;
     private final CopyOnWriteArrayList<HttpRequestHandler> requestHandlers                 = new CopyOnWriteArrayList<HttpRequestHandler>();
-
     private RequestSizeLimits                              requestSizeLimits               = null;
     private HeaderValidationRules                          headerValidationRules           = null;
     private Set<RequestMethod>                             allowedMethods                  = null;
@@ -89,9 +87,7 @@ public class HttpServer implements Runnable, HttpServerInterface {
     private CorsHandler                                    corsHandler                     = null;
     private ConnectionTimeouts                             connectionTimeouts              = null;
     private String                                         responseServerHeader            = APP_WORK_GMB_H_HTTP_SERVER;
-
     private ThreadPoolExecutor                             threadPool;
-
     /** Default maximum header size: 16 KB */
     private static final int                               DEFAULT_MAX_HEADER_SIZE         = 16 * 1024;
     /** Default maximum POST body size: 10 MB */
@@ -103,7 +99,6 @@ public class HttpServer implements Runnable, HttpServerInterface {
         this.wishPort = port;
         // Set default size limits
         this.requestSizeLimits = new RequestSizeLimits(DEFAULT_MAX_HEADER_SIZE, DEFAULT_MAX_POST_BODY_SIZE, DEFAULT_MAX_POST_PROCESSED_SIZE);
-
         // Set default header validation rules
         this.headerValidationRules = new HeaderValidationRules();
         // Set default allowed methods (only GET allowed by default)
@@ -112,13 +107,11 @@ public class HttpServer implements Runnable, HttpServerInterface {
         this.responseSecurityHeaders = new ResponseSecurityHeaders();
         // Set default connection timeouts config
         this.connectionTimeouts = new ConnectionTimeouts();
-
     }
 
     protected HttpConnectionRunnable createHttpConnection(Socket clientSocket) throws IOException {
         InputStream inputStream = clientSocket.getInputStream();
         HttpConnection con = new HttpConnection(this, clientSocket, inputStream, null);
-
         return con;
     }
 
@@ -255,7 +248,6 @@ public class HttpServer implements Runnable, HttpServerInterface {
 
     public void run() {
         final List<ServerSocket> controlSockets = this.controlSockets.get();
-
         try {
             if (controlSockets == null || controlSockets.size() == 0) {
                 return;
@@ -287,7 +279,6 @@ public class HttpServer implements Runnable, HttpServerInterface {
                     /*
                      * WORKAROUND for stupid SUN /ORACLE way of "how a threadpool should work" !
                      */
-
                     final int active = threadPool.getPoolSize();
                     final int max = threadPool.getMaximumPoolSize();
                     if (active < max) {
@@ -305,14 +296,11 @@ public class HttpServer implements Runnable, HttpServerInterface {
                         final Socket socket = (r instanceof HttpConnectionRunnable) ? ((HttpConnectionRunnable) r).getClientSocket() : null;
                         ((HttpConnectionThread) t).setCurrentConnection(connection, socket);
                         httpT.setName(HttpServer.this, socket);
-
                     }
-
                     super.beforeExecute(t, r);
                 }
             };
             threadPool.allowCoreThreadTimeOut(true);
-
             final List<Thread> controlSocketThreads = new ArrayList<Thread>();
             for (final ServerSocket controlSocket : controlSockets) {
                 final Thread controlSocketThread = new Thread(Thread.currentThread().getName() + ":Listener:" + controlSocket.getLocalSocketAddress()) {
@@ -337,9 +325,7 @@ public class HttpServer implements Runnable, HttpServerInterface {
                                             continue;
                                         }
                                     }
-
                                     final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
-
                                     if (connection != null) {
                                         threadPool.execute(connection);
                                         closeSocket = false;
@@ -348,7 +334,6 @@ public class HttpServer implements Runnable, HttpServerInterface {
                                     LogV3.log(e);
                                 } catch (final Throwable e) {
                                     LogV3.log(e);
-
                                 } finally {
                                     if (closeSocket && clientSocket != null) {
                                         try {
@@ -425,7 +410,6 @@ public class HttpServer implements Runnable, HttpServerInterface {
     /**
      *
      */
-
     public synchronized void start() throws IOException {
         List<ServerSocket> serverSockets = new ArrayList<ServerSocket>();
         try {
@@ -682,5 +666,4 @@ public class HttpServer implements Runnable, HttpServerInterface {
     public String getResponseServerHeader() {
         return this.responseServerHeader;
     }
-
 }

@@ -168,14 +168,14 @@ public class HTTPConnectionImpl implements HTTPConnection {
         return this.proxy;
     }
 
-    protected String                      httpPath;
-    protected RequestMethod               httpMethod              = RequestMethod.GET;
-    protected HTTPHeaderMap<List<String>> headers                 = null;
-    protected int                         httpResponseCode        = -1;
-    protected String                      httpResponseMessage     = "";
-    protected volatile int                readTimeout             = 30000;
-    protected volatile int                requestedConnectTimeout = 30000;
-    protected IPVERSION                   ipVersion               = null;
+    protected String                                             httpPath;
+    protected org.appwork.utils.net.httpconnection.RequestMethod httpMethod              = org.appwork.utils.net.httpconnection.RequestMethod.GET;
+    protected HTTPHeaderMap<List<String>>                        headers                 = null;
+    protected int                                                httpResponseCode        = -1;
+    protected String                                             httpResponseMessage     = "";
+    protected volatile int                                       readTimeout             = 30000;
+    protected volatile int                                       requestedConnectTimeout = 30000;
+    protected IPVERSION                                          ipVersion               = null;
 
     public IPVERSION getIPVersion() {
         return ipVersion;
@@ -568,7 +568,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
     protected boolean addHostHeader() {
         /* check if host entry does exist */
         for (final String key : this.requestProperties.keySet()) {
-
             if (HTTPConstants.HEADER_REQUEST_HOST.equalsIgnoreCase(key)) {
                 return false;
             }
@@ -1209,10 +1208,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                 if (code != null) {
                     this.httpResponseCode = Integer.parseInt(code);
                 }
-                this.httpResponseMessage = new Regex(this.httpHeader, "[a-zA-Z0-9/\\.]+\\s*\\d+\\s*(.+)").getMatch(0);
-                if (this.httpResponseMessage == null) {
-                    this.httpResponseMessage = "";
-                }
+                this.httpResponseMessage = StringUtils.valueOrEmpty(new Regex(this.httpHeader, "[a-zA-Z0-9/\\.]+\\s*\\d+\\s*(.+)").getMatch(0));
             } else {
                 if (connectionSocket instanceof KeepAliveSocketStream) {
                     throw new KeepAliveSocketStreamException(new IOException("unknown HTTP response"), connectionSocket);
@@ -1310,7 +1306,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
             } else {
                 wrappedInputStream = inputStream;
             }
-            if (RequestMethod.HEAD.equals(this.getRequestMethod())) {
+            if (org.appwork.utils.net.httpconnection.RequestMethod.HEAD.equals(this.httpMethod)) {
                 wrappedInputStream = new LimitedInputStream(wrappedInputStream, 0);
             } else {
                 final boolean isChunked = StringUtils.containsIgnoreCase(this.getHeaderField(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING), HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
@@ -1482,7 +1478,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         if (this.isOK() || code == 404 || code == 403 || code == 416 || code == 401 || code == 410) {
             if (this.convertedInputStream == null) {
                 InputStream rawInputStream = getRawInputStream();
-                if (this.contentDecoded && !RequestMethod.HEAD.equals(this.getRequestMethod())) {
+                if (this.contentDecoded && !org.appwork.utils.net.httpconnection.RequestMethod.HEAD.equals(httpMethod)) {
                     if (getContentLength() == 0) {
                         // Content-Length is 0, return EmptyInputStream
                         this.convertedInputStream = new EmptyInputStream();
@@ -1665,8 +1661,18 @@ public class HTTPConnectionImpl implements HTTPConnection {
         return sb.toString();
     }
 
+    @Deprecated
     public RequestMethod getRequestMethod() {
-        return this.httpMethod;
+        switch (this.httpMethod) {
+        case GET:
+            return RequestMethod.GET;
+        case POST:
+            return RequestMethod.POST;
+        case HEAD:
+            return RequestMethod.HEAD;
+        default:
+            return RequestMethod.valueOf(this.httpMethod.name());
+        }
     }
 
     public Map<String, String> getRequestProperties() {
@@ -1894,7 +1900,25 @@ public class HTTPConnectionImpl implements HTTPConnection {
         }
     }
 
+    @Deprecated
     public void setRequestMethod(final RequestMethod method) {
+        switch (method) {
+        case GET:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.GET);
+            break;
+        case POST:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.POST);
+            break;
+        case HEAD:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.HEAD);
+            break;
+        default:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.valueOf(method.name()));
+            break;
+        }
+    }
+
+    public void setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod method) {
         this.httpMethod = method;
     }
 

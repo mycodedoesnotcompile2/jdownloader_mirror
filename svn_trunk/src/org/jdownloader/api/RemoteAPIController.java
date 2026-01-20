@@ -18,10 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import jd.nutils.DiffMatchPatch;
-import jd.nutils.DiffMatchPatch.Diff;
-import jd.nutils.DiffMatchPatch.Patch;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -58,7 +54,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
@@ -112,6 +108,10 @@ import org.jdownloader.myjdownloader.client.bindings.interfaces.EventsInterface;
 import org.jdownloader.myjdownloader.client.bindings.interfaces.Linkable;
 import org.jdownloader.myjdownloader.client.json.AbstractJsonData;
 import org.jdownloader.myjdownloader.client.json.ObjectData;
+
+import jd.nutils.DiffMatchPatch;
+import jd.nutils.DiffMatchPatch.Diff;
+import jd.nutils.DiffMatchPatch.Patch;
 
 public class RemoteAPIController {
     private static RemoteAPIController INSTANCE = new RemoteAPIController();
@@ -719,15 +719,10 @@ public class RemoteAPIController {
     }
 
     public Object call(final String namespace, final String methodName, Object... params) throws BasicRemoteAPIException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
-        RemoteAPIMethod dummyMethod = this.rapi.getRemoteAPIMethod(new HttpRequest(null) {
+        final RemoteAPIMethod dummyMethod = this.rapi.getRemoteAPIMethod(new HttpRequest(null) {
             @Override
             public String getRequestedPath() {
                 return "/" + namespace + "/" + methodName;
-            }
-
-            @Override
-            public HttpConnectionType getHttpConnectionType() {
-                return HttpConnectionType.GET;
             }
 
             @Override
@@ -739,10 +734,15 @@ public class RemoteAPIController {
             public String[] getParametersbyKey(String key) throws IOException {
                 return null;
             }
+
+            @Override
+            public RequestMethod getRequestMethod() {
+                return RequestMethod.GET;
+            }
         });
-        InterfaceHandler<?> iface = dummyMethod.getInterfaceHandler();
-        Method method = iface.getMethod(methodName, params.length);
-        ArrayList<String> stringParams = new ArrayList<String>();
+        final InterfaceHandler<?> iface = dummyMethod.getInterfaceHandler();
+        final Method method = iface.getMethod(methodName, params.length);
+        final ArrayList<String> stringParams = new ArrayList<String>();
         for (Object o : params) {
             stringParams.add(JSonStorage.serializeToJson(o));
         }

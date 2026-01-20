@@ -1,9 +1,5 @@
 package org.jdownloader.captcha.v2.solver.gui;
 
-import jd.controlling.captcha.BasicCaptchaDialogHandler;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-
 import org.appwork.storage.config.JsonConfig;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -15,6 +11,10 @@ import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
+
+import jd.controlling.captcha.BasicCaptchaDialogHandler;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
 
 public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
     private CaptchaSettings                       config;
@@ -33,8 +33,12 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof BasicCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof BasicCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     private DialogBasicCaptchaSolver() {

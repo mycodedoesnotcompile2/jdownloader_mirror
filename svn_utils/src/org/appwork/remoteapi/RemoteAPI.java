@@ -83,11 +83,11 @@ import org.appwork.utils.net.NullOutputStream;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RequestSizeLimitExceededException;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.reflection.Clazz;
 
@@ -483,9 +483,9 @@ public class RemoteAPI implements HttpRequestHandler {
             }
             parameters.add(param.value);
         }
-        if (request instanceof PostRequest) {
+        if (request instanceof AbstractPostRequest) {
             try {
-                final List<KeyValuePair> ret = ((PostRequest) request).getPostParameter();
+                final List<KeyValuePair> ret = ((AbstractPostRequest) request).getPostParameter();
                 if (ret != null) {
                     /* add POST parameters to methodParameters */
                     for (final KeyValuePair param : ret) {
@@ -679,7 +679,7 @@ public class RemoteAPI implements HttpRequestHandler {
      * @param string
      * @return
      */
-    public boolean onGetRequest(final GetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onGetRequest(final AbstractGetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         final RemoteAPIRequest apiRequest = this.createRemoteAPIRequestObject(request);
         if (apiRequest == null) {
             return this.onUnknownRequest(request, response);
@@ -692,7 +692,7 @@ public class RemoteAPI implements HttpRequestHandler {
         return true;
     }
 
-    public boolean onPostRequest(final PostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onPostRequest(final AbstractPostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         final RemoteAPIRequest apiRequest = this.createRemoteAPIRequestObject(request);
         if (apiRequest == null) {
             return this.onUnknownRequest(request, response);

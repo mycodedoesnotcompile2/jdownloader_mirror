@@ -191,47 +191,68 @@ public class URLConnectionAdapterNative extends NativeHTTPConnectionImpl impleme
 
     @Override
     public SocketAddress getEndPointSocketAddress() {
-        if (this.endPointSocketAddress == null) {
-            Proxy proxy = null;
+        final SocketAddress endPointSocketAddress = this.endPointSocketAddress;
+        if (endPointSocketAddress != null) {
+            return endPointSocketAddress;
+        }
+        Proxy proxy = nativeProxy;
+        if (proxy == null) {
             Field proxyField = null;
             try {
                 proxyField = this.con.getClass().getDeclaredField("instProxy");
-                proxyField.setAccessible(true);
+                try {
+                    proxyField.setAccessible(true);
+                } catch (RuntimeException ignoreInaccessibleObjectException) {
+                }
                 proxy = (Proxy) proxyField.get(this.con);
             } catch (NoSuchFieldException ignore) {
-            } catch (IllegalAccessException ignore1) {
+            } catch (IllegalAccessException ignore) {
             }
             if (proxyField == null) {
                 try {
                     final Field delegateField = this.con.getClass().getDeclaredField("delegate");
-                    delegateField.setAccessible(true);
+                    try {
+                        delegateField.setAccessible(true);
+                    } catch (RuntimeException ignoreInaccessibleObjectException) {
+                    }
                     final Object delegate = delegateField.get(this.con);
                     // DelegateHttpsURLConnection->AbstractDelegateHttpsURLConnection->HttpURLConnection
                     proxyField = delegate.getClass().getSuperclass().getSuperclass().getDeclaredField("instProxy");
-                    proxyField.setAccessible(true);
-                    proxy = (Proxy) proxyField.get(delegate);
-                } catch (NoSuchFieldException ignore2) {
-                } catch (IllegalAccessException ignore3) {
-                }
-            }
-            try {
-                if (proxy != null) {
-                    this.endPointSocketAddress = proxy.address();
-                } else {
-                    final Field http = this.con.getClass().getDeclaredField("http");
-                    http.setAccessible(true);
-                    final Object httpValue = http.get(this.con);
-                    if (httpValue != null) {
-                        final Field serverSocket = httpValue.getClass().getSuperclass().getDeclaredField("serverSocket");
-                        serverSocket.setAccessible(true);
-                        this.endPointSocketAddress = SocketConnection.getRootEndPointSocketAddress((Socket) serverSocket.get(httpValue));
+                    try {
+                        proxyField.setAccessible(true);
+                    } catch (RuntimeException ignoreInaccessibleObjectException) {
                     }
+                    proxy = (Proxy) proxyField.get(delegate);
+                } catch (NoSuchFieldException ignore) {
+                } catch (IllegalAccessException ignore) {
                 }
-            } catch (final Throwable e) {
-                e.printStackTrace();
             }
         }
-        return this.endPointSocketAddress;
+        try {
+            if (proxy != null) {
+                return this.endPointSocketAddress = proxy.address();
+            } else {
+                final Field http = this.con.getClass().getDeclaredField("http");
+                try {
+                    http.setAccessible(true);
+                } catch (RuntimeException ignoreInaccessibleObjectException) {
+                }
+                final Object httpValue = http.get(this.con);
+                if (httpValue != null) {
+                    final Field serverSocket = httpValue.getClass().getSuperclass().getDeclaredField("serverSocket");
+                    try {
+                        serverSocket.setAccessible(true);
+                    } catch (RuntimeException ignoreInaccessibleObjectException) {
+                    }
+                    return this.endPointSocketAddress = SocketConnection.getRootEndPointSocketAddress((Socket) serverSocket.get(httpValue));
+                }
+            }
+        } catch (NoSuchFieldException ignore) {
+        } catch (IllegalAccessException ignore) {
+        } catch (final Throwable e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     @Override

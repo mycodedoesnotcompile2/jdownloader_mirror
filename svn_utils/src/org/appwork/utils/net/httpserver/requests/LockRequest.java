@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link PostRequest} because LOCK requests always have
+ * Note: This class extends {@link AbstractPostRequest} because LOCK requests always have
  * a request body (XML) containing the lock information. According to the RequestMethod
  * enum, LOCK has requiresOutputStream=true.
  * </p>
  *
  * @author AppWork
  */
-public class LockRequest extends PostRequest {
+public class LockRequest extends AbstractPostRequest {
     /**
      * @param connection
      */

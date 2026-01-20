@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51651 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52114 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends PluginForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -1044,7 +1044,7 @@ public class ProLeechLink extends PluginForHost {
                 /* No error */
                 return;
             }
-            /* 2022-09-15: Possible not explicitely implemented error(s): */
+            /* 2022-09-15: Possible not explicitly implemented error(s): */
             /*
              * {"error":9,"message":"Your file is big! (12.0 MB). You do not have traffic- bandwidth limit 10.0 GB :)\r\n\t\t\t\t Time Left
              * To Reset Your Bandwith For This Host: 9 Hours 11 Minutes 33 Seconds"}

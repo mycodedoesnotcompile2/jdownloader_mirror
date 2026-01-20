@@ -46,6 +46,11 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         return plugin.getSupportedCaptchaTypes();
     }
 
+    @Override
+    public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
+        return this.plugin.getUserDisabledCaptchaTypes(account);
+    }
+
     public Account getAccount() {
         return account;
     }
@@ -63,12 +68,13 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public boolean canHandle(Challenge<?> c) {
+    public ChallengeVetoReason getVetoReason(Challenge<?> c) {
         // TODO: Only call plugin.canHandle if there is an override or always call both
-        if (!plugin.canHandle(c, account)) {
-            return false;
+        final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
+        if (veto != null) {
+            return veto;
         } else {
-            return super.canHandle(c);
+            return super.getVetoReason(c);
         }
     }
 

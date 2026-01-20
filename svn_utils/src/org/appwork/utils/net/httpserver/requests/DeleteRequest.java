@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link GetRequest} because DELETE requests do not have
+ * Note: This class extends {@link AbstractGetRequest} because DELETE requests do not have
  * a request body according to HTTP standards (body is not standard-compliant).
  * According to the RequestMethod enum, DELETE has requiresOutputStream=false.
  * </p>
  *
  * @author AppWork
  */
-public class DeleteRequest extends GetRequest {
+public class DeleteRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

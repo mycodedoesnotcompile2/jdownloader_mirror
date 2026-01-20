@@ -5,13 +5,6 @@ import java.awt.event.ActionEvent;
 
 import javax.swing.TransferHandler;
 
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.ClipboardMonitoring.ClipboardContent;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
-
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
@@ -29,8 +22,14 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
 import org.jdownloader.gui.views.linkgrabber.actions.AddLinksProgress;
 import org.jdownloader.translate._JDT;
 
-public class PasteLinksAction extends CustomizableAppAction implements ActionContext {
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.ClipboardMonitoring.ClipboardContent;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
 
+public class PasteLinksAction extends CustomizableAppAction implements ActionContext {
     public static final String DEEP_DECRYPT_ENABLED = "deepDecryptEnabled";
     private boolean            deepDecryptEnabled   = false;
 
@@ -70,6 +69,9 @@ public class PasteLinksAction extends CustomizableAppAction implements ActionCon
     public static void processPaste(final boolean deepDecrypt) {
         final View view = MainTabbedPane.getInstance().getSelectedView();
         final Transferable transferable = ClipboardMonitoring.getTransferable();
+        if (transferable == null) {
+            return;
+        }
         if ((view instanceof DownloadsView || view instanceof LinkGrabberView) && transferable.isDataFlavorSupported(PackageControllerTableTransferable.FLAVOR)) {
             final PackageControllerTable<?, ?> table;
             if (view instanceof DownloadsView) {
@@ -81,9 +83,16 @@ public class PasteLinksAction extends CustomizableAppAction implements ActionCon
             return;
         }
         new Thread("Add Links Thread") {
+            {
+                setDaemon(true);
+            }
+
             @Override
             public void run() {
                 final ClipboardContent content = ClipboardMonitoring.getINSTANCE().getCurrentContent(transferable);
+                if (content == null) {
+                    return;
+                }
                 final LinkCollectingJob crawljob = new LinkCollectingJob(LinkOrigin.PASTE_LINKS_ACTION.getLinkOriginDetails(), content != null ? content.getContent() : null);
                 if (content != null) {
                     crawljob.setCustomSourceUrl(content.getBrowserURL());

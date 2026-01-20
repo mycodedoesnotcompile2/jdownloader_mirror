@@ -24,8 +24,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.utils.CharSequenceUtils;
 import org.appwork.utils.IO;
 import org.appwork.utils.IO.BOM;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
@@ -158,9 +160,13 @@ public class ClipboardMonitoring {
                 final CHANGE_FLAG ret = hasChanges();
                 switch (ret) {
                 case DETECTED:
-                case TIMEOUT:
                 case INTERRUPTED:
+                case TIMEOUT:
                     return ret;
+                case SKIP:
+                    return ret;
+                case BLACKLISTED:
+                case FALSE:
                 default:
                     break;
                 }
@@ -206,7 +212,12 @@ public class ClipboardMonitoring {
         }
 
         protected void slowDown(Throwable e) {
-            waitTimeout = 5000;
+            if (e instanceof IllegalStateException) {
+                // java.lang.IllegalStateException: cannot open system clipboard
+                waitTimeout = 0;
+            } else {
+                waitTimeout = 5000;
+            }
         }
 
         protected void restart() {
@@ -312,7 +323,7 @@ public class ClipboardMonitoring {
             return IGNORE.PACKAGECONTROLLER;
         }
         try {
-            if (transferable != null && transferable.getClass().getName().contains("TransferableProxy")) {
+            if (transferable != null && ReflectionUtils.isInstanceOf("sun.awt.datatransfer.TransferableProxy", transferable)) {
                 final Field isLocal = transferable.getClass().getDeclaredField("isLocal");
                 if (isLocal != null) {
                     isLocal.setAccessible(true);
@@ -334,7 +345,11 @@ public class ClipboardMonitoring {
     }
 
     public static Transferable getTransferable() {
-        return getINSTANCE().clipboard.getContents(null);
+        try {
+            return getINSTANCE().clipboard.getContents(null);
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     public synchronized void startMonitoring() {
@@ -356,7 +371,7 @@ public class ClipboardMonitoring {
                             }
                         } else {
                             if (StringUtils.isNotEmpty(add)) {
-                                if (existing.equals(add)) {
+                                if (existing.equals(add) || existing.contains(add)) {
                                     return existing;
                                 } else {
                                     return existing + "\r\n" + add;
@@ -371,7 +386,7 @@ public class ClipboardMonitoring {
                     public void run() {
                         try {
                             clipboardChangeDetector.reset();
-                            while (Thread.currentThread() == ClipboardMonitoring.this.monitoringThread.get()) {
+                            clipboardLoop: while (Thread.currentThread() == ClipboardMonitoring.this.monitoringThread.get()) {
                                 final CHANGE_FLAG changeFlag = clipboardChangeDetector.waitForClipboardChanges();
                                 if (Thread.currentThread() != ClipboardMonitoring.this.monitoringThread.get()) {
                                     logger.finer("Changed ClipBoard Monitoring Thread");
@@ -379,18 +394,26 @@ public class ClipboardMonitoring {
                                 } else if (CHANGE_FLAG.INTERRUPTED.equals(changeFlag)) {
                                     logger.finer("Interrupted ClipBoard Monitoring Thread");
                                     return;
+                                } else if (CHANGE_FLAG.SKIP.equals(changeFlag)) {
+                                    continue clipboardLoop;
                                 }
                                 try {
                                     final Transferable currentContent;
                                     final DataFlavor[] dataFlavors;
-                                    if (true) {
-                                        // more lightweight way beause only fetch content when required
-                                        dataFlavors = clipboard.getAvailableDataFlavors();
-                                        currentContent = null;
-                                    } else {
-                                        // heavy way because all content is fetched at once
-                                        currentContent = clipboard.getContents(null);
-                                        dataFlavors = null;
+                                    try {
+                                        final boolean lightweightFlag = true;
+                                        if (lightweightFlag) {
+                                            // more lightweight way beause only fetch content when required
+                                            dataFlavors = clipboard.getAvailableDataFlavors();
+                                            currentContent = null;
+                                        } else {
+                                            // heavy way because all content is fetched at once
+                                            currentContent = clipboard.getContents(null);
+                                            dataFlavors = null;
+                                        }
+                                    } catch (IllegalStateException e) {
+                                        clipboardChangeDetector.slowDown(e);
+                                        continue clipboardLoop;
                                     }
                                     final IGNORE ignoreFlag = ignoreTransferable(currentContent, dataFlavors);
                                     switch (ignoreFlag) {
@@ -401,24 +424,26 @@ public class ClipboardMonitoring {
                                         if (CHANGE_FLAG.DETECTED.equals(changeFlag)) {
                                             roundIndex.getAndIncrement();
                                         }
-                                        continue;
+                                        continue clipboardLoop;
                                     case NO:
                                     default:
                                         break;
                                     }
                                     String handleThisRound = null;
                                     boolean macOSWorkaroundNeeded = false;
-                                    String debugListContent = null;
+                                    ClipboardHash thisListContent = oldListContent;
                                     try {
                                         /* change detection for List/URI content */
-                                        final String newListContent = getListTransferData(currentContent, dataFlavors);
+                                        final String newListContent;
                                         try {
-                                            if (!oldListContent.equals(newListContent)) {
-                                                debugListContent = newListContent;
-                                                handleThisRound = handleThisRound(handleThisRound, newListContent);
-                                            }
-                                        } finally {
-                                            oldListContent = new ClipboardHash(newListContent);
+                                            newListContent = getListTransferData(currentContent, dataFlavors);
+                                            thisListContent = new ClipboardHash(newListContent);
+                                        } catch (IllegalStateException e) {
+                                            clipboardChangeDetector.slowDown(e);
+                                            continue clipboardLoop;
+                                        }
+                                        if (!oldListContent.equals(newListContent)) {
+                                            handleThisRound = newListContent;
                                         }
                                     } catch (final Throwable e) {
                                         if (CrossSystem.isMac() && e instanceof IOException) {
@@ -430,79 +455,60 @@ public class ClipboardMonitoring {
                                         }
                                     }
                                     String browserURL = null;
-                                    final boolean htmlFlavorAllowed = isHtmlFlavorAllowed();
-                                    String debugStringContent = null;
-                                    String debugHtmlFragment = null;
+                                    ClipboardHash thisStringContent = oldStringContent;
+                                    ClipboardHash thisHTMLFragment = oldHTMLFragment;
                                     /* change detection for String/HTML content */
                                     if (StringUtils.isEmpty(handleThisRound) || CrossSystem.isMac()) {
-                                        final String newStringContent = getStringTransferData(currentContent, dataFlavors);
+                                        final String newStringContent;
                                         try {
-                                            if (!oldStringContent.equals(newStringContent)) {
-                                                debugStringContent = newStringContent;
+                                            newStringContent = getStringTransferData(currentContent, dataFlavors);
+                                            thisStringContent = new ClipboardHash(newStringContent);
+                                        } catch (IllegalStateException e) {
+                                            clipboardChangeDetector.slowDown(e);
+                                            continue clipboardLoop;
+                                        }
+                                        final String handleThisRoundHTML;
+                                        if (!oldStringContent.equals(newStringContent)) {
+                                            /*
+                                             * we only use normal String Content to detect a change
+                                             */
+                                            handleThisRound = handleThisRound(handleThisRound, newStringContent);
+                                            handleThisRoundHTML = handleThisRound;
+                                        } else {
+                                            handleThisRoundHTML = newStringContent;
+                                        }
+                                        try {
+                                            /*
+                                             * lets fetch fresh HTML Content if available
+                                             */
+                                            final HTMLFragment htmlFragment;
+                                            try {
+                                                htmlFragment = getHTMLFragment(currentContent, dataFlavors);
+                                                thisHTMLFragment = new ClipboardHash(htmlFragment == null ? null : htmlFragment.getFragment());
+                                            } catch (IllegalStateException e) {
+                                                clipboardChangeDetector.slowDown(e);
+                                                continue clipboardLoop;
+                                            }
+                                            if (htmlFragment != null && !oldHTMLFragment.equals(htmlFragment.getFragment())) {
+                                                browserURL = htmlFragment.getSourceURL();
                                                 /*
-                                                 * we only use normal String Content to detect a change
+                                                 * Remember that we had HTML content this round
                                                  */
-                                                handleThisRound = handleThisRound(handleThisRound, newStringContent);
-                                                try {
-                                                    /*
-                                                     * lets fetch fresh HTML Content if available
-                                                     */
-                                                    final HTMLFragment htmlFragment = getHTMLFragment(currentContent, dataFlavors);
-                                                    if (htmlFragment != null) {
-                                                        if (!oldHTMLFragment.equals(htmlFragment.getFragment())) {
-                                                            oldHTMLFragment = new ClipboardHash(htmlFragment.getFragment());
-                                                            debugHtmlFragment = htmlFragment.getFragment();
-                                                            /*
-                                                             * Remember that we had HTML content this round
-                                                             */
-                                                            if (htmlFlavorAllowed) {
-                                                                handleThisRound = handleThisRound(handleThisRound, htmlFragment.getFragment());
-                                                            }
-                                                            browserURL = htmlFragment.getSourceURL();
-                                                        }
-                                                    } else {
-                                                        oldHTMLFragment = new ClipboardHash(null);
-                                                    }
-                                                } catch (final Throwable e) {
-                                                }
-                                            } else {
-                                                /*
-                                                 * no String Content change detected, let's verify if the HTML content hasn't changed
-                                                 */
-                                                try {
-                                                    /*
-                                                     * lets fetch fresh HTML Content if available
-                                                     */
-                                                    final HTMLFragment htmlFragment = getHTMLFragment(currentContent, dataFlavors);
-                                                    if (htmlFragment != null) {
-                                                        /*
-                                                         * remember that we had HTML content this round
-                                                         */
-                                                        if (!oldHTMLFragment.equals(htmlFragment.getFragment())) {
-                                                            oldHTMLFragment = new ClipboardHash(htmlFragment.getFragment());
-                                                            debugHtmlFragment = htmlFragment.getFragment();
-                                                            if (htmlFlavorAllowed) {
-                                                                handleThisRound = handleThisRound(newStringContent, htmlFragment.getFragment());
-                                                            }
-                                                            browserURL = htmlFragment.getSourceURL();
-                                                        }
-                                                    } else {
-                                                        oldHTMLFragment = new ClipboardHash(null);
-                                                    }
-                                                } catch (final Throwable e) {
+                                                if (isHtmlFlavorAllowed()) {
+                                                    handleThisRound = handleThisRound(handleThisRoundHTML, htmlFragment.getFragment());
                                                 }
                                             }
-                                        } finally {
-                                            oldStringContent = new ClipboardHash(newStringContent);
+                                        } catch (final Throwable e) {
+                                            e.printStackTrace();
                                         }
                                     }
+                                    oldHTMLFragment = thisHTMLFragment;
+                                    oldStringContent = thisStringContent;
+                                    oldListContent = thisListContent;
                                     if (handleThisRound != null || CHANGE_FLAG.DETECTED.equals(changeFlag)) {
-                                        final ClipboardHash stringContent = oldStringContent;
-                                        final ClipboardHash htmlFragment = oldHTMLFragment;
-                                        final ClipboardHash listContent = oldListContent;
-                                        final String stringDebugContent = debugStringContent;
-                                        final String listDebugContent = debugListContent;
-                                        final String htmlFragmentDebugContent = debugHtmlFragment;
+                                        final ClipboardHash stringContent = thisStringContent;
+                                        final ClipboardHash htmlFragment = thisHTMLFragment;
+                                        final ClipboardHash listContent = thisListContent;
                                         final long round = roundIndex.getAndIncrement();
                                         if (StringUtils.isNotEmpty(handleThisRound) && (round > 0 || !skipFirstRound)) {
                                             clipboardChangeDetector.restart();
@@ -513,11 +519,7 @@ public class ClipboardMonitoring {
                                                 final LinkCollectingJob job = new LinkCollectingJob(LinkOrigin.CLIPBOARD.getLinkOriginDetails(), handleThisRound) {
                                                     @Override
                                                     public String toString() {
-                                                        if (false && LogController.getInstance().isDebugMode()) {
-                                                            return super.toString() + "|ChangeFlag:" + changeFlag + "|Round:" + round + "|StringContent:(" + stringContent + "|" + stringDebugContent + ")|HTMLFragment:(" + htmlFragment + "|" + htmlFragmentDebugContent + ")|ListContent:(" + listContent + "|" + listDebugContent + ")";
-                                                        } else {
-                                                            return super.toString() + "|ChangeFlag:" + changeFlag + "|Round:" + round + "|StringContent:(" + (stringDebugContent != null) + "|" + stringContent + ")|HTMLFragment:(" + (htmlFragmentDebugContent != null) + "|" + htmlFragment + ")|ListContent:(" + (listDebugContent != null) + "|" + listContent + ")";
-                                                        }
+                                                        return super.toString() + "|ChangeFlag:" + changeFlag + "|Round:" + round + "|StringContent:(" + stringContent + ")|HTMLFragment:(" + htmlFragment + ")|ListContent:(" + listContent + ")";
                                                     };
                                                 };
                                                 final HashSet<String> pws = PasswordUtils.getPasswords(handleThisRound);
@@ -545,6 +547,9 @@ public class ClipboardMonitoring {
                                     if (macOSWorkaroundNeeded) {
                                         setCurrentContent(handleThisRound);
                                     }
+                                } catch (final IllegalStateException e) {
+                                    clipboardChangeDetector.slowDown(e);
+                                    continue clipboardLoop;
                                 } catch (final Throwable e) {
                                     clipboardChangeDetector.slowDown(e);
                                     final String message = e.getMessage();
@@ -576,11 +581,22 @@ public class ClipboardMonitoring {
     }
 
     public synchronized ClipboardContent getCurrentContent() {
-        if (clipboard != null) {
+        if (clipboard == null) {
+            return null;
+        }
+        clipboardLoop: for (int retry = 0; retry < 20; retry++) {
             try {
                 final Transferable currentContent = clipboard.getContents(null);
                 return getCurrentContent(currentContent);
+            } catch (IllegalStateException e) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e1) {
+                    break clipboardLoop;
+                }
             } catch (final Throwable e) {
+                LogController.CL().log(e);
+                break clipboardLoop;
             }
         }
         return null;
@@ -589,116 +605,99 @@ public class ClipboardMonitoring {
     /**
      * Returns clipboard content in form: <StringContent> [Optional (User setting)]\r\n<htmlContent> </br>
      */
-    public synchronized ClipboardContent getCurrentContent(final Transferable currentContent) {
-        if (currentContent != null) {
-            final ClipboardContent ret = getCurrentContent(currentContent, true, true, isHtmlFlavorAllowed());
-            if (ret == null) {
-                return null;
-            }
-            final StringBuilder sb = new StringBuilder();
-            if (StringUtils.isNotEmpty(ret.getContentText())) {
-                sb.append("<");
-                sb.append(ret.getContentText());
-                sb.append(">");
-            }
-            if (StringUtils.isNotEmpty(ret.getContentHtml())) {
-                if (sb.length() > 0) {
-                    sb.append("\r\n");
-                }
-                sb.append("<");
-                sb.append(ret.getContentHtml());
-                sb.append(">");
-            }
-            if (sb.length() > 0) {
-                return new ClipboardContent(ret.getBrowserURL(), ret.getContentText(), ret.getContentHtml(), sb.toString());
-            }
-        }
-        return null;
-    }
-
-    public synchronized ClipboardContent getCurrentContent(boolean browserURL, boolean contentText, boolean contentHtml) {
-        if (clipboard != null) {
-            try {
-                final Transferable currentContent = clipboard.getContents(null);
-                return getCurrentContent(currentContent, browserURL, contentText, contentHtml);
-            } catch (final Throwable e) {
-            }
-        }
-        return null;
-    }
-
-    public synchronized ClipboardContent getCurrentContent(final Transferable currentContent, boolean browserURL, boolean contentText, boolean contentHtml) {
+    public synchronized ClipboardContent getCurrentContent(final Transferable currentContent) throws IllegalStateException {
         if (currentContent == null) {
             return null;
-        } else {
-            String stringContent = null;
-            if (contentText) {
-                try {
-                    stringContent = getStringTransferData(currentContent, null);
-                } catch (final Throwable e) {
-                    contentText = false;
-                }
+        }
+        final ClipboardContent ret = getCurrentContent(currentContent, true, true, isHtmlFlavorAllowed());
+        if (ret == null) {
+            return null;
+        }
+        final StringBuilder sb = new StringBuilder();
+        if (StringUtils.isNotEmpty(ret.getContentText())) {
+            sb.append("<");
+            sb.append(ret.getContentText());
+            sb.append(">");
+        }
+        if (StringUtils.isNotEmpty(ret.getContentHtml())) {
+            if (sb.length() > 0) {
+                sb.append("\r\n");
             }
-            HTMLFragment htmlFragment = null;
-            String sourceURL = null;
-            if (browserURL || contentHtml) {
-                try {
-                    /* lets fetch fresh HTML Content if available */
-                    htmlFragment = getHTMLFragment(currentContent, null);
-                    sourceURL = htmlFragment.getSourceURL();
-                } catch (final Throwable e) {
-                    contentHtml = false;
-                }
-            }
-            if (browserURL && StringUtils.isEmpty(sourceURL)) {
-                try {
-                    sourceURL = getCurrentBrowserURL(currentContent);
-                } catch (final Throwable e) {
-                    browserURL = false;
-                }
-            }
-            if ((browserURL && StringUtils.isNotEmpty(sourceURL)) || (contentHtml && htmlFragment != null && StringUtils.isNotEmpty(htmlFragment.getFragment())) || (contentText && StringUtils.isNotEmpty(stringContent))) {
-                return new ClipboardContent(sourceURL, stringContent, htmlFragment == null ? null : htmlFragment.getFragment());
-            } else {
-                return null;
+            sb.append("<");
+            sb.append(ret.getContentHtml());
+            sb.append(">");
+        }
+        if (CharSequenceUtils.isEmpty(sb)) {
+            return null;
+        }
+        return new ClipboardContent(ret.getBrowserURL(), ret.getContentText(), ret.getContentHtml(), sb.toString());
+    }
+
+    private synchronized ClipboardContent getCurrentContent(final Transferable currentContent, boolean browserURL, boolean contentText, boolean contentHtml) throws IllegalStateException {
+        if (currentContent == null) {
+            return null;
+        }
+        String stringContent = null;
+        if (contentText) {
+            try {
+                stringContent = getStringTransferData(currentContent, null);
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (final Throwable e) {
+                LogController.CL().log(e);
+                contentText = false;
             }
         }
+        HTMLFragment htmlFragment = null;
+        String sourceURL = null;
+        if (browserURL || contentHtml) {
+            try {
+                /* lets fetch fresh HTML Content if available */
+                htmlFragment = getHTMLFragment(currentContent, null);
+                sourceURL = htmlFragment.getSourceURL();
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (final Throwable e) {
+                LogController.CL().log(e);
+                contentHtml = false;
+            }
+        }
+        if (browserURL && StringUtils.isEmpty(sourceURL)) {
+            try {
+                sourceURL = getCurrentBrowserURL(currentContent);
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (final Throwable e) {
+                LogController.CL().log(e);
+                browserURL = false;
+            }
+        }
+        if ((browserURL && StringUtils.isNotEmpty(sourceURL)) || (contentHtml && htmlFragment != null && StringUtils.isNotEmpty(htmlFragment.getFragment())) || (contentText && StringUtils.isNotEmpty(stringContent))) {
+            return new ClipboardContent(sourceURL, stringContent, htmlFragment == null ? null : htmlFragment.getFragment());
+        }
+        return null;
     }
 
     public synchronized void setCurrentContent(final String string) {
-        if (clipboard != null) {
-            try {
-                final AtomicBoolean skipFlag = new AtomicBoolean(true);
-                skipChangeDetection.set(skipFlag);
-                clipboard.setContents(new StringSelection(string), new ClipboardOwner() {
-                    public void lostOwnership(Clipboard clipboard, Transferable contents) {
-                        skipFlag.set(false);
-                    }
-                });
-            } catch (final Throwable e) {
-                final AtomicBoolean old = skipChangeDetection.getAndSet(null);
-                if (old != null) {
-                    old.set(false);
-                }
-            }
-        }
+        setCurrentContent(new StringSelection(string));
     }
 
     public synchronized void setCurrentContent(Transferable object) {
-        if (clipboard != null) {
-            try {
-                final AtomicBoolean skipFlag = new AtomicBoolean(true);
-                skipChangeDetection.set(skipFlag);
-                clipboard.setContents(object, new ClipboardOwner() {
-                    public void lostOwnership(Clipboard clipboard, Transferable contents) {
-                        skipFlag.set(false);
-                    }
-                });
-            } catch (final Throwable e) {
-                final AtomicBoolean old = skipChangeDetection.getAndSet(null);
-                if (old != null) {
-                    old.set(false);
+        if (clipboard == null) {
+            return;
+        }
+        try {
+            final AtomicBoolean skipFlag = new AtomicBoolean(true);
+            skipChangeDetection.set(skipFlag);
+            clipboard.setContents(object, new ClipboardOwner() {
+                public void lostOwnership(Clipboard clipboard, Transferable contents) {
+                    skipFlag.set(false);
                 }
+            });
+        } catch (final Throwable e) {
+            final AtomicBoolean old = skipChangeDetection.getAndSet(null);
+            if (old != null) {
+                old.set(false);
             }
         }
     }
@@ -744,16 +743,6 @@ public class ClipboardMonitoring {
             }
         } else {
             this.clipboardChangeDetector = null;
-        }
-    }
-
-    @Deprecated
-    public static String getHTMLTransferData(final Transferable transferable) throws UnsupportedFlavorException, IOException {
-        final HTMLFragment ret = getHTMLFragment(transferable, null);
-        if (ret != null) {
-            return ret.getFragment();
-        } else {
-            return null;
         }
     }
 
@@ -946,46 +935,47 @@ public class ClipboardMonitoring {
                 }
                 LinkCollector.getInstance().addCrawlerJob(job);
             }
+            return;
         } catch (final Throwable e) {
+            LogController.CL().log(e);
         }
     }
 
     public static String getStringTransferData(final Transferable transferable, DataFlavor[] dataFlavors) throws UnsupportedFlavorException, IOException {
-        if (isDataFlavorSupported(transferable, dataFlavors, DataFlavor.stringFlavor)) {
-            Object ret = null;
-            try {
-                ret = getTransferData(transferable, ClipboardMonitoring.getINSTANCE().clipboard, DataFlavor.stringFlavor);
-            } catch (UnsupportedFlavorException e) {
-                if (StringUtils.containsIgnoreCase(e.getMessage(), "Unicode String")) {
-                    return null;
-                } else {
-                    throw e;
-                }
-            }
-            if (ret == null) {
+        if (!isDataFlavorSupported(transferable, dataFlavors, DataFlavor.stringFlavor)) {
+            return null;
+        }
+        final Object ret;
+        try {
+            ret = getTransferData(transferable, ClipboardMonitoring.getINSTANCE().clipboard, DataFlavor.stringFlavor);
+        } catch (UnsupportedFlavorException e) {
+            if (StringUtils.containsIgnoreCase(e.getMessage(), "Unicode String")) {
                 return null;
             } else {
-                return StringUtils.removeBOM(ret.toString());
+                throw e;
             }
         }
-        return null;
+        if (ret == null) {
+            return null;
+        }
+        return StringUtils.removeBOM(ret.toString());
     }
 
     public static String getURLTransferData(final Transferable transferable, DataFlavor[] dataFlavors) throws UnsupportedFlavorException, IOException {
-        if (URLFLAVOR != null && isDataFlavorSupported(transferable, dataFlavors, URLFLAVOR)) {
-            final Object ret = getTransferData(transferable, ClipboardMonitoring.getINSTANCE().clipboard, URLFLAVOR);
-            if (ret == null) {
+        if (URLFLAVOR == null || !isDataFlavorSupported(transferable, dataFlavors, URLFLAVOR)) {
+            return null;
+        }
+        final Object ret = getTransferData(transferable, ClipboardMonitoring.getINSTANCE().clipboard, URLFLAVOR);
+        if (ret == null) {
+            return null;
+        } else {
+            final URL url = (URL) ret;
+            if (StringUtils.isEmpty(url.getFile())) {
                 return null;
             } else {
-                final URL url = (URL) ret;
-                if (StringUtils.isEmpty(url.getFile())) {
-                    return null;
-                } else {
-                    return url.toExternalForm();
-                }
+                return url.toExternalForm();
             }
         }
-        return null;
     }
 
     public static boolean isDataFlavorSupported(final Transferable transferable, DataFlavor[] dataFlavors, DataFlavor dataFlavor) {

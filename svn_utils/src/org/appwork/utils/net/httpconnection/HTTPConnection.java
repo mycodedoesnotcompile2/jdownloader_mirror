@@ -41,6 +41,17 @@ import java.util.List;
 import java.util.Map;
 
 public interface HTTPConnection {
+    @Deprecated
+    // will be removed by daniel
+    public static enum RequestMethod {
+        PUT(), // HTTP 1.1/WebDAV
+        DELETE(), // WebDAV
+        OPTIONS(), // HTTP 1.1
+        GET(), // HTTP 1.1
+        POST(), // HTTP 1.1
+        HEAD(); // HTTP 1.1
+    }
+
     public static class HTTPResponseException extends IOException {
         /**
          *
@@ -182,7 +193,10 @@ public interface HTTPConnection {
 
     void setReadTimeout(int readTimeout);
 
+    @Deprecated
     void setRequestMethod(RequestMethod method);
+
+    void setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod method);
 
     void setRequestProperty(String key, String string);
 

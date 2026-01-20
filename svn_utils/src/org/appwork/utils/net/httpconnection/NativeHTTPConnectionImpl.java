@@ -37,6 +37,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+//import java.lang.reflect.Field;
+//import java.lang.reflect.Method;
 import java.net.Authenticator;
 import java.net.HttpURLConnection;
 import java.net.PasswordAuthentication;
@@ -63,8 +65,9 @@ import javax.net.ssl.SSLSession;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Exceptions;
-import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.net.CountingInputStream;
@@ -78,64 +81,42 @@ import org.appwork.utils.net.StreamValidEOF;
  *
  */
 public class NativeHTTPConnectionImpl implements HTTPConnection {
-    protected final static ProxySelector                DEFAULT_PROXY_SELECTOR      = ProxySelector.getDefault();
-    protected final URL                                 httpURL;
-    protected final HTTPProxy                           proxy;
-    protected final HTTPHeaderMap<String>               requestProperties;
-    protected final HTTPHeaderMap<List<String>>         headers;
-    protected HttpURLConnection                         con;
-    protected int                                       readTimeout                 = 30000;
-    protected int                                       connectTimeout              = 30000;
-    private int[]                                       allowedResponseCodes        = new int[0];
-    protected long                                      postTodoLength              = -1;
-    protected RequestMethod                             httpMethod                  = RequestMethod.GET;
-    protected HTTPOutputStream                          outputStream                = null;
-    protected InputStream                               inputStream                 = null;
-    protected InputStream                               convertedInputStream        = null;
-    protected boolean                                   inputStreamConnected        = false;
-    protected boolean                                   outputClosed                = false;
-    protected int                                       httpResponseCode            = -1;
-    protected String                                    httpResponseMessage         = "";
-    protected String                                    customcharset               = null;
-    protected long                                      requestTime                 = -1;
-    protected long[]                                    ranges;
-    protected boolean                                   contentDecoded              = true;
-    private boolean                                     connected                   = false;
-    private boolean                                     wasConnected                = false;
-    private boolean                                     sslTrustALL                 = false;
-    private boolean                                     legacyConnectFlag           = true;
-    protected final CopyOnWriteArrayList<String>        connectExceptions           = new CopyOnWriteArrayList<String>();
-    private final static WeakHashMap<Thread, HTTPProxy> CURRENT_THREAD_PROXY_AUTH   = new WeakHashMap<Thread, HTTPProxy>();
-    private final static WeakHashMap<Thread, Proxy>     CURRENT_THREAD_NATIVE_PROXY = new WeakHashMap<Thread, Proxy>();
-    private static boolean                              proxySelectorSet            = false;
+    protected final static ProxySelector                         DEFAULT_PROXY_SELECTOR      = ProxySelector.getDefault();
+    protected final URL                                          httpURL;
+    protected final HTTPProxy                                    proxy;
+    protected final HTTPHeaderMap<String>                        requestProperties;
+    protected final HTTPHeaderMap<List<String>>                  headers;
+    protected HttpURLConnection                                  con;
+    protected int                                                readTimeout                 = 30000;
+    protected int                                                connectTimeout              = 30000;
+    private int[]                                                allowedResponseCodes        = new int[0];
+    protected long                                               postTodoLength              = -1;
+    protected org.appwork.utils.net.httpconnection.RequestMethod httpMethod                  = org.appwork.utils.net.httpconnection.RequestMethod.GET;
+    protected HTTPOutputStream                                   outputStream                = null;
+    protected InputStream                                        inputStream                 = null;
+    protected InputStream                                        convertedInputStream        = null;
+    protected boolean                                            inputStreamConnected        = false;
+    protected boolean                                            outputClosed                = false;
+    protected int                                                httpResponseCode            = -1;
+    protected String                                             httpResponseMessage         = "";
+    protected String                                             customcharset               = null;
+    protected long                                               requestTime                 = -1;
+    protected long[]                                             ranges;
+    protected boolean                                            contentDecoded              = true;
+    private boolean                                              connected                   = false;
+    private boolean                                              wasConnected                = false;
+    private boolean                                              sslTrustALL                 = false;
+    private boolean                                              legacyConnectFlag           = true;
+    protected final CopyOnWriteArrayList<String>                 connectExceptions           = new CopyOnWriteArrayList<String>();
+    private final static WeakHashMap<Thread, HTTPProxy>          CURRENT_THREAD_PROXY_AUTH   = new WeakHashMap<Thread, HTTPProxy>();
+    private final static WeakHashMap<Thread, Proxy>              CURRENT_THREAD_NATIVE_PROXY = new WeakHashMap<Thread, Proxy>();
+    private static boolean                                       proxySelectorSet            = false;
     static {
         // JDK1.8_111, java disabled basic auth
         // https://www.oracle.com/technetwork/java/javase/8u111-relnotes-3124969.html
         // jdk.http.auth.tunneling.disabledSchemes="" and jdk.http.auth.proxying.disabledSchemes=""
         try {
-            Authenticator.setDefault(new Authenticator() {
-                @Override
-                protected PasswordAuthentication getPasswordAuthentication() {
-                    HTTPProxy foundProxy = null;
-                    synchronized (NativeHTTPConnectionImpl.CURRENT_THREAD_PROXY_AUTH) {
-                        foundProxy = NativeHTTPConnectionImpl.CURRENT_THREAD_PROXY_AUTH.remove(Thread.currentThread());
-                    }
-                    if (foundProxy != null) {
-                        String user = foundProxy.getUser();
-                        String pass = foundProxy.getPass();
-                        if (user != null || pass != null) {
-                            if (StringUtils.isEmpty(user)) {
-                                user = "";
-                            }
-                            if (StringUtils.isEmpty(pass)) {
-                                pass = "";
-                            }
-                            return new PasswordAuthentication(user, pass.toCharArray());
-                        }
-                    }
-                    return null;
-                }
-            });
+            Authenticator.setDefault(getDefaultAuthenticator());
         } catch (final Throwable e) {
             e.printStackTrace();
         }
@@ -172,6 +153,35 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
     }
 
+    protected static Authenticator getDefaultAuthenticator() {
+        return new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                if (!RequestorType.PROXY.equals(getRequestorType())) {
+                    return null;
+                }
+                final HTTPProxy foundProxy;
+                synchronized (NativeHTTPConnectionImpl.CURRENT_THREAD_PROXY_AUTH) {
+                    foundProxy = NativeHTTPConnectionImpl.CURRENT_THREAD_PROXY_AUTH.remove(Thread.currentThread());
+                }
+                if (foundProxy != null) {
+                    String user = foundProxy.getUser();
+                    String pass = foundProxy.getPass();
+                    if (user != null || pass != null) {
+                        if (StringUtils.isEmpty(user)) {
+                            user = "";
+                        }
+                        if (StringUtils.isEmpty(pass)) {
+                            pass = "";
+                        }
+                        return new PasswordAuthentication(user, pass.toCharArray());
+                    }
+                }
+                return null;
+            }
+        };
+    }
+
     protected boolean appendPortToHostHeaderonCONNECT(HTTPProxy p) {
         // some proxy implementation might expect 'HOST: host:port' header
         return false;
@@ -181,7 +191,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         this(url, null);
     }
 
-    protected String getExceptionMessage(Exception e) {
+    protected String getExceptionMessage(Throwable e) {
         if (e == null) {
             return null;
         } else if (e.getMessage() != null) {
@@ -199,12 +209,12 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
      * @return
      */
     protected URL getProxyConnectHostHeaderWorkaroundURL(final URL url, final HTTPProxy p) {
-        if (appendPortToHostHeaderonCONNECT(p) && JVMVersion.get() <= JVMVersion.JAVA18 && p != null && HTTPProxy.TYPE.HTTP.equals(p.getType()) && StringUtils.equalsIgnoreCase(url.getProtocol(), "https")) {
+        if (appendPortToHostHeaderonCONNECT(p) && JavaVersion.getVersion().isMaximum(JavaVersion.JVM_1_8) && p != null && (HTTPProxy.TYPE.HTTP.equals(p.getType()) || HTTPProxy.TYPE.HTTPS.equals(p.getType())) && StringUtils.equalsIgnoreCase(url.getProtocol(), "https")) {
             try {
                 final int hostPort = url.getPort() != -1 ? url.getPort() : url.getDefaultPort();
-                final Field portField = url.getClass().getDeclaredField("port");
+                final Field portField = ReflectionUtils.getField(url.getClass(), "port", url, int.class);
                 portField.setAccessible(true);
-                final Field handlerField = url.getClass().getDeclaredField("handler");
+                final Field handlerField = ReflectionUtils.getField(url.getClass(), "handler", url, URLStreamHandler.class);
                 handlerField.setAccessible(true);
                 final URLStreamHandler handler = (URLStreamHandler) handlerField.get(url);
                 final URL ret = new URL(null, url.toExternalForm(), new URLStreamHandler() {
@@ -259,7 +269,18 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
             switch (proxy.getType()) {
             case HTTP:
             case HTTPS:
-                this.setRequestProperty(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION, "close");
+                if (StringUtils.contains(proxy.getUser(), "\\") && StringUtils.equalsIgnoreCase(url.getProtocol(), "http")) {
+                    // user contains DOMAIN\\user
+                    // NTLM based proxy authentication requires keep alive proxy connection, else
+                    // Caused by: java.lang.NullPointerException
+                    // at sun.net.www.protocol.http.ntlm.NTLMAuthentication.setHeaders(NTLMAuthentication.java:247)
+                    // at sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1669)
+                    // at sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1500)
+                    // https://stackoverflow.com/questions/1326849/java-6-ntlm-proxy-authentication-and-https-has-anyone-got-it-to-work
+                    this.setRequestProperty(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION, "keep-alive");
+                } else {
+                    this.setRequestProperty(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION, "close");
+                }
                 break;
             default:
                 break;
@@ -295,7 +316,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         return options;
     }
 
-    protected void setRequestMethod(HttpURLConnection con, RequestMethod requestMethod) throws ProtocolException {
+    protected void setRequestMethod(HttpURLConnection con, org.appwork.utils.net.httpconnection.RequestMethod requestMethod) throws ProtocolException {
         try {
             con.setRequestMethod(requestMethod.name());
         } catch (ProtocolException e) {
@@ -333,6 +354,8 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
     }
 
+    protected Proxy nativeProxy = null;
+
     @Override
     public void connect() throws IOException {
         if (this.isConnected()) {
@@ -340,7 +363,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
         this.wasConnected = false;
         final long startTime = Time.systemIndependentCurrentJVMTimeMillis();
-        final Proxy nativeProxy = proxy != null ? proxy.toNativeProxy() : null;
+        nativeProxy = proxy != null ? proxy.toNativeProxy() : null;
         try {
             if (nativeProxy != null) {
                 synchronized (NativeHTTPConnectionImpl.CURRENT_THREAD_PROXY_AUTH) {
@@ -365,6 +388,14 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                     NativeHTTPConnectionImpl.CURRENT_THREAD_PROXY_AUTH.remove(Thread.currentThread());
                 }
                 this.con = (HttpURLConnection) this.httpURL.openConnection();
+            }
+            if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
+                try {
+                    // Java >=9, per HttpURLConnection authenticator
+                    ReflectionUtils.invoke(con.getClass(), "setAuthenticator", con, void.class, getDefaultAuthenticator());
+                } catch (Throwable e) {
+                    connectExceptions.add(getExceptionMessage(e));
+                }
             }
             if (this.con instanceof HttpsURLConnection) {
                 final HttpsURLConnection scon = (HttpsURLConnection) this.con;
@@ -394,7 +425,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
             }
             this.con.setConnectTimeout(this.connectTimeout);
             this.con.setReadTimeout(this.readTimeout);
-            setRequestMethod(con, getRequestMethod());
+            setRequestMethod(con, httpMethod);
             this.con.setAllowUserInteraction(false);
             this.con.setInstanceFollowRedirects(false);
             if (this.isRequiresOutputStream()) {
@@ -415,7 +446,30 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                 }
                 this.con.setRequestProperty(next.getKey(), next.getValue());
             }
-            this.con.connect();
+            try {
+                this.con.connect();
+            } catch (IOException e) {
+                if (StringUtils.contains(e.getMessage(), "Unable to tunnel through proxy")) {
+                    // e.g. CONNECT method
+                    final String proxyReturns = new Regex(e.getMessage(), "Proxy returns\\s*\"(.+)\"").getMatch(0);
+                    if (proxyReturns != null) {
+                        String proxyCode = null;
+                        if (proxyReturns.startsWith("HTTP")) {
+                            /* parse response code */
+                            proxyCode = new Regex(proxyReturns, "HTTP.*? (\\d+)").getMatch(0);
+                        }
+                        if (proxyCode != null) {
+                            this.httpResponseCode = Integer.parseInt(proxyCode);
+                        }
+                        this.httpResponseMessage = StringUtils.valueOrEmpty(new Regex(proxyReturns, "[a-zA-Z0-9/\\.]+\\s*\\d+\\s*(.+)").getMatch(0));
+                    }
+                    if (httpResponseCode == 407) {
+                        throw new ProxyAuthException(e, proxy);
+                    }
+                    throw new ProxyConnectException(e, proxy);
+                }
+                throw e;
+            }
             this.connected = true;
             this.wasConnected = true;
             this.requestTime = Time.systemIndependentCurrentJVMTimeMillis() - startTime;
@@ -451,10 +505,17 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
         IOException inputException = null;
         try {
-            this.inputStream = this.con.getInputStream();
-        } catch (final IOException e) {
-            inputException = e;
-            this.inputStream = this.con.getErrorStream();
+            try {
+                this.inputStream = this.con.getInputStream();
+            } catch (final IOException e) {
+                inputException = e;
+                this.inputStream = this.con.getErrorStream();
+            }
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException) {
+                throw (IOException) e.getCause();
+            }
+            throw new IOException(e);
         }
         this.inputStreamConnected = true;
         this.httpResponseCode = this.con.getResponseCode();
@@ -496,6 +557,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
             this.con.disconnect();
         } catch (final Throwable e) {
         } finally {
+            nativeProxy = null;
             this.connected = false;
             if (freeConnection) {
                 this.con = null;
@@ -594,7 +656,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         } else if (this.isOK() || code == 404 || code == 403 || code == 416 || code == 401 || code == 410) {
             if (this.convertedInputStream == null) {
                 final InputStream rawInputStream = getRawInputStream();
-                if (this.contentDecoded && !RequestMethod.HEAD.equals(this.getRequestMethod())) {
+                if (this.contentDecoded && !org.appwork.utils.net.httpconnection.RequestMethod.HEAD.equals(httpMethod)) {
                     if (getContentLength() == 0) {
                         // Content-Length is 0, return EmptyInputStream
                         this.convertedInputStream = new EmptyInputStream();
@@ -711,9 +773,18 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         return sb.toString();
     }
 
-    @Override
+    @Deprecated
     public RequestMethod getRequestMethod() {
-        return this.httpMethod;
+        switch (this.httpMethod) {
+        case GET:
+            return RequestMethod.GET;
+        case POST:
+            return RequestMethod.POST;
+        case HEAD:
+            return RequestMethod.HEAD;
+        default:
+            return RequestMethod.valueOf(this.httpMethod.name());
+        }
     }
 
     @Override
@@ -879,8 +950,25 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         return this.proxy;
     }
 
-    @Override
+    @Deprecated
     public void setRequestMethod(final RequestMethod method) {
+        switch (method) {
+        case GET:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.GET);
+            break;
+        case POST:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.POST);
+            break;
+        case HEAD:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.HEAD);
+            break;
+        default:
+            setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod.valueOf(method.name()));
+            break;
+        }
+    }
+
+    public void setRequestMethod(org.appwork.utils.net.httpconnection.RequestMethod method) {
         this.httpMethod = method;
     }
 

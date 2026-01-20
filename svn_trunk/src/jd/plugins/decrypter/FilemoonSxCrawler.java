@@ -37,7 +37,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilemoonSx;
 
-@DecrypterPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52124 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
@@ -46,7 +46,7 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "filemoon.sx", "filemoon.to", "filemoon.eu", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link" });
+        ret.add(new String[] { "filemoon.sx", "filemoon.to", "filemoon.eu", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com" });
         return ret;
     }
 

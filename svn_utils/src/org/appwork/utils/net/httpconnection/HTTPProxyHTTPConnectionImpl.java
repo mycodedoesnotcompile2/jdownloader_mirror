@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -251,6 +251,9 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                         proxyCode = new Regex(proxyResponseStatus, "HTTP.*? (\\d+)").getMatch(0);
                     }
                     if (!"200".equals(proxyCode)) {
+                        // TODO: read/parse proxy response headers to make them available as response headers
+                        this.httpResponseCode = Integer.parseInt(proxyCode);
+                        this.httpResponseMessage = StringUtils.valueOrEmpty(new Regex(proxyResponseStatus, "[a-zA-Z0-9/\\.]+\\s*\\d+\\s*(.+)").getMatch(0));
                         /* something went wrong */
                         try {
                             this.connectionSocket.close();

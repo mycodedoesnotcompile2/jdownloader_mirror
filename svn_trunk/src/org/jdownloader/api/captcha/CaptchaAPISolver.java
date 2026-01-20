@@ -53,15 +53,15 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     private final CaptchaMyJDownloaderRemoteSolverSettings config;
 
     @Override
-    protected boolean isChallengeSupported(final Challenge<?> c) {
+    protected ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         if (AbstractBrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special false case */
-            return false;
+            return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
         } else if (c instanceof AccountLoginOAuthChallenge) {
             /* Special true case */
-            return true;
+            return null;
         } else {
-            return super.isChallengeSupported(c);
+            return super.getChallengeVetoReason(c);
         }
     }
 
@@ -125,7 +125,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         for (final SolverJob<?> entry : ChallengeResponseController.getInstance().listJobs()) {
             if (!entry.isDone()) {
                 final Challenge<?> challenge = entry.getChallenge();
-                if (isChallengeSupported(challenge)) {
+                if (getChallengeVetoReason(challenge) == null) {
                     final CaptchaJob captchaJob = getCaptchaJob(request, challenge.getId().getID());
                     if (captchaJob != null) {
                         ret.add(captchaJob);

@@ -93,16 +93,16 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(final Challenge<?> c) {
+    protected ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         /* 2025-12-22: hCaptcha is not supported anymore */
         if (c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
-            return true;
+            return null;
         } else if (c instanceof CutCaptchaChallenge) {
-            return true;
+            return null;
         } else if (c instanceof CloudflareTurnstileChallenge) {
-            return true;
+            return null;
         } else {
-            return false;
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
     }
 

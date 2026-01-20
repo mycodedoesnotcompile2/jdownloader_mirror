@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -26,6 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -33,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50551 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52122 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -236,7 +238,19 @@ public class CopyCaseCom extends PluginForHost {
 
     public Map<String, Object> callAPI(final Browser br, final Object link, final Account account, final Request req, final boolean checkErrors) throws IOException, PluginException {
         br.getPage(req);
-        if (checkErrors) {
+        if (br.getHttpConnection().getResponseCode() == 429) {
+            /* {"message":"Too Many Attempts."} */
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "429 Rate Limit reached", 30 * 1000l);
+        } else if (br.getHttpConnection().getResponseCode() == 403) {
+            if (br.containsHTML("<h2>\\s*This network is blocked\\s*!\\s*</h2>") || br.containsHTML("<h3>\\s*We do not allow the to connect to our site using your network or country.\\s*</h3>")) {
+                if (account != null) {
+                    throw new AccountUnavailableException("This network is blocked", TimeUnit.HOURS.toMillis(1));
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "This network is blocked", TimeUnit.HOURS.toMillis(1));
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (checkErrors) {
             return checkErrorsAPI(br, link, account);
         } else {
             return restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -338,10 +352,6 @@ public class CopyCaseCom extends PluginForHost {
     }
 
     private Map<String, Object> checkErrorsAPI(final Browser br, final Object link, final Account account) throws PluginException {
-        if (br.getHttpConnection().getResponseCode() == 429) {
-            /* {"message":"Too Many Attempts."} */
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "429 Rate Limit reached", 30 * 1000l);
-        }
         final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Object data = resp.get("data");
         final String error = (String) resp.get("error");

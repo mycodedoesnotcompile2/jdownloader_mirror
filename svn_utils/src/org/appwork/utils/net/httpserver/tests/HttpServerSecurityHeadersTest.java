@@ -51,21 +51,20 @@ import org.appwork.utils.net.httpserver.XFrameOptions;
 
 /**
  * Tests for HTTP server security headers functionality.
- * 
+ *
  * <p>
  * This test class verifies that:
  * </p>
  * <ul>
- *   <li>Default security headers are present in responses</li>
- *   <li>Security headers can be configured via HttpServer</li>
- *   <li>Incompatible header combinations are detected and rejected</li>
- *   <li>Compatible header combinations work correctly</li>
+ * <li>Default security headers are present in responses</li>
+ * <li>Security headers can be configured via HttpServer</li>
+ * <li>Incompatible header combinations are detected and rejected</li>
+ * <li>Compatible header combinations work correctly</li>
  * </ul>
- * 
+ *
  * @author AppWork
  */
 public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -92,12 +91,11 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
     /**
      * Test: Default security headers should be present in responses
      *
-     * This test verifies that default security headers (X-Content-Type-Options, Content-Security-Policy,
-     * Referrer-Policy) are automatically added to all responses.
+     * This test verifies that default security headers (X-Content-Type-Options, Content-Security-Policy, Referrer-Policy) are automatically
+     * added to all responses.
      */
     private void testDefaultSecurityHeaders() throws Exception {
         LogV3.info("Test: Default Security Headers");
-
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("Hello", "UTF-8");
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
@@ -105,7 +103,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
             this.logContextOnFailure(context, "Request should return 200, was: " + responseCode);
         }
         assertTrue(responseCode == 200, "Request should return 200, was: " + responseCode);
-
         // Verify X-Content-Type-Options header
         final String xContentTypeOptions = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS);
         if (xContentTypeOptions == null) {
@@ -117,7 +114,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         }
         assertTrue(XContentTypeOptions.NOSNIFF.getValue().equalsIgnoreCase(xContentTypeOptions), "X-Content-Type-Options should be \"" + XContentTypeOptions.NOSNIFF.getValue() + "\", was: \"" + xContentTypeOptions + "\"");
         LogV3.info("X-Content-Type-Options header test passed: " + xContentTypeOptions);
-
         // Verify Content-Security-Policy header (should contain default-src 'none' and frame-ancestors 'none')
         final String contentSecurityPolicy = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
         if (contentSecurityPolicy == null) {
@@ -143,7 +139,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
             assertTrue(contentSecurityPolicy.contains("frame-ancestors 'none'"), "Content-Security-Policy should contain frame-ancestors 'none', was: \"" + contentSecurityPolicy + "\"");
         }
         LogV3.info("Content-Security-Policy header test passed: " + contentSecurityPolicy);
-
         // Verify X-Frame-Options header is NOT present (CSP frame-ancestors is used instead)
         final String xFrameOptions = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
         if (xFrameOptions != null) {
@@ -151,7 +146,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         }
         assertTrue(xFrameOptions == null, "X-Frame-Options header should NOT be present when CSP frame-ancestors is used, but was: \"" + xFrameOptions + "\"");
         LogV3.info("X-Frame-Options header test passed: Not present (using CSP frame-ancestors instead)");
-
         // Verify Referrer-Policy header
         final String referrerPolicy = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
         if (referrerPolicy == null) {
@@ -163,7 +157,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         }
         assertTrue(ReferrerPolicy.NO_REFERRER.getValue().equalsIgnoreCase(referrerPolicy), "Referrer-Policy should be \"" + ReferrerPolicy.NO_REFERRER.getValue() + "\", was: \"" + referrerPolicy + "\"");
         LogV3.info("Referrer-Policy header test passed: " + referrerPolicy);
-
         LogV3.info("Default Security Headers test successful: All security headers are present with correct default values");
     }
 
@@ -176,7 +169,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
         assertTrue(responseCode == 200, "Request should return 200, was: " + responseCode);
-
         final String serverHeader = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_SERVER);
         assertTrue(serverHeader != null, "Server header should be present by default");
         LogV3.info("Default Server header test passed: " + serverHeader);
@@ -195,7 +187,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
             final RequestContext context = this.httpClient.get(url);
             final int responseCode = context.getCode();
             assertTrue(responseCode == 200, "Request should return 200, was: " + responseCode);
-
             final String serverHeader = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_SERVER);
             assertTrue(customHeader.equals(serverHeader), "Server header should be \"" + customHeader + "\", was: \"" + serverHeader + "\"");
             LogV3.info("Custom Server header test passed: " + serverHeader);
@@ -212,11 +203,10 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("Hello", "UTF-8");
         final String previous = this.handlerInfo.getHttpServer().getResponseServerHeader();
         try {
-            this.handlerInfo.getHttpServer().setResponseServerHeader(null);
+            this.handlerInfo.getHttpServer().setResponseServerHeader("");// null results in default server header
             final RequestContext context = this.httpClient.get(url);
             final int responseCode = context.getCode();
             assertTrue(responseCode == 200, "Request should return 200, was: " + responseCode);
-
             final String serverHeader = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_SERVER);
             assertTrue(serverHeader == null, "Server header should be absent when disabled, but was: " + serverHeader);
             LogV3.info("Server header disabled test passed: header not present");
@@ -232,16 +222,13 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         LogV3.info("Test 1a: Incompatible X-Frame-Options SAMEORIGIN + CSP frame-ancestors 'none'");
         this.teardownServer();
         this.setupServer();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             // Default CSP has frame-ancestors 'none', but we set X-Frame-Options SAMEORIGIN
             // These are incompatible, so an IllegalArgumentException is thrown on the server when headers are added to response
             final ResponseSecurityHeaders incompatibleConfig = new ResponseSecurityHeaders();
             incompatibleConfig.setXFrameOptions(XFrameOptions.SAMEORIGIN);
             this.handlerInfo.getHttpServer().setResponseSecurityHeaders(incompatibleConfig);
-
             try {
                 final RequestContext contextIncompatible = this.httpClient.get(url);
                 throw new WTFException("Expected Exception!: " + contextIncompatible);
@@ -263,10 +250,8 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
     private void testIncompatibleFramingHeadersCspFirst() throws Exception {
         LogV3.info("Test 1a alternative: Incompatible headers (CSP set first)");
         this.setupServer();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             final ResponseSecurityHeaders incompatibleConfig2 = new ResponseSecurityHeaders();
             final ContentSecurityPolicy cspNone = new ContentSecurityPolicy();
             cspNone.setFrameAncestors("'none'");
@@ -274,7 +259,6 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
             incompatibleConfig2.setContentSecurityPolicy(cspNone);
             incompatibleConfig2.setXFrameOptions(XFrameOptions.SAMEORIGIN);
             this.handlerInfo.getHttpServer().setResponseSecurityHeaders(incompatibleConfig2);
-
             try {
                 this.httpClient.get(url);
             } catch (HttpClientException e) {
@@ -295,38 +279,31 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
     private void testCompatibleFramingHeadersDenyNone() throws Exception {
         LogV3.info("Test 1b: Compatible X-Frame-Options DENY + CSP frame-ancestors 'none'");
         this.setupServer();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             final ResponseSecurityHeaders compatibleConfig = new ResponseSecurityHeaders();
             compatibleConfig.setXFrameOptions(XFrameOptions.DENY);
             // Default CSP already has frame-ancestors 'none', which is compatible with DENY
             compatibleConfig.setReferrerPolicy(ReferrerPolicy.ORIGIN);
             this.handlerInfo.getHttpServer().setResponseSecurityHeaders(compatibleConfig);
-
             final RequestContext context1b = this.httpClient.get(url);
             final int responseCode1b = context1b.getCode();
             if (responseCode1b != 200) {
                 this.logContextOnFailure(context1b, "Request should return 200, was: " + responseCode1b);
             }
             assertTrue(responseCode1b == 200, "Request should return 200, was: " + responseCode1b);
-
             // Verify X-Frame-Options is present
             final String xFrameOptions1b = context1b.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
             assertTrue(xFrameOptions1b != null, "X-Frame-Options header should be present");
             assertTrue(XFrameOptions.DENY.getValue().equalsIgnoreCase(xFrameOptions1b), "X-Frame-Options should be \"" + XFrameOptions.DENY.getValue() + "\", was: \"" + xFrameOptions1b + "\"");
-
             // Verify CSP DOES contain frame-ancestors when compatible with X-Frame-Options
             final String contentSecurityPolicy1b = context1b.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
             assertTrue(contentSecurityPolicy1b != null, "Content-Security-Policy header should be present");
             assertTrue(contentSecurityPolicy1b.contains("frame-ancestors 'none'"), "Content-Security-Policy should contain frame-ancestors 'none' when compatible with X-Frame-Options DENY");
-
             // Verify custom Referrer-Policy
             final String referrerPolicy1b = context1b.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
             assertTrue(referrerPolicy1b != null, "Referrer-Policy header should be present");
             assertTrue(ReferrerPolicy.ORIGIN.getValue().equalsIgnoreCase(referrerPolicy1b), "Referrer-Policy should be \"" + ReferrerPolicy.ORIGIN.getValue() + "\", was: \"" + referrerPolicy1b + "\"");
-
             LogV3.info("Test 1b passed: Compatible headers DENY + 'none' work correctly");
         } finally {
             this.teardownServer();
@@ -339,10 +316,8 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
     private void testCompatibleFramingHeadersSameoriginSelf() throws Exception {
         LogV3.info("Test 1c: Compatible X-Frame-Options SAMEORIGIN + CSP frame-ancestors 'self'");
         this.setupServer();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             final ResponseSecurityHeaders compatibleConfig2 = new ResponseSecurityHeaders();
             compatibleConfig2.setXFrameOptions(XFrameOptions.SAMEORIGIN);
             final ContentSecurityPolicy cspSelf = new ContentSecurityPolicy();
@@ -351,24 +326,20 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
             compatibleConfig2.setContentSecurityPolicy(cspSelf);
             compatibleConfig2.setReferrerPolicy(ReferrerPolicy.ORIGIN);
             this.handlerInfo.getHttpServer().setResponseSecurityHeaders(compatibleConfig2);
-
             final RequestContext context1c = this.httpClient.get(url);
             final int responseCode1c = context1c.getCode();
             if (responseCode1c != 200) {
                 this.logContextOnFailure(context1c, "Request should return 200, was: " + responseCode1c);
             }
             assertTrue(responseCode1c == 200, "Request should return 200, was: " + responseCode1c);
-
             // Verify X-Frame-Options is present
             final String xFrameOptions1c = context1c.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
             assertTrue(xFrameOptions1c != null, "X-Frame-Options header should be present");
             assertTrue(XFrameOptions.SAMEORIGIN.getValue().equalsIgnoreCase(xFrameOptions1c), "X-Frame-Options should be \"" + XFrameOptions.SAMEORIGIN.getValue() + "\", was: \"" + xFrameOptions1c + "\"");
-
             // Verify CSP DOES contain frame-ancestors when compatible with X-Frame-Options
             final String contentSecurityPolicy1c = context1c.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
             assertTrue(contentSecurityPolicy1c != null, "Content-Security-Policy header should be present");
             assertTrue(contentSecurityPolicy1c.contains("frame-ancestors 'self'"), "Content-Security-Policy should contain frame-ancestors 'self' when compatible with X-Frame-Options SAMEORIGIN");
-
             LogV3.info("Test 1c passed: Compatible headers SAMEORIGIN + 'self' work correctly");
         } finally {
             this.teardownServer();
@@ -381,29 +352,23 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
     private void testNullConfigUsesDefaultSecurityHeaders() throws Exception {
         LogV3.info("Test 2: Null config uses default security headers");
         this.setupServer();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             this.handlerInfo.getHttpServer().setResponseSecurityHeaders(null);
-
             final RequestContext context2 = this.httpClient.get(url);
             final int responseCode2 = context2.getCode();
             if (responseCode2 != 200) {
                 this.logContextOnFailure(context2, "Request should return 200, was: " + responseCode2);
             }
             assertTrue(responseCode2 == 200, "Request should return 200, was: " + responseCode2);
-
             // Verify default headers are present when config is null (security by default)
             final String xContentTypeOptions2 = context2.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS);
             final String contentSecurityPolicy2 = context2.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
             final String referrerPolicy2 = context2.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
-
             assertTrue(xContentTypeOptions2 != null && XContentTypeOptions.NOSNIFF.getValue().equalsIgnoreCase(xContentTypeOptions2), "X-Content-Type-Options header should be present with default value when config is null");
             assertTrue(contentSecurityPolicy2 != null, "Content-Security-Policy header should be present with default value when config is null");
             assertTrue(contentSecurityPolicy2.contains("frame-ancestors 'none'"), "Content-Security-Policy should contain frame-ancestors 'none' when config is null");
             assertTrue(referrerPolicy2 != null && ReferrerPolicy.NO_REFERRER.getValue().equalsIgnoreCase(referrerPolicy2), "Referrer-Policy header should be present with default value when config is null");
-
             LogV3.info("Test 2 passed: Default security headers used when config is null");
         } finally {
             this.teardownServer();
@@ -416,10 +381,8 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
     private void testCustomCspWithAdditionalDirectives() throws Exception {
         LogV3.info("Test 3: Custom CSP with additional directives");
         this.setupServer();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             final ResponseSecurityHeaders cspConfig = new ResponseSecurityHeaders();
             cspConfig.setXFrameOptions(null); // Use CSP frame-ancestors instead
             final ContentSecurityPolicy csp = new ContentSecurityPolicy();
@@ -428,28 +391,23 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
             csp.addDirective("script-src 'self'");
             cspConfig.setContentSecurityPolicy(csp);
             this.handlerInfo.getHttpServer().setResponseSecurityHeaders(cspConfig);
-
             final RequestContext context3 = this.httpClient.get(url);
             final int responseCode3 = context3.getCode();
             if (responseCode3 != 200) {
                 this.logContextOnFailure(context3, "Request should return 200, was: " + responseCode3);
             }
             assertTrue(responseCode3 == 200, "Request should return 200, was: " + responseCode3);
-
             // Verify CSP is present with frame-ancestors
             final String contentSecurityPolicy3 = context3.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
             assertTrue(contentSecurityPolicy3 != null, "Content-Security-Policy header should be present");
             assertTrue(contentSecurityPolicy3.contains("frame-ancestors 'self'"), "CSP should contain frame-ancestors 'self'");
             assertTrue(contentSecurityPolicy3.contains("default-src 'self'"), "CSP should contain default-src 'self'");
-
             // Verify X-Frame-Options is not present (using CSP instead)
             final String xFrameOptions3 = context3.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
             assertTrue(xFrameOptions3 == null, "X-Frame-Options header should not be present when using CSP frame-ancestors");
-
             LogV3.info("Test 3 passed: Custom CSP with additional directives works correctly");
         } finally {
             this.teardownServer();
         }
     }
 }
-

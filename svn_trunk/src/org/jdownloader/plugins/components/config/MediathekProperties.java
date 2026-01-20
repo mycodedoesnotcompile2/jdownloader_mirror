@@ -106,6 +106,12 @@ public interface MediathekProperties extends DownloadLinkDatabindingInterface {
     @Key("AUDIODESCRIPTION")
     void setAudioDescription(boolean isAudioDescription);
 
+    @Key("SPEECHOPTIMIZED")
+    boolean getSpeechOptimized();
+
+    @Key("SPEECHOPTIMIZED")
+    void setSpeechOptimized(boolean isSpeechOptimized);
+
     @Key("AUDIOLANGUAGE")
     String getAudioLanguage();
 

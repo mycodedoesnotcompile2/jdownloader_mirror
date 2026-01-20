@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link GetRequest} because MOVE requests are controlled
+ * Note: This class extends {@link AbstractGetRequest} because MOVE requests are controlled
  * by headers, not by a request body. According to the RequestMethod enum,
  * MOVE has requiresOutputStream=false.
  * </p>
  *
  * @author AppWork
  */
-public class MoveRequest extends GetRequest {
+public class MoveRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

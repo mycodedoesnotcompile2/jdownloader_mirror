@@ -13,8 +13,7 @@ import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
 import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
-import org.appwork.utils.net.httpserver.requests.HTTPBridge;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
@@ -33,9 +32,8 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
     @Override
     public void onBeforeRequest(HttpRequest request, HttpResponse response) throws BasicRemoteAPIException {
         response.setHook(this);
-        HTTPBridge bridge = request.getBridge();
         checkDirectConnectionToken(request);
-        if (bridge != null && bridge instanceof MyJDownloaderConnectThread) {
+        if (isMyJDownloaderRequest(request)) {
             // no origin evaluation for my.jdownloader
             return;
         }
@@ -48,6 +46,13 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
             }
             // TODO Validate origin
         }
+    }
+
+    @Deprecated
+    // TODO: change for new system
+    protected boolean isMyJDownloaderRequest(HttpRequest request) {
+        final Object bridge = request.getBridge();
+        return bridge != null && (bridge instanceof MyJDownloaderConnectThread || bridge.getClass().isAnonymousClass());
     }
 
     protected void checkDirectConnectionToken(HttpRequest request) throws BasicRemoteAPIException {
@@ -68,7 +73,7 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
     }
 
     @Override
-    public boolean onGetRequest(GetRequest request, HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
         if (request instanceof OptionsRequest) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
             response.setResponseCode(ResponseCode.SUCCESS_OK);
@@ -81,7 +86,6 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
     @Override
     public void onBeforeSendHeaders(HttpResponse response) {
         final HttpRequest request = response.getConnection().getRequest();
-        final HTTPBridge bridge = request.getBridge();
         response.getResponseHeaders().addIfAbsent(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, "1800"));
         response.getResponseHeaders().addIfAbsent(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, GET, POST"));
         final String allowHeaders = request.getRequestHeaders().getValue("Access-Control-Request-Headers");
@@ -92,7 +96,7 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
         if (pna != null) {
             response.getResponseHeaders().addIfAbsent(new HTTPHeader("Access-Control-Allow-Private-Network", pna));
         }
-        if (bridge != null && bridge instanceof MyJDownloaderConnectThread) {
+        if (isMyJDownloaderRequest(request)) {
             final String allowOrigin = request.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_ORIGIN);
             if (allowOrigin != null) {
                 response.getResponseHeaders().addIfAbsent(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, allowOrigin));

@@ -50,8 +50,8 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link HttpRequest} directly rather than {@link GetRequest}
- * or {@link PostRequest} because CONNECT is a special method that establishes a tunnel
+ * Note: This class extends {@link HttpRequest} directly rather than {@link AbstractGetRequest}
+ * or {@link AbstractPostRequest} because CONNECT is a special method that establishes a tunnel
  * and does not follow standard request/response semantics. According to the RequestMethod
  * enum, CONNECT has requiresOutputStream=false.
  * </p>

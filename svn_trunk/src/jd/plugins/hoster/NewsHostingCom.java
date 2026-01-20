@@ -26,7 +26,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52124 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
 public class NewsHostingCom extends UseNet {
     public NewsHostingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,7 +136,9 @@ public class NewsHostingCom extends UseNet {
                     login = getLoginForm(br);
                     if (login != null && login.containsHTML("username") && login.containsHTML("password")) {
                         throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else if (br.getCookie(getHost(), "sessionID", Cookies.NOTDELETEDPATTERN) == null) {
+                    } else if (br.getCookie(getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN) == null) {
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    } else if (br.getCookie(getHost(), "nh_cid", Cookies.NOTDELETEDPATTERN) == null) {
                         throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
                     }
                 }
@@ -152,17 +154,16 @@ public class NewsHostingCom extends UseNet {
                 if (!StringUtils.equalsIgnoreCase(nntpStatus, "active")) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, "NNTP Status:" + nntpStatus, PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
-                final String validUntil = br.getRegex("Next Bill:</strong>\\s*(.*?)<").getMatch(0);
                 final String connectionsString = br.getRegex(">\\s*Connections\\s*</div>\\s*<div[^>]+>\\s*(\\d+)\\s*<").getMatch(0);
-                final String bucketType = br.getRegex(">\\s*Your Plan\\s*</div>\\s*<div[^>]+>\\s*(.*?)\\s*<").getMatch(0);
+                final String yourPlan = br.getRegex(">\\s*Your Plan\\s*</div>\\s*<div[^>]+>\\s*(.*?)\\s*<").getMatch(0);
                 int connections = 1;
-                if (bucketType != null) {
-                    ai.setStatus(Encoding.htmlOnlyDecode(bucketType));
-                    if (StringUtils.containsIgnoreCase(bucketType, "lite")) {
+                if (yourPlan != null) {
+                    ai.setStatus(Encoding.htmlOnlyDecode(yourPlan));
+                    if (StringUtils.containsIgnoreCase(yourPlan, "lite")) {
                         connections = 30;
-                    } else if (StringUtils.containsIgnoreCase(bucketType, "Unlimited")) {
+                    } else if (StringUtils.containsIgnoreCase(yourPlan, "Unlimited")) {
                         connections = 30;
-                    } else if (StringUtils.containsIgnoreCase(bucketType, "Powerpack")) {
+                    } else if (StringUtils.containsIgnoreCase(yourPlan, "Powerpack")) {
                         connections = 60;
                     } else {
                         // smallest number of connections
@@ -175,20 +176,30 @@ public class NewsHostingCom extends UseNet {
                     connections = Integer.parseInt(connectionsString);
                 }
                 account.setMaxSimultanDownloads(connections);
-                if (validUntil != null) {
-                    final long date = TimeFormatter.getMilliSeconds(validUntil, "MMM dd',' yyyy", null);
-                    if (date > 0) {
-                        ai.setValidUntil(date + (24 * 60 * 60 * 1000l));
-                    }
+                long validUntil = -1;
+                final String nextBill = br.getRegex("Next Bill:</strong>\\s*(.*?)<").getMatch(0);
+                final String expiresOn = br.getRegex("ACCESS EXPIRES ON\\s*:\\s*(\\d+-\\d+-\\d+)\\s*<").getMatch(0);
+                if (nextBill != null) {
+                    validUntil = TimeFormatter.getMilliSeconds(nextBill, "MMM dd',' yyyy", null);
+                } else if (expiresOn != null) {
+                    validUntil = TimeFormatter.getMilliSeconds(expiresOn, "yyyy'-'MM'-'dd", null);
                 }
-                // TODO
-                final String trafficTotal = br.getRegex("Byte Allott?ment:</strong>\\s*(\\d+)").getMatch(0);
-                final String trafficLeft = br.getRegex("Bytes Remaining:</strong>\\s*(.*?)<").getMatch(0);
-                if (trafficLeft != null && trafficTotal != null) {
-                    ai.setTrafficMax(Long.parseLong(trafficTotal));
-                    ai.setTrafficLeft(trafficLeft);
-                } else if (StringUtils.equalsIgnoreCase(trafficLeft, "unlimited") || StringUtils.equalsIgnoreCase(trafficLeft, "Powerpack")) {
+                if (validUntil > 0) {
+                    ai.setValidUntil(validUntil + (24 * 60 * 60 * 1000l));
+                }
+                final String data = br.getRegex(">\\s*Data\\s*</div>\\s*<div[^>]+>\\s*(.*?)\\s*<").getMatch(0);
+                if (StringUtils.containsIgnoreCase(yourPlan, "Unlimited") || StringUtils.containsIgnoreCase(yourPlan, "Powerpack")) {
                     ai.setUnlimitedTraffic();
+                } else if (StringUtils.endsWithCaseInsensitive(data, "unlimited") || StringUtils.endsWithCaseInsensitive(data, "Powerpack")) {
+                    ai.setUnlimitedTraffic();
+                } else {
+                    // TODO
+                    final String trafficTotal = br.getRegex("Byte Allott?ment:</strong>\\s*(\\d+)").getMatch(0);
+                    final String trafficLeft = br.getRegex("Bytes Remaining:</strong>\\s*(.*?)<").getMatch(0);
+                    if (trafficLeft != null && trafficTotal != null) {
+                        ai.setTrafficMax(Long.parseLong(trafficTotal));
+                        ai.setTrafficLeft(trafficLeft);
+                    }
                 }
             } catch (IOException e) {
                 logger.log(e);

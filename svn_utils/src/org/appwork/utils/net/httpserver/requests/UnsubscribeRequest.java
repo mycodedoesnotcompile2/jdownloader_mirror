@@ -44,13 +44,13 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  *
  * <p>
- * Note: This class extends {@link GetRequest} because UNSUBSCRIBE requests do not require body handling functionality. According to the
+ * Note: This class extends {@link AbstractGetRequest} because UNSUBSCRIBE requests do not require body handling functionality. According to the
  * RequestMethod enum, UNSUBSCRIBE has requiresOutputStream=false.
  * </p>
  *
  * @author AppWork
  */
-public class UnsubscribeRequest extends GetRequest {
+public class UnsubscribeRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

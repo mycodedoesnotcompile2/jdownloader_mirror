@@ -2,7 +2,9 @@ package org.jdownloader.captcha.v2.solver.jac;
 
 import java.awt.Image;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 
 import org.appwork.shutdown.ShutdownController;
@@ -24,6 +26,7 @@ import jd.captcha.JACMethod;
 import jd.captcha.JAntiCaptcha;
 import jd.captcha.LetterComperator;
 import jd.captcha.pixelgrid.Captcha;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
@@ -76,17 +79,18 @@ public class JACSolver extends ChallengeSolver<String> {
         return 30000;
     }
 
-    public boolean canHandle(Challenge<?> c) {
-        // JAC is too old/unsafe to use for account logins!
-        if (c.isAccountLogin()) {
-            return false;
-        }
-        return super.canHandle(c);
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        types.add(CAPTCHA_TYPE.IMAGE);
+        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        return types;
     }
 
     @Override
     public void enqueue(SolverJob<String> job) {
-        if (isEnabled() && canHandle(job.getChallenge())) {
+        if (isEnabled() && getVetoReason(job.getChallenge()) == null) {
             super.enqueue(job);
         }
     }

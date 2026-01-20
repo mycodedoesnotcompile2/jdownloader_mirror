@@ -4,8 +4,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import jd.http.Browser;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Files;
@@ -18,6 +16,8 @@ import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaC
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
+
+import jd.http.Browser;
 
 public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiClickedPoint> {
     private static final Captcha9kwSolverMultiClick INSTANCE        = new Captcha9kwSolverMultiClick();
@@ -43,8 +43,12 @@ public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiCl
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof MultiClickCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof MultiClickCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     @Override

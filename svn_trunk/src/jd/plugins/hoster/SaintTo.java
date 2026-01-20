@@ -24,7 +24,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52086 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52124 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,15 +50,12 @@ public class SaintTo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "saint.to", "saint2.su", "saint2.cr" });
-        /* 2026-01-13: New domain on which a different system is running */
-        ret.add(new String[] { "turbovid.cr" });
+        ret.add(new String[] { "turbo.cr", "turbovid.cr", "saint.to", "saint2.su", "saint2.cr" });
         return ret;
     }
 
     @Override
     public String rewriteHost(final String host) {
-        /* 2024-09-16: Main domain has changed from saint.to to saint2.su */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

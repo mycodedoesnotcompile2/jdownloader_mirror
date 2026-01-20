@@ -4,8 +4,6 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
-import jd.http.Browser;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -26,6 +24,8 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
+
+import jd.http.Browser;
 
 public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     private static final AntiCaptchaComSolver INSTANCE = new AntiCaptchaComSolver();
@@ -50,15 +50,15 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> challenge) {
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> challenge) {
         if (challenge instanceof RecaptchaV2Challenge) {
-            return true;
+            return null;
         } else if (challenge instanceof BasicCaptchaChallenge) {
-            return true;
+            return null;
         } else if (challenge instanceof CloudflareTurnstileChallenge) {
-            return true;
+            return null;
         } else {
-            return false;
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
     }
 
@@ -230,7 +230,6 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
                     // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV3Enterprise
                     task.put("isEnterprise", Boolean.TRUE);
                 }
-
                 if (v3Action != null) {
                     final String action = (String) v3Action.get("action");
                     if (action != null) {

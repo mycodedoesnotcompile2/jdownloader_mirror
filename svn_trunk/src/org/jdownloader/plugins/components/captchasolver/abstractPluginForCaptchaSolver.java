@@ -8,6 +8,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
@@ -16,6 +17,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -25,26 +27,6 @@ import jd.plugins.PluginForHost;
  * Abstract base class for captcha solver plugins.
  */
 public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
-    /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
-    public boolean enoughBalanceFor(final Challenge<?> c, final Account account) {
-        // TODO: Implement logic
-        return true;
-    }
-
-    /**
-     * Checks if this solver can handle a specific challenge.
-     *
-     * @param c
-     *            The challenge to check
-     * @return true if this solver can handle the challenge, false otherwise
-     */
-    public final boolean canHandle(final Challenge<?> c, Account account) {
-        if (!this.enoughBalanceFor(c, account)) {
-            return false;
-        }
-        return true;
-    }
-
     public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, Account account) throws Exception {
         final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
         plugin.setBrowser(plugin.createNewBrowserInstance());
@@ -108,6 +90,22 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return List of supported captcha types
      */
     public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+
+    public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes(final Account account) {
+        final AccountInfo ai = account.getAccountInfo();
+        if (ai == null) {
+            return null;
+        }
+        final List<CAPTCHA_TYPE> disabled_captcha_types = new ArrayList<CAPTCHA_TYPE>();
+        for (final CAPTCHA_TYPE ctype : CAPTCHA_TYPE.values()) {
+            final CaptchaType captchaType = new CaptchaType(ctype);
+            captchaType.setAccountInfo(ai);
+            if (!captchaType.isEnabled()) {
+                disabled_captcha_types.add(ctype);
+            }
+        }
+        return disabled_captcha_types;
+    }
 
     /**
      * Determines whether the user should be notified when the account balance is low.
@@ -246,6 +244,32 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public void handleFree(DownloadLink link) throws Exception {
         /* Must override but should never be called. */
         throw new WTFException();
+    }
+
+    /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
+    public boolean enoughBalanceFor(final Challenge<?> c, final Account account) {
+        // TODO: Implement logic
+        return true;
+    }
+
+    /**
+     * Checks if this solver can handle a specific challenge.
+     *
+     * @param c
+     *            The challenge to check
+     * @return null if this solver can handle the challenge, ChallengeVetoReason otherwise
+     */
+    public final ChallengeVetoReason getVetoReason(final Challenge<?> c, Account account) {
+        if (!account.isEnabled()) {
+            return ChallengeVetoReason.ACCOUNT_DISABLED;
+        }
+        if (!account.isValid()) {
+            return ChallengeVetoReason.ACCOUNT_IN_ERROR_STATE;
+        }
+        if (!this.enoughBalanceFor(c, account)) {
+            return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
+        }
+        return null;
     }
 
     private CaptchaSolverPluginConfig getDefaultConfig() {

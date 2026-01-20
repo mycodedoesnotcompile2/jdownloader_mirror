@@ -6,6 +6,8 @@ import java.util.Locale;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComConfigInterface;
+import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSettings;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 
@@ -64,6 +66,14 @@ public class CaptchaSolverSettingsMigration {
     }
 
     public void migrate() {
+        /**
+         * TODO: <br>
+         * - Currently "CaptchaSolverPluginConfig" is used as new config everywhere which is still wrong as each solver will have its own
+         * config <br>
+         * - add migration for all existing solvers <br>
+         * - add migration of settings for non account based solvers <br>
+         * - test migration
+         */
         migrate_anti_captcha_com();
         migrate_cheap_captcha();
         migrate_deathbycaptcha();
@@ -75,11 +85,123 @@ public class CaptchaSolverSettingsMigration {
     }
 
     public void migrate_anti_captcha_com() {
-        // TODO
+        final String host = "anti-captcha.com";
+        final AntiCaptchaComConfigInterface cfgOld = JsonConfig.create(AntiCaptchaComConfigInterface.class);
+        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        /* Migrate account */
+        String apikey = cfgOld.getApiKey();
+        if (apikey != null) {
+            apikey = apikey.trim();
+        }
+        // final PluginForCaptchaSolverNineKw plg = new PluginForCaptchaSolverNineKw(null);
+        boolean userHasAccount = false;
+        boolean userHasEnabledExistingAccount = false;
+        if (apikey != null && apikey.matches("[a-f0-9]{32}")) {
+            final Account existingAccount = getExistingAccount(host, apikey);
+            if (existingAccount != null) {
+                // TODO: Check if an account with same apikey already exists
+                System.out.print("Same " + host + " account already exists");
+            } else {
+                final Account acc = new Account(null, apikey);
+                if (!cfgOld.isEnabled()) {
+                    /* Disable account if it was disabled by old config. */
+                    acc.setEnabled(false, false);
+                } else {
+                    userHasEnabledExistingAccount = true;
+                }
+                ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add(host);
+            }
+            userHasAccount = true;
+        }
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = this.getValidatedDomainList(cfgOld.getBlacklistEntries());
+        final List<String> whitelist = this.getValidatedDomainList(cfgOld.getWhitelistEntries());
+        if (blacklist != null && blacklist.size() > 0) {
+            /* Only migrate blacklist settings if user has a blacklist with at least 1 valid entry */
+            cfgNew.setDomainBlacklist(listToCommaSeparatedDomains(blacklist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has blacklist entries && blacklist is disabled. */
+                cfgNew.setDomainBlacklistEnabled(false);
+            }
+        }
+        if (whitelist != null && whitelist.size() > 0) {
+            cfgNew.setDomainWhitelist(listToCommaSeparatedDomains(whitelist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has whitelist entries && whitelist is disabled. */
+                cfgNew.setDomainWhitelistEnabled(false);
+            }
+        }
+        if (userHasAccount && userHasEnabledExistingAccount) {
+            /* Migrate some settings only if user has an active account */
+            if (!cfgOld.isFeedBackSendingEnabled()) {
+                cfgNew.setEnableCaptchaFeedback(false);
+            }
+        }
+        System.out.print(host + " migration successful");
     }
 
     public void migrate_cheap_captcha() {
-        // TODO
+        final String host = "cheapcaptcha.com";
+        final CheapCaptchaConfigInterface cfgOld = JsonConfig.create(CheapCaptchaConfigInterface.class);
+        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        /* Migrate account */
+        String username = cfgOld.getUserName();
+        if (username != null) {
+            username = username.trim();
+        }
+        String password = cfgOld.getPassword();
+        if (password != null) {
+            password = password.trim();
+        }
+        // final PluginForCaptchaSolverNineKw plg = new PluginForCaptchaSolverNineKw(null);
+        boolean userHasAccount = false;
+        boolean userHasEnabledExistingAccount = false;
+        if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
+            final Account existingAccount = getExistingAccount(host, username, password);
+            if (existingAccount != null) {
+                // TODO: Check if an account with same apikey already exists
+                System.out.print("Same " + host + " account already exists");
+            } else {
+                final Account acc = new Account(null, username);
+                if (!cfgOld.isEnabled()) {
+                    /* Disable account if it was disabled by old config. */
+                    acc.setEnabled(false, false);
+                } else {
+                    userHasEnabledExistingAccount = true;
+                }
+                ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add(host);
+            }
+            userHasAccount = true;
+        }
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = this.getValidatedDomainList(cfgOld.getBlacklistEntries());
+        final List<String> whitelist = this.getValidatedDomainList(cfgOld.getWhitelistEntries());
+        if (blacklist != null && blacklist.size() > 0) {
+            /* Only migrate blacklist settings if user has a blacklist with at least 1 valid entry */
+            cfgNew.setDomainBlacklist(listToCommaSeparatedDomains(blacklist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has blacklist entries && blacklist is disabled. */
+                cfgNew.setDomainBlacklistEnabled(false);
+            }
+        }
+        if (whitelist != null && whitelist.size() > 0) {
+            cfgNew.setDomainWhitelist(listToCommaSeparatedDomains(whitelist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has whitelist entries && whitelist is disabled. */
+                cfgNew.setDomainWhitelistEnabled(false);
+            }
+        }
+        if (userHasAccount && userHasEnabledExistingAccount) {
+            /* Migrate some settings only if user has an active account */
+            if (!cfgOld.isFeedBackSendingEnabled()) {
+                cfgNew.setEnableCaptchaFeedback(false);
+            }
+        }
+        System.out.print(host + " migration successful");
     }
 
     public void migrate_deathbycaptcha() {
@@ -99,6 +221,7 @@ public class CaptchaSolverSettingsMigration {
     }
 
     public void migrate_9kw() {
+        final String host = "9kw.eu";
         final Captcha9kwSettings cfgOld = JsonConfig.create(Captcha9kwSettings.class);
         final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
         /* Migrate account */
@@ -110,10 +233,10 @@ public class CaptchaSolverSettingsMigration {
         boolean userHasAccount = false;
         boolean userHasEnabledExistingAccount = false;
         if (apikey != null && apikey.matches("[a-zA-Z0-9]{10,}")) {
-            final Account existingAccount = getExistingAccount("9kw.eu", apikey);
+            final Account existingAccount = getExistingAccount(host, apikey);
             if (existingAccount != null) {
                 // TODO: Check if an account with same apikey already exists
-                System.out.print("Same 9kw.eu account already exists");
+                System.out.print("Same " + host + " account already exists");
             } else {
                 final Account acc = new Account(null, apikey);
                 if (!cfgOld.isEnabledGlobally() && !cfgOld.isEnabled()) {
@@ -123,7 +246,7 @@ public class CaptchaSolverSettingsMigration {
                     userHasEnabledExistingAccount = true;
                 }
                 ac.addAccount(acc);
-                namesOfServicesWithMigratedAccounts.add("9kw.eu");
+                namesOfServicesWithMigratedAccounts.add(host);
             }
             userHasAccount = true;
         }
@@ -154,20 +277,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        /* Old default was 1 which makes no sense -> Only migrate it if user has changed that setting */
-        if (cfgOld.getThreadpoolSize() > 1) {
-            cfgNew.setLimitMaxSimultaneousCaptchasEnabled(true);
-            cfgNew.setMaxSimultaneousCaptchas(cfgOld.getThreadpoolSize());
-        }
-        /* Old default was true -> Migrate if user has changed it. */
-        /*
-         * TODO: Check if it makes sense to migrate this setting -> I think low credits warning should be on by default, even after this
-         * migration
-         */
-        if (!cfgOld.getlowcredits()) {
-            cfgNew.setWarnOnLowCredits(false);
-        }
-        System.out.print("9kw migration successful");
+        System.out.print(host + " migration successful");
     }
 
     /**
@@ -187,13 +297,29 @@ public class CaptchaSolverSettingsMigration {
     }
 
     private List<String> commaSeparatedDomainsToList(final String input) {
-        final List<String> ret = new ArrayList<String>();
         if (input == null || input.trim().length() == 0) {
             return null;
         }
+        final List<String> ret = new ArrayList<String>();
         final String[] parts = input.split(",");
         for (int i = 0; i < parts.length; i++) {
-            final String domain = parts[i].trim().toLowerCase(Locale.ROOT);
+            final String domain = parts[i];
+            ret.add(domain);
+        }
+        return getValidatedDomainList(ret);
+    }
+
+    /**
+     * Removes invalid elements from given domain list. <br>
+     * Returns either null or an arraylist with at least one valid element.
+     */
+    private List<String> getValidatedDomainList(final List<String> domains) {
+        if (domains == null || domains.isEmpty()) {
+            return null;
+        }
+        final List<String> ret = new ArrayList<String>();
+        for (String domain : domains) {
+            domain = domain.toLowerCase(Locale.ROOT).trim();
             if (looksLikeValidDomain(domain) && !ret.contains(domain)) {
                 ret.add(domain);
             }

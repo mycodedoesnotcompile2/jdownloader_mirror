@@ -34,151 +34,133 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
+import org.appwork.utils.ByteArrayUtils;
+
 public enum RequestMethod {
     /**
      * UPnP NOTIFY method. Used to send event notifications. Has a request body (XML event data).
      */
     NOTIFY(true), // UPnP
-
     /**
      * UPnP M-SEARCH method. Used to discover UPnP devices and services. No request body.
      */
-    MSEARCH(false), // UPnP
-
+    MSEARCH("M-SEARCH", false), // UPnP
     /**
      * UPnP SUBSCRIBE method. Used to subscribe to event notifications. No request body (header-based).
      */
     SUBSCRIBE(false), // UPnP
-
     /**
      * UPnP UNSUBSCRIBE method. Used to unsubscribe from event notifications. No request body.
      */
     UNSUBSCRIBE(false), // UPnP
-
     /**
      * HTTP PUT method. Used to create or replace a resource. Requires a request body.
      */
     PUT(true), // HTTP / WebDAV
-
     /**
      * HTTP DELETE method. Used to delete a resource. No request body (body is not standard-compliant).
      */
     DELETE(false), // HTTP / WebDAV
-
     /**
      * HTTP OPTIONS method. Used to describe communication options. No request body.
      */
     OPTIONS(false), // HTTP
-
     /**
      * HTTP GET method. Used to retrieve a resource. No request body.
      */
     GET(false), // HTTP
-
     /**
      * HTTP POST method. Used to submit data to the server. Requires a request body.
      */
     POST(true), // HTTP
-
     /**
      * HTTP HEAD method. Same as GET but without a response body. No request body.
      */
     HEAD(false), // HTTP
-
     /**
      * WebDAV PROPFIND method. Used to retrieve properties of a resource. Requires a request body.
      */
     PROPFIND(true), // WebDAV
-
     /**
      * HTTP TRACE method. Used for diagnostic loop-back testing. No request body.
      */
     TRACE(false), // HTTP
-
     /**
      * HTTP CONNECT method. Used to establish a tunnel (e.g. for HTTPS). No HTTP request body.
      */
     CONNECT(false), // HTTP
-
     /**
      * HTTP PATCH method. Used to apply partial updates to a resource. Requires a request body.
      */
     PATCH(true), // HTTP
-
     /**
      * WebDAV PROPPATCH method. Used to modify resource properties. Requires a request body.
      */
     PROPPATCH(true), // WebDAV
-
     /**
      * WebDAV MKCOL method. Used to create a new collection (directory). No request body in standard usage.
      */
     MKCOL(false), // WebDAV
-
     /**
      * WebDAV COPY method. Used to copy a resource. Controlled by headers, not by a request body.
      */
     COPY(false), // WebDAV
-
     /**
      * WebDAV MOVE method. Used to move a resource. Controlled by headers, not by a request body.
      */
     MOVE(false), // WebDAV
-
     /**
      * WebDAV LOCK method. Used to lock a resource. Requires a request body with lock information.
      */
     LOCK(true), // WebDAV
-
     /**
      * WebDAV UNLOCK method. Used to remove a lock from a resource. No request body.
      */
     UNLOCK(false), // WebDAV
-
     /**
      * Unknown or unsupported HTTP method. No request body.
      */
     UNKNOWN(false);
 
     public final boolean mayHavePostBody;
-
     private final byte[] requestMethodBytes;
+
+    private RequestMethod(final boolean requiresOutputStream) {
+        this(null, requiresOutputStream);
+    }
 
     /**
      *
      */
-    private RequestMethod(boolean requiresOutputStream) {
+    private RequestMethod(final String methodName, final boolean requiresOutputStream) {
         this.mayHavePostBody = requiresOutputStream;
-        // Store the method name as bytes for efficient comparison
-        // Special case: MSEARCH enum represents "M-SEARCH" HTTP method
-        String methodName = "MSEARCH".equals(this.name()) ? "M-SEARCH" : this.name();
+        final String methodNameString = methodName != null ? methodName : name();
         byte[] bytes = null;
         try {
-            bytes = methodName.getBytes("ISO-8859-1");
+            bytes = methodNameString.getBytes("ISO-8859-1");
         } catch (final Throwable e) {
-            bytes = methodName.getBytes();
+            bytes = methodNameString.getBytes();
         }
         this.requestMethodBytes = bytes;
     }
 
     /**
      * Checks if the input byte array starts with this request method name.
-     * 
-     * @param input The byte array to check
+     *
+     * @param input
+     *            The byte array to check
      * @return true if the input starts with this method name
      */
     private boolean isRequestMethod(final byte[] input) {
-        if (input == null || input.length < this.requestMethodBytes.length) {
+        if (input == null) {
             return false;
         }
-        for (int i = 0; i < this.requestMethodBytes.length; i++) {
-            if (this.requestMethodBytes[i] != input[i]) {
-                return false;
-            }
+        if (!ByteArrayUtils.contains(input, 0, requestMethodBytes)) {
+            return false;
         }
         // Check that the method name is followed by a space, tab, or end of array
         if (input.length > this.requestMethodBytes.length) {
-            byte nextByte = input[this.requestMethodBytes.length];
+            final byte nextByte = input[this.requestMethodBytes.length];
             if (nextByte != ' ' && nextByte != '\t' && nextByte != '\r' && nextByte != '\n') {
                 return false;
             }
@@ -187,25 +169,25 @@ public enum RequestMethod {
     }
 
     /**
-     * Parses the HTTP request method from a byte array containing the request line.
-     * The byte array should start with the method name, followed by a space or end of array.
-     * This method is used to detect HTTP requests vs SSL handshakes (which start with different bytes).
-     * 
-     * @param guessProtocolBuffer The byte array containing the HTTP request line (e.g., "GET /path HTTP/1.1")
+     * Parses the HTTP request method from a byte array containing the request line. The byte array should start with the method name,
+     * followed by a space or end of array. This method is used to detect HTTP requests vs SSL handshakes (which start with different
+     * bytes).
+     *
+     * @param guessProtocolBuffer
+     *            The byte array containing the HTTP request line (e.g., "GET /path HTTP/1.1")
      * @return The matching RequestMethod enum value, or UNKNOWN if no match is found
      */
     public static RequestMethod get(byte[] guessProtocolBuffer) {
         if (guessProtocolBuffer == null || guessProtocolBuffer.length == 0) {
             return UNKNOWN;
         }
-        
-        // Try to match against all enum values (except UNKNOWN)
         for (RequestMethod method : values()) {
-            if (method != UNKNOWN && method.isRequestMethod(guessProtocolBuffer)) {
+            if (method == UNKNOWN) {
+                continue;
+            } else if (method.isRequestMethod(guessProtocolBuffer)) {
                 return method;
             }
         }
-        
         return UNKNOWN;
     }
 }

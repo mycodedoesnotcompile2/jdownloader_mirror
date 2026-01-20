@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 
@@ -34,6 +33,18 @@ public abstract class ChallengeSolver<T> {
         }
     };
 
+    public enum ChallengeVetoReason {
+        UNSUPPORTED_BY_SOLVER,
+        UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS,
+        UNSUPPORTED_BROWSER_NO_URL_OPEN,
+        UNSUITABLE_FOR_SOLVER,
+        CHALLENGE_BLACKLISTED,
+        TYPE_DISABLED_BY_USER,
+        ACCOUNT_DISABLED,
+        ACCOUNT_IN_ERROR_STATE,
+        ACCOUNT_NOT_ENOUGH_CREDITS
+    }
+
     protected ChallengeSolver() {
     }
 
@@ -48,6 +59,14 @@ public abstract class ChallengeSolver<T> {
      */
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         // TODO: Make this abstract
+        return null;
+    }
+
+    /**
+     * Return list of user disabled captcha types if any are disabled. <br>
+     * Returns null or empty list of user has not disabled any captcha types.
+     */
+    public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
         return null;
     }
 
@@ -184,32 +203,37 @@ public abstract class ChallengeSolver<T> {
         return resultType;
     }
 
-    protected boolean isChallengeSupported(final Challenge<?> c) {
-        if (c instanceof AbstractBrowserChallenge) {
-            return false;
-        } else if (this.getSupportedCaptchaTypes() != null) {
-            // TODO: Change this to return false if list of supported types is null
-            final List<CAPTCHA_TYPE> supportedTypes = this.getSupportedCaptchaTypes();
-            for (final CAPTCHA_TYPE supportedType : supportedTypes) {
-                if (supportedType.canHandle(c)) {
-                    return true;
-                }
-            }
-            return false;
-        } else {
-            return true;
+    protected ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+        final List<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
+        if (supported_types == null) {
+            return null;
         }
+        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        final List<CAPTCHA_TYPE> disabled_types = this.getUserDisabledCaptchaTypes();
+        if (ctype != null && disabled_types != null && supported_types.contains(ctype) && disabled_types.contains(ctype)) {
+            /* Captcha type is supported by plugin but user has disabled this captcha type for this account. */
+            return ChallengeVetoReason.TYPE_DISABLED_BY_USER;
+        }
+        if (!supported_types.contains(ctype)) {
+            /* Challenge is not supported by solver */
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
+        /* We were unable to find a reason why this challenge cannot be handled by this solver. */
+        return null;
     }
 
-    public boolean canHandle(final Challenge<?> c) {
-        if (!isChallengeSupported(c)) {
-            return false;
-        } else if (!getResultType().isAssignableFrom(c.getResultType())) {
-            return false;
+    public ChallengeVetoReason getVetoReason(final Challenge<?> c) {
+        final ChallengeVetoReason veto = getChallengeVetoReason(c);
+        if (veto != null) {
+            return veto;
+        } else if (getResultType() != null && !getResultType().isAssignableFrom(c.getResultType())) {
+            // TODO: fix possible NPE in above condition, getResultType should never return null?
+            // This should never happen?!
+            return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
         } else if (!validateBlackWhite(c)) {
-            return false;
+            return ChallengeVetoReason.CHALLENGE_BLACKLISTED;
         } else {
-            return true;
+            return null;
         }
     }
 
@@ -237,7 +261,7 @@ public abstract class ChallengeSolver<T> {
      * @param c
      * @return
      */
-    public boolean validateBlackWhite(final Challenge<?> c) {
+    protected boolean validateBlackWhite(final Challenge<?> c) {
         if (!this.isDomainWhitelistEnabled() && !this.isDomainBlacklistEnabled()) {
             /* Black/Whitelist disabled by user -> No need to check */
             return true;
@@ -249,7 +273,6 @@ public abstract class ChallengeSolver<T> {
         if (siteSupportedNames != null) {
             hosts.addAll(Arrays.asList(siteSupportedNames));
         }
-        Boolean result = null;
         if (this.isDomainWhitelistEnabled()) {
             final List<String> whiteListEntries = getWhitelistedDomains();
             whiteListHandling: if (whiteListEntries != null && whiteListEntries.size() > 0) {
@@ -259,8 +282,8 @@ public abstract class ChallengeSolver<T> {
                         for (final String host : hosts) {
                             final Boolean matches = match(c, host, whiteListPattern);
                             if (Boolean.TRUE.equals(matches)) {
-                                result = Boolean.TRUE;
-                                break whiteListHandling;
+                                plugin.getLogger().info(c + " is whitelisted for " + this);
+                                return true;
                             }
                         }
                     } catch (Throwable e) {
@@ -269,7 +292,7 @@ public abstract class ChallengeSolver<T> {
                 }
             }
         }
-        if (result == null && this.isDomainBlacklistEnabled()) {
+        if (this.isDomainBlacklistEnabled()) {
             final List<String> blackListEntries = getBlacklistedDomains();
             if (blackListEntries != null && blackListEntries.size() > 0) {
                 blackListHandling: for (final String blackListEntry : blackListEntries) {
@@ -278,8 +301,8 @@ public abstract class ChallengeSolver<T> {
                         for (final String host : hosts) {
                             final Boolean matches = match(c, host, blackListPattern);
                             if (Boolean.TRUE.equals(matches)) {
-                                result = Boolean.FALSE;
-                                break blackListHandling;
+                                plugin.getLogger().info(c + " is blacklisted for " + this);
+                                return false;
                             }
                         }
                     } catch (Throwable e) {
@@ -288,15 +311,7 @@ public abstract class ChallengeSolver<T> {
                 }
             }
         }
-        if (result == null) {
-            return true;
-        }
-        if (result) {
-            plugin.getLogger().info(c + " is whitelisted for " + this);
-        } else {
-            plugin.getLogger().info(c + " is blacklisted for " + this);
-        }
-        return result.booleanValue();
+        return true;
     }
 
     private Boolean match(final Challenge<?> c, final String host, final Pattern pattern) {

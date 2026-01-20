@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47639 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52125 $", interfaceVersion = 3, names = {}, urls = {})
 public class ArdaudiothekDe extends PluginForDecrypt {
     public ArdaudiothekDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class ArdaudiothekDe extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(sendung/[\\w\\-]+/\\d+/?|episode/[\\w\\-]+/[\\w\\-]+/[\\w\\-]+/\\d+/?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(sendung/[\\w\\-]+/(\\d+|urn:\\w+:\\w+:\\w+)/?|episode/([\\w\\-]+/[\\w\\-]+/[\\w\\-]+/)?(\\d+|urn:\\w+:\\w+:\\w+)/?)");
         }
         return ret.toArray(new String[0]);
     }
@@ -72,12 +72,15 @@ public class ArdaudiothekDe extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String episodeTargetID = null;
-        final boolean doSpecialHandlingToFindSingleEpisodePosition = true;
+        boolean doSpecialHandlingToFindSingleEpisodePosition = true;
         br.setFollowRedirects(true);
         List<Map<String, Object>> episodes = null;
         int infiniteLoopPreventionCounter = -1;
         FilePackage fp = null;
         String urlToAccess = param.getCryptedUrl();
+        if (urlToAccess.matches("(?i).*urn:\\w+:episode.*")) {
+            doSpecialHandlingToFindSingleEpisodePosition = false;
+        }
         Map<String, Object> publicationService = null;
         int page = 0;
         final int maxItemsPerPage = 12;

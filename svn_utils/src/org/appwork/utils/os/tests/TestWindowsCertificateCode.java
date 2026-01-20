@@ -34,12 +34,24 @@ public class TestWindowsCertificateCode extends AWTest {
         } finally {
             out.close();
         }
+
+        File javaExeSigndateFromCounterSig = Application.getTempUniqueResource("appworktests");
+        javaExeSigndateFromCounterSig.deleteOnExit();
+        javaExeSigndateFromCounterSig.getParentFile().mkdirs();
+        final FileOutputStream out2 = new FileOutputStream(javaExeSigndateFromCounterSig);
+        try {
+            IO.readStreamToOutputStream(-1, TestWindowsCertificateCode.class.getResource("javaw.exe").openStream(), out2, true);
+        } finally {
+            out2.close();
+        }
+
         TestTarget testExeTarget;
         // ------------------------------------------------------------
         // Test targets (prevent Eclipse auto-formatting)
         // ------------------------------------------------------------
         //@formatter:off
         TestTarget[] targets = new TestTarget[] {
+            new TestTarget(javaExeSigndateFromCounterSig.getAbsolutePath(), true,    "Eclipse.org Foundation, Inc.", "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1", DateMapper.parse("2025-01-22T02:57:12Z"), DateMapper.parse("2025-07-22T01:59:59Z")),
             testExeTarget= new TestTarget(file.getAbsolutePath(), true,    "Appwork GmbH", "GlobalSign GCC R45 EV CodeSigning CA 2020", DateMapper.parse("2025-09-20T19:24:38Z"), DateMapper.parse("2026-10-22T14:36:28Z")),
             new TestTarget(CrossSystem.getJavaBinary(),  true,    "Eclipse.org Foundation, Inc.", "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1", null, null),
             new TestTarget(winDir + "explorer.exe",      true,    "Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null),

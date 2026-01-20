@@ -5,11 +5,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
@@ -25,6 +20,11 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_IMAGE_TYPERZ;
 import org.seamless.util.io.IO;
+
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
 
 public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
     private final ImageTyperzConfigInterface      config;
@@ -60,8 +60,12 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge || c instanceof HCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge || c instanceof HCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     @Override

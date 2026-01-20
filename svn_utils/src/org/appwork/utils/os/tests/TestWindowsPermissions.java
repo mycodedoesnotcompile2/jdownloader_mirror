@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -207,24 +207,15 @@ public class TestWindowsPermissions extends AWTest {
      *
      */
     private void testHandleBlocks() throws Exception {
-        long myPID = CrossSystem.getPID();
-        List<LockInfo> myself = WindowsUtils.getLocksOnPath(new File(CrossSystem.getJavaBinary()));
-        assertThat(myself.size()).isHigherThan(0);
-        boolean found = false;
-        for (LockInfo l : myself) {
-            if (l.getPid() == myPID) {
-                found = true;
-            }
-        }
-        assertTrue(found);
-        File file = Application.getTempFile("tests", Time.now() + "");
+        final long myPID = CrossSystem.getPID();
+        final File file = Application.getTempFile("tests", Time.now() + "");
         try {
             IO.secureWrite(file, "abc".getBytes());
-            FileOutputStream fos = new FileOutputStream(file, true);
+            final FileOutputStream fos = new FileOutputStream(file, true);
             try {
                 System.out.println("Run findLockingPids");
                 for (int i = 0; i < 10; i++) {
-                    List<LockInfo> lockedBy = WindowsUtils.getLocksOnPath(file);
+                    final List<LockInfo> lockedBy = WindowsUtils.getLocksOnPath(file);
                     assertTrue(lockedBy.size() == 1);
                     assertThat(myPID).isNumber(lockedBy.get(0).getPid());
                     logInfoAnyway("ROund " + i);

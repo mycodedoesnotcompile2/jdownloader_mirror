@@ -42,7 +42,7 @@ import org.appwork.remoteapi.exceptions.BadParameterException;
 import org.appwork.remoteapi.exceptions.BadRequestException;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
-import org.appwork.utils.net.httpserver.requests.RealGetRequest;
+import org.appwork.utils.net.httpserver.requests.GetRequest;
 
 /**
  * Comprehensive test for RemoteAPI functionality.
@@ -113,7 +113,7 @@ public class HttpServerRemoteAPITest extends HttpServerTestBase {
         assertTrue(responseCode == ResponseCode.SUCCESS_OK.getCode(), "Echo method should return 200, was: " + responseCode);
         String responseBody = context.getResponseString();
         assertTrue(responseBody != null && responseBody.contains("test123"), "Response should contain 'test123', was: " + responseBody);
-        assertTrue(responseBody.contains(" [Request: " + RealGetRequest.class.getSimpleName() + "]"), "Response should contain ' [Request: " + RealGetRequest.class.getSimpleName() + "]', was: " + responseBody);
+        assertTrue(responseBody.contains(" [Request: " + GetRequest.class.getSimpleName() + "]"), "Response should contain ' [Request: " + GetRequest.class.getSimpleName() + "]', was: " + responseBody);
 
         // Test multiParam method
         final String multiParamUrl = "http://localhost:" + this.serverPort + "/test/multiParam?param1=value1&param2=value2";

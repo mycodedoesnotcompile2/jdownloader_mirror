@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link PostRequest} because PROPFIND requests can have
+ * Note: This class extends {@link AbstractPostRequest} because PROPFIND requests can have
  * a request body (XML) specifying which properties to retrieve. According to the
  * RequestMethod enum, PROPFIND has requiresOutputStream=true.
  * </p>
  *
  * @author AppWork
  */
-public class PropfindRequest extends PostRequest {
+public class PropfindRequest extends AbstractPostRequest {
     /**
      * @param connection
      */

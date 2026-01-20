@@ -44,13 +44,13 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  *
  * <p>
- * Note: This class extends {@link GetRequest} because UNLOCK requests do not have a request body - the lock token is provided via the
+ * Note: This class extends {@link AbstractGetRequest} because UNLOCK requests do not have a request body - the lock token is provided via the
  * Lock-Token header. According to the RequestMethod enum, UNLOCK has requiresOutputStream=false.
  * </p>
  *
  * @author AppWork
  */
-public class UnlockRequest extends GetRequest {
+public class UnlockRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

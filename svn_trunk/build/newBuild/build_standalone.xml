@@ -167,12 +167,7 @@
 		<mkdir dir="${dist}/libs" />
 		<manifest file="${dist}/Manifest.MF">
 			<attribute name="Created-By" value="Appwork GmbH and JDownloader Community" />
-		</manifest>
-		<jar duplicate="fail" file="${dist}/libs/JDHttp.jar" manifest="${dist}/Manifest.MF">
-			<fileset dir="${cls}">
-				<include name="jd/http/**/*" />
-			</fileset>
-		</jar>
+		</manifest>		
 
 		<jar duplicate="fail" file="${dist}/libs/JDGUI.jar" manifest="${dist}/Manifest.MF">
 			<fileset dir="${cls}">
@@ -191,13 +186,7 @@
 			<fileset dir="${cls}">
 				<include name="jd/nutils/**" />
 			</fileset>
-		</jar>
-
-		<jar duplicate="fail" file="${dist}/libs/Dynamics.jar" manifest="${dist}/Manifest.MF">
-			<fileset dir="${cls}">
-				<include name="org/jdownloader/dynamic/**/*" />
-			</fileset>
-		</jar>
+		</jar>		
 
 		<jar duplicate="fail" file="${dist}/libs/cons.jar" manifest="${dist}/Manifest.MF">
 			<fileset dir="${cls}">
@@ -350,6 +339,7 @@
 				<include name="org/jdownloader/update/**/*.class" />
 				<include name="org/jdownloader/uninstaller/**/*.class" />
 				<include name="org/jdownloader/installer/**/*.class" />
+				<include name="jd/http/**/*" />
 
 				<include name="org/appwork/**/*" />
 				<exclude name="org/appwork/update/server/**/*" />

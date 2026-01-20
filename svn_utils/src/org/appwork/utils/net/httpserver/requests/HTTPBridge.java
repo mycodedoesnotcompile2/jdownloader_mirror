@@ -40,6 +40,7 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  * @date 28.03.2017
  *
  */
+@Deprecated
 public interface HTTPBridge {
     /**
      * @param request

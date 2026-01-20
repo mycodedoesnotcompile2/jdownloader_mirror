@@ -2,8 +2,6 @@ package org.jdownloader.captcha.v2.solver.solver9kw;
 
 import java.io.IOException;
 
-import jd.http.Browser;
-
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -12,6 +10,8 @@ import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
+
+import jd.http.Browser;
 
 public class Captcha9kwSolverClick extends AbstractCaptcha9kwSolver<ClickedPoint> {
     private static final Captcha9kwSolverClick INSTANCE = new Captcha9kwSolverClick();
@@ -36,8 +36,12 @@ public class Captcha9kwSolverClick extends AbstractCaptcha9kwSolver<ClickedPoint
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof ClickCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof ClickCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     @Override

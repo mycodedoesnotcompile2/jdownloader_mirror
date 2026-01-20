@@ -4,11 +4,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
@@ -17,11 +17,13 @@ import org.appwork.timetracker.TrackerRule;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.Regex;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.captcha.CaptchaAPISolver;
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
@@ -64,7 +66,6 @@ import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.CaptchaSettings.INTERACTIVE_CAPTCHA_PRIVACY_LEVEL;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
-import jd.parser.Regex;
 import jd.plugins.Account;
 
 public class ChallengeResponseController {
@@ -346,20 +347,19 @@ public class ChallengeResponseController {
         return url;
     }
 
-    protected final static AtomicLong TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new AtomicLong(-1);
+    protected final static Map<String, Long> TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new HashMap<String, Long>();
 
     public <T> Thread showNoBrowserSolverInfoDialog(final Challenge<T> c, String captcha_challenge_type) {
-        while (true) {
-            final long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get();
-            if ((Time.systemIndependentCurrentJVMTimeMillis() - lastDisplay) < TimeUnit.HOURS.toMillis(1)) {
-                /* Dialog has been shown already just recently -> Do not display now. */
-                return null;
-            } else if (TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.compareAndSet(lastDisplay, Time.systemIndependentCurrentJVMTimeMillis())) {
-                break;
-            }
-        }
         if (captcha_challenge_type == null) {
             captcha_challenge_type = c.getTypeID();
+        }
+        synchronized (TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED) {
+            final Long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get(captcha_challenge_type);
+            if (lastDisplay != null && Time.systemIndependentCurrentJVMTimeMillis() - lastDisplay.longValue() < TimeUnit.HOURS.toMillis(1)) {
+                /* Dialog has been shown already just recently -> Do not display now. */
+                return null;
+            }
+            TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.put(captcha_challenge_type, Time.systemIndependentCurrentJVMTimeMillis());
         }
         if (captcha_challenge_type != null && captcha_challenge_type.contains("turnstile")) {
             captcha_challenge_type = "Cloudflare Turnstile";
@@ -416,9 +416,17 @@ public class ChallengeResponseController {
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     }
                     message += "</html>";
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_HTML, title, message);
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_HTML | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, title, message) {
+                        @Override
+                        public String getDontShowAgainKey() {
+                            return ChallengeResponseController.class.getSimpleName() + ".showNoBrowserSolverInfoDialog." + captcha_challenge_type_final;
+                        }
+                    };
                     dialog.setTimeout((int) TimeUnit.MINUTES.toMillis(3));
-                    UIOManager.I().show(ConfirmDialogInterface.class, dialog).throwCloseExceptions();
+                    try {
+                        UIOManager.I().show(ConfirmDialogInterface.class, dialog).throwCloseExceptions();
+                    } catch (DialogNoAnswerException ignore) {
+                    }
                 } catch (final Throwable e) {
                     // getLogger().log(e);
                 }
@@ -434,14 +442,14 @@ public class ChallengeResponseController {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         for (final ChallengeSolver<?> solver : solverList) {
             try {
-                if (solver.isEnabled() && solver.validateLogins() && solver.canHandle(c) && solver.validateBlackWhite(c)) {
+                if (solver.isEnabled() && solver.validateLogins() && solver.getVetoReason(c) == null) {
                     ret.add((ChallengeSolver<T>) solver);
                 }
             } catch (final Throwable e) {
                 logger.log(e);
             }
         }
-        final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
+        final AccountFilter af = new AccountFilter().setFeature(FEATURE.CAPTCHA_SOLVER);
         final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
         /* Collect unavailable solver domains for logging purposes only */
         final HashSet<String> unavailableSolverDomains = new HashSet<String>();
@@ -449,12 +457,12 @@ public class ChallengeResponseController {
             boolean success = false;
             try {
                 final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
-                if (!plugin.canHandle(c, solverAccount)) {
-                    continue;
-                }
                 final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
                 if (solver == null) {
                     /* E.g. solver cannot handle challenge it gets presented */
+                    continue;
+                }
+                if (solver.getVetoReason(c) != null) {
                     continue;
                 }
                 ret.add(solver);

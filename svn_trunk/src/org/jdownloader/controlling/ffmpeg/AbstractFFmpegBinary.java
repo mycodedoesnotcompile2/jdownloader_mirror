@@ -19,11 +19,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.raf.FileBytesMap;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.resources.AWUTheme;
@@ -38,9 +33,9 @@ import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.NullOutputStream;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.ARCHFamily;
@@ -49,6 +44,11 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.controlling.ffmpeg.FFMpegException.ERROR;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
+
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.raf.FileBytesMap;
 
 public abstract class AbstractFFmpegBinary {
     public static enum FLAGTYPE {
@@ -516,7 +516,7 @@ public abstract class AbstractFFmpegBinary {
             }
 
             @Override
-            public boolean onPostRequest(PostRequest request, HttpResponse response) {
+            public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) {
                 try {
                     logger.info(request.toString());
                     if (!validateID(request)) {
@@ -535,7 +535,7 @@ public abstract class AbstractFFmpegBinary {
             }
 
             @Override
-            public boolean onGetRequest(GetRequest request, HttpResponse response) {
+            public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) {
                 boolean requestOkay = false;
                 try {
                     logger.info("START " + request.getRequestedURL());

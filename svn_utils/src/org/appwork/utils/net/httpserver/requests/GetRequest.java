@@ -33,91 +33,16 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver.requests;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
-/**
- * HTTP GET request handler.
- *
- * <p>
- * GET is used to retrieve a representation of the specified resource.
- * </p>
- *
- * <p>
- * Note: This class extends {@link HttpRequest} directly and provides URL parameter handling functionality. GET requests do not have a
- * request body. According to the RequestMethod enum, GET has requiresOutputStream=false.
- * </p>
- *
- * <p>
- * This class serves as a base class for other request types that do not require body handling but need URL parameter parsing (e.g., HEAD,
- * OPTIONS, TRACE, UNLOCK).
- * </p>
- *
- * @author daniel
- */
-public abstract class GetRequest extends HttpRequest {
-    /**
-     * @param connection
-     */
-    public GetRequest(final RawHttpConnectionInterface connection) {
+public class GetRequest extends AbstractGetRequest {
+    public GetRequest(RawHttpConnectionInterface connection) {
         super(connection);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.net.httpserver.requests.HttpRequestInterface# getParameterbyKey(java.lang.String)
-     */
     @Override
-    public String getParameterbyKey(final String key) throws IOException {
-        final List<KeyValuePair> params = this.getRequestedURLParameters();
-        if (params != null) {
-            for (final KeyValuePair param : params) {
-                if (StringUtils.equalsIgnoreCase(key, param.key)) {
-                    return param.value;
-                }
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public String[] getParametersbyKey(String key) throws IOException {
-        final List<String> ret = new ArrayList<String>();
-        final List<KeyValuePair> params = this.getRequestedURLParameters();
-        if (params != null) {
-            for (final KeyValuePair param : params) {
-                if (StringUtils.equalsIgnoreCase(key, param.key)) {
-                    ret.add(param.value);
-                }
-            }
-            if (ret.size() > 0) {
-                return ret.toArray(new String[0]);
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public abstract RequestMethod getRequestMethod();
-
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("\r\n----------------Request " + getId() + "-------------------------\r\n");
-        sb.append(getRequestMethod() + " ").append(this.getRequestedURL()).append(" HTTP/1.1\r\n");
-        for (final HTTPHeader key : this.getRequestHeaders()) {
-            sb.append(key.getKey());
-            sb.append(": ");
-            sb.append(key.getValue());
-            sb.append("\r\n");
-        }
-        return sb.toString();
+    public RequestMethod getRequestMethod() {
+        return RequestMethod.GET;
     }
 }

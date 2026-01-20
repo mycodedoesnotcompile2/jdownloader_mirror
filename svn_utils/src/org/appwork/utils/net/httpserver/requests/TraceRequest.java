@@ -44,13 +44,13 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  *
  * <p>
- * Note: This class extends {@link GetRequest} because TRACE requests do not have a request body. According to the RequestMethod enum, TRACE
+ * Note: This class extends {@link AbstractGetRequest} because TRACE requests do not have a request body. According to the RequestMethod enum, TRACE
  * has requiresOutputStream=false.
  * </p>
  *
  * @author AppWork
  */
-public class TraceRequest extends GetRequest {
+public class TraceRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

@@ -53,7 +53,8 @@ import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
@@ -155,7 +156,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.ChunkRange;
 
-@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 52132 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -1791,12 +1792,12 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         httpServer.setLocalhostOnly(true);
                         httpServer.registerRequestHandler(new HttpRequestHandler() {
                             @Override
-                            public boolean onPostRequest(PostRequest request, HttpResponse response) throws BasicRemoteAPIException {
+                            public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) throws BasicRemoteAPIException {
                                 return false;
                             }
 
                             @Override
-                            public boolean onGetRequest(org.appwork.utils.net.httpserver.requests.GetRequest request, HttpResponse response) throws BasicRemoteAPIException {
+                            public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
                                 try {
                                     final String id = request.getParameterbyKey("id");
                                     if (id != null && metaDataProcessID.getID() == Long.parseLong(request.getParameterbyKey("id")) && "/meta".equals(request.getRequestedPath())) {

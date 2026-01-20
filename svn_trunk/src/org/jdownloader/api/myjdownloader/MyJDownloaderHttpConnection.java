@@ -60,16 +60,16 @@ import org.jdownloader.myjdownloader.client.exceptions.TokenException;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
 
 public class MyJDownloaderHttpConnection extends HttpConnection {
-    protected final static ArrayList<HttpRequestHandler>                    requestHandler = new ArrayList<HttpRequestHandler>();
+    protected final static ArrayList<HttpRequestHandler> requestHandler = new ArrayList<HttpRequestHandler>();
     static {
         requestHandler.add(RemoteAPIController.getInstance().getRequestHandler());
     }
     protected final MyJDownloaderAPI                                        api;
     private final LogSource                                                 logger;
     private final SocketStreamInterface                                     socketStream;
-    private static final HashMap<String, List<MyJDownloaderHttpConnection>> CONNECTIONS    = new HashMap<String, List<MyJDownloaderHttpConnection>>();
-    private static final HashMap<String, KeyPair>                           RSAKEYPAIRS    = new HashMap<String, KeyPair>();
-    public final static Charset                                             UTF8           = Charset.forName("UTF-8");
+    private static final HashMap<String, List<MyJDownloaderHttpConnection>> CONNECTIONS = new HashMap<String, List<MyJDownloaderHttpConnection>>();
+    private static final HashMap<String, KeyPair>                           RSAKEYPAIRS = new HashMap<String, KeyPair>();
+    public final static Charset                                             UTF8        = Charset.forName("UTF-8");
 
     public KeyPair getRSAKeyPair() {
         final String token = getRequestConnectToken();
@@ -236,7 +236,7 @@ public class MyJDownloaderHttpConnection extends HttpConnection {
             // TLS socket already closed
             return true;
         } else if (e instanceof HttpConnectionExceptionHandler) {
-            return ((HttpConnectionExceptionHandler) e).handle(response);
+            return ((HttpConnectionExceptionHandler) e).handle(request, response);
         } else {
             final BasicRemoteAPIException apiException;
             if (!(e instanceof BasicRemoteAPIException)) {

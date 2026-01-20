@@ -3,8 +3,6 @@ package org.jdownloader.captcha.v2.solver.solver9kw;
 import java.io.IOException;
 import java.util.Map;
 
-import jd.http.Browser;
-
 import org.appwork.utils.IO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -15,6 +13,8 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
+
+import jd.http.Browser;
 
 public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
     private static final Captcha9kwSolver INSTANCE = new Captcha9kwSolver();
@@ -34,32 +34,36 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
+            return null;
+        } else {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
     }
 
     @Override
-    public boolean canHandle(Challenge<?> c) {
+    public ChallengeVetoReason getVetoReason(Challenge<?> c) {
         if (c instanceof HCaptchaChallenge) {
             try {
                 checkForEnoughCredits();
             } catch (SolverException e) {
-                return false;
+                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
             }
         } else if (c instanceof RecaptchaV2Challenge) {
             try {
                 checkForEnoughCredits();
             } catch (SolverException e) {
-                return false;
+                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
             }
         } else if (c instanceof BasicCaptchaChallenge) {
             try {
                 checkForEnoughCredits();
             } catch (SolverException e) {
-                return false;
+                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
             }
         }
-        return super.canHandle(c);
+        return super.getVetoReason(c);
     }
 
     @Override

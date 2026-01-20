@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link PostRequest} because PUT requests always have
+ * Note: This class extends {@link AbstractPostRequest} because PUT requests always have
  * a request body containing the resource representation to be stored. According to
  * the RequestMethod enum, PUT has requiresOutputStream=true.
  * </p>
  *
  * @author AppWork
  */
-public class PutRequest extends PostRequest {
+public class PutRequest extends AbstractPostRequest {
     /**
      * @param connection
      */

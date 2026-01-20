@@ -301,7 +301,7 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
     private ExtTextColumn<CaptchaType> createSupportedColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new ExtTextColumn<CaptchaType>("Supported by this account") {
+        return new ExtTextColumn<CaptchaType>("Supported by this service") {
             @Override
             public String getStringValue(final CaptchaType captchaType) {
                 return captchaType.isSupported() ? "Yes" : "No";
@@ -315,9 +315,9 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
             @Override
             protected String getTooltipText(final CaptchaType captchaType) {
                 if (captchaType.isSupported()) {
-                    return "This captcha type is supported by this account";
+                    return "This captcha type is supported by this service";
                 } else {
-                    return "This captcha type is NOT supported by this account";
+                    return "This captcha type is NOT supported by this service";
                 }
             }
         };
@@ -447,7 +447,7 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                 final List<String> domains = new ArrayList<String>();
                 for (final CaptchaHistoryEntry entry : entries) {
                     final String domain = entry.getDomain();
-                    if (domain != null && !domain.isEmpty() && !domains.contains(domain)) {
+                    if (!domains.contains(domain)) {
                         domains.add(domain);
                     }
                 }

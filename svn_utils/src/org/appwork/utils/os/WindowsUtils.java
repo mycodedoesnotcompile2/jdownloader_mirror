@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -92,7 +92,6 @@ import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
 import com.sun.jna.StringArray;
 import com.sun.jna.Structure;
-import com.sun.jna.WString;
 import com.sun.jna.platform.DesktopWindow;
 import com.sun.jna.platform.win32.AccCtrl;
 import com.sun.jna.platform.win32.Advapi32;
@@ -188,6 +187,7 @@ public class WindowsUtils {
         SYNCHRONIZE(WinNT.SYNCHRONIZE),
         @StorableDoc("Access system security.")
         ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
+
         public final int mask;
 
         private AccessPermission(int mask) {
@@ -278,6 +278,7 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
+
         public final String sid;
 
         private SID(String sid) {
@@ -1435,6 +1436,7 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
+
             private final int value;
 
             ApplicationType(int value) {
@@ -1583,7 +1585,7 @@ public class WindowsUtils {
             }
             try {
                 // Register the file we're interested in
-                StringArray resources = new StringArray(new WString[] { new WString(filePath.getAbsolutePath()) });
+                StringArray resources = new StringArray(new String[] { filePath.getAbsolutePath() }, true);
                 res = Rm.INSTANCE.RmRegisterResources(session.getValue(), 1, resources, 0, Pointer.NULL, 0, null);
                 if (res != 0) {
                     throw new Win32Exception(res);
@@ -1592,11 +1594,10 @@ public class WindowsUtils {
                 IntByReference needed = new IntByReference();
                 IntByReference count = new IntByReference();
                 res = Rm.INSTANCE.RmGetList(session.getValue(), needed, count, null, new LongByReference());
-                if (res != WinNT.ERROR_MORE_DATA) {
-                    throw new Win32Exception(res);
-                }
-                if (needed.getValue() == 0) {
+                if (res == 0 && needed.getValue() == 0) {
                     return Collections.emptyList();
+                } else if (res != WinNT.ERROR_MORE_DATA) {
+                    throw new Win32Exception(res);
                 }
                 // Allocate array and call again
                 RmProcessInfo[] arr = (RmProcessInfo[]) new RmProcessInfo().toArray(needed.getValue());

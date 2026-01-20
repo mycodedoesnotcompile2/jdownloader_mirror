@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link GetRequest} because COPY requests are controlled
+ * Note: This class extends {@link AbstractGetRequest} because COPY requests are controlled
  * by headers, not by a request body. According to the RequestMethod enum,
  * COPY has requiresOutputStream=false.
  * </p>
  *
  * @author AppWork
  */
-public class CopyRequest extends GetRequest {
+public class CopyRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

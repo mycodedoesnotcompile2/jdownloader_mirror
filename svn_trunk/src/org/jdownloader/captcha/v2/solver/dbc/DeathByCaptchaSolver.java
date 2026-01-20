@@ -80,17 +80,17 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
-            return true;
+            return null;
         } else if (c instanceof RecaptchaV2Challenge) {
-            return true;
+            return null;
         } else if (c instanceof CutCaptchaChallenge) {
-            return true;
+            return null;
         } else if (c instanceof CloudflareTurnstileChallenge) {
-            return true;
+            return null;
         } else {
-            return false;
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
     }
 

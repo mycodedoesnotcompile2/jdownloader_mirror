@@ -8,10 +8,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import jd.controlling.captcha.SkipRequest;
-import jd.parser.Regex;
-import jd.plugins.Plugin;
-
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -31,6 +27,8 @@ import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
@@ -45,6 +43,10 @@ import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.controlling.captcha.SkipRequest;
+import jd.parser.Regex;
+import jd.plugins.Plugin;
 
 public abstract class BrowserReference implements ExtendedHttpRequestHandler, HttpRequestHandler, ConnectionHook {
     private final AbstractBrowserChallenge challenge;
@@ -100,11 +102,11 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     protected final AtomicReference<HttpHandlerInfo> handlerInfo = new AtomicReference<HttpHandlerInfo>(null);
     protected final SingleReachableState             canClose    = new SingleReachableState("canClose");
     protected final static Queue                     QUEUE       = new Queue("BrowserReference") {
-        @Override
-        public void killQueue() {
-            LogController.CL().log(new Throwable("YOU CANNOT KILL ME!"));
-        }
-    };
+                                                                     @Override
+                                                                     public void killQueue() {
+                                                                         LogController.CL().log(new Throwable("YOU CANNOT KILL ME!"));
+                                                                     }
+                                                                 };
 
     public void open() throws IOException {
         if (!canClose.isReached()) {
@@ -279,7 +281,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onGetRequest(GetRequest request, HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
         try {
             final String XMyjdAppkey = request.getRequestHeaders().getValue("X-Myjd-Appkey");
             final String version[] = new Regex(XMyjdAppkey, "(\\d+)(\\.|$)").getColumn(0);
@@ -316,7 +318,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                 return false;
             }
             // custom
-            final boolean custom = challenge.onRawGetRequest(this, request, response);
+            final boolean custom = challenge.onRawGetRequest(this, (GetRequest) request, response);
             if (custom) {
                 return true;
             }
@@ -452,7 +454,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
             } else if (pDo == null) {
                 response.getOutputStream(true).write(challenge.getHTML(request, String.valueOf(this.id.getID())).getBytes("UTF-8"));
             } else {
-                return challenge.onGetRequest(this, request, response);
+                return challenge.onGetRequest(this, (GetRequest) request, response);
             }
             return true;
         } catch (Throwable e) {
@@ -473,7 +475,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     }
 
     @Override
-    public boolean onPostRequest(PostRequest request, HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) throws BasicRemoteAPIException {
         synchronized (BrowserReference.this) {
             final String requestString = request.getRemoteAddress() + "\r\n" + request.getRequestedURL() + "\r\n" + request.getRequestHeaders();
             if (!StringUtils.equals(lastRequestString, requestString)) {
@@ -486,7 +488,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
         }
         try {
             // custom
-            final boolean custom = challenge.onRawPostRequest(this, request, response);
+            final boolean custom = challenge.onRawPostRequest(this, (PostRequest) request, response);
             if (custom) {
                 return true;
             }
@@ -495,7 +497,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
             if (!StringUtils.equals(id, this.id.getID() + "")) {
                 return false;
             }
-            return challenge.onPostRequest(this, request, response);
+            return challenge.onPostRequest(this, (PostRequest) request, response);
         } catch (Throwable e) {
             getLogger().log(e);
             error(response, e);

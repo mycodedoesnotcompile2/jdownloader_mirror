@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51480 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52120 $", interfaceVersion = 2, names = {}, urls = {})
 public class PobierajNet extends YetiShareCore {
     public PobierajNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,7 @@ public class PobierajNet extends YetiShareCore {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         /* 2023-10-27: Main domain has changed from rapidu.vip to pobieraj.net. */
-        ret.add(new String[] { "pobieraj.net", "pobieraj.to", "rapidu.vip" });
+        ret.add(new String[] { "pobieraj.net", "pobieraj.to", "pobieraj.io", "plik.to", "rapidu.vip" });
         return ret;
     }
 

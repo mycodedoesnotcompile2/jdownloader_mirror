@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -43,10 +43,10 @@ import org.appwork.remoteapi.exceptions.AuthException;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.handler.HttpSessionRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
@@ -117,7 +117,7 @@ public abstract class HttpSessionController<T extends HttpSession> implements Ht
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onGetRequest(final GetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onGetRequest(final AbstractGetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         final java.util.List<HttpSessionRequestHandler<T>> handlers = this.handler;
         final T session = this.getSession(request, this.extractSessionID(request));
         ApiCommandNotAvailable notFound = null;
@@ -143,7 +143,7 @@ public abstract class HttpSessionController<T extends HttpSession> implements Ht
      * (org.appwork.utils.net.httpserver.requests.PostRequest, org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onPostRequest(final PostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onPostRequest(final AbstractPostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         final java.util.List<HttpSessionRequestHandler<T>> handlers = this.handler;
         final T session = this.getSession(request, this.extractSessionID(request));
         ApiCommandNotAvailable notFound = null;

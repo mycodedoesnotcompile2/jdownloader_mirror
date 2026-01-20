@@ -1,13 +1,13 @@
 package org.jdownloader.captcha.v2.challenge.oauth;
 
-import jd.controlling.captcha.SkipException;
-
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+
+import jd.controlling.captcha.SkipException;
 
 public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
     private static final AccountOAuthSolver INSTANCE = new AccountOAuthSolver();
@@ -17,8 +17,12 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof OAuthChallenge;
+    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (!(c instanceof OAuthChallenge)) {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        } else {
+            return null;
+        }
     }
 
     @Override

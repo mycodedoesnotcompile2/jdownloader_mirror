@@ -48,4 +48,10 @@ public class EmptyRequestException extends IOException implements HttpConnection
     public boolean handle(HttpRequest request, HttpResponse response) throws IOException {
         return true;
     }
+
+    @Override
+    @Deprecated
+    public boolean handle(HttpResponse response) throws IOException {
+        return handle(null, response);
+    }
 }

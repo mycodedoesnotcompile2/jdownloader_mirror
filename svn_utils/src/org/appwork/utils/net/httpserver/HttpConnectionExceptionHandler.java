@@ -40,8 +40,12 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * @author daniel
- * 
+ *
  */
 public interface HttpConnectionExceptionHandler {
+    @Deprecated
+    // will be removed by daniel
+    public boolean handle(HttpResponse response) throws IOException;
+
     public boolean handle(HttpRequest request, final HttpResponse response) throws IOException;
 }

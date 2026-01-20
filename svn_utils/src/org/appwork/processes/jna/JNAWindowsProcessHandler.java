@@ -81,6 +81,7 @@ import com.sun.jna.platform.win32.Psapi;
 import com.sun.jna.platform.win32.User32;
 import com.sun.jna.platform.win32.W32Errors;
 import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinBase.FILETIME;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HWND;
@@ -378,7 +379,27 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         return handle != null && !handle.equals(WinBase.INVALID_HANDLE_VALUE);
     }
 
-    private String getProcessName(final int pid) {
+    public long getProcessCreationTime(final int pid) {
+        final WinNT.HANDLE processHandle = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (!isValid(processHandle)) {
+            return -1;
+        }
+        try {
+            FILETIME lpCreationTime = new FILETIME();
+            FILETIME lpExitTime = new FILETIME();
+            FILETIME lpKernelTime = new FILETIME();
+            FILETIME lpUserTime = new FILETIME();
+            if (!Kernel32.INSTANCE.GetProcessTimes(processHandle, lpCreationTime, lpExitTime, lpKernelTime, lpUserTime)) {
+                checkForErrors();
+                return -1;
+            }
+            return lpCreationTime.toTime();
+        } finally {
+            Kernel32.INSTANCE.CloseHandle(processHandle);
+        }
+    }
+
+    public String getProcessName(final int pid) {
         final WinNT.HANDLE processHandle = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_INFORMATION | WinNT.PROCESS_VM_READ, false, pid);
         if (!isValid(processHandle)) {
             return "Cannot open process with PID " + pid;

@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link PostRequest} because PATCH requests always have
+ * Note: This class extends {@link AbstractPostRequest} because PATCH requests always have
  * a request body containing the partial modifications to be applied. According to
  * the RequestMethod enum, PATCH has requiresOutputStream=true.
  * </p>
  *
  * @author AppWork
  */
-public class PatchRequest extends PostRequest {
+public class PatchRequest extends AbstractPostRequest {
     /**
      * @param connection
      */

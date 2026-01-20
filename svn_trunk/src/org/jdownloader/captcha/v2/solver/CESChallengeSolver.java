@@ -41,7 +41,7 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
             return;
         } else if (!isEnabled()) {
             return;
-        } else if (!canHandle(job.getChallenge())) {
+        } else if (getVetoReason(job.getChallenge()) != null) {
             return;
         }
         checkInterruption();

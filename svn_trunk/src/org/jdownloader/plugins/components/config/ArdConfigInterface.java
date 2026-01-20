@@ -102,6 +102,12 @@ public interface ArdConfigInterface extends PluginConfigInterface {
     void setPreferAudioDescription(boolean b);
 
     @DefaultBooleanValue(false)
+    @Order(13)
+    boolean isPreferSpeechOptimized();
+
+    void setPreferSpeechOptimized(boolean b);
+
+    @DefaultBooleanValue(false)
     @Order(20)
     boolean isGrabBESTEnabled();
 

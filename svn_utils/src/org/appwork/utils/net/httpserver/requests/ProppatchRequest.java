@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link PostRequest} because PROPPATCH requests always have
+ * Note: This class extends {@link AbstractPostRequest} because PROPPATCH requests always have
  * a request body (XML) containing the property modifications. According to the
  * RequestMethod enum, PROPPATCH has requiresOutputStream=true.
  * </p>
  *
  * @author AppWork
  */
-public class ProppatchRequest extends PostRequest {
+public class ProppatchRequest extends AbstractPostRequest {
     /**
      * @param connection
      */

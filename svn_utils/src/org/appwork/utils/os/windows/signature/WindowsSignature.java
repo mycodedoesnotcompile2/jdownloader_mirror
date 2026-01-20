@@ -311,13 +311,18 @@ public class WindowsSignature {
             CRYPT_ATTRIBUTE attr = new CRYPT_ATTRIBUTE(pAttr);
             attr.read();
             if (OID_SIGNING_TIME.equals(attr.pszObjId) && attr.cValue > 0 && attr.rgValue != null) {
-                CRYPT_ATTR_BLOB blob = new CRYPT_ATTR_BLOB(attr.rgValue);
-                blob.read();
-                if (blob.cbData > 0 && blob.pbData != null) {
-                    byte[] timeData = blob.pbData.getByteArray(0, blob.cbData);
-                    String parsed = parseAsn1TimeToIso(timeData);
-                    if (parsed != null) {
-                        return parsed;
+                CRYPT_ATTR_BLOB blobProto = new CRYPT_ATTR_BLOB();
+                int blobSize = blobProto.size();
+                for (int j = 0; j < attr.cValue; j++) {
+                    Pointer pBlob = attr.rgValue.share((long) j * blobSize);
+                    CRYPT_ATTR_BLOB blob = new CRYPT_ATTR_BLOB(pBlob);
+                    blob.read();
+                    if (blob.cbData > 0 && blob.pbData != null) {
+                        byte[] timeData = blob.pbData.getByteArray(0, blob.cbData);
+                        String parsed = parseAsn1TimeToIso(timeData);
+                        if (parsed != null) {
+                            return parsed;
+                        }
                     }
                 }
             }
@@ -326,6 +331,9 @@ public class WindowsSignature {
     }
 
     /** Finds counterSignature (OID 1.2.840.113549.1.9.6) and extracts its embedded signingTime */
+    // #define PKCS7_SIGNER_INFO ((LPCSTR) 500)
+    private static final Pointer PKCS7_SIGNER_INFO = new Pointer(500);
+
     static String findSigningTimeInCountersign(CRYPT_ATTRIBUTES attrs) {
         if (attrs == null || attrs.cAttr <= 0 || attrs.rgAttr == null) {
             return null;
@@ -337,15 +345,33 @@ public class WindowsSignature {
             CRYPT_ATTRIBUTE attr = new CRYPT_ATTRIBUTE(pAttr);
             attr.read();
             if (WindowsSignature.OID_COUNTERSIGN.equals(attr.pszObjId) && attr.cValue > 0 && attr.rgValue != null) {
-                CRYPT_ATTR_BLOB blob = new CRYPT_ATTR_BLOB(attr.rgValue);
-                blob.read();
-                if (blob.cbData > 0 && blob.pbData != null) {
-                    // This blob itself is a nested CMSG_SIGNER_INFO
-                    CMSG_SIGNER_INFO nested = new CMSG_SIGNER_INFO(blob.pbData);
-                    nested.read();
-                    String parsed = findSigningTimeInAttrs(nested.AuthAttrs);
-                    if (parsed != null) {
-                        return parsed;
+                CRYPT_ATTR_BLOB blobProto = new CRYPT_ATTR_BLOB();
+                int blobSize = blobProto.size();
+                for (int j = 0; j < attr.cValue; j++) {
+                    Pointer pBlob = attr.rgValue.share((long) j * blobSize);
+                    CRYPT_ATTR_BLOB blob = new CRYPT_ATTR_BLOB(pBlob);
+                    blob.read();
+                    if (blob.cbData > 0 && blob.pbData != null) {
+                        try {
+                            IntByReference pcbDecoded = new IntByReference();
+                            boolean ok = Crypt32Ext.INSTANCE.CryptDecodeObject(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, PKCS7_SIGNER_INFO, blob.pbData, blob.cbData, 0, Pointer.NULL, pcbDecoded);
+                            if (!ok || pcbDecoded.getValue() <= 0) {
+                                continue;
+                            }
+                            Memory decodedMem = new Memory(pcbDecoded.getValue());
+                            ok = Crypt32Ext.INSTANCE.CryptDecodeObject(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, PKCS7_SIGNER_INFO, blob.pbData, blob.cbData, 0, decodedMem, pcbDecoded);
+                            if (!ok) {
+                                continue;
+                            }
+                            CMSG_SIGNER_INFO nested = new CMSG_SIGNER_INFO(decodedMem);
+                            nested.read();
+                            String parsed = findSigningTimeInAttrs(nested.AuthAttrs);
+                            if (parsed != null) {
+                                return parsed;
+                            }
+                        } catch (Throwable e) {
+                            // Skip invalid countersignature blobs
+                        }
                     }
                 }
             }

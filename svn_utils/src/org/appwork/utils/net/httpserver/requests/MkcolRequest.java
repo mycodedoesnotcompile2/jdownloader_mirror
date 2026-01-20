@@ -45,13 +45,13 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  *
  * <p>
  * Note: MKCOL requests typically do not have a request body according to RFC 4918. If a request body is present, the server MUST reject it
- * with 415 (Unsupported Media Type). Therefore, this class extends {@link HttpRequest} directly rather than {@link PostRequest}, as it does
+ * with 415 (Unsupported Media Type). Therefore, this class extends {@link HttpRequest} directly rather than {@link AbstractPostRequest}, as it does
  * not need body handling functionality.
  * </p>
  *
  * @author AppWork
  */
-public class MkcolRequest extends GetRequest {
+public class MkcolRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

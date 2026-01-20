@@ -48,7 +48,7 @@ import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequestInterface;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 
 /**
  * @author daniel
@@ -107,8 +107,8 @@ public class RemoteAPIRequest implements HttpRequestInterface {
     }
 
     public InputStream getInputStream() throws IOException {
-        if (this.request instanceof PostRequest) {
-            return ((PostRequest) this.request).getInputStream();
+        if (this.request instanceof AbstractPostRequest) {
+            return ((AbstractPostRequest) this.request).getInputStream();
         }
         return null;
     }

@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link GetRequest} rather than {@link PostRequest}
+ * Note: This class extends {@link AbstractGetRequest} rather than {@link AbstractPostRequest}
  * because SUBSCRIBE requests do not require body handling functionality according
  * to the RequestMethod enum (requiresOutputStream=false).
  * </p>
  *
  * @author AppWork
  */
-public class SubscribeRequest extends GetRequest {
+public class SubscribeRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

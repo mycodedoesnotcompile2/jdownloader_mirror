@@ -44,13 +44,13 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  *
  * <p>
- * Note: This class extends {@link GetRequest} because OPTIONS requests do not have a request body. According to the RequestMethod enum,
+ * Note: This class extends {@link AbstractGetRequest} because OPTIONS requests do not have a request body. According to the RequestMethod enum,
  * OPTIONS has requiresOutputStream=false.
  * </p>
  *
  * @author daniel
  */
-public class OptionsRequest extends GetRequest {
+public class OptionsRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

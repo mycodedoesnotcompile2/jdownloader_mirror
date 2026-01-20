@@ -53,4 +53,9 @@ public interface Crypt32Ext extends com.sun.jna.platform.win32.Crypt32 {
 
     // void CryptMsgClose(HCRYPTMSG);
     void CryptMsgClose(HCRYPTMSG hCryptMsg);
+
+    // BOOL CryptDecodeObject(DWORD dwCertEncodingType, LPCSTR lpszStructType,
+    //                        const BYTE *pbEncoded, DWORD cbEncoded, DWORD dwFlags,
+    //                        void *pvStructInfo, DWORD *pcbStructInfo);
+    boolean CryptDecodeObject(int dwCertEncodingType, Pointer lpszStructType, Pointer pbEncoded, int cbEncoded, int dwFlags, Pointer pvStructInfo, IntByReference pcbStructInfo);
 }

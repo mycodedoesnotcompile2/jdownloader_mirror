@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -38,9 +38,9 @@ import java.io.IOException;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.remoteapi.exceptions.SessionException;
 import org.appwork.utils.net.httpserver.handler.HttpSessionRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.net.httpserver.session.HttpSession;
 
@@ -65,7 +65,7 @@ public class SessionRemoteAPI<T extends HttpSession> extends RemoteAPI implement
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onGetSessionRequest(final T session, final GetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onGetSessionRequest(final T session, final AbstractGetRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         RemoteAPIRequest apiRequest = this.createRemoteAPIRequestObject(request);
         if (apiRequest == null) {
             return this.onUnknownRequest(request, response);
@@ -90,7 +90,7 @@ public class SessionRemoteAPI<T extends HttpSession> extends RemoteAPI implement
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onPostSessionRequest(final T session, final PostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+    public boolean onPostSessionRequest(final T session, final AbstractPostRequest request, final HttpResponse response) throws BasicRemoteAPIException {
         RemoteAPIRequest apiRequest = this.createRemoteAPIRequestObject(request);
         if (apiRequest == null) {
             return this.onUnknownRequest(request, response);

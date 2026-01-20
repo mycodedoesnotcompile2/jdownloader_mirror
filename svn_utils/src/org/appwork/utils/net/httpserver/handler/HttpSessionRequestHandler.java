@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany   
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -34,8 +34,8 @@
 package org.appwork.utils.net.httpserver.handler;
 
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.net.httpserver.session.HttpSession;
 
@@ -45,8 +45,8 @@ import org.appwork.utils.net.httpserver.session.HttpSession;
  */
 public interface HttpSessionRequestHandler<T extends HttpSession> {
 
-    public abstract boolean onGetSessionRequest(final T session, final GetRequest request, final HttpResponse response) throws BasicRemoteAPIException;
+    public abstract boolean onGetSessionRequest(final T session, final AbstractGetRequest request, final HttpResponse response) throws BasicRemoteAPIException;
 
-    public abstract boolean onPostSessionRequest(final T session, final PostRequest request, final HttpResponse response) throws BasicRemoteAPIException;
+    public abstract boolean onPostSessionRequest(final T session, final AbstractPostRequest request, final HttpResponse response) throws BasicRemoteAPIException;
 
 }

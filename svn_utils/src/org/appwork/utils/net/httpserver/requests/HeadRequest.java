@@ -44,13 +44,13 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  *
  * <p>
- * Note: This class extends {@link GetRequest} because HEAD requests do not have a request body and behave similarly to GET requests.
+ * Note: This class extends {@link AbstractGetRequest} because HEAD requests do not have a request body and behave similarly to GET requests.
  * According to the RequestMethod enum, HEAD has requiresOutputStream=false.
  * </p>
  *
  * @author daniel
  */
-public class HeadRequest extends GetRequest {
+public class HeadRequest extends AbstractGetRequest {
     /**
      * @param connection
      */

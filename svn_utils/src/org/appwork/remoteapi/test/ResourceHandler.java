@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -37,8 +37,8 @@ import java.io.IOException;
 import java.net.URL;
 
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.GetRequest;
-import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.responses.FileResponse;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
@@ -54,7 +54,7 @@ public class ResourceHandler implements HttpRequestHandler {
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onGetRequest(final GetRequest request, final HttpResponse response) {        
+    public boolean onGetRequest(final AbstractGetRequest request, final HttpResponse response) {        
         // TODO: SECURITY
         if (!request.getRequestedPath().startsWith("/resources/")) {
             return false;
@@ -79,7 +79,7 @@ public class ResourceHandler implements HttpRequestHandler {
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onPostRequest(final PostRequest request, final HttpResponse response) {        
+    public boolean onPostRequest(final AbstractPostRequest request, final HttpResponse response) {        
         return false;
     }
 }

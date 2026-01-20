@@ -100,6 +100,10 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
 
     @Override
     protected void slowDown(Throwable e) {
+        if (e instanceof IllegalStateException) {
+            // java.lang.IllegalStateException: cannot open system clipboard
+            reset();
+        }
     }
 
     @Override
@@ -128,6 +132,15 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
 
     @Override
     protected CHANGE_FLAG hasChanges() {
+        if (lastClipboardSequenceNumber == null) {
+            try {
+                synchronized (this) {
+                    this.wait(5);
+                }
+            } catch (InterruptedException e) {
+                return CHANGE_FLAG.INTERRUPTED;
+            }
+        }
         final int currentClipboardSequenceNumber = user32.GetClipboardSequenceNumber();
         if (currentClipboardSequenceNumber != 0) {
             if (lastClipboardSequenceNumber == null || (currentClipboardSequenceNumber != lastClipboardSequenceNumber.intValue())) {

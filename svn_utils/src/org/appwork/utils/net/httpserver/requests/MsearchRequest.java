@@ -44,14 +44,14 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  * </p>
  * 
  * <p>
- * Note: This class extends {@link GetRequest} rather than {@link PostRequest}
+ * Note: This class extends {@link AbstractGetRequest} rather than {@link AbstractPostRequest}
  * because M-SEARCH requests do not require body handling functionality according
  * to the RequestMethod enum (requiresOutputStream=false).
  * </p>
  *
  * @author AppWork
  */
-public class MsearchRequest extends GetRequest {
+public class MsearchRequest extends AbstractGetRequest {
     /**
      * @param connection
      */
