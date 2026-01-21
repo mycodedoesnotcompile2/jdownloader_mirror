@@ -28,7 +28,6 @@ import jd.controlling.ProgressController;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.nutils.encoding.HTMLEntities;
-import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -39,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49690 $", interfaceVersion = 3, names = { "hoerbuch.in", "hi10anime.com", "scene-rls.com", "cgpersia.com" }, urls = { "https?://(www\\.)?hoerbuch\\.in/blog\\.php\\?id=[\\d]+", "https?://(www\\.)?hi10anime\\.com/\\?page_id=.+", "https?://((www|nfo)\\.)?scene-rls\\.(com|net)/[\\w-/]+/?$", "https?://(?:www\\.)?cgpersia\\.com/\\d+/\\d+/[^/$]+\\.html?" })
+@DecrypterPlugin(revision = "$Revision: 52141 $", interfaceVersion = 3, names = { "hoerbuch.in", "hi10anime.com", "scene-rls.com", "cgpersia.com" }, urls = { "https?://(www\\.)?hoerbuch\\.in/blog\\.php\\?id=[\\d]+", "https?://(www\\.)?hi10anime\\.com/\\?page_id=.+", "https?://((www|nfo)\\.)?scene-rls\\.(com|net)/(?!(?:category/|releases/|contact/|wp-json/))[\\w-/]+/?$", "https?://(?:www\\.)?cgpersia\\.com/\\d+/\\d+/[^/$]+\\.html?" })
 public class Wrdprss extends antiDDoSForDecrypt {
     private HashMap<String, String[]> defaultPasswords = new HashMap<String, String[]>();
 
@@ -59,7 +58,7 @@ public class Wrdprss extends antiDDoSForDecrypt {
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        contenturl = param.getCryptedUrl().replace("watchseries-online.ch/", "watchseries-online.pl/");
+        contenturl = param.getCryptedUrl();
         if (StringUtils.startsWithCaseInsensitive(param.getCryptedUrl(), "https")) {
             contenturl = contenturl.replaceFirst("^http://", "https://");
         }
@@ -86,17 +85,6 @@ public class Wrdprss extends antiDDoSForDecrypt {
         final String password = br.getRegex(Pattern.compile("<.*?>Passwor(?:t|d)[<|:].*?[>|:]\\s*(.*?)[\\||<]", Pattern.CASE_INSENSITIVE)).getMatch(0);
         if (password != null) {
             link_passwds.add(password.trim());
-        }
-        if (contenturl.matches(".+watchseries-online\\.be.+")) {
-            if (br.getRedirectLocation() != null) {
-                br.followRedirect();
-            }
-            final String BaseURL = new Regex(br.getBaseURL(), "(https?://[^/]+)/").getMatch(0);
-            final String[] lnks = br.getRegex("href=\"([^\"]+)\">Play<").getColumn(0);
-            for (final String link : lnks) {
-                ret.add(createDownloadlink(BaseURL + link));
-            }
-            return ret;
         }
         if (contenturl.matches(".+cgpersia\\.com.+")) {
             if (br.getRedirectLocation() != null) {

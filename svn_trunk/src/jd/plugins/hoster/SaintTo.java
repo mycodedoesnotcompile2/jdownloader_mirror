@@ -24,7 +24,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52124 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52134 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,20 +122,11 @@ public class SaintTo extends PluginForHost {
         return this.getFID(link) + ".mp4";
     }
 
-    private boolean isNewWebsite(final DownloadLink link) {
-        /*
-         * At this moment we only check via domain but if they upgrade the system to be used for their other domains, this needs to be
-         * updated.
-         */
-        return this.getHost().equals("turbovid.cr");
-    }
-
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
         final Regex type_api_indirect;
         final String contenturl = link.getPluginPatternMatcher();
-        final boolean isNewWebsite = this.isNewWebsite(link);
         if (new Regex(contenturl, TYPE_EMBED).patternFind()) {
             br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
@@ -143,10 +134,7 @@ public class SaintTo extends PluginForHost {
             } else if (br.containsHTML("\"(Video not found|Video has been removed)")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            String filename = br.getRegex("<title>\\s*([^<]+)\\s*</title>").getMatch(0);
-            if (isNewWebsite) {
-                filename = br.getRegex("property=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
-            }
+            String filename = br.getRegex("property=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
@@ -171,11 +159,6 @@ public class SaintTo extends PluginForHost {
             }
         } else if ((type_api_indirect = new Regex(contenturl, TYPE_API_INDIRECT)).patternFind()) {
             /* TYPE_API_INDIRECT */
-            if (!isNewWebsite) {
-                final String filenameBase64 = type_api_indirect.getMatch(0);
-                final String filename = Encoding.Base64Decode(filenameBase64);
-                link.setName(filename);
-            }
             br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -189,7 +172,7 @@ public class SaintTo extends PluginForHost {
             }
             if (filename != null) {
                 link.setFinalFileName(filename);
-            } else if (isNewWebsite) {
+            } else {
                 /* Data should be available via new website */
                 logger.warning("Failed to find filename");
             }
@@ -213,14 +196,14 @@ public class SaintTo extends PluginForHost {
                 link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
             } else if (filesizeVagueStr != null) {
                 link.setDownloadSize(SizeFormatter.getSize(filesizeVagueStr));
-            } else if (isNewWebsite) {
+            } else {
                 /* Data should be available via new website */
                 logger.warning("Failed to find filesize");
             }
             final String md5 = br.getRegex("Checksum \\(MD5\\)\\s*</div>\\s*<div[^>]*>([a-f0-9]{32})").getMatch(0);
             if (md5 != null) {
                 link.setMD5Hash(md5);
-            } else if (isNewWebsite) {
+            } else {
                 /* Data should be available via new website */
                 logger.warning("Failed to find md5");
             }
@@ -245,7 +228,6 @@ public class SaintTo extends PluginForHost {
     private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
         final String contenturl = link.getPluginPatternMatcher();
-        final boolean isNewWebsite = this.isNewWebsite(link);
         String dllink = null;
         final boolean storeDirecturl;
         if (new Regex(contenturl, TYPE_API_DIRECT).patternFind()) {
@@ -263,7 +245,8 @@ public class SaintTo extends PluginForHost {
                 // TYPE_API_INDIRECT
                 dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Video").getMatch(0);
             }
-            if (dllink == null && isNewWebsite) {
+            if (dllink == null) {
+                /* New website version */
                 final Browser brc = br.cloneBrowser();
                 brc.getPage("/api/sign?v=" + this.getFID(link));
                 final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);

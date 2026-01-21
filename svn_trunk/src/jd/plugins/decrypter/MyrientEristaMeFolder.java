@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51827 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52135 $", interfaceVersion = 3, names = {}, urls = {})
 public class MyrientEristaMeFolder extends PluginForDecrypt {
     public MyrientEristaMeFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,8 +83,11 @@ public class MyrientEristaMeFolder extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    /** Do not allow users "/files/" since this would crawl the whole website content. */
-    private static Pattern PATTERN_FOLDER = Pattern.compile("/files/(.+)", Pattern.CASE_INSENSITIVE);
+    /**
+     * Do not allow users "/files/" since this would crawl the whole website content. <br>
+     * Prohibit "?" after "/files/" to try to prohibit user from adding main URL.
+     */
+    private static Pattern PATTERN_FOLDER = Pattern.compile("/files/(?!(?:\\?|#))(.+)", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -191,7 +194,7 @@ public class MyrientEristaMeFolder extends PluginForDecrypt {
 
     protected DownloadLink parseEntry(final Browser br, final String href, final String filesizeStr) throws PluginException, IOException {
         final String decodedHref = Encoding.htmlOnlyDecode(href);
-        final String url = br.getURL(decodedHref).toString();
+        final String url = br.getURL(decodedHref).toExternalForm();
         /* Is it a file or a folder? */
         if (filesizeStr.equals("-") || href.endsWith("/")) {
             /* Folder -> Will go back into this crawler */

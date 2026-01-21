@@ -70,7 +70,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 52068 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52141 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -365,7 +365,16 @@ public class RedditComCrawler extends PluginForDecrypt {
         for (final Map<String, Object> post : items) {
             boolean crawlPreview = !PreviewCrawlerMode.NEVER.equals(previewMode);
             final String kind = (String) post.get("kind");
-            final Map<String, Object> data = (Map<String, Object>) post.get("data");
+            Map<String, Object> data = (Map<String, Object>) post.get("data");
+            final List<Map<String, Object>> crosspost_parent_list = (List<Map<String, Object>>) data.get("crosspost_parent_list");
+            if (crosspost_parent_list != null && crosspost_parent_list.size() == 1) {
+                /**
+                 * post is a crosspost -> Crawl original post content <br>
+                 * See: https://www.reddit.com/r/redditdev/comments/18c67v8/how_to_detect_crossposts_in_praw/ </br>
+                 * If we fail to do this, some video elements may be downloaded in max 720p while 1080p is available via "fallback_url".
+                 */
+                data = crosspost_parent_list.get(0);
+            }
             final String postID = (String) data.get("id");
             final String author = (String) data.get("author");
             final long createdDateTimestampMillis = ((Number) data.get("created")).longValue() * 1000;
@@ -520,7 +529,6 @@ public class RedditComCrawler extends PluginForDecrypt {
                             crawlPreview = false;
                         }
                     } else if (!this.canHandle(maybeExternalURL)) {
-                        logger.info("Found external URL in 'url' field: " + maybeExternalURL);
                         if (PreviewCrawlerMode.ONLY_IF_NO_MEDIA_SUPPORT_AVAILABLE.equals(previewMode)) {
                             final List<LazyCrawlerPlugin> nextLazyCrawlerPlugins = findNextLazyCrawlerPlugins(maybeExternalURL);
                             if (nextLazyCrawlerPlugins.size() > 0) {
@@ -539,7 +547,6 @@ public class RedditComCrawler extends PluginForDecrypt {
                          * one by one but usually if we got a gallery e can crawl the images right away without the need to do additional
                          * http requests see down below.
                          */
-                        logger.info("Ignoring URL found in 'url' field: " + maybeExternalURL);
                     }
                 }
                 if (preview != null && crawlPreview) {
@@ -701,8 +708,6 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 thisCrawledLinks.add(image);
                                 imageNumber++;
                             }
-                        } else {
-                            logger.info("Failed to find selfhosted image(s)");
                         }
                     }
                 }

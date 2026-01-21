@@ -97,77 +97,78 @@ public class JACSolver extends ChallengeSolver<String> {
 
     @Override
     public void solve(SolverJob<String> job) throws InterruptedException, SolverException {
+        if (!(job.getChallenge() instanceof BasicCaptchaChallenge)) {
+            throw new IllegalArgumentException("Unsupported challenge type");
+        }
         try {
-            if (job.getChallenge() instanceof BasicCaptchaChallenge && isEnabled()) {
-                BasicCaptchaChallenge captchaChallenge = (BasicCaptchaChallenge) job.getChallenge();
-                String host = null;
-                if (captchaChallenge.getPlugin() instanceof PluginForHost) {
-                    host = ((PluginForHost) captchaChallenge.getPlugin()).getHost();
-                } else if (captchaChallenge.getPlugin() instanceof PluginForDecrypt) {
-                    host = ((PluginForDecrypt) captchaChallenge.getPlugin()).getHost();
-                }
-                String trustID = (host + "_" + captchaChallenge.getTypeID()).toLowerCase(Locale.ENGLISH);
-                if (StringUtils.isEmpty(captchaChallenge.getTypeID())) {
-                    return;
-                }
-                job.getLogger().info("JACSolver handles " + job);
-                job.getLogger().info("JAC: enabled: " + config.isEnabled() + " Has Method: " + JACMethod.hasMethod(captchaChallenge.getTypeID()));
-                if (!config.isEnabled() || !JACMethod.hasMethod(captchaChallenge.getTypeID())) {
-                    return;
-                }
-                job.getChallenge().sendStatsSolving(this);
-                checkInterruption();
-                final JAntiCaptcha jac = new JAntiCaptcha(captchaChallenge.getTypeID());
-                checkInterruption();
-                Image captchaImage;
-                captchaImage = ImageProvider.read(captchaChallenge.getImageFile());
-                checkInterruption();
-                final Captcha captcha = jac.createCaptcha(captchaImage);
-                checkInterruption();
-                String captchaCode = jac.checkCaptcha(captchaChallenge.getImageFile(), captcha);
-                if (StringUtils.isEmpty(captchaCode)) {
-                    return;
-                }
-                if (jac.isExtern()) {
-                    /* external captchaCode Response */
-                    job.addAnswer(new CaptchaResponse(captchaChallenge, this, captchaCode, 100));
+            BasicCaptchaChallenge captchaChallenge = (BasicCaptchaChallenge) job.getChallenge();
+            String host = null;
+            if (captchaChallenge.getPlugin() instanceof PluginForHost) {
+                host = ((PluginForHost) captchaChallenge.getPlugin()).getHost();
+            } else if (captchaChallenge.getPlugin() instanceof PluginForDecrypt) {
+                host = ((PluginForDecrypt) captchaChallenge.getPlugin()).getHost();
+            }
+            String trustID = (host + "_" + captchaChallenge.getTypeID()).toLowerCase(Locale.ENGLISH);
+            if (StringUtils.isEmpty(captchaChallenge.getTypeID())) {
+                return;
+            }
+            job.getLogger().info("JACSolver handles " + job);
+            job.getLogger().info("JAC: enabled: " + config.isEnabled() + " Has Method: " + JACMethod.hasMethod(captchaChallenge.getTypeID()));
+            if (!config.isEnabled() || !JACMethod.hasMethod(captchaChallenge.getTypeID())) {
+                return;
+            }
+            job.getChallenge().sendStatsSolving(this);
+            checkInterruption();
+            final JAntiCaptcha jac = new JAntiCaptcha(captchaChallenge.getTypeID());
+            checkInterruption();
+            Image captchaImage;
+            captchaImage = ImageProvider.read(captchaChallenge.getImageFile());
+            checkInterruption();
+            final Captcha captcha = jac.createCaptcha(captchaImage);
+            checkInterruption();
+            String captchaCode = jac.checkCaptcha(captchaChallenge.getImageFile(), captcha);
+            if (StringUtils.isEmpty(captchaCode)) {
+                return;
+            }
+            if (jac.isExtern()) {
+                /* external captchaCode Response */
+                job.addAnswer(new CaptchaResponse(captchaChallenge, this, captchaCode, 100));
+            } else {
+                /* internal captchaCode Response */
+                final LetterComperator[] lcs = captcha.getLetterComperators();
+                double vp = 0.0;
+                if (lcs == null) {
                 } else {
-                    /* internal captchaCode Response */
-                    final LetterComperator[] lcs = captcha.getLetterComperators();
-                    double vp = 0.0;
-                    if (lcs == null) {
-                    } else {
-                        for (final LetterComperator element : lcs) {
-                            if (element == null) {
-                                vp = 0;
-                                break;
-                            }
-                            vp += element.getValityPercent();
+                    for (final LetterComperator element : lcs) {
+                        if (element == null) {
+                            vp = 0;
+                            break;
                         }
-                        vp /= lcs.length;
+                        vp += element.getValityPercent();
                     }
-                    int trust = 120 - (int) vp;
-                    int orgTrust = trust;
-                    // StatsManager.I().
-                    synchronized (jacMethodTrustMap) {
-                        Integer trustMap = jacMethodTrustMap.get(trustID);
-                        if (trustMap != null) {
-                            if (trust > trustMap) {
+                    vp /= lcs.length;
+                }
+                int trust = 120 - (int) vp;
+                int orgTrust = trust;
+                // StatsManager.I().
+                synchronized (jacMethodTrustMap) {
+                    Integer trustMap = jacMethodTrustMap.get(trustID);
+                    if (trustMap != null) {
+                        if (trust > trustMap) {
+                            trust = 100;
+                        }
+                    }
+                    synchronized (threshold) {
+                        final AutoTrust trustValue = threshold.get(trustID);
+                        if (trustValue != null) {
+                            if (trust > trustValue.getValue() * _0_85) {
                                 trust = 100;
                             }
                         }
-                        synchronized (threshold) {
-                            final AutoTrust trustValue = threshold.get(trustID);
-                            if (trustValue != null) {
-                                if (trust > trustValue.getValue() * _0_85) {
-                                    trust = 100;
-                                }
-                            }
-                        }
                     }
-                    // we need to invert th
-                    job.addAnswer(new JACCaptchaResponse(captchaChallenge, this, captchaCode, trust, orgTrust));
                 }
+                // we need to invert th
+                job.addAnswer(new JACCaptchaResponse(captchaChallenge, this, captchaCode, trust, orgTrust));
             }
         } catch (IOException e) {
             job.getChallenge().sendStatsError(this, e);

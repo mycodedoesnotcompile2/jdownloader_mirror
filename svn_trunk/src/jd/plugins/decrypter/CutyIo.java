@@ -18,11 +18,15 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -33,10 +37,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51681 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52138 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -72,19 +83,17 @@ public class CutyIo extends PluginForDecrypt {
         if (content_id.toLowerCase(Locale.ENGLISH).equals(content_id) && !content_id.matches(".*\\d+.*")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Form form1 = br.getFormbyProperty("id", "submit-form");
+        final Form form1 = br.getFormbyProperty("id", "free-submit-form");
         if (form1 != null) {
             br.submitForm(form1);
         } else {
             logger.warning("Failed to find form1");
         }
-        final Form form2 = br.getFormbyProperty("id", "submit-form");
+        final Form form2 = br.getFormbyProperty("id", "free-submit-form");
         if (form2 != null) {
             if (CaptchaHelperCrawlerPluginRecaptchaV2.containsRecaptchaV2Class(form2)) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
@@ -99,6 +108,21 @@ public class CutyIo extends PluginForDecrypt {
         if (form3 == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
+        long passedTimeMillis = 0;
+        if (br.containsHTML("id=\"turnstile-widget\"")) {
+            final String tsKey = "0x4AAAAAAABnHbN4cNchLhd_";
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("https://cdn.cuty.io/js/public/links/last.js?id=f4f3bcae68da87c1b86167fe79d01ae7");
+            /* Check if our static key is still correct */
+            if (!brc.containsHTML(Pattern.quote(tsKey))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Turnstile key has changed");
+            }
+            final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, tsKey).getToken();
+            form3.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+            form3.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
+            passedTimeMillis = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
+        }
         final boolean skipWaitTime = false;
         final String waitSecondsStr = br.getRegex("class=\"timer\"[^>]*>(\\d+)</span>").getMatch(0);
         if (waitSecondsStr != null) {
@@ -106,7 +130,12 @@ public class CutyIo extends PluginForDecrypt {
             if (skipWaitTime) {
             } else {
                 logger.info("Waiting seconds: " + waitSecondsStr);
-                this.sleep(Integer.parseInt(waitSecondsStr) * 1001, param);
+                long waitMillis = Long.parseLong(waitSecondsStr) * 1000;
+                /* Substract time it took to solve the captcha if a captcha was needed. */
+                waitMillis -= passedTimeMillis;
+                if (waitMillis > 0) {
+                    this.sleep(waitMillis, param);
+                }
             }
         } else {
             logger.warning("Failed to find wait-time-value before final form");
@@ -117,6 +146,7 @@ public class CutyIo extends PluginForDecrypt {
         if (finallink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         ret.add(createDownloadlink(finallink));
         return ret;
     }

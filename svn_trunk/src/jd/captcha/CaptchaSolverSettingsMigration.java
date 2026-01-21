@@ -3,15 +3,21 @@ package jd.captcha;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComConfigInterface;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaConfigInterface;
+import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSettings;
+import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaConfigInterface;
+import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzConfigInterface;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSettings;
+import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 
 import jd.controlling.AccountController;
+import jd.parser.Regex;
 import jd.plugins.Account;
 
 /** Class designed to migrate existing captcha solver config to new captcha solver plugin system. */
@@ -93,7 +99,6 @@ public class CaptchaSolverSettingsMigration {
         if (apikey != null) {
             apikey = apikey.trim();
         }
-        // final PluginForCaptchaSolverNineKw plg = new PluginForCaptchaSolverNineKw(null);
         boolean userHasAccount = false;
         boolean userHasEnabledExistingAccount = false;
         if (apikey != null && apikey.matches("[a-f0-9]{32}")) {
@@ -155,16 +160,15 @@ public class CaptchaSolverSettingsMigration {
         if (password != null) {
             password = password.trim();
         }
-        // final PluginForCaptchaSolverNineKw plg = new PluginForCaptchaSolverNineKw(null);
         boolean userHasAccount = false;
         boolean userHasEnabledExistingAccount = false;
         if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
-            final Account existingAccount = getExistingAccount(host, username, password);
-            if (existingAccount != null) {
+            final Account existingAccountViaUserPW = getExistingAccount(host, username, password);
+            if (existingAccountViaUserPW != null) {
                 // TODO: Check if an account with same apikey already exists
                 System.out.print("Same " + host + " account already exists");
             } else {
-                final Account acc = new Account(null, username);
+                final Account acc = new Account(username, password);
                 if (!cfgOld.isEnabled()) {
                     /* Disable account if it was disabled by old config. */
                     acc.setEnabled(false, false);
@@ -205,19 +209,245 @@ public class CaptchaSolverSettingsMigration {
     }
 
     public void migrate_deathbycaptcha() {
-        // TODO
+        final String host = "deathbycaptcha.com";
+        final DeathByCaptchaSettings cfgOld = JsonConfig.create(DeathByCaptchaSettings.class);
+        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        /* Migrate account */
+        String username = cfgOld.getUserName();
+        if (username != null) {
+            username = username.trim();
+        }
+        String passwordOrApitoken = cfgOld.getPassword();
+        if (passwordOrApitoken != null) {
+            passwordOrApitoken = passwordOrApitoken.trim();
+        }
+        boolean userHasAccount = false;
+        boolean userHasEnabledExistingAccount = false;
+        final Pattern apikeypattern = Pattern.compile("^[a-zA-Z0-9]{100,}$");
+        final boolean isApikey = passwordOrApitoken != null && new Regex(passwordOrApitoken, apikeypattern).patternFind();
+        if ((!StringUtils.isEmpty(username) && !StringUtils.isEmpty(passwordOrApitoken)) || isApikey) {
+            final Account existingAccount = getExistingAccount(host, username, passwordOrApitoken);
+            Account existingAccountViaApikey = null;
+            if (isApikey) {
+                existingAccountViaApikey = getExistingAccount(host, passwordOrApitoken);
+            }
+            if (existingAccount != null) {
+                System.out.print("Same " + host + " account already exists via user:pw");
+            } else if (existingAccountViaApikey != null) {
+                System.out.print("Same " + host + " account already exists via apikey");
+            } else {
+                final Account acc = new Account(username, passwordOrApitoken);
+                if (!cfgOld.isEnabled()) {
+                    acc.setEnabled(false, false);
+                } else {
+                    userHasEnabledExistingAccount = true;
+                }
+                ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add(host);
+            }
+            userHasAccount = true;
+        }
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = this.getValidatedDomainList(cfgOld.getBlacklistEntries());
+        final List<String> whitelist = this.getValidatedDomainList(cfgOld.getWhitelistEntries());
+        if (blacklist != null && blacklist.size() > 0) {
+            cfgNew.setDomainBlacklist(listToCommaSeparatedDomains(blacklist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                cfgNew.setDomainBlacklistEnabled(false);
+            }
+        }
+        if (whitelist != null && whitelist.size() > 0) {
+            cfgNew.setDomainWhitelist(listToCommaSeparatedDomains(whitelist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                cfgNew.setDomainWhitelistEnabled(false);
+            }
+        }
+        if (userHasAccount && userHasEnabledExistingAccount) {
+            if (!cfgOld.isFeedBackSendingEnabled()) {
+                cfgNew.setEnableCaptchaFeedback(false);
+            }
+        }
+        System.out.print(host + " migration successful");
     }
 
     public void migrate_endcaptcha() {
-        // TODO
+        final String host = "endcaptcha.com";
+        final EndCaptchaConfigInterface cfgOld = JsonConfig.create(EndCaptchaConfigInterface.class);
+        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        /* Migrate account */
+        String username = cfgOld.getUserName();
+        if (username != null) {
+            username = username.trim();
+        }
+        String password = cfgOld.getPassword();
+        if (password != null) {
+            password = password.trim();
+        }
+        boolean userHasAccount = false;
+        boolean userHasEnabledExistingAccount = false;
+        if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
+            final Account existingAccount = getExistingAccount(host, username, password);
+            if (existingAccount != null) {
+                // TODO: Check if an account with same apikey already exists
+                System.out.print("Same " + host + " account already exists via user:pw");
+            } else {
+                final Account acc = new Account(username, password);
+                if (!cfgOld.isEnabled()) {
+                    /* Disable account if it was disabled by old config. */
+                    acc.setEnabled(false, false);
+                } else {
+                    userHasEnabledExistingAccount = true;
+                }
+                ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add(host);
+            }
+            userHasAccount = true;
+        }
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = this.getValidatedDomainList(cfgOld.getBlacklistEntries());
+        final List<String> whitelist = this.getValidatedDomainList(cfgOld.getWhitelistEntries());
+        if (blacklist != null && blacklist.size() > 0) {
+            /* Only migrate blacklist settings if user has a blacklist with at least 1 valid entry */
+            cfgNew.setDomainBlacklist(listToCommaSeparatedDomains(blacklist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has blacklist entries && blacklist is disabled. */
+                cfgNew.setDomainBlacklistEnabled(false);
+            }
+        }
+        if (whitelist != null && whitelist.size() > 0) {
+            cfgNew.setDomainWhitelist(listToCommaSeparatedDomains(whitelist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has whitelist entries && whitelist is disabled. */
+                cfgNew.setDomainWhitelistEnabled(false);
+            }
+        }
+        if (userHasAccount && userHasEnabledExistingAccount) {
+            /* Migrate some settings only if user has an active account */
+            if (!cfgOld.isFeedBackSendingEnabled()) {
+                cfgNew.setEnableCaptchaFeedback(false);
+            }
+        }
+        System.out.print(host + " migration successful");
     }
 
     public void migrate_imagetyperz() {
-        // TODO
+        final String host = "imagetyperz.com";
+        final ImageTyperzConfigInterface cfgOld = JsonConfig.create(ImageTyperzConfigInterface.class);
+        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        /* Migrate account */
+        String username = cfgOld.getUserName();
+        if (username != null) {
+            username = username.trim();
+        }
+        String password = cfgOld.getPassword();
+        if (password != null) {
+            password = password.trim();
+        }
+        boolean userHasAccount = false;
+        boolean userHasEnabledExistingAccount = false;
+        if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
+            final Account existingAccount = getExistingAccount(host, username, password);
+            if (existingAccount != null) {
+                // TODO: Check if an account with same apikey already exists
+                System.out.print("Same " + host + " account already exists via user:pw");
+            } else {
+                final Account acc = new Account(username, password);
+                if (!cfgOld.isEnabled()) {
+                    /* Disable account if it was disabled by old config. */
+                    acc.setEnabled(false, false);
+                } else {
+                    userHasEnabledExistingAccount = true;
+                }
+                ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add(host);
+            }
+            userHasAccount = true;
+        }
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = this.getValidatedDomainList(cfgOld.getBlacklistEntries());
+        final List<String> whitelist = this.getValidatedDomainList(cfgOld.getWhitelistEntries());
+        if (blacklist != null && blacklist.size() > 0) {
+            /* Only migrate blacklist settings if user has a blacklist with at least 1 valid entry */
+            cfgNew.setDomainBlacklist(listToCommaSeparatedDomains(blacklist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has blacklist entries && blacklist is disabled. */
+                cfgNew.setDomainBlacklistEnabled(false);
+            }
+        }
+        if (whitelist != null && whitelist.size() > 0) {
+            cfgNew.setDomainWhitelist(listToCommaSeparatedDomains(whitelist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has whitelist entries && whitelist is disabled. */
+                cfgNew.setDomainWhitelistEnabled(false);
+            }
+        }
+        if (userHasAccount && userHasEnabledExistingAccount) {
+            /* Migrate some settings only if user has an active account */
+            if (!cfgOld.isFeedBackSendingEnabled()) {
+                cfgNew.setEnableCaptchaFeedback(false);
+            }
+        }
+        System.out.print(host + " migration successful");
     }
 
     public void migrate_2captcha() {
-        // TODO
+        final String host = "2captcha.com";
+        final TwoCaptchaConfigInterface cfgOld = JsonConfig.create(TwoCaptchaConfigInterface.class);
+        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        /* Migrate account */
+        String apikey = cfgOld.getApiKey();
+        if (apikey != null) {
+            apikey = apikey.trim();
+        }
+        boolean userHasAccount = false;
+        boolean userHasEnabledExistingAccount = false;
+        if (apikey != null && apikey.matches("[a-f0-9]{32}")) {
+            final Account existingAccount = getExistingAccount(host, apikey);
+            if (existingAccount != null) {
+                // TODO: Check if an account with same apikey already exists
+                System.out.print("Same " + host + " account already exists via apikey");
+            } else {
+                final Account acc = new Account(apikey, apikey);
+                if (!cfgOld.isEnabled()) {
+                    /* Disable account if it was disabled by old config. */
+                    acc.setEnabled(false, false);
+                } else {
+                    userHasEnabledExistingAccount = true;
+                }
+                ac.addAccount(acc);
+                namesOfServicesWithMigratedAccounts.add(host);
+            }
+            userHasAccount = true;
+        }
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = this.getValidatedDomainList(cfgOld.getBlacklistEntries());
+        final List<String> whitelist = this.getValidatedDomainList(cfgOld.getWhitelistEntries());
+        if (blacklist != null && blacklist.size() > 0) {
+            /* Only migrate blacklist settings if user has a blacklist with at least 1 valid entry */
+            cfgNew.setDomainBlacklist(listToCommaSeparatedDomains(blacklist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has blacklist entries && blacklist is disabled. */
+                cfgNew.setDomainBlacklistEnabled(false);
+            }
+        }
+        if (whitelist != null && whitelist.size() > 0) {
+            cfgNew.setDomainWhitelist(listToCommaSeparatedDomains(whitelist));
+            if (!cfgOld.isBlackWhiteListingEnabled()) {
+                /* Only migrate disabled state if user has whitelist entries && whitelist is disabled. */
+                cfgNew.setDomainWhitelistEnabled(false);
+            }
+        }
+        if (userHasAccount && userHasEnabledExistingAccount) {
+            /* Migrate some settings only if user has an active account */
+            if (!cfgOld.isFeedBackSendingEnabled()) {
+                cfgNew.setEnableCaptchaFeedback(false);
+            }
+        }
+        System.out.print(host + " migration successful");
     }
 
     public void migrate_9kw() {

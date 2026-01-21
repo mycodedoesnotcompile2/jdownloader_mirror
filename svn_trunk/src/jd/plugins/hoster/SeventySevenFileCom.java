@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50390 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52139 $", interfaceVersion = 2, names = {}, urls = {})
 public class SeventySevenFileCom extends PluginForHost {
     public SeventySevenFileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class SeventySevenFileCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "77file.com" });
+        ret.add(new String[] { "77file.com", "77disk.com" });
         return ret;
     }
 
@@ -133,23 +133,35 @@ public class SeventySevenFileCom extends PluginForHost {
         } else if (br.containsHTML("<span id=\"file_size\"></span>")) {
             /* Empty / Missing filesize */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*此文件已被用户删除，暂时无法访问")) {
+        } else if (br.containsHTML(">\\s*此文件已被用户删除，暂时无法访问")) {
             /* 2021-12-07 */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*此文件已被删除，无法访问")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String extFileID = new Regex(br.getURL(), "(?i)/s/(.+)").getMatch(0);
         if (extFileID != null) {
             link.setLinkID(this.getHost() + "://" + extFileID);
         }
-        String filename = br.getRegex("align=.absbottom. border=.0.[^>]*/>([^<>\"]+)<").getMatch(0);
-        String filesize = br.getRegex("<span id=\"file_size\">([^<]+)</span>").getMatch(0);
+        /*
+         * 2026-01-20: New optional step, not (as the name implies) related to any kind of password. The value of "file_pwd" is the file_id.
+         */
+        final Form redirectform = br.getFormbyKey("file_pwd");
+        if (redirectform != null) {
+            br.submitForm(redirectform);
+        }
+        String filename = br.getRegex("<div class=\"fs-5\"[^>]*>([^<]+)</div>").getMatch(0);
+        String filesize = br.getRegex("文件大小：\\s*</b><span class=\"text-primary fw-bold\">([^<]+)</span>").getMatch(0);
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
         } else {
             logger.warning("Failed to find filename");
         }
         if (filesize != null) {
-            filesize += "b";
+            filesize = filesize.trim();
+            if (!StringUtils.endsWithCaseInsensitive(filesize, "b")) {
+                filesize += "b";
+            }
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
             logger.warning("Failed to find filesize");
@@ -168,97 +180,72 @@ public class SeventySevenFileCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleFreeDownload(link, null, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        handleFreeDownload(link, null, FREE_RESUME, FREE_MAXCHUNKS);
     }
 
-    private void handleFreeDownload(final DownloadLink link, final Account account, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
+    private void handleFreeDownload(final DownloadLink link, final Account account, final boolean resumable, final int maxchunks) throws Exception, PluginException {
         // final String fid = getFID(link);
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty, resumable, maxchunks)) {
-            if (account != null) {
-                this.login(account, false);
+        if (account != null) {
+            this.login(account, false);
+        }
+        requestFileInformation(link);
+        String fileID2 = this.br.getRegex("file_id=(\\d+)").getMatch(0);
+        if (fileID2 == null) {
+            fileID2 = this.br.getRegex("load_down_addr1\\('(\\d+)'\\)").getMatch(0);
+        }
+        if (fileID2 == null) {
+            logger.warning("Failed to find fileID2");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brAjax = this.br.cloneBrowser();
+        brAjax.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        brAjax.getPage("/ajax_new.php??a=1&ctime=" + System.currentTimeMillis());
+        if (false) {
+            /* 2020-04-09: Waittime is skippable */
+            final String longWaittimeStr = PluginJSonUtils.getJson(brAjax, "wtime");
+            if (longWaittimeStr != null && longWaittimeStr.matches("\\d+")) {
+                // TODO: what is difference between waittime and wtime ?
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Integer.parseInt(longWaittimeStr) * 1001l);
             }
-            requestFileInformation(link);
-            String fileID2 = this.br.getRegex("file_id=(\\d+)").getMatch(0);
-            if (fileID2 == null) {
-                fileID2 = this.br.getRegex("load_down_addr1\\('(\\d+)'\\)").getMatch(0);
-            }
-            if (fileID2 == null) {
-                logger.warning("Failed to find fileID2");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final Browser brAjax = this.br.cloneBrowser();
-            brAjax.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            brAjax.getPage("/ajax_new.php??a=1&ctime=" + System.currentTimeMillis());
-            if (false) {
-                /* 2020-04-09: Waittime is skippable */
-                final String longWaittimeStr = PluginJSonUtils.getJson(brAjax, "wtime");
-                if (longWaittimeStr != null && longWaittimeStr.matches("\\d+")) {
-                    // TODO: what is difference between waittime and wtime ?
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Integer.parseInt(longWaittimeStr) * 1001l);
-                }
-            }
-            /* 2024-12-30: Waittime is NOT skippable */
+        }
+        /* 2024-12-30: Waittime is NOT skippable */
+        final boolean skipWait = true;
+        if (!skipWait) {
             final String waittimeStr = PluginJSonUtils.getJson(brAjax, "waittime");
             if (waittimeStr == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final int wait = Integer.parseInt(waittimeStr);
-            /* Too high waittime --> Reconnect required */
+            /* Wait too high -> Reconnect required */
             if (wait > 75) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait * 1001l);
             }
-            this.sleep(wait * 1001l, link);
-            /* 2020-04-09: '/down' page is skippable */
-            // br.getPage(br.getURL().replace("/file/", "/down/"));
-            /* 2024-12-30: Captcha is NOT skippable */
-            final String code = getCaptchaCode("/imagecode.php", link);
-            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            br.postPage("/ajax.php", "action=check_code&code=" + Encoding.urlEncode(code));
-            if (br.toString().equals("false")) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-            }
-            br.postPage("/ajax.php", "action=load_down_addr1&file_id=" + fileID2 + "&code=" + Encoding.urlEncode(code));
-            String dllink = br.getRegex("true\\|<a href=\"([^<>\"]+)").getMatch(0);
-            if (dllink == null) {
-                dllink = br.getRegex("\"(https?://down\\.[^<>\"]+)\"").getMatch(0);
-            }
-            if (dllink == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
-            /* 2023-03-24: They will e.g. send "Content-Type: text/plain" for text-files and won't provide a content-disposition header. */
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            link.setProperty(directlinkproperty, dllink);
+        }
+        // this.sleep(wait * 1001l, link);
+        /* 2020-04-09: '/down' page is skippable */
+        // br.getPage(br.getURL().replace("/file/", "/down/"));
+        /* 2024-12-30: Captcha is NOT skippable */
+        final String code = getCaptchaCode("/imagecode.php", link);
+        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        br.postPage("/ajax.php", "action=check_code&code=" + Encoding.urlEncode(code));
+        if (br.getRequest().getHtmlCode().equals("false")) {
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+        }
+        br.postPage("/ajax.php", "action=load_down_addr1&file_id=" + fileID2 + "&code=" + Encoding.urlEncode(code));
+        String dllink = br.getRegex("true\\|.*<a href=\"([^<>\"]+)").getMatch(0);
+        if (dllink == null) {
+            dllink = br.getRegex("\"(https?://(down|dl\\d+)\\.[^<>\"]+)\"").getMatch(0);
+        }
+        if (dllink == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+        /* 2023-03-24: They will e.g. send "Content-Type: text/plain" for text-files and won't provide a content-disposition header. */
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            br.followConnection(true);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty, final boolean resumable, final int maxchunks) throws Exception {
-        final String url = link.getStringProperty(directlinkproperty);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, resumable, maxchunks);
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            link.removeProperty(directlinkproperty);
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
     }
 
     private boolean login(final Account account, final boolean force) throws Exception {
@@ -328,7 +315,7 @@ public class SeventySevenFileCom extends PluginForHost {
             br.getPage("/mydisk.php?item=profile&menu=cp");
         }
         ai.setUnlimitedTraffic();
-        final String premiumExpire = br.getRegex("(?i)VIP结束时间\\s*：</td>\\s*<td>\\s*(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        final String premiumExpire = br.getRegex("VIP结束时间\\s*：\\s*</td>\\s*<td>\\s*(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
         if (premiumExpire == null) {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
@@ -345,35 +332,31 @@ public class SeventySevenFileCom extends PluginForHost {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         if (account.getType() == AccountType.PREMIUM) {
             // this.handleFreeDownload(link, account, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS, "premium_directlink");
-            final String premiumDirectlinkproperty = "premium_directlink";
             // final String fid = getFID(link);
-            if (!attemptStoredDownloadurlDownload(link, premiumDirectlinkproperty, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS)) {
-                this.login(account, false);
-                requestFileInformation(link);
-                /* Here comes unfinished code because we do not support their used captcha called "TencentCaptcha" yet. */
-                if (br.containsHTML("getverify\\.php")) {
-                    /* 2022-05-31: Unsupported captcha in premium mode */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                String dllink = br.getRegex("true\\|<a href=\"([^<>\"]+)").getMatch(0);
-                if (dllink == null) {
-                    dllink = br.getRegex("\"(https?://down\\.[^<>\"]+)\"").getMatch(0);
-                }
-                if (dllink == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS);
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    br.followConnection(true);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                link.setProperty(premiumDirectlinkproperty, dllink);
+            this.login(account, false);
+            requestFileInformation(link);
+            /* Here comes unfinished code because we do not support their used captcha called "TencentCaptcha" yet. */
+            if (br.containsHTML("getverify\\.php")) {
+                /* 2022-05-31: Unsupported captcha in premium mode */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            String dllink = br.getRegex("true\\|<a href=\"([^<>\"]+)").getMatch(0);
+            if (dllink == null) {
+                dllink = br.getRegex("\"(https?://down\\.[^<>\"]+)\"").getMatch(0);
+            }
+            if (dllink == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS);
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             dl.startDownload();
         } else {
-            this.handleFreeDownload(link, account, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS, "account_free_directlink");
+            this.handleFreeDownload(link, account, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS);
         }
     }
 

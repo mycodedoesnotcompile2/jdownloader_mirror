@@ -17,9 +17,9 @@ import org.jdownloader.plugins.config.Type;
 @PluginHost(host = "reddit.com", type = Type.HOSTER)
 public interface RedditConfig extends PluginConfigInterface {
     public static final RedditConfig.TRANSLATION TRANSLATION                             = new TRANSLATION();
-    final String                                 text_PreferredCommentsPackagenameScheme = "Select preferred package name scheme for single comments";
-    final String                                 text_CustomCommentsPackagenameScheme    = "Define custom packagename scheme";
-    final String                                 text_PreferredFilenameScheme            = "Select preferred filename scheme";
+    final String                                 text_PreferredCommentsPackagenameScheme = "Preferred package name scheme for single comments";
+    final String                                 text_CustomCommentsPackagenameScheme    = "Custom packagename scheme";
+    final String                                 text_PreferredFilenameScheme            = "Preferred filename scheme";
     final String                                 text_CrawlerTextDownloadMode            = "Crawler: Text download mode";
     final String                                 text_PreviewDownloadMode                = "Crawler: Preview download mode";
     final String                                 text_CrawlUrlsInsidePostText            = "Crawl URLs inside post-text?";
