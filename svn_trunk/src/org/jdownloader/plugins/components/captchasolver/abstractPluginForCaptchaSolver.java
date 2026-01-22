@@ -7,6 +7,7 @@ import java.util.Locale;
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.CaptchaChallengeFilter;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
@@ -136,6 +137,22 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             return Integer.MAX_VALUE;
         }
         return cfg.getMaxSimultaneousCaptchas();
+    }
+
+    public boolean isFilterListEnabled() {
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return true;
+        }
+        return cfg.isFilterListEnabled();
+    }
+
+    public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return null;
+        }
+        return cfg.getFilterList();
     }
 
     public boolean isDomainBlacklistEnabled() {

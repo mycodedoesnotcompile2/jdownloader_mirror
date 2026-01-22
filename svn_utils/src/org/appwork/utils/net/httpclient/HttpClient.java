@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Straße 58
  *         91183 Abenberg
  *         Germany
@@ -962,7 +962,9 @@ public class HttpClient {
         final HTTPConnection connection = this.createHTTPConnection(context);
         boolean followRedirect = false;
         context.linkInterrupt();
+
         try {
+
             try {
                 this.prepareConnection(context);
                 boolean rangeRequest = false;
@@ -972,12 +974,14 @@ public class HttpClient {
                     rangeRequest = true;
                 }
                 context.onConnect();
+
                 if (context.getPostDataStream() != null) {
                     final HTTPOutputStream directHTTPConnectionOutputStream = this.connect(context, true);
                     final OutputStream outputStream = this.wrapPostOutputStream(connection, directHTTPConnectionOutputStream);
                     final InputStream input = context.getPostDataStream();
                     context.onPostStart();
                     if (context.getPostDataLength() > 0) {
+
                         final byte[] buffer = new byte[32767];
                         int len;
                         while ((len = input.read(buffer)) != -1) {
@@ -990,6 +994,7 @@ public class HttpClient {
                             }
                         }
                         input.close();
+
                     }
                     final boolean before = directHTTPConnectionOutputStream.isClosingAllowed();
                     try {
@@ -1014,8 +1019,11 @@ public class HttpClient {
                     /* contentLength is known */
                     context.onContentLength(connection.getCompleteContentLength());
                 }
+
                 followRedirect = this.followRedirect(context);
+
                 if (!followRedirect) {
+                    // do not follow redirects if we had errors during post
                     this.checkResponseCode(context);
                     InputStream input = connection.getInputStream();
                     if (!(input instanceof CountingConnection)) {
@@ -1023,6 +1031,7 @@ public class HttpClient {
                     }
                     this.readInputStream(context, (CountingInputStream) input);
                 }
+
             } catch (final ReadIOException e) {
                 throw this.handleInterrupt(new HttpClientException(context, e));
             } catch (final WriteIOException e) {
@@ -1031,6 +1040,8 @@ public class HttpClient {
                 throw this.handleInterrupt(e);
             } catch (final IOException e) {
                 throw this.handleInterrupt(new HttpClientException(context, new ReadIOException(e)));
+            } catch (RuntimeException e) {
+                throw e;
             } finally {
                 this.log(connection);
             }

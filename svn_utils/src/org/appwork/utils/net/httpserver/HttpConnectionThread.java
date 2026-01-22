@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -36,7 +36,7 @@ package org.appwork.utils.net.httpserver;
 import java.io.IOException;
 import java.net.Socket;
 
-import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
+import org.appwork.utils.net.httpserver.AbstractServerBasics;
 
 /**
  * @author daniel
@@ -48,7 +48,7 @@ public class HttpConnectionThread extends Thread {
     private volatile Socket         socket            = null;
     private int                     serverThreadID    = 0;
 
-    public HttpConnectionThread(final HttpServerInterface server, final Runnable r) {
+    public HttpConnectionThread(final AbstractServerBasics server, final Runnable r) {
         super(r);
         this.setDaemon(true);
     }

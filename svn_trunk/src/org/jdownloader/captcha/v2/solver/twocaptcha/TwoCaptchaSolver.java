@@ -93,14 +93,17 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         /* 2025-12-22: hCaptcha is not supported anymore */
         if (c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else if (c instanceof CutCaptchaChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else if (c instanceof CloudflareTurnstileChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

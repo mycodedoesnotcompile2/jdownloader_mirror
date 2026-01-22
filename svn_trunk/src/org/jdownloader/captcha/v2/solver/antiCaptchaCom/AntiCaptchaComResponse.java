@@ -11,7 +11,7 @@ public class AntiCaptchaComResponse extends CaptchaResponse {
     }
 
     public AntiCaptchaComResponse(Challenge<String> challenge, AntiCaptchaComSolver solver, int id, String text) {
-        super(challenge, solver, text, 100);
+        super(challenge, solver, text);
         this.taskId = id;
     }
 }

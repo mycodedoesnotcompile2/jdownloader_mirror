@@ -25,7 +25,7 @@ public class OAuthDialogSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (!(c instanceof OAuthChallenge)) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         } else {

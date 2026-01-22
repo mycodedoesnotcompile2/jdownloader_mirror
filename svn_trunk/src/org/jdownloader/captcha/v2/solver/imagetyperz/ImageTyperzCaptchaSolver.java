@@ -60,7 +60,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge || c instanceof HCaptchaChallenge) {
             return null;
         } else {
@@ -122,7 +122,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
                         }
                     } else {
                         final AbstractResponse<String> answer = challenge.parseAPIAnswer(response, "rawtoken", this);
-                        job.setAnswer(new ImageTyperzResponse(challenge, this, captchaID, answer.getValue(), answer.getPriority()));
+                        job.setAnswer(new ImageTyperzResponse(challenge, this, captchaID, answer.getValue()));
                     }
                 }
             } else {
@@ -203,7 +203,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
                         }
                     } else {
                         final AbstractResponse<String> answer = challenge.parseAPIAnswer(response, "rawtoken", this);
-                        job.setAnswer(new ImageTyperzResponse(challenge, this, captchaID, answer.getValue(), answer.getPriority()));
+                        job.setAnswer(new ImageTyperzResponse(challenge, this, captchaID, answer.getValue()));
                     }
                 }
             } else {
@@ -263,7 +263,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
             if (result != null) {
                 final AbstractResponse<String> answer = challenge.parseAPIAnswer(result[1], null, this);
                 job.getLogger().info("CAPTCHA " + challenge.getImageFile() + " solved: " + response);
-                job.setAnswer(new ImageTyperzResponse(challenge, this, result[0], answer.getValue(), answer.getPriority()));
+                job.setAnswer(new ImageTyperzResponse(challenge, this, result[0], answer.getValue()));
             } else {
                 job.getLogger().info("Failed solving CAPTCHA");
                 throw new SolverException("Failed:" + response);

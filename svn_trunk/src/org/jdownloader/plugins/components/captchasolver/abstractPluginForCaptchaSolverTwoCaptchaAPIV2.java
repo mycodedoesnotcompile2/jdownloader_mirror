@@ -200,7 +200,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 final String token = (String) solutionmap.get("token");
                 AbstractResponse resp = null;
                 if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
-                    resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, token, 0);
+                    resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, token);
                 } else if (captchachallenge instanceof MultiClickCaptchaChallenge || captchachallenge instanceof ClickCaptchaChallenge) {
                     // TODO: Test this
                     final int[] x = new int[clicklist.size()];
@@ -215,14 +215,14 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                     if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                         final MultiClickedPoint mcp = new MultiClickedPoint(x, y);
                         final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-                        resp = new MultiClickCaptchaResponse(challenge, this, mcp, 0);
+                        resp = new MultiClickCaptchaResponse(challenge, this, mcp);
                     } else {
                         final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
                         final ClickedPoint cp = new ClickedPoint(x[0], y[0]);
-                        resp = new ClickCaptchaResponse(challenge, this, cp, 0);
+                        resp = new ClickCaptchaResponse(challenge, this, cp);
                     }
                 } else {
-                    resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, solutionmap.get("text").toString(), 0);
+                    resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, solutionmap.get("text").toString());
                 }
                 /**
                  * TODO: Correct answer leads to exception in PluginForHost -> Line 676 check why this happens <br>

@@ -30,9 +30,10 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof MultiClickCaptchaChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
@@ -62,7 +63,7 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
                 handler.run();
                 final MultiClickedPoint result = handler.getResult();
                 if (result != null) {
-                    solverJob.addAnswer(new MultiClickCaptchaResponse(captchaChallenge, this, result, 100));
+                    solverJob.addAnswer(new MultiClickCaptchaResponse(captchaChallenge, this, result));
                 }
             }
         }

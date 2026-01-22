@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -177,4 +177,14 @@ public interface DummyTestAPI extends RemoteAPIInterface {
      * @return Combined result
      */
     public String multiTypedParams(String str, int num, boolean flag);
+
+    /**
+     * Method that returns all request headers as JSON string.
+     * This is useful for testing to verify that exactly the expected headers are present.
+     *
+     * @param request
+     *            The RemoteAPI request (automatically injected)
+     * @return JSON string containing all request headers
+     */
+    public String getAllRequestHeaders(RemoteAPIRequest request);
 }

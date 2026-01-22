@@ -258,22 +258,10 @@ public class IDETestRunner2 {
                 skip = false;
             } else {
                 for (Entry<String, String> es : references.entrySet()) {
-                    if (IDETestRunner.class.getName().equals(es.getKey())) {
-                        // Maybe rmeove later....
+                    if (es.getKey().startsWith(IDETestRunner.class.getName().replaceAll("[^\\.]+$", ""))) {
                         continue;
                     }
-                    if (ClassCollector.class.getName().equals(es.getKey())) {
-                        // Maybe rmeove later....
-                        continue;
-                    }
-                    if (IDETestRunner2.class.getName().equals(es.getKey())) {
-                        // Maybe rmeove later....
-                        continue;
-                    }
-                    if (ClassCollector2.class.getName().equals(es.getKey())) {
-                        // Maybe rmeove later....
-                        continue;
-                    }
+
                     String cls = es.getKey();
                     String knownHash = known.get(cls);
                     if (knownHash == null) {

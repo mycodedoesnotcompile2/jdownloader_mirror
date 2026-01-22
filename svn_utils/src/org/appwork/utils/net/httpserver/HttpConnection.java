@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -38,14 +38,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.appwork.loggingv3.LogV3;
@@ -56,6 +53,9 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.duration.TimeSpan;
+import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.CountingInputStreamInterface;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.HeaderCollection;
@@ -72,7 +72,6 @@ import org.appwork.utils.net.httpserver.requests.DeleteRequest;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HeadRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.requests.LockRequest;
 import org.appwork.utils.net.httpserver.requests.MkcolRequest;
@@ -172,24 +171,25 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         return requestedURLParameters;
     }
 
-    protected final HttpServerInterface server;
-    protected final Socket              clientSocket;
-    protected boolean                   outputStreamInUse = false;
-    protected HttpResponse              response          = null;
-    protected InputStream               is;
-    protected final OutputStream        os;
-    protected HttpRequest               request;
-    private volatile boolean            isActive;
-    // Thread currently processing this connection (set in beforeExecute, cleared in afterExecute)
-    private static final Pattern        METHOD            = Pattern.compile("(" + new Joiner("|").join(RequestMethod.values()) + ")");
-    private static final Pattern        REQUESTLINE       = Pattern.compile("\\s+(.+)\\s+HTTP/");
-    public static final Pattern         REQUESTURL        = Pattern.compile("^(/.*?)($|\\?)");
-    public static final Pattern         REQUESTPARAM      = Pattern.compile("^/.*?\\?(.+)");
+    protected final AbstractServerBasics server;
+    protected final Socket               clientSocket;
+    protected boolean                    outputStreamInUse = false;
+    protected HttpResponse               response          = null;
+    protected InputStream                is;
+    protected final OutputStream         os;
+    protected HttpRequest                request;
+    private volatile boolean             isActive;
 
-    protected HttpConnection(final HttpServerInterface server, final Socket clientSocket, final InputStream is, final OutputStream os) throws IOException {
+    // Thread currently processing this connection (set in beforeExecute, cleared in afterExecute)
+    private static final Pattern         METHOD            = Pattern.compile("(" + new Joiner("|").join(RequestMethod.values()) + ")");
+    private static final Pattern         REQUESTLINE       = Pattern.compile("\\s+(.+)\\s+HTTP/");
+    public static final Pattern          REQUESTURL        = Pattern.compile("^(/.*?)($|\\?)");
+    public static final Pattern          REQUESTPARAM      = Pattern.compile("^/.*?\\?(.+)");
+
+    protected HttpConnection(final AbstractServerBasics server, final Socket clientSocket, final InputStream is, final OutputStream os) throws IOException {
         this.server = server;
         this.clientSocket = clientSocket;
-        // fcgi clentsocket may be null
+
         if (is == null && clientSocket != null) {
             this.is = clientSocket.getInputStream();
         } else {
@@ -200,15 +200,17 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         } else {
             this.os = os;
         }
+
         this.isActive = true;
         // Set socket timeout from server configuration
-        final ConnectionTimeouts timeouts = server == null ? null : server.getConnectionTimeouts();
+        final ConnectionTimeouts timeouts = getServer().getConnectionTimeouts();
         if (timeouts != null && timeouts.getSocketTimeoutMs() > 0) {
             this.clientSocket.setSoTimeout(timeouts.getSocketTimeoutMs());
         } else {
             // Fallback to default if not configured
             this.clientSocket.setSoTimeout(ConnectionTimeouts.DEFAULT_SOCKET_TIMEOUT_MS);
         }
+
     }
 
     public Socket getClientSocket() {
@@ -228,14 +230,14 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         this(null);
     }
 
-    public HttpConnection(final HttpServerInterface server, final Socket clientSocket) throws IOException {
+    public HttpConnection(final AbstractServerBasics server, final Socket clientSocket) throws IOException {
         this(server, clientSocket, null, null);
     }
 
     /**
      * @param server2
      */
-    protected HttpConnection(HttpServerInterface server) {
+    protected HttpConnection(AbstractServerBasics server) {
         this.server = server;
         this.clientSocket = null;
         this.is = null;
@@ -331,29 +333,35 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
      */
     protected HttpRequest buildRequest() throws IOException {
         /* read request Method and Path */
+
+        RequestSizeLimits limits;
         InputStream headerStream = is;
-        final HttpServerInterface server = getServer();
-        final RequestSizeLimits limits = server == null ? null : server.getRequestSizeLimits();
+        limits = getServer().getRequestSizeLimits();
         if (limits != null) {
-            int headerLimit = limits.getMaxHeaderSize();
+
+            long headerLimit = limits.getMaxHeaderSize();
             if (headerLimit > 0) {
                 headerStream = new LimitedInputStreamWithException(headerStream, headerLimit);
             }
         }
+
         final String requestLine = this.parseRequestLine(headerStream);
         if (StringUtils.isEmpty(requestLine)) {
             throw new EmptyRequestException();
         }
         // TOTO: requestLine may be "" in some cases (chrome pre connection...?)
         final RequestMethod connectionType = this.parseConnectionType(requestLine);
+
         String requestedURL = new Regex(requestLine, HttpConnection.REQUESTLINE).getMatch(0);
         if (!StringUtils.startsWithCaseInsensitive(requestedURL, "/")) {
             requestedURL = "/" + StringUtils.valueOrEmpty(requestedURL);
         }
         String requestedPath = new Regex(requestedURL, HttpConnection.REQUESTURL).getMatch(0);
+
         final List<KeyValuePair> requestedURLParameters = this.parseRequestURLParams(requestedURL);
         /* read request Headers */
         final HeaderCollection requestHeaders = this.parseRequestHeaders(headerStream);
+
         // wrap for further post Reads
         if (!connectionType.mayHavePostBody) {
             // ensure that nobody tries to read any further...
@@ -362,6 +370,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                     return new RequestSizeLimitExceededException("This Method does not support POST data!");
                 };
             };
+
         } else {
             if (limits != null) {
                 long postLimits = limits.getMaxPostBodySize();
@@ -370,6 +379,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                 }
             }
         }
+
         final HttpRequest request;
         switch (connectionType) {
         case CONNECT:
@@ -446,6 +456,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         request.setRequestedURL(requestedURL);
         request.setRequestHeaders(requestHeaders);
         return request;
+
     }
 
     /**
@@ -472,7 +483,41 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
      * @return
      */
     protected HttpResponse buildResponse() throws IOException {
-        return new HttpResponse(this);
+        HttpResponse res = new HttpResponse(this);
+
+        return res;
+    }
+
+    /**
+     * @param request
+     * @param res
+     */
+    void configure(HttpRequest request, HttpResponse response) {
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CONNECTION, "close"));
+
+        AbstractServerBasics server = getServer();
+        {
+            String serverHeader = server.getResponseServerHeader();
+
+            if (!StringUtils.isEmpty(serverHeader)) {
+                response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_SERVER, serverHeader));
+            }
+        }
+        {
+            ResponseSecurityHeaders securityHeaders = server.getResponseSecurityHeaders();
+
+            if (securityHeaders != null) {
+                securityHeaders.addSecurityHeaders(response.getResponseHeaders());
+            }
+        }
+        if (request != null) {
+            CorsHandler corsHandler = server.getCorsHandler();
+            // Only add CORS headers if CORS is enabled
+            if (corsHandler != null) {
+                corsHandler.addCorsHeaders(request.getRequestHeaders(), response.getResponseHeaders());
+            }
+        }
+
     }
 
     public boolean closableStreams() {
@@ -487,6 +532,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
      */
     public void closeConnection() {
         this.isActive = false;
+
         if (this.clientSocket != null) {
             try {
                 this.clientSocket.shutdownOutput();
@@ -535,6 +581,68 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         return this.is;
     }
 
+    /**
+     * Drains exactly the specified number of bytes from the input stream to prevent TCP RST. This is used when we know exactly how much
+     * data the client will send (e.g. from Content-Length header).
+     *
+     * @param bytesToDrain
+     *            Number of bytes to read and discard
+     */
+    public void drainContentLength(long bytesToDrain) {
+        if (bytesToDrain <= 0) {
+            LogV3.fine("Nothing to drain (bytesToDrain = " + bytesToDrain + "), skipping");
+            return;
+        }
+        if (this.is == null || this.clientSocket == null) {
+            LogV3.fine("Cannot drain: input stream or socket is null");
+            return;
+        }
+        final RequestSizeLimits limits = getServer().getRequestSizeLimits();
+        if (limits == null) {
+            return;
+        }
+        if (!limits.isDrainInputStreamEnabled()) {
+            LogV3.fine("Draining is disabled");
+            return;
+        }
+        long breakAt = 0;
+        final TimeSpan timeout = limits.getDrainInputStreamTimeout();
+        if (timeout != null && timeout.isMoreThan(TimeSpan.ZERO)) {
+            breakAt = Time.systemIndependentCurrentJVMTimeMillis() + timeout.toMillis();
+        }
+        final long maxDrain = limits.getMaxDrainInputStreamBytes();
+        // Check if we would exceed drain limits
+        if (maxDrain > 0 && bytesToDrain > maxDrain) {
+            LogV3.fine("Content-Length " + bytesToDrain + " exceeds max drain limit " + maxDrain + ". Skipping drain to avoid long wait.");
+            return;
+        }
+        try {
+            LogV3.fine("Draining exactly " + bytesToDrain + " bytes from Content-Length");
+            final byte[] buffer = new byte[8192];
+            long totalRead = 0;
+            int len;
+            InputStream stream = is;
+            // do not read from the limited InputStream.class..Cause.ACTIVATION..limits limited..
+            while (stream instanceof CountingInputStream) {
+                stream = ((CountingInputStream) stream).getParentInputStream();
+            }
+            while (totalRead < bytesToDrain && (len = stream.read(buffer, 0, (int) Math.min(buffer.length, bytesToDrain - totalRead))) != -1) {
+                totalRead += len;
+                if (breakAt > 0 && Time.systemIndependentCurrentJVMTimeMillis() > breakAt) {
+                    LogV3.fine("Drained " + totalRead + " of " + bytesToDrain + " bytes. Break after timeout: " + timeout);
+                    break;
+                }
+            }
+            if (totalRead > 0) {
+                LogV3.fine("Drained " + totalRead + " of " + bytesToDrain + " bytes from input stream to prevent TCP RST");
+            }
+        } catch (final java.net.SocketTimeoutException e) {
+            LogV3.fine("Drain stopped due to socket timeout");
+        } catch (final Throwable e) {
+            LogV3.fine("Drain stopped due to exception: " + e.getMessage());
+        }
+    }
+
     protected OutputStream getRawOutputStream() throws IOException {
         if (this.os == null) {
             throw new IllegalStateException("no RawOutputStream available!");
@@ -547,12 +655,15 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         if (this.clientSocket != null) {
             final InetAddress clientAddress = this.clientSocket.getInetAddress();
             remoteAddress.add(clientAddress.getHostAddress());
+
         }
         final HTTPHeader forwardedFor = requestHeaders.get("X-Forwarded-For");
         if (forwardedFor != null && !StringUtils.isEmpty(forwardedFor.getValue())) {
             final String addresses[] = forwardedFor.getValue().split(", ");
             for (final String ip : addresses) {
+
                 remoteAddress.add(ip.trim());
+
             }
         }
         return remoteAddress;
@@ -568,120 +679,6 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
 
     public boolean isOutputStreamInUse() {
         return this.outputStreamInUse;
-    }
-
-    public boolean onException(final Throwable e, final HttpRequest request, HttpResponse response) throws IOException {
-        // create a fresh new Response Instance - just to be sure that we return the exception only. we do not know at this stage if the
-        // existing response Instance already contains parts of an answer
-        HTTPHeader originAllowedOrigin = response == null ? null : response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
-        HTTPHeader originAllowedHeader = response == null ? null : response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
-        HTTPHeader originAlloweMethods = response == null ? null : response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS);
-        HTTPHeader accessAge = response == null ? null : response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
-        this.response = response = new HttpResponse(this);
-        if (originAllowedOrigin != null) {
-            response.getResponseHeaders().add(originAllowedOrigin);
-        }
-        if (originAllowedHeader != null) {
-            response.getResponseHeaders().add(originAllowedHeader);
-        }
-        if (originAlloweMethods != null) {
-            response.getResponseHeaders().add(originAlloweMethods);
-        }
-        if (accessAge != null) {
-            response.getResponseHeaders().add(accessAge);
-        }
-        this.response.setResponseCode(HTTPConstants.ResponseCode.SERVERERROR_INTERNAL);
-        if (Exceptions.containsInstanceOf(e, SocketException.class, ClosedChannelException.class)) {
-            // socket already closed (likely due to timeout or security limit)
-            // Don't log as error - this is expected when timeouts trigger or security limits are exceeded
-            return true;
-        } else if (e instanceof HttpMethodNotAllowedException) {
-            final String remoteAddress = request != null ? StringUtils.join(request.getRemoteAddress(), ", ") : "unknown";
-            final String requestUrl = request != null ? request.getRequestedURL() : "unknown";
-            final String method = request != null && request.getRequestMethod() != null ? request.getRequestMethod().name() : "unknown";
-            LogV3.warning("Security: HTTP method not allowed | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Method: " + method + " | Message: " + e.getMessage());
-            this.response.setResponseCode(ResponseCode.METHOD_NOT_ALLOWED);
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
-            try {
-                final String message = e.getMessage() != null ? e.getMessage() : "HTTP method not allowed";
-                final byte[] bytes = message.getBytes("UTF-8");
-                this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
-                this.response.getOutputStream(true).write(bytes);
-                this.response.getOutputStream(true).flush();
-            } catch (final Throwable ignore) {
-                // Ignore
-            }
-            return true;
-        } else if (request instanceof OptionsRequest) {
-            this.response.setResponseCode(HTTPConstants.ResponseCode.ERROR_FORBIDDEN);
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
-            this.response.getOutputStream(true).flush();
-            return true;
-        } else if (e instanceof RequestSizeLimitExceededException) {
-            final String remoteAddress = request != null ? StringUtils.join(request.getRemoteAddress(), ", ") : "unknown";
-            final String requestUrl = request != null ? request.getRequestedURL() : "unknown";
-            LogV3.warning("Security: Request size limit exceeded | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Message: " + e.getMessage());
-            this.response.setResponseCode(ResponseCode.REQUEST_ENTITY_TOO_LARGE);
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
-            try {
-                final String message = "Request size limit exceeded!";
-                final byte[] bytes = message.getBytes("UTF-8");
-                this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
-                this.response.getOutputStream(true).write(bytes);
-                this.response.getOutputStream(true).flush();
-            } catch (final Throwable ignore) {
-                // Ignore
-            }
-            return true;
-        } else if (e instanceof ForbiddenOriginException) {
-            final String remoteAddress = request != null ? StringUtils.join(request.getRemoteAddress(), ", ") : "unknown";
-            final String requestUrl = request != null ? request.getRequestedURL() : "unknown";
-            LogV3.warning("Security: Forbidden origin detected | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Message: " + e.getMessage());
-            this.response.setResponseCode(ResponseCode.ERROR_FORBIDDEN);
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
-            try {
-                final String message = "Forbidden Origin!";
-                final byte[] bytes = message.getBytes("UTF-8");
-                this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
-                this.response.getOutputStream(true).write(bytes);
-                this.response.getOutputStream(true).flush();
-            } catch (final Throwable ignore) {
-                // Ignore
-            }
-            return true;
-        } else if (e instanceof ForbiddenHeaderException) {
-            final String remoteAddress = request != null ? StringUtils.join(request.getRemoteAddress(), ", ") : "unknown";
-            final String requestUrl = request != null ? request.getRequestedURL() : "unknown";
-            LogV3.warning("Security: Forbidden header detected | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Message: " + e.getMessage());
-            this.response.setResponseCode(ResponseCode.ERROR_BAD_REQUEST);
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
-            try {
-                final String message = "Forbidden Headers!";
-                final byte[] bytes = message.getBytes("UTF-8");
-                this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
-                this.response.getOutputStream(true).write(bytes);
-                this.response.getOutputStream(true).flush();
-            } catch (final Throwable ignore) {
-                // Ignore
-            }
-            return true;
-        } else if (e instanceof HttpConnectionExceptionHandler) {
-            return ((HttpConnectionExceptionHandler) e).handle(request, response);
-        } else if (request != null) {
-            this.response.setResponseCode(ResponseCode.SERVERERROR_INTERNAL);
-            LogV3.log(e);
-            // do not return stacktraces!
-            final byte[] bytes = "Unexpected Exception".getBytes("UTF-8");
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text; charset=UTF-8"));
-            this.response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
-            this.response.getOutputStream(true).write(bytes);
-            this.response.getOutputStream(true).flush();
-            return true;
-        } else {
-            // too early - no request read so far
-            LogV3.log(e);
-            return true;
-        }
     }
 
     protected void onUnhandled(final HttpRequest request, final HttpResponse response) throws IOException {
@@ -779,48 +776,23 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         Thread.interrupted();
         boolean closeConnection = true;
         try {
-            if (this.request == null) {
-                this.request = this.buildRequest();
-            }
-            if (this.response == null) {
-                this.response = this.buildResponse();
-            }
-            final HttpServerInterface server = getServer();
-            final HeaderValidationRules headerRules = server == null ? null : server.getHeaderValidationRules();
-            if (headerRules != null && headerRules.isEnabled()) {
-                if (!headerRules.isRequestAllowed(request.getRequestHeaders())) {
-                    final String errorMessage = headerRules.getValidationError(request.getRequestHeaders());
-                    final String remoteAddress = StringUtils.join(request.getRemoteAddress(), ", ");
-                    final String requestUrl = request.getRequestedURL();
-                    LogV3.warning("Security: Header validation failed | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Error: " + errorMessage);
-                    throw new ForbiddenHeaderException(errorMessage);
+            try {
+                if (this.response == null) {
+                    this.response = this.buildResponse();
+
                 }
-            }
-            final Set<RequestMethod> allowedMethods = server == null ? null : server.getAllowedMethods();
-            if (allowedMethods != null) {
-                RequestMethod method = request.getRequestMethod();
-                if (method == RequestMethod.UNKNOWN || !allowedMethods.contains(method)) {
-                    throw new HttpMethodNotAllowedException("Illegal Method");
+                if (this.request == null) {
+                    this.request = this.buildRequest();
                 }
-            } else {
-                // if null everything is allowed
+            } finally {
+                final HttpRequest request = this.request;
+                final HttpResponse response = this.response;
+
+                configure(request, response);
             }
-            // Origin validation is handled by the server instance (CorsHandler).
-            // If CORS is disabled (corsHandler == null), reject any request that sends an Origin header.
-            final HTTPHeader originHeader = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ORIGIN);
-            if (originHeader != null) {
-                final String origin = originHeader.getValue();
-                if (StringUtils.isEmpty(origin)) {
-                    throw new ForbiddenOriginException("Empty Origin header rejected");
-                }
-                final CorsHandler corsHandler = server == null ? null : server.getCorsHandler();
-                final boolean allowed = corsHandler != null && corsHandler.isOriginAllowed(request);
-                if (!allowed) {
-                    throw new ForbiddenOriginException("Cross-Origin request rejected");
-                }
-            }
-            final HttpRequest request = this.request;
-            final HttpResponse response = this.response;
+
+            server.validateRequest(request);
+
             if (this.deferRequest(request)) {
                 closeConnection = false;
             } else {
@@ -849,6 +821,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                             } else {
                                 throw new HttpMethodNotAllowedException("This server is not a proxy!");
                             }
+
                         } else {
                             throw new HttpMethodNotAllowedException("Unsupported RequestType");
                         }
@@ -874,17 +847,83 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
             }
         } catch (final Throwable e) {
             try {
-                closeConnection = this.onException(e, this.request, this.response);
+
+                final AbstractServerBasics server = this.getServer();
+                this.response = createErrorResponse();
+                closeConnection = server.onException(e, this.request, this.response);
+
             } catch (final Throwable nothing) {
+
                 LogV3.warning("Error: Cannot Send HTTP Response!");
                 LogV3.log(Exceptions.addSuppressed(e, nothing));
             }
         } finally {
+
             if (closeConnection) {
+                try {
+                    if (request instanceof AbstractPostRequest) {
+                        HTTPHeader header = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_CONTENT_LENGTH);
+                        if (header != null) {
+                            long cl = Long.parseLong(header.getValue());
+                            CountingInputStream inputStream;
+
+                            inputStream = getInputStreamByType(request.getConnection().getInputStream(), CountingInputStream.class);
+
+                            if (inputStream != null) {
+                                long remaining = cl - inputStream.transferedBytes();
+                                if (remaining > 0) {
+                                    drainContentLength(remaining);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    LogV3.log(e);
+                }
+
                 this.closeConnection();
+
                 this.close();
             }
         }
+    }
+
+    /**
+     * @return
+     * @throws IOException
+     *
+     */
+    public HttpResponse createErrorResponse() throws IOException {
+        // create a fresh new Response Instance - just to be sure that we return the exception only. we do not know at this stage if the
+        // existing response Instance already contains parts of an answer
+        // DISCUSS: keep existing headers, or re-configure a new response
+        // HTTPHeader originAllowedOrigin = response == null ? null :
+        // response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
+        // HTTPHeader originAllowedHeader = response == null ? null :
+        // response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
+        // HTTPHeader originAlloweMethods = response == null ? null :
+        // response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS);
+        // HTTPHeader accessAge = response == null ? null :
+        // response.getResponseHeaders().get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
+        //
+        HttpResponse ret = buildResponse();
+        // if (originAllowedOrigin != null) {
+        // ret.getResponseHeaders().add(originAllowedOrigin);
+        // }
+        // if (originAllowedHeader != null) {
+        // ret.getResponseHeaders().add(originAllowedHeader);
+        // }
+        // if (originAlloweMethods != null) {
+        // ret.getResponseHeaders().add(originAlloweMethods);
+        // }
+        // if (accessAge != null) {
+        // ret.getResponseHeaders().add(accessAge);
+        // }
+
+        configure(request, ret);
+
+        ret.setResponseCode(HTTPConstants.ResponseCode.SERVERERROR_INTERNAL);
+        return ret;
     }
 
     public static interface ConnectionHook {
@@ -913,6 +952,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         if (this.isOutputStreamInUse()) {
             throw new OutputStreamIsAlreadyInUseException("OutputStream is already in use!");
         } else if (this.response != null) {
+
             try {
                 final OutputStream out = this.getRawOutputStream();
                 final ConnectionHook lHook = hook;
@@ -929,8 +969,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
     protected void openOutputStream(OutputStream out, HttpResponse response) throws IOException {
         // Validate response headers before writing them
         // Validate security headers if configured
-        final HttpServerInterface server = getServer();
-        final ResponseSecurityHeaders responseSecurityHeaders = server == null ? null : server.getResponseSecurityHeaders();
+        ResponseSecurityHeaders responseSecurityHeaders = getServer().getResponseSecurityHeaders();
         if (responseSecurityHeaders != null) {
             responseSecurityHeaders.validateResponseHeaders(response.getResponseHeaders());
         }
@@ -960,7 +999,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
      *
      * @return The HttpServer instance
      */
-    public HttpServerInterface getServer() {
+    public AbstractServerBasics getServer() {
         return this.server;
     }
 
@@ -972,4 +1011,5 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
             return "HttpConnectionThread: IS and OS";
         }
     }
+
 }

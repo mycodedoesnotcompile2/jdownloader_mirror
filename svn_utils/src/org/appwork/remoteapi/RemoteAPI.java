@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -84,10 +84,10 @@ import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.RequestSizeLimitExceededException;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
-import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
+import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.reflection.Clazz;
 
@@ -355,14 +355,11 @@ public class RemoteAPI implements HttpRequestHandler {
             }
             if (methodHasResponseParameter && !methodHasReturnTypeAndAResponseParameter) {
                 /*
-                 * Method has RemoteAPIResponse as parameter but no @AllowResponseAccess annotation.
-                 * We assume the method writes directly to the OutputStream via the response parameter.
-                 * If responseData is non-null, it will be ignored - log a warning.
+                 * Method has RemoteAPIResponse as parameter but no @AllowResponseAccess annotation. We assume the method writes directly to
+                 * the OutputStream via the response parameter. If responseData is non-null, it will be ignored - log a warning.
                  */
                 if (responseData != null) {
-                    LogV3.warning("RemoteAPI: Method " + method.getDeclaringClass().getSimpleName() + "." + method.getName() + 
-                        " has RemoteAPIResponse parameter but returned non-null value (" + responseData.getClass().getSimpleName() + 
-                        "). Return value will be ignored. If you want to return data, use @AllowResponseAccess annotation or remove RemoteAPIResponse parameter.");
+                    LogV3.warning("RemoteAPI: Method " + method.getDeclaringClass().getSimpleName() + "." + method.getName() + " has RemoteAPIResponse parameter but returned non-null value (" + responseData.getClass().getSimpleName() + "). Return value will be ignored. If you want to return data, use @AllowResponseAccess annotation or remove RemoteAPIResponse parameter.");
                 }
                 return;
             }
@@ -509,7 +506,8 @@ public class RemoteAPI implements HttpRequestHandler {
                     throw (BasicRemoteAPIException) e.getCause();
                 }
                 if (e instanceof RequestSizeLimitExceededException) {
-                    throw new BasicRemoteAPIException("Post Data Limit Exceeded", ResponseCode.REQUEST_ENTITY_TOO_LARGE);
+
+                    throw new BasicRemoteAPIException(e, e.getMessage(), ResponseCode.REQUEST_ENTITY_TOO_LARGE, null);
 
                 }
                 throw new BasicRemoteAPIException(e, "Bad Request", ResponseCode.ERROR_BAD_REQUEST, null);

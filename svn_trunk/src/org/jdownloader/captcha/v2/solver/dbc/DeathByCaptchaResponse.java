@@ -10,8 +10,8 @@ public class DeathByCaptchaResponse extends CaptchaResponse {
         return captcha;
     }
 
-    public DeathByCaptchaResponse(Challenge<String> challenge, DeathByCaptchaSolver deathByCaptchaSolver, DBCUploadResponse captcha, String value, int priority) {
-        super(challenge, deathByCaptchaSolver, value, priority);
+    public DeathByCaptchaResponse(Challenge<String> challenge, DeathByCaptchaSolver deathByCaptchaSolver, DBCUploadResponse captcha, String value) {
+        super(challenge, deathByCaptchaSolver, value);
         this.captcha = captcha;
     }
 }

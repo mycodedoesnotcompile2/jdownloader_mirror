@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -92,8 +92,11 @@ public class HttpServerRemoteAPITest extends HttpServerTestBase {
     private void testNonExistentMethod() throws Exception {
         LogV3.info("Test: Non-existent method should return 404");
         final String url = "http://localhost:" + this.serverPort + "/test/nonexistent";
+        lastServerException = null;
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
+        ;
+        assertTrue(lastServerException instanceof ApiCommandNotAvailable);
         assertTrue(responseCode == ResponseCode.ERROR_NOT_FOUND.getCode(), "Non-existent method should return 404, was: " + responseCode);
         final String responseBody = context.getResponseString();
         assertTrue(responseBody != null && (responseBody.contains("API_COMMAND_NOT_FOUND") || responseBody.contains("not found") || responseBody.contains(ApiCommandNotAvailable.class.getSimpleName())), "Response should indicate method not found, was: " + responseBody);

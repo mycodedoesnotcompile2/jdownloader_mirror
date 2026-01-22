@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -123,6 +123,7 @@ public class HTTPConstants {
         SERVERERROR_SERVICE_UNAVAILABLE(503, "Service Unavailable"),
         GATEWAY_TIMEOUT(504, "Gateway Time-out"),
         WEB_SERVER_DOWN(521, "Cloudflare, Web server is down");
+
         /**
          * @param responseCode
          * @return
@@ -289,25 +290,24 @@ public class HTTPConstants {
     public static final String           HEADER_REQUEST_X_FORWARDED_FOR                = "X-Forwarded-For";
     public static final String           HEADER_REQUEST_X_CLIENT_IP                    = "X-Client-IP";
     /**
-     * Sec-Fetch-Site header indicates the relationship between the origin of the resource and the origin of the request.
-     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site
+     * Sec-Fetch-Site header indicates the relationship between the origin of the resource and the origin of the request. See
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site
      */
     public static final String           HEADER_REQUEST_SEC_FETCH_SITE                 = "Sec-Fetch-Site";
     /**
-     * Sec-Fetch-Mode header indicates the request's mode.
-     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Mode
+     * Sec-Fetch-Mode header indicates the request's mode. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Mode
      */
     public static final String           HEADER_REQUEST_SEC_FETCH_MODE                 = "Sec-Fetch-Mode";
     /**
-     * Sec-Fetch-User header indicates whether the request was initiated by a user action.
-     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-User
+     * Sec-Fetch-User header indicates whether the request was initiated by a user action. See
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-User
      */
     public static final String           HEADER_REQUEST_SEC_FETCH_USER                 = "Sec-Fetch-User";
     /**
-     * Sec-Fetch-Dest header indicates the destination of the request (what the fetched resource will be used for).
-     * See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest
+     * Sec-Fetch-Dest header indicates the destination of the request (what the fetched resource will be used for). See
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest
      */
-    public static final String           HEADER_REQUEST_SEC_FETCH_DEST                = "Sec-Fetch-Dest";
+    public static final String           HEADER_REQUEST_SEC_FETCH_DEST                 = "Sec-Fetch-Dest";
     /**
      * Implementation-specific headers that may have various effects anywhere along the request-response chain. Pragma: no-cache
      */
@@ -360,7 +360,7 @@ public class HTTPConstants {
     public static final String           HEADER_REQUEST_CONTROL_HEADERS                = "Access-Control-Request-Headers";
     /*
      * https://www.rfc-editor.org/rfc/rfc2616#page-141
-     * 
+     *
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
      */
     public static final String           HEADER_RESPONSE_RETRY_AFTER                   = "Retry-After";
@@ -390,8 +390,10 @@ public class HTTPConstants {
     public static final String           HEADER_VALUE_ENCODING_DEFLATE                 = "deflate";
     public static final String           HEADER_RESPONSE_LAST_MODFIED                  = "Last-Modified";
     public static final String           HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS      = "Upgrade-Insecure-Requests";
+
     /**
-     * 
+     *
      */
-    public static final String X_APPWORK = "x-appwork";
+    public static final String           X_APPWORK                                     = "x-appwork";
+    public static final String           HEADER_REQUEST_CONTENT_LENGTH                 = "Content-Length";
 }

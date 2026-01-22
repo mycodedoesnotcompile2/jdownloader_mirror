@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -164,7 +164,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
         corsHandler.setMaxAge(30000L); // 30 seconds in milliseconds, like RemoteAPI.java
         corsHandler.setAllowHeadersFromRequest(true); // Dynamic allowHeaders from request (State-of-the-Art)
-        this.handlerInfo.getHttpServer().setCorsHandler(corsHandler);
+        httpServer.setCorsHandler(corsHandler);
     }
 
     private void assertNoCorsHeaders(final RequestContext context, final String messagePrefix) throws Exception {
@@ -173,10 +173,10 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final String allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
         final String maxAge = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
 
-        assertTrue(allowOrigin == null, messagePrefix + ": Access-Control-Allow-Origin header should not be present, but was: " + allowOrigin);
-        assertTrue(allowMethods == null, messagePrefix + ": Access-Control-Allow-Methods header should not be present, but was: " + allowMethods);
-        assertTrue(allowHeaders == null, messagePrefix + ": Access-Control-Allow-Headers header should not be present, but was: " + allowHeaders);
-        assertTrue(maxAge == null, messagePrefix + ": Access-Control-Max-Age header should not be present, but was: " + maxAge);
+        this.assertTrueWithContext(allowOrigin == null, messagePrefix + ": Access-Control-Allow-Origin header should not be present, but was: " + allowOrigin, context);
+        this.assertTrueWithContext(allowMethods == null, messagePrefix + ": Access-Control-Allow-Methods header should not be present, but was: " + allowMethods, context);
+        this.assertTrueWithContext(allowHeaders == null, messagePrefix + ": Access-Control-Allow-Headers header should not be present, but was: " + allowHeaders, context);
+        this.assertTrueWithContext(maxAge == null, messagePrefix + ": Access-Control-Max-Age header should not be present, but was: " + maxAge, context);
     }
 
     /**
@@ -190,7 +190,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final int responseCode = context.getCode();
 
         // Cross-origin requests should be rejected with 403 Forbidden
-        assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Cross-Origin request should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Cross-Origin request should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
 
         // Check that no CORS headers are present in the response (request was blocked)
         this.assertNoCorsHeaders(context, "Default CORS blocked request");
@@ -208,7 +208,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         // Don't set Origin header - should be allowed
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200, "Direct browser navigation (no Origin) should return 200, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "Direct browser navigation (no Origin) should return 200, was: " + responseCode, context);
         this.assertNoCorsHeaders(context, "Default CORS no Origin");
         LogV3.info("Test 2 passed: Direct browser navigation successful: " + responseCode);
     }
@@ -222,7 +222,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://localhost:" + this.serverPort).setUrl(url));
         final int responseCode = context.getCode();
-        assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Localhost Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Localhost Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
         this.assertNoCorsHeaders(context, "Default CORS localhost Origin");
         LogV3.info("Test 3 passed: Localhost Origin blocked with " + responseCode + ", no CORS headers present");
     }
@@ -254,7 +254,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", originValue).setUrl(url));
         final int responseCode = context.getCode();
-        assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), label + " should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), label + " should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
         this.assertNoCorsHeaders(context, "Default CORS " + label);
         LogV3.info("Test passed: " + label + " blocked with " + responseCode + ", no CORS headers present");
     }
@@ -270,17 +270,17 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
         final int responseCode = context.getCode();
 
-        assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Non-allowed Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Non-allowed Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
 
         final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
         final String allowMethods = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS);
         final String allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
         final String maxAge = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
 
-        assertTrue(allowOrigin == null, "Access-Control-Allow-Origin header should not be present for blocked Origin, but was: " + allowOrigin);
-        assertTrue(allowMethods == null, "Access-Control-Allow-Methods header should not be present for blocked Origin, but was: " + allowMethods);
-        assertTrue(allowHeaders == null, "Access-Control-Allow-Headers header should not be present for blocked Origin, but was: " + allowHeaders);
-        assertTrue(maxAge == null, "Access-Control-Max-Age header should not be present for blocked Origin, but was: " + maxAge);
+        this.assertTrueWithContext(allowOrigin == null, "Access-Control-Allow-Origin header should not be present for blocked Origin, but was: " + allowOrigin, context);
+        this.assertTrueWithContext(allowMethods == null, "Access-Control-Allow-Methods header should not be present for blocked Origin, but was: " + allowMethods, context);
+        this.assertTrueWithContext(allowHeaders == null, "Access-Control-Allow-Headers header should not be present for blocked Origin, but was: " + allowHeaders, context);
+        this.assertTrueWithContext(maxAge == null, "Access-Control-Max-Age header should not be present for blocked Origin, but was: " + maxAge, context);
 
         LogV3.info("Test 4 passed: Non-allowed Origin blocked with " + responseCode + ", no CORS headers present");
     }
@@ -306,11 +306,11 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final int responseCode = context.getCode();
 
         // Request should succeed (origin is explicitly allowed)
-        assertTrue(responseCode == 200, "Cross-origin request with CORS enabled should return 200, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "Cross-origin request with CORS enabled should return 200, was: " + responseCode, context);
 
         // Check that CORS headers are present
         final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
-        assertTrue(allowOrigin != null, "Access-Control-Allow-Origin header should be present when CORS is enabled");
+        this.assertTrueWithContext(allowOrigin != null, "Access-Control-Allow-Origin header should be present when CORS is enabled", context);
         // Origin is explicitly allowed, so Access-Control-Allow-Origin should match it
         assertEquals(origin, allowOrigin, "Access-Control-Allow-Origin should match the allowed Origin from request");
 
@@ -328,10 +328,10 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
         final int responseCode = context.getCode();
 
-        assertTrue(responseCode == 200, "Request should return 200, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "Request should return 200, was: " + responseCode, context);
 
         final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
-        assertTrue(allowOrigin != null, "Access-Control-Allow-Origin header should be present");
+        this.assertTrueWithContext(allowOrigin != null, "Access-Control-Allow-Origin header should be present", context);
         assertEquals(origin, allowOrigin, "Access-Control-Allow-Origin should match the allowed Origin from request");
 
         LogV3.info("Test 6 passed: Access-Control-Allow-Origin matches request Origin: " + allowOrigin);
@@ -350,10 +350,10 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", requestedHeaders).setUrl(url));
 
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200 || responseCode == 204, "OPTIONS preflight request should return 200/204, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS preflight request should return 200/204, was: " + responseCode, context);
 
         final String allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
-        assertTrue(allowHeaders != null, "Access-Control-Allow-Headers header should be present");
+        this.assertTrueWithContext(allowHeaders != null, "Access-Control-Allow-Headers header should be present", context);
         assertEquals(requestedHeaders, allowHeaders, "Access-Control-Allow-Headers should echo Access-Control-Request-Headers from request");
 
         LogV3.info("Test 7 passed: Access-Control-Allow-Headers from request: " + allowHeaders);
@@ -370,11 +370,11 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").setUrl(url));
 
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200 || responseCode == 204, "OPTIONS request should return 200/204, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS request should return 200/204, was: " + responseCode, context);
 
         final String allowMethods = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS);
-        assertTrue(allowMethods != null, "Access-Control-Allow-Methods header should be present");
-        assertTrue(allowMethods.contains("OPTIONS") && allowMethods.contains("GET") && allowMethods.contains("POST"), "Access-Control-Allow-Methods should contain OPTIONS, GET, POST, was: " + allowMethods);
+        this.assertTrueWithContext(allowMethods != null, "Access-Control-Allow-Methods header should be present", context);
+        this.assertTrueWithContext(allowMethods.contains("OPTIONS") && allowMethods.contains("GET") && allowMethods.contains("POST"), "Access-Control-Allow-Methods should contain OPTIONS, GET, POST, was: " + allowMethods, context);
 
         LogV3.info("Test 8 passed: Access-Control-Allow-Methods: " + allowMethods);
     }
@@ -390,10 +390,10 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").setUrl(url));
 
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200 || responseCode == 204, "OPTIONS request should return 200/204, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS request should return 200/204, was: " + responseCode, context);
 
         final String maxAge = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
-        assertTrue(maxAge != null, "Access-Control-Max-Age header should be present");
+        this.assertTrueWithContext(maxAge != null, "Access-Control-Max-Age header should be present", context);
         assertEquals("30", maxAge, "Access-Control-Max-Age should be 30 seconds (converted from 30000 ms)");
 
         LogV3.info("Test 9 passed: Access-Control-Max-Age: " + maxAge);
@@ -410,11 +410,11 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
 
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200, "GET request should return 200, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "GET request should return 200, was: " + responseCode, context);
 
         final String exposeHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_EXPOSE_HEADERS);
-        assertTrue(exposeHeaders != null, "Access-Control-Expose-Headers header should be present");
-        assertTrue(exposeHeaders.contains("X-Custom-Header") && exposeHeaders.contains("X-Another-Header"), "Access-Control-Expose-Headers should contain configured headers, was: " + exposeHeaders);
+        this.assertTrueWithContext(exposeHeaders != null, "Access-Control-Expose-Headers header should be present", context);
+        this.assertTrueWithContext(exposeHeaders.contains("X-Custom-Header") && exposeHeaders.contains("X-Another-Header"), "Access-Control-Expose-Headers should contain configured headers, was: " + exposeHeaders, context);
 
         LogV3.info("Test 10 passed: Access-Control-Expose-Headers: " + exposeHeaders);
     }
@@ -430,7 +430,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type, Authorization").setUrl(url));
 
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200 || responseCode == 204, "OPTIONS preflight request should return 200/204, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS preflight request should return 200/204, was: " + responseCode, context);
 
         // Check all CORS headers are present
         final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
@@ -438,10 +438,10 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         final String allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
         final String maxAge = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
 
-        assertTrue(allowOrigin != null, "Access-Control-Allow-Origin should be present in preflight response");
-        assertTrue(allowMethods != null, "Access-Control-Allow-Methods should be present in preflight response");
-        assertTrue(allowHeaders != null, "Access-Control-Allow-Headers should be present in preflight response");
-        assertTrue(maxAge != null, "Access-Control-Max-Age should be present in preflight response");
+        this.assertTrueWithContext(allowOrigin != null, "Access-Control-Allow-Origin should be present in preflight response", context);
+        this.assertTrueWithContext(allowMethods != null, "Access-Control-Allow-Methods should be present in preflight response", context);
+        this.assertTrueWithContext(allowHeaders != null, "Access-Control-Allow-Headers should be present in preflight response", context);
+        this.assertTrueWithContext(maxAge != null, "Access-Control-Max-Age should be present in preflight response", context);
 
         assertEquals(origin, allowOrigin, "Access-Control-Allow-Origin should match Origin");
         assertEquals("Content-Type, Authorization", allowHeaders, "Access-Control-Allow-Headers should echo request headers");
@@ -459,7 +459,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         // Request without Origin header
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200, "Request without Origin should return 200, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "Request without Origin should return 200, was: " + responseCode, context);
 
         // CORS headers should not be present (no Origin = no CORS)
         this.assertNoCorsHeaders(context, "CORS enabled no Origin");
@@ -477,11 +477,11 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200, "Wildcard CORS should allow any Origin, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "Wildcard CORS should allow any Origin, was: " + responseCode, context);
 
         final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
         assertEquals("*", allowOrigin, "Wildcard CORS should return Access-Control-Allow-Origin: *");
-        assertTrue(!origin.equals(allowOrigin), "Wildcard CORS should not echo the Origin when using '*'");
+        this.assertTrueWithContext(!origin.equals(allowOrigin), "Wildcard CORS should not echo the Origin when using '*'", context);
 
         LogV3.info("Test 13 passed: Wildcard CORS allowed Origin with Access-Control-Allow-Origin=*");
     }
@@ -495,7 +495,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://localhost:" + this.serverPort).setUrl(url));
         final int responseCode = context.getCode();
-        assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "allowedOrigins=null should reject Origin requests, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "allowedOrigins=null should reject Origin requests, was: " + responseCode, context);
         this.assertNoCorsHeaders(context, "allowedOrigins=null blocked request");
 
         LogV3.info("Test 14 passed: Origin request rejected with allowedOrigins=null");
@@ -510,7 +510,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
-        assertTrue(responseCode == 200, "No-Origin request should be allowed with allowedOrigins=null, was: " + responseCode);
+        this.assertTrueWithContext(responseCode == 200, "No-Origin request should be allowed with allowedOrigins=null, was: " + responseCode, context);
         this.assertNoCorsHeaders(context, "allowedOrigins=null no Origin");
 
         LogV3.info("Test 15 passed: No-Origin request allowed with allowedOrigins=null");

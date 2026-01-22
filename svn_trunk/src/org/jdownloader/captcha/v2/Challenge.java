@@ -31,6 +31,12 @@ public abstract class Challenge<T> {
     private final boolean         createdInsideAccountChecker;
     private int                   round        = -1;
 
+    public enum CaptchaRequestType {
+        HOSTER,
+        HOSTER_LOGIN,
+        DECRYPTER
+    }
+
     public int getRound() {
         return round;
     }
@@ -312,6 +318,15 @@ public abstract class Challenge<T> {
         Plugin plg = getPlugin();
         if (plg != null) {
             round = plg.addChallenge(this);
+        }
+    }
+
+    public CaptchaRequestType getRequestType() {
+        // TODO: Implement CaptchaRequestType.HOSTER
+        if (this.isAccountLogin()) {
+            return CaptchaRequestType.HOSTER_LOGIN;
+        } else {
+            return CaptchaRequestType.DECRYPTER;
         }
     }
 

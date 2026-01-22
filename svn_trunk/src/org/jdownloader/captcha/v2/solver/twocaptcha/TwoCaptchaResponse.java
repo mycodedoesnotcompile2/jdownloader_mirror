@@ -11,7 +11,7 @@ public class TwoCaptchaResponse extends CaptchaResponse {
     }
 
     public TwoCaptchaResponse(Challenge<String> challenge, TwoCaptchaSolver solver, String id, String text) {
-        super(challenge, solver, text, 100);
+        super(challenge, solver, text);
         this.captchaID = id;
     }
 }

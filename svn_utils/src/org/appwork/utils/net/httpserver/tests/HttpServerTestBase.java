@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -48,12 +48,13 @@ import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.HeaderValidationRules;
-import org.appwork.utils.net.httpserver.HttpHandlerInfo;
-import org.appwork.utils.net.httpserver.HttpServerController;
+import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.RequestSizeLimits;
 import org.appwork.utils.net.httpserver.SecFetchDest;
 import org.appwork.utils.net.httpserver.SecFetchMode;
 import org.appwork.utils.net.httpserver.SecFetchSite;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * Base class for HTTP server tests providing common setup and teardown functionality.
@@ -70,26 +71,59 @@ import org.appwork.utils.net.httpserver.SecFetchSite;
  * @author AppWork
  */
 public abstract class HttpServerTestBase extends AWTest {
-    protected HttpServerController serverController;
-    protected RemoteAPI            remoteAPI;
-    protected HttpHandlerInfo      handlerInfo;
-    protected int                  serverPort;
-    protected HttpClient           httpClient;
+    /**
+     * @author thomas
+     * @date 21.01.2026
+     *
+     */
+    final class TestHttpServer extends HttpServer {
+        /**
+         * @param port
+         */
+        private TestHttpServer(int port) {
+            super(port);
+        }
+
+        public boolean onException(Throwable e, org.appwork.utils.net.httpserver.requests.HttpRequest request, org.appwork.utils.net.httpserver.responses.HttpResponse response) throws IOException {
+
+            HttpServerTestBase.this.lastServerException = e;
+            HttpServerTestBase.this.lastRequest = request;
+            HttpServerTestBase.this.lastResponse = response;
+            return super.onException(e, request, response);
+        }
+    }
+
+    protected TestHttpServer httpServer;
+    protected RemoteAPI      remoteAPI;
+    protected int            serverPort;
+    protected HttpClient     httpClient;
+    protected Throwable      lastServerException;
+    protected HttpRequest    lastRequest;
+    protected HttpResponse   lastResponse;
 
     /**
      * Server Setup: Creates and starts an HTTP Server with Dummy API
      */
     protected void setupServer() throws IOException, ParseException {
         LogV3.info("Starting HTTP Server Setup...");
-        this.serverController = new HttpServerController();
-        this.remoteAPI = new RemoteAPI();
 
-        // Register Dummy API
+        // Create RemoteAPI and register Dummy API
+        this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
 
-        // Start server on a free port (0 = automatic)
-        this.handlerInfo = this.serverController.registerRequestHandler(0, true, this.remoteAPI);
-        this.serverPort = this.handlerInfo.getPort();
+        // Create HttpServer on a free port (0 = automatic)
+        this.httpServer = new TestHttpServer(0);
+
+        this.httpServer.setLocalhostOnly(true);
+
+        // Register RemoteAPI as request handler
+        this.httpServer.registerRequestHandler(this.remoteAPI);
+
+        // Start server
+        this.httpServer.start();
+        this.serverPort = this.httpServer.getActualPort();
+
+        // Note: Input stream draining is enabled by default via RequestSizeLimits.DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES
 
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
@@ -105,10 +139,9 @@ public abstract class HttpServerTestBase extends AWTest {
      * Server Teardown: Stops the server
      */
     protected void teardownServer() {
-        if (this.handlerInfo != null) {
+        if (this.httpServer != null) {
             try {
-                this.handlerInfo.unregisterRequestHandler();
-                this.handlerInfo.getHttpServer().shutdown();
+                this.httpServer.shutdown();
                 LogV3.info("HTTP Server stopped");
             } catch (final Throwable e) {
                 LogV3.log(e);
@@ -164,6 +197,73 @@ public abstract class HttpServerTestBase extends AWTest {
     }
 
     /**
+     * Helper method to create an AssertionError with HttpClient context information included in the error message.
+     *
+     * <p>
+     * This method appends HttpClient context details (URL, response code, method, response body) to the error message, making it easier to
+     * debug test failures.
+     * </p>
+     *
+     * @param message
+     *            The base error message
+     * @param context
+     *            The RequestContext to include in the error message, or null
+     * @return An AssertionError with the message and context information
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    protected AssertionError createAssertionErrorWithContext(final String message, final HttpClient.RequestContext context) throws IOException, InterruptedException {
+        final StringBuilder errorMsg = new StringBuilder(message);
+        this.appendContextInfoToMessage(errorMsg, context);
+        return new AssertionError(errorMsg.toString());
+    }
+
+    /**
+     * Helper method to append HttpClient context information to an error message.
+     *
+     * @param errorMsg
+     *            The StringBuilder to append context information to
+     * @param context
+     *            The RequestContext to include, or null
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    protected void appendContextInfoToMessage(final StringBuilder errorMsg, final HttpClient.RequestContext context) throws IOException, InterruptedException {
+        if (context != null) {
+            errorMsg.append("\n\nHttpClient Context Information:\n");
+            errorMsg.append("  URL: " + (context.getUrl() != null ? context.getUrl() : "null") + "\n");
+            errorMsg.append("  Response Code: " + context.getCode() + "\n");
+            errorMsg.append("  Method: " + (context.getMethod() != null ? context.getMethod() : "null") + "\n");
+            final String responseBody = context.getResponseString();
+            if (responseBody != null) {
+
+                if (responseBody.length() > 500) {
+                    errorMsg.append("  Response Body (first 500 chars): " + responseBody.substring(0, 500) + "...\n");
+                } else {
+                    errorMsg.append("  Response Body: " + responseBody + "\n");
+                }
+            }
+            if (context.getConnection() != null) {
+                try {
+                    errorMsg.append("  Connection: " + context.getConnection().getClass().getSimpleName() + "\n");
+                    final java.util.Map<String, java.util.List<String>> headerFields = context.getConnection().getHeaderFields();
+                    if (headerFields != null && !headerFields.isEmpty()) {
+                        errorMsg.append("  Response Headers:\n");
+                        for (final java.util.Map.Entry<String, java.util.List<String>> entry : headerFields.entrySet()) {
+                            final String key = entry.getKey();
+                            if (key != null) {
+                                errorMsg.append("    " + key + ": " + entry.getValue() + "\n");
+                            }
+                        }
+                    }
+                } catch (final Throwable e) {
+                    errorMsg.append("  Error getting connection details: " + org.appwork.utils.Exceptions.getStackTrace(e) + "\n");
+                }
+            }
+        }
+    }
+
+    /**
      * Server Setup with Size Limits: Creates and starts an HTTP Server with Dummy API and size limits
      */
     protected void setupServerWithLimits(final int maxHeaderSize, final long maxPostBodySize) throws IOException, ParseException {
@@ -175,19 +275,26 @@ public abstract class HttpServerTestBase extends AWTest {
      */
     protected void setupServerWithLimits(final int maxHeaderSize, final long maxPostBodySize, final long maxPostProcessedSize) throws IOException, ParseException {
         LogV3.info("Starting HTTP Server Setup with Limits (maxHeaderSize=" + maxHeaderSize + ", maxPostBodySize=" + maxPostBodySize + ", maxPostProcessedSize=" + maxPostProcessedSize + ")...");
-        this.serverController = new HttpServerController();
-        this.remoteAPI = new RemoteAPI();
 
-        // Register Dummy API
+        // Create RemoteAPI and register Dummy API
+        this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
 
-        // Start server on a free port (0 = automatic)
-        this.handlerInfo = this.serverController.registerRequestHandler(0, true, this.remoteAPI);
-        this.serverPort = this.handlerInfo.getPort();
+        // Create HttpServer on a free port (0 = automatic) with exception tracking
+        this.httpServer = new TestHttpServer(0);
 
-        // Set request size limits
+        this.httpServer.setLocalhostOnly(true);
+
+        // Set request size limits BEFORE registering handlers and starting
         final RequestSizeLimits limits = new RequestSizeLimits(maxHeaderSize, maxPostBodySize, maxPostProcessedSize);
-        this.handlerInfo.getHttpServer().setRequestSizeLimits(limits);
+        this.httpServer.setRequestSizeLimits(limits);
+
+        // Register RemoteAPI as request handler
+        this.httpServer.registerRequestHandler(this.remoteAPI);
+
+        // Start server
+        this.httpServer.start();
+        this.serverPort = this.httpServer.getActualPort();
 
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
@@ -205,17 +312,17 @@ public abstract class HttpServerTestBase extends AWTest {
      */
     protected void setupServerWithBrowserHeaders() throws IOException, ParseException {
         LogV3.info("Starting HTTP Server Setup with Browser Header Rules...");
-        this.serverController = new HttpServerController();
-        this.remoteAPI = new RemoteAPI();
 
-        // Register Dummy API
+        // Create RemoteAPI and register Dummy API
+        this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
 
-        // Start server on a free port (0 = automatic)
-        this.handlerInfo = this.serverController.registerRequestHandler(0, true, this.remoteAPI);
-        this.serverPort = this.handlerInfo.getPort();
+        // Create HttpServer on a free port (0 = automatic) with exception tracking
+        this.httpServer = new TestHttpServer(0);
 
-        // Set header validation rules that allow direct browser requests
+        this.httpServer.setLocalhostOnly(true);
+
+        // Set header validation rules that allow direct browser requests BEFORE starting
         // - No mandatory headers (allow direct browser navigation)
         // - No forbidden headers (allow sec-fetch-* headers)
         final Map<String, String> mandatoryHeaders = new HashMap<String, String>();
@@ -225,7 +332,14 @@ public abstract class HttpServerTestBase extends AWTest {
         mandatoryHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, SecFetchMode.NAVIGATE.getValue());
         mandatoryHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, SecFetchDest.DOCUMENT.getValue());
         final HeaderValidationRules rules = new HeaderValidationRules(mandatoryHeaders, forbiddenHeaders);
-        this.handlerInfo.getHttpServer().setHeaderValidationRules(rules);
+        this.httpServer.setHeaderValidationRules(rules);
+
+        // Register RemoteAPI as request handler
+        this.httpServer.registerRequestHandler(this.remoteAPI);
+
+        // Start server
+        this.httpServer.start();
+        this.serverPort = this.httpServer.getActualPort();
 
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
@@ -243,12 +357,12 @@ public abstract class HttpServerTestBase extends AWTest {
      * @return The previous set of allowed methods
      */
     protected Set<RequestMethod> allowHttpMethods(final RequestMethod... methods) {
-        final Set<RequestMethod> previousMethods = this.handlerInfo.getHttpServer().getAllowedMethods();
+        final Set<RequestMethod> previousMethods = this.httpServer.getAllowedMethods();
         final EnumSet<RequestMethod> newMethods = EnumSet.noneOf(RequestMethod.class);
         for (final RequestMethod method : methods) {
             newMethods.add(method);
         }
-        this.handlerInfo.getHttpServer().setAllowedMethods(newMethods);
+        this.httpServer.setAllowedMethods(newMethods);
         return previousMethods;
     }
 
@@ -260,9 +374,29 @@ public abstract class HttpServerTestBase extends AWTest {
      */
     protected void restoreHttpMethods(final Set<RequestMethod> methods) {
         if (methods != null) {
-            this.handlerInfo.getHttpServer().setAllowedMethods(methods);
+            this.httpServer.setAllowedMethods(methods);
         } else {
-            this.handlerInfo.getHttpServer().setAllowedMethods(EnumSet.of(RequestMethod.GET));
+            this.httpServer.setAllowedMethods(EnumSet.of(RequestMethod.GET));
+        }
+    }
+
+    /**
+     * Assertion helper that includes HttpClient context information in the error message if the assertion fails.
+     *
+     * @param condition
+     *            The condition to assert (must be true)
+     * @param message
+     *            The error message if assertion fails
+     * @param context
+     *            The RequestContext to include in error message, or null
+     * @throws InterruptedException
+     * @throws IOException
+     * @throws AssertionError
+     */
+    protected void assertTrueWithContext(final boolean condition, final String message, final HttpClient.RequestContext context) throws AssertionError, IOException, InterruptedException {
+        if (!condition) {
+            this.logContextOnFailure(context, message);
+            throw this.createAssertionErrorWithContext(message, context);
         }
     }
 }

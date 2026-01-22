@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -88,6 +88,7 @@ public class HttpServerTestLauncher {
         testClasses.add(HttpServerAttackScenariosTest.class);
         testClasses.add(HttpServerConnectionTimeoutsTest.class);
         testClasses.add(HttpServerRemoteAPITest.class);
+        testClasses.add(HttpServerHeaderVerificationTest.class);
 
         LogV3.info("========================================");
         LogV3.info("HTTP Server Test Suite Launcher");

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -151,5 +151,43 @@ public class DummyTestAPIImpl implements DummyTestAPI {
     @Override
     public String multiTypedParams(final String str, final int num, final boolean flag) {
         return "String: " + (str != null ? str : "null") + ", Int: " + num + ", Boolean: " + flag;
+    }
+
+    @Override
+    public String getAllRequestHeaders(final org.appwork.remoteapi.RemoteAPIRequest request) {
+        if (request == null || request.getHttpRequest() == null) {
+            return "{}";
+        }
+        final org.appwork.utils.net.httpserver.requests.HttpRequest httpRequest = request.getHttpRequest();
+        final org.appwork.utils.net.HeaderCollection headers = httpRequest.getRequestHeaders();
+        
+        // Build JSON string manually (simple approach)
+        final StringBuilder json = new StringBuilder();
+        json.append("{");
+        boolean first = true;
+        for (final org.appwork.utils.net.HTTPHeader header : headers) {
+            if (!first) {
+                json.append(",");
+            }
+            first = false;
+            // Escape JSON special characters in key and value
+            json.append("\"");
+            json.append(escapeJson(header.getKey()));
+            json.append("\":\"");
+            json.append(escapeJson(header.getValue()));
+            json.append("\"");
+        }
+        json.append("}");
+        return json.toString();
+    }
+
+    /**
+     * Escape JSON special characters
+     */
+    private String escapeJson(final String str) {
+        if (str == null) {
+            return "";
+        }
+        return str.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 }

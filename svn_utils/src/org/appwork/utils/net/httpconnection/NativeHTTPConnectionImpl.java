@@ -1026,4 +1026,5 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     public HTTPConnectionProfilerInterface getProfiler() {
         return null;
     }
+
 }

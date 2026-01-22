@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -36,13 +36,11 @@ package org.appwork.storage.flexijson.tests;
 import java.io.UnsupportedEncodingException;
 import java.util.Date;
 
-import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.flexijson.FlexiJSONParser;
 import org.appwork.storage.flexijson.FlexiParserException;
 import org.appwork.storage.flexijson.FlexiUtils;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.IDETestRunner;
 
 /**
  * @author thomas
@@ -51,8 +49,7 @@ import org.appwork.testframework.IDETestRunner;
  */
 public class DateTest extends AWTest {
     public static void main(String[] args) throws FlexiParserException, UnsupportedEncodingException, InterruptedException {
-        IDETestRunner.run(DateTest.class);
-        LogV3.disableSysout();
+        run();
     }
 
     /*

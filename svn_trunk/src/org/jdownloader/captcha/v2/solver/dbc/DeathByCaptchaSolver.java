@@ -80,7 +80,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
             return null;
         } else if (c instanceof RecaptchaV2Challenge) {
@@ -220,20 +220,20 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 final DeathByCaptchaResponse response;
                 if (challenge instanceof HCaptchaChallenge) {
                     final HCaptchaChallenge hc = (HCaptchaChallenge) challenge;
-                    response = new DeathByCaptchaResponse(hc, this, status, status.getText(), 100);
+                    response = new DeathByCaptchaResponse(hc, this, status, status.getText());
                 } else if (challenge instanceof RecaptchaV2Challenge) {
                     final RecaptchaV2Challenge rv2c = (RecaptchaV2Challenge) challenge;
-                    response = new DeathByCaptchaResponse(rv2c, this, status, status.getText(), 100);
+                    response = new DeathByCaptchaResponse(rv2c, this, status, status.getText());
                 } else if (challenge instanceof CutCaptchaChallenge) {
                     final CutCaptchaChallenge cc = (CutCaptchaChallenge) challenge;
-                    response = new DeathByCaptchaResponse(cc, this, status, status.getText(), 100);
+                    response = new DeathByCaptchaResponse(cc, this, status, status.getText());
                 } else if (challenge instanceof CloudflareTurnstileChallenge) {
                     final CloudflareTurnstileChallenge cc = (CloudflareTurnstileChallenge) challenge;
-                    response = new DeathByCaptchaResponse(cc, this, status, status.getText(), 100);
+                    response = new DeathByCaptchaResponse(cc, this, status, status.getText());
                 } else {
                     final BasicCaptchaChallenge bcc = (BasicCaptchaChallenge) challenge;
                     final AbstractResponse<String> answer = bcc.parseAPIAnswer(status.getText().replace("[", "").replace("]", ""), null, this);
-                    response = new DeathByCaptchaResponse(bcc, this, status, answer.getValue(), answer.getPriority());
+                    response = new DeathByCaptchaResponse(bcc, this, status, answer.getValue());
                 }
                 job.setAnswer(response);
             }

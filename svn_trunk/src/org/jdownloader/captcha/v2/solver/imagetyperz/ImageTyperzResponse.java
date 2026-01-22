@@ -11,13 +11,13 @@ public class ImageTyperzResponse extends CaptchaResponse {
         return captchaID;
     }
 
-    public ImageTyperzResponse(BasicCaptchaChallenge challenge, ImageTyperzCaptchaSolver ImageTyperzSolver, String id, String text, int priority) {
-        super(challenge, ImageTyperzSolver, text, priority);
+    public ImageTyperzResponse(BasicCaptchaChallenge challenge, ImageTyperzCaptchaSolver ImageTyperzSolver, String id, String text) {
+        super(challenge, ImageTyperzSolver, text);
         this.captchaID = id;
     }
 
-    public ImageTyperzResponse(RecaptchaV2Challenge challenge, ImageTyperzCaptchaSolver ImageTyperzSolver, String id, String text, int priority) {
-        super(challenge, ImageTyperzSolver, text, priority);
+    public ImageTyperzResponse(RecaptchaV2Challenge challenge, ImageTyperzCaptchaSolver ImageTyperzSolver, String id, String text) {
+        super(challenge, ImageTyperzSolver, text);
         this.captchaID = id;
     }
 }

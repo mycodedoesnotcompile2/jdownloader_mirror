@@ -66,7 +66,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52110 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52145 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -306,9 +306,9 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
             AbstractResponse resp = null;
             if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge || challenge instanceof CutCaptchaChallenge) {
-                resp = new TokenCaptchaResponse((Challenge<String>) challenge, this, solution, 0);
+                resp = new TokenCaptchaResponse((Challenge<String>) challenge, this, solution);
             } else {
-                resp = new CaptchaResponse((Challenge<String>) challenge, this, solution, 0);
+                resp = new CaptchaResponse((Challenge<String>) challenge, this, solution);
             }
             resp.setCaptchaSolverTaskID(Integer.toString(captchaID));
             job.setAnswer(resp);

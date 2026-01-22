@@ -7,8 +7,8 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaRespo
 public class Captcha9kwMultiClickResponse extends MultiClickCaptchaResponse implements Captcha9KWResponseInterface {
     private final String Captcha9kwID;
 
-    public Captcha9kwMultiClickResponse(Challenge<MultiClickedPoint> challenge, Object solver, MultiClickedPoint captchaCode, int priority, final String captcha9kwID) {
-        super(challenge, solver, captchaCode, priority);
+    public Captcha9kwMultiClickResponse(Challenge<MultiClickedPoint> challenge, Object solver, MultiClickedPoint captchaCode, final String captcha9kwID) {
+        super(challenge, solver, captchaCode);
         this.Captcha9kwID = captcha9kwID;
     }
 

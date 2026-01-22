@@ -30,9 +30,10 @@ public class DialogClickCaptchaSolver extends AbstractDialogSolver<ClickedPoint>
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof ClickCaptchaChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
@@ -62,7 +63,7 @@ public class DialogClickCaptchaSolver extends AbstractDialogSolver<ClickedPoint>
                 handler.run();
                 final ClickedPoint result = handler.getResult();
                 if (result != null) {
-                    solverJob.addAnswer(new ClickCaptchaResponse(captchaChallenge, this, result, 100));
+                    solverJob.addAnswer(new ClickCaptchaResponse(captchaChallenge, this, result));
                 }
             }
         }

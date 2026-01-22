@@ -27,35 +27,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.Icon;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -99,7 +70,36 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 51092 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
+
+@HostPlugin(revision = "$Revision: 52145 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String          CLIENT_SECRET_KEY        = "client_secret";
     private static final String          CLIENT_ID_KEY            = "client_id";
@@ -756,7 +756,7 @@ public class RealDebridCom extends PluginForHost {
                             final ClientSecret clientSecret = checkCredentials(code);
                             if (clientSecret != null) {
                                 clientSecretResult.set(clientSecret);
-                                job.addAnswer(new AbstractResponse<Boolean>(this, ChallengeSolver.EXTERN, 100, true));
+                                job.addAnswer(new AbstractResponse<Boolean>(this, ChallengeSolver.EXTERN, true));
                             }
                         } catch (Throwable e) {
                             logger.log(e);
@@ -788,13 +788,13 @@ public class RealDebridCom extends PluginForHost {
                 private final Boolean check(SolverJob<Boolean> job, Browser br) throws Exception {
                     if (isInvalid(autoSolveBr)) {
                         loginsInvalid.set(true);
-                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, false));
                         return false;
                     } else if (isAllowed(autoSolveBr)) {
                         final ClientSecret clientSecret = checkCredentials(code);
                         if (clientSecret != null) {
                             clientSecretResult.set(clientSecret);
-                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, true));
+                            job.addAnswer(new AbstractResponse<Boolean>(this, this, true));
                             return true;
                         } else {
                             logger.info("No ClientSecret?!");
@@ -894,7 +894,7 @@ public class RealDebridCom extends PluginForHost {
                                     final ClientSecret clientSecret = checkCredentials(code);
                                     if (clientSecret != null) {
                                         clientSecretResult.set(clientSecret);
-                                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, true));
+                                        job.addAnswer(new AbstractResponse<Boolean>(this, this, true));
                                         return true;
                                     } else {
                                         logger.info("No ClientSecret?!");
@@ -905,13 +905,13 @@ public class RealDebridCom extends PluginForHost {
                         }
                     } catch (CaptchaException e) {
                         logger.log(e);
-                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, false));
                     } catch (PluginException e) {
                         logger.log(e);
-                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, false));
                     } catch (InterruptedException e) {
                         logger.log(e);
-                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, false));
                     } catch (Throwable e) {
                         logger.log(e);
                     }

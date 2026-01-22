@@ -43,7 +43,7 @@ public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiCl
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof MultiClickCaptchaChallenge) {
             return null;
         } else {
@@ -141,6 +141,6 @@ public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiCl
         String jsonInString = "{\"x\":[" + "],\"y\":[" + "]}";
         MultiClickedPoint res = JSonStorage.restoreFromString(jsonInString, new TypeRef<MultiClickedPoint>() {
         });
-        solverJob.setAnswer(new Captcha9kwMultiClickResponse(captchaChallenge, this, res, 100, captchaID));
+        solverJob.setAnswer(new Captcha9kwMultiClickResponse(captchaChallenge, this, res, captchaID));
     }
 }

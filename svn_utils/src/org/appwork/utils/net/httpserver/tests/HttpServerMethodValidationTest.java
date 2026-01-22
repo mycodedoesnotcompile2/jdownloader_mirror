@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -47,6 +47,7 @@ import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.requests.CopyRequest;
@@ -83,6 +84,7 @@ import org.appwork.utils.net.httpserver.requests.UnsubscribeRequest;
  * @author AppWork
  */
 public class HttpServerMethodValidationTest extends HttpServerTestBase {
+
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -110,6 +112,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
      */
     private void testDangerousHttpMethodsBlocked() throws Exception {
         LogV3.info("Test: Dangerous HTTP Methods Blocked");
+
         // Test that GET is allowed (default)
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         RequestContext context = this.httpClient.get(url);
@@ -119,16 +122,20 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         final String responseBody = context.getResponseString();
         assertTrue(responseBody.contains("[Request: " + GetRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + GetRequest.class.getSimpleName() + "]', was: " + responseBody);
         LogV3.info("GET method test passed: " + getResponseCode + ", response: " + responseBody);
+
         // Test all other RequestMethods are blocked by default
         final EnumSet<RequestMethod> allMethods = EnumSet.allOf(RequestMethod.class);
         allMethods.remove(RequestMethod.GET); // GET is allowed by default
         allMethods.remove(RequestMethod.UNKNOWN); // UNKNOWN is not a real HTTP method
+
         for (final RequestMethod method : allMethods) {
             this.testMethodBlockedByDefault(method, url);
         }
+
         // Test that POST can be explicitly allowed
         LogV3.info("Test: POST can be explicitly allowed");
         final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
+
         try {
             final String postUrl = "http://localhost:" + this.serverPort + "/test/postData";
             final byte[] postData = "{\"params\":[\"test\"]}".getBytes("UTF-8");
@@ -144,6 +151,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         } finally {
             this.restoreHttpMethods(previousMethods);
         }
+
         LogV3.info("Dangerous HTTP Methods Blocked test completed successfully!");
     }
 
@@ -153,6 +161,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
     private void testPreflightOptionsBlockedByDefault() throws Exception {
         LogV3.info("Test: Preflight OPTIONS blocked by default (CORS disabled)");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
+
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).setUrl(url).addHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://example.com").addHeader("Access-Control-Request-Method", RequestMethod.GET.name()));
         final int responseCode = context.getCode();
         assertTrue(responseCode == ResponseCode.METHOD_NOT_ALLOWED.getCode(), "Preflight OPTIONS should return " + ResponseCode.METHOD_NOT_ALLOWED.getCode() + ", was: " + responseCode);
@@ -167,9 +176,11 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
      */
     private void testApiMethodHttpMethodValidation() throws Exception {
         LogV3.info("Test: API Method HTTP Method Validation");
+
         // Test that POST to /test/echo is rejected (echo only accepts GET)
         LogV3.info("Test: POST to /test/echo should be rejected");
         final String echoUrl = "http://localhost:" + this.serverPort + "/test/echo";
+
         final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
         try {
             final byte[] postData = "{\"params\":[\"test\"]}".getBytes("UTF-8");
@@ -185,6 +196,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         } finally {
             this.restoreHttpMethods(previousMethods);
         }
+
         // Test that GET to /test/postData is rejected (postData only accepts POST)
         LogV3.info("Test: GET to /test/postData should be rejected");
         final String postDataUrl = "http://localhost:" + this.serverPort + "/test/postData?data";
@@ -201,6 +213,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         } finally {
             this.restoreHttpMethods(previousMethods2);
         }
+
         LogV3.info("API Method HTTP Method Validation test completed successfully!");
     }
 
@@ -234,14 +247,19 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
      */
     private void testExplicitMethodAllowance() throws Exception {
         LogV3.info("Test: Explicit Method Allowance");
+
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String postUrl = "http://localhost:" + this.serverPort + "/test/postData";
+
         // Test all RequestMethods can be explicitly allowed
         final EnumSet<RequestMethod> allMethods = EnumSet.allOf(RequestMethod.class);
+        allMethods.remove(RequestMethod.GET); // GET is already tested
         allMethods.remove(RequestMethod.UNKNOWN); // UNKNOWN is not a real HTTP method
+
         for (final RequestMethod method : allMethods) {
             this.testMethodCanBeExplicitlyAllowed(method, url, postUrl);
         }
+
         LogV3.info("Explicit Method Allowance test completed successfully!");
     }
 
@@ -251,6 +269,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
     private void testMethodCanBeExplicitlyAllowed(final RequestMethod method, final String url, final String postUrl) throws Exception {
         LogV3.info("Test: " + method.name() + " can be explicitly allowed");
         final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, method);
+
         try {
             RequestContext context = null;
             if (method.mayHavePostBody) {
@@ -258,7 +277,9 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
                 final byte[] data = "{\"params\":[\"test\"]}".getBytes("UTF-8");
                 final String targetUrl = postUrl;
                 final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
+
                 requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
+
                 context = this.httpClient.execute(requestContext);
             } else {
                 // Methods that don't require output stream
@@ -271,11 +292,14 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             // POST to /test/postData should return 200 (handler supports it)
             // Other methods should return 501 (NOT_IMPLEMENTED) if handler doesn't support them, not 405
             if (method == RequestMethod.CONNECT) {
+
                 assertTrue(responseCode == ResponseCode.METHOD_NOT_ALLOWED.getCode(), "Connect is expected to be 405 here, because it is used for proxy servers only!, was: " + responseCode);
                 return;
             }
+
             assertTrue(responseCode == 200, method.name() + " request to " + context.getUrl() + " should return 200, was: " + responseCode);
             // Verify Request class is included in response
+
             if (method == RequestMethod.GET) {
                 assertTrue(responseBody.contains("[Request: " + GetRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + GetRequest.class.getSimpleName() + "]', was: " + responseBody);
             } else if (method == RequestMethod.POST) {
@@ -285,6 +309,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             } else if (method == RequestMethod.DELETE) {
                 assertTrue(responseBody.contains("[Request: " + DeleteRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + DeleteRequest.class.getSimpleName() + "]', was: " + responseBody);
             } else if (method == RequestMethod.HEAD) {
+
                 assertTrue(responseBody.equals(""), "No response for head request!. was: " + responseBody);
             } else if (method == RequestMethod.OPTIONS) {
                 assertTrue(responseBody.contains("[Request: " + OptionsRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + OptionsRequest.class.getSimpleName() + "]', was: " + responseBody);
@@ -317,6 +342,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             } else if (method == RequestMethod.MSEARCH) {
                 assertTrue(responseBody.contains("[Request: " + MsearchRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + MsearchRequest.class.getSimpleName() + "]', was: " + responseBody);
             }
+
             LogV3.info(method.name() + " method allowed test passed: " + responseCode);
         } finally {
             this.restoreHttpMethods(previousMethods);
@@ -330,21 +356,27 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
      */
     private void testAllMethodsAllowedWhenNull() throws Exception {
         LogV3.info("Test: All Methods Allowed When Null");
+
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String postUrl = "http://localhost:" + this.serverPort + "/test/postData";
+
         // Save previous allowed methods
-        final Set<RequestMethod> previousMethods = this.handlerInfo.getHttpServer().getAllowedMethods();
+        final Set<RequestMethod> previousMethods = this.httpServer.getAllowedMethods();
+
         try {
             // Set allowed methods to null (disables method validation)
-            this.handlerInfo.getHttpServer().setAllowedMethods(null);
-            assertTrue(this.handlerInfo.getHttpServer().getAllowedMethods() == null, "getAllowedMethods() should return null after setAllowedMethods(null)");
+            this.httpServer.setAllowedMethods((Set) null);
+            assertTrue(this.httpServer.getAllowedMethods() == null, "getAllowedMethods() should return null after setAllowedMethods(null)");
+
             // Test all RequestMethods work when methods are null
             final EnumSet<RequestMethod> allMethods = EnumSet.allOf(RequestMethod.class);
             allMethods.remove(RequestMethod.UNKNOWN); // UNKNOWN is not a real HTTP method
             allMethods.remove(RequestMethod.CONNECT); // UNKNOWN is for proxies only
+
             for (final RequestMethod method : allMethods) {
                 this.testMethodWorksWhenNull(method, url, postUrl);
             }
+
             LogV3.info("All Methods Allowed When Null test completed successfully!");
         } finally {
             // Restore previous allowed methods
@@ -398,11 +430,14 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
      */
     private void testGetRequestWithBodyData() throws Exception {
         LogV3.info("Test: GET Request with Body Data");
+
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final byte[] bodyData = "This is body data that should not be sent with GET".getBytes("UTF-8");
+
         // Create a GET request with body data
         final RequestContext requestContext = new RequestContext().setMethod(RequestMethod.GET).setUrl(url).setPostDataStream(new ByteArrayInputStream(bodyData)).setPostDataLength(bodyData.length);
         requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "text/plain");
+
         RequestContext context = null;
         try {
             // fake get with post data
@@ -412,8 +447,9 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
                 }
 
                 protected org.appwork.utils.net.httpconnection.HTTPConnection createHTTPConnection(RequestContext context) throws HttpClientException {
+
                     try {
-                        HTTPConnectionImpl ret = new HTTPConnectionImpl(new URL(context.getUrl()), null) {
+                        HTTPConnection ret = new HTTPConnectionImpl(new URL(context.getUrl()), null) {
                             protected boolean isRequiresOutputStream() {
                                 return true;
                             };
@@ -423,8 +459,10 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
                     } catch (MalformedURLException e) {
                         throw new WTFException(e);
                     }
+
                 };
             }.execute(requestContext);
+
             final int responseCode = context.getCode();
             // The server should handle GET requests with body data gracefully and return 200 (ignoring the body)
             assertTrue(responseCode == 200, "GET request with body data should return 200 (ignoring body), was: " + responseCode);
@@ -433,6 +471,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             e.printStackTrace();
             throw e;
         }
+
         LogV3.info("GET Request with Body Data test completed successfully!");
     }
 }

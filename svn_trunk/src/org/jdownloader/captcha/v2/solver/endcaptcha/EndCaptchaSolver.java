@@ -61,9 +61,10 @@ public class EndCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

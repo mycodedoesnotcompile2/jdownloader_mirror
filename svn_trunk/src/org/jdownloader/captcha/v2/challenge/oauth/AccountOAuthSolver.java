@@ -17,11 +17,11 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (!(c instanceof OAuthChallenge)) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         } else {
-            return null;
+            return super.getChallengeVetoReason(c);
         }
     }
 
@@ -42,7 +42,7 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
             try {
                 if (challenge instanceof AccountLoginOAuthChallenge) {
                     if (((AccountLoginOAuthChallenge) challenge).autoSolveChallenge(job)) {
-                        job.addAnswer(new AbstractResponse<Boolean>(challenge, this, 100, true));
+                        job.addAnswer(new AbstractResponse<Boolean>(challenge, this, true));
                         return;
                     }
                 }

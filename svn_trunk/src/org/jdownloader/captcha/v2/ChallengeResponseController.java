@@ -442,7 +442,7 @@ public class ChallengeResponseController {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         for (final ChallengeSolver<?> solver : solverList) {
             try {
-                if (solver.isEnabled() && solver.validateLogins() && solver.getVetoReason(c) == null) {
+                if (solver.getChallengeVetoReason(c) == null) {
                     ret.add((ChallengeSolver<T>) solver);
                 }
             } catch (final Throwable e) {
@@ -457,12 +457,12 @@ public class ChallengeResponseController {
             boolean success = false;
             try {
                 final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
-                final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
+                final ChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
                 if (solver == null) {
                     /* E.g. solver cannot handle challenge it gets presented */
                     continue;
                 }
-                if (solver.getVetoReason(c) != null) {
+                if (solver.getChallengeVetoReason(c) != null) {
                     continue;
                 }
                 ret.add(solver);

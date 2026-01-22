@@ -41,6 +41,7 @@ import java.util.List;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.net.httpserver.HttpServer;
 
 /**
  * Tests for HTTP server localhost binding functionality.
@@ -80,7 +81,7 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
     private void testIsLocalhostOnlyFlag() throws Exception {
         LogV3.info("Test 1: isLocalhostOnly() flag");
 
-        final boolean isLocalhostOnly = this.handlerInfo.getHttpServer().isLocalhostOnly();
+        final boolean isLocalhostOnly = httpServer.isLocalhostOnly();
         assertTrue(isLocalhostOnly, "Server isLocalhostOnly() should return true, was: " + isLocalhostOnly);
         LogV3.info("Test 1 passed: isLocalhostOnly() = " + isLocalhostOnly);
     }
@@ -90,7 +91,7 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
      */
     private void testGetLocalAddressesReturnsOnlyLoopback() throws Exception {
         LogV3.info("Test 2: getLocalAddresses() returns only loopback addresses");
-        final List<SocketAddress> localAddresses = this.handlerInfo.getHttpServer().getLocalAddresses();
+        final List<SocketAddress> localAddresses = httpServer.getLocalAddresses();
         assertTrue(localAddresses != null && localAddresses.size() > 0, "getLocalAddresses() should return at least one address");
 
         for (final SocketAddress socketAddress : localAddresses) {
@@ -110,10 +111,10 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
         LogV3.info("Test 3: ServerSocket instances bound to loopback addresses");
         // Use reflection to access controlSockets field for low-level verification
         try {
-            final java.lang.reflect.Field controlSocketsField = this.handlerInfo.getHttpServer().getClass().getDeclaredField("controlSockets");
+            final java.lang.reflect.Field controlSocketsField = HttpServer.class.getDeclaredField("controlSockets");
             controlSocketsField.setAccessible(true);
             @SuppressWarnings("unchecked")
-            final java.util.concurrent.atomic.AtomicReference<List<ServerSocket>> controlSocketsRef = (java.util.concurrent.atomic.AtomicReference<List<ServerSocket>>) controlSocketsField.get(this.handlerInfo.getHttpServer());
+            final java.util.concurrent.atomic.AtomicReference<List<ServerSocket>> controlSocketsRef = (java.util.concurrent.atomic.AtomicReference<List<ServerSocket>>) controlSocketsField.get(httpServer);
             final List<ServerSocket> controlSockets = controlSocketsRef.get();
 
             assertTrue(controlSockets != null && controlSockets.size() > 0, "controlSockets should contain at least one ServerSocket");

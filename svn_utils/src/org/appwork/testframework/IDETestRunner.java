@@ -115,7 +115,7 @@ public class IDETestRunner {
                 if ((IDETestRunner.class.getSimpleName() + ".java").equals(record.getThrownAt().getFileName())) {
                     return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - ";
                 }
-                return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - " + fillPost("(" + record.getThrownAt().getFileName() + ":" + record.getThrownAt().getLineNumber() + ")." + abbr(record.getThrownAt().getMethodName(), 30), " ", offsetForThrownAt) + " > ";
+                return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("(" + record.getThrownAt().getFileName() + ":" + record.getThrownAt().getLineNumber() + ") ." + abbr(record.getThrownAt().getMethodName(), 30), " ", offsetForThrownAt) + " > ";
             }
         });
         if (knownClassesCacheFile != null && knownClassesCacheFile.isFile()) {

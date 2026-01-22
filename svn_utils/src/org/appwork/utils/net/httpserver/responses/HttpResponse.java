@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -36,110 +36,34 @@ package org.appwork.utils.net.httpserver.responses;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.net.protocol.http.ResponseCodeInterface;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.HeaderCollection;
-import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpConnection;
 import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
-import org.appwork.utils.net.httpserver.HttpServer;
-import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
-import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 
 /**
  * @author daniel
  *
  */
 public class HttpResponse implements HttpResponseInterface {
-    private final HeaderCollection             responseHeaders;
-    public static final byte[]                 NEWLINE       = "\r\n".getBytes();
-    public static final byte[]                 HTTP11        = "HTTP/1.1 ".getBytes();
-    public static final byte[]                 _0            = "0".getBytes();
-    private ResponseCodeInterface              responseCode  = ResponseCode.SUCCESS_NO_CONTENT;
-    protected final RawHttpConnectionInterface connection;
-    protected OutputStream                     outputStream  = null;
-    protected boolean                          asyncResponse = false;
+    private final HeaderCollection responseHeaders;
+    public static final byte[]     NEWLINE       = "\r\n".getBytes();
+    public static final byte[]     HTTP11        = "HTTP/1.1 ".getBytes();
+    public static final byte[]     _0            = "0".getBytes();
+    private ResponseCodeInterface  responseCode  = ResponseCode.SUCCESS_NO_CONTENT;
+    protected final HttpConnection connection;
+    protected OutputStream         outputStream  = null;
+    protected boolean              asyncResponse = false;
 
-    public RawHttpConnectionInterface getConnection() {
+    public HttpConnection getConnection() {
         return connection;
     }
 
-    public HttpResponse(final RawHttpConnectionInterface connection) {
+    public HttpResponse(final HttpConnection connection) {
         this.connection = connection;
         this.responseHeaders = new HeaderCollection();
-        this.responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CONNECTION, "close"));
-        this.addDefaultServerHeader();
-        // Add default security headers if not already present (allows overriding)
-        this.addDefaultSecurityHeaders();
-        // Add default CORS headers if not already present (allows overriding)
-        this.addDefaultCorsHeaders();
-    }
 
-    private void addDefaultServerHeader() {
-        String serverHeader = null;
-        if (this.connection instanceof HttpConnection) {
-            final HttpServerInterface server = ((HttpConnection) this.connection).getServer();
-            if (server != null) {
-                serverHeader = server.getResponseServerHeader();
-            }
-        }
-        if (serverHeader == null) {
-            serverHeader = HttpServer.APP_WORK_GMB_H_HTTP_SERVER;
-        }
-        if (!StringUtils.isEmpty(serverHeader)) {
-            this.responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_SERVER, serverHeader));
-        }
-    }
-
-    /**
-     * Adds default security headers to the response if they are not already present. This allows handlers to override these defaults if
-     * needed. The security headers configuration is obtained from the HttpServer via the connection.
-     */
-    private void addDefaultSecurityHeaders() {
-        ResponseSecurityHeaders securityHeaders = null;
-        // Try to get security headers config from HttpServer via HttpConnection
-        if (this.connection instanceof HttpConnection) {
-            final HttpServerInterface server = ((HttpConnection) this.connection).getServer();
-            if (server != null) {
-                securityHeaders = server.getResponseSecurityHeaders();
-            }
-        } else {
-            DebugMode.debugger();
-        }
-        // Use default values if no config is available
-        if (securityHeaders == null) {
-            securityHeaders = new ResponseSecurityHeaders();
-        }
-        // Add security headers to response (only if not already present)
-        securityHeaders.addSecurityHeaders(this.responseHeaders);
-    }
-
-    /**
-     * Adds default CORS headers to the response if CORS is enabled and the request is a cross-origin request. This allows handlers to
-     * override these defaults if needed. The CORS configuration is obtained from the HttpServer via the connection.
-     */
-    private void addDefaultCorsHeaders() {
-        CorsHandler corsHandler = null;
-        // Try to get CORS config from HttpServer via HttpConnection
-        if (this.connection instanceof HttpConnection) {
-            final HttpServerInterface server = ((HttpConnection) this.connection).getServer();
-            if (server != null) {
-                corsHandler = server.getCorsHandler();
-            }
-        }
-        // Only add CORS headers if CORS is enabled
-        if (corsHandler != null) {
-            final HttpRequest request = this.connection.getRequest();
-            if (request != null) {
-                corsHandler.addCorsHeaders(request, this.responseHeaders);
-            }
-        }
     }
 
     /*

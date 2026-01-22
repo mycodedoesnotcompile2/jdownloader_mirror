@@ -1,5 +1,7 @@
 package org.jdownloader.plugins.components.config;
 
+import java.util.List;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultDoubleValue;
@@ -8,6 +10,7 @@ import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
 import org.appwork.storage.config.annotations.SpinnerValidator;
+import org.jdownloader.captcha.v2.CaptchaChallengeFilter;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -28,6 +31,14 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
 
         public String getLowCreditsWarningThreshold_label() {
             return "Low credits warning threshold (in currency of captcha solver service)";
+        }
+
+        public String getFilterListEnabled_label() {
+            return "Enable filter list";
+        }
+
+        public String getFilterList_label() {
+            return "Filter list";
         }
 
         public String getEnableDomainWhitelist_label() {
@@ -99,6 +110,22 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
     boolean isDomainWhitelistEnabled();
 
     void setDomainWhitelistEnabled(boolean b);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Enable filter list")
+    @DefaultBooleanValue(true)
+    @Order(500)
+    boolean isFilterListEnabled();
+
+    void setFilterListEnabled(boolean b);
+
+    @AboutConfig
+    @Order(501)
+    @DescriptionForConfigEntry("Filter list")
+    // TODO: Add default value?
+    List<CaptchaChallengeFilter> getFilterList();
+
+    void setFilterList(List<CaptchaChallengeFilter> list);
 
     @AboutConfig
     @DescriptionForConfigEntry("Comma-separated list of domains where captcha solving is enabled")

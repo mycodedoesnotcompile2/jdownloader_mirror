@@ -261,9 +261,12 @@ public class SolverJob<T> {
     }
 
     public boolean isSolved() {
-        final int autoPriority = config.getAutoCaptchaPriorityThreshold();
         final ResponseList<T> response = getResponse();
-        return (response != null && response.getSum() >= autoPriority);
+        if (response != null && response.getTrustlevelPercentageSum() != null) {
+            final int autoPriority = config.getAutoCaptchaPriorityThreshold();
+            return response.getTrustlevelPercentageSum() >= autoPriority;
+        }
+        return true;
     }
 
     public boolean isAlive() {

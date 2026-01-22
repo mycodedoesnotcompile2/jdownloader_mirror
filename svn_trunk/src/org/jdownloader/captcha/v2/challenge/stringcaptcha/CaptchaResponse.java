@@ -4,9 +4,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 
 public class CaptchaResponse extends AbstractResponse<String> {
-
-    public CaptchaResponse(Challenge<String> challenge, Object solver, String captchaCode, int priority) {
-        super(challenge, solver, priority, captchaCode);
+    public CaptchaResponse(Challenge<String> challenge, Object solver, String captchaCode) {
+        super(challenge, solver, captchaCode);
     }
-
 }

@@ -90,7 +90,7 @@ public class JACSolver extends ChallengeSolver<String> {
 
     @Override
     public void enqueue(SolverJob<String> job) {
-        if (isEnabled() && getVetoReason(job.getChallenge()) == null) {
+        if (isEnabled() && getChallengeVetoReason(job.getChallenge()) == null) {
             super.enqueue(job);
         }
     }
@@ -132,7 +132,7 @@ public class JACSolver extends ChallengeSolver<String> {
             }
             if (jac.isExtern()) {
                 /* external captchaCode Response */
-                job.addAnswer(new CaptchaResponse(captchaChallenge, this, captchaCode, 100));
+                job.addAnswer(new CaptchaResponse(captchaChallenge, this, captchaCode));
             } else {
                 /* internal captchaCode Response */
                 final LetterComperator[] lcs = captcha.getLetterComperators();

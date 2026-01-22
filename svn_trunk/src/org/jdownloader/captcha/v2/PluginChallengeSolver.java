@@ -20,12 +20,6 @@ import jd.plugins.PluginException;
 public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     protected final Account                        account;
     protected final abstractPluginForCaptchaSolver plugin;
-    // public PluginChallengeSolver(abstractPluginForCaptchaSolver plugin, Account account, SolverService solverService) {
-    // super(solverService, 0);
-    // this.service = new PluginForCaptchaSolverSolverService(plugin);
-    // this.account = account;
-    // this.plugin = plugin;
-    // }
 
     public PluginChallengeSolver(abstractPluginForCaptchaSolver plugin, Account account) {
         if (plugin == null || account == null) {
@@ -39,6 +33,11 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
     protected boolean enoughBalanceFor(final Challenge<?> c, final Account account) throws Exception {
         return plugin.enoughBalanceFor(c, account);
+    }
+
+    @Override
+    public SolverType getSolverType() {
+        return SolverType.EXTERNAL;
     }
 
     @Override
@@ -68,14 +67,25 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public ChallengeVetoReason getVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         // TODO: Only call plugin.canHandle if there is an override or always call both
         final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
         if (veto != null) {
             return veto;
         } else {
-            return super.getVetoReason(c);
+            return super.getChallengeVetoReason(c);
         }
+    }
+
+    @Override
+    public boolean isFilterListEnabled() {
+        return plugin.isFilterListEnabled();
+    }
+
+    @Override
+    public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
+        // TODO: Make this abstract
+        return this.plugin.getCaptchaChallengeFilterList();
     }
 
     @Override

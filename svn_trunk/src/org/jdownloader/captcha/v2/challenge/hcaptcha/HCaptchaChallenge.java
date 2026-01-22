@@ -6,11 +6,6 @@ import java.net.URL;
 import java.util.Locale;
 import java.util.Map;
 
-import jd.http.Browser;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -32,6 +27,11 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.http.Browser;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public class HCaptchaChallenge extends AbstractBrowserChallenge {
     public static final String             RAWTOKEN = "rawtoken";
@@ -118,7 +118,7 @@ public class HCaptchaChallenge extends AbstractBrowserChallenge {
     @Override
     public AbstractResponse<String> parseAPIAnswer(String result, String resultFormat, ChallengeSolver<?> solver) {
         if (RAWTOKEN.equals(resultFormat) || "extension".equals(resultFormat)) {
-            return new CaptchaResponse(this, solver, result, 100);
+            return new CaptchaResponse(this, solver, result);
         } else {
             if (hasBasicCaptchaChallenge()) {
                 final BasicCaptchaChallenge basic = createBasicCaptchaChallenge(false);

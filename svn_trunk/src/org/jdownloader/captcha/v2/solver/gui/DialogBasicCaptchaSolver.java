@@ -33,9 +33,10 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
-            return null;
+            /* Looks good -> Let upper handling decide for VetoReason */
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
@@ -57,7 +58,7 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
                 BasicCaptchaChallenge captchaChallenge = (BasicCaptchaChallenge) job.getChallenge();
                 String result = solveBasicCaptchaChallenge(job, captchaChallenge);
                 if (result != null) {
-                    job.addAnswer(new CaptchaResponse(captchaChallenge, this, result, 100));
+                    job.addAnswer(new CaptchaResponse(captchaChallenge, this, result));
                 }
             }
         }

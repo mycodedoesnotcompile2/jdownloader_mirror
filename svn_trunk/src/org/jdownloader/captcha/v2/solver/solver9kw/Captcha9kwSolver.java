@@ -34,36 +34,17 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
-            return null;
+            try {
+                checkForEnoughCredits();
+            } catch (SolverException e) {
+                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
+            }
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
-    }
-
-    @Override
-    public ChallengeVetoReason getVetoReason(Challenge<?> c) {
-        if (c instanceof HCaptchaChallenge) {
-            try {
-                checkForEnoughCredits();
-            } catch (SolverException e) {
-                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
-            }
-        } else if (c instanceof RecaptchaV2Challenge) {
-            try {
-                checkForEnoughCredits();
-            } catch (SolverException e) {
-                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
-            }
-        } else if (c instanceof BasicCaptchaChallenge) {
-            try {
-                checkForEnoughCredits();
-            } catch (SolverException e) {
-                return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
-            }
-        }
-        return super.getVetoReason(c);
     }
 
     @Override
@@ -214,6 +195,6 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
     @Override
     protected void parseResponse(CESSolverJob<String> solverJob, Challenge<String> captchaChallenge, String captchaID, String ret) {
         final AbstractResponse<String> answer = captchaChallenge.parseAPIAnswer(ret, (captchaChallenge instanceof RecaptchaV2Challenge || captchaChallenge instanceof HCaptchaChallenge) ? "rawtoken" : null, this);
-        solverJob.setAnswer(new Captcha9kwResponse(captchaChallenge, this, answer.getValue(), answer.getPriority(), captchaID));
+        solverJob.setAnswer(new Captcha9kwResponse(captchaChallenge, this, answer.getValue(), captchaID));
     }
 }

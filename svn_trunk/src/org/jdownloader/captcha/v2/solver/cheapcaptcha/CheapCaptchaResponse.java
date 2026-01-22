@@ -4,7 +4,6 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 
 public class CheapCaptchaResponse extends CaptchaResponse {
-
     private String captchaID;
 
     public String getCaptchaID() {
@@ -12,9 +11,7 @@ public class CheapCaptchaResponse extends CaptchaResponse {
     }
 
     public CheapCaptchaResponse(BasicCaptchaChallenge challenge, CheapCaptchaSolver solver, String id, String text) {
-        super(challenge, solver, text, 100);
+        super(challenge, solver, text);
         this.captchaID = id;
-
     }
-
 }

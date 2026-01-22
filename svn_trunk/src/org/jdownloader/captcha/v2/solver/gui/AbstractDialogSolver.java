@@ -1,9 +1,5 @@
 package org.jdownloader.captcha.v2.solver.gui;
 
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.gui.swing.jdgui.JDGui;
-
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
@@ -12,11 +8,18 @@ import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
-public abstract class AbstractDialogSolver<T> extends ChallengeSolver<T> {
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.gui.swing.jdgui.JDGui;
 
+public abstract class AbstractDialogSolver<T> extends ChallengeSolver<T> {
     public AbstractDialogSolver(int i) {
         super(DialogSolverService.getInstance(), i);
+    }
 
+    @Override
+    public SolverType getSolverType() {
+        return SolverType.JD_LOCAL;
     }
 
     public void checkSilentMode(final SolverJob<T> job) throws SkipException, InterruptedException {
@@ -26,7 +29,6 @@ public abstract class AbstractDialogSolver<T> extends ChallengeSolver<T> {
                 break;
             case DISABLE_DIALOG_SOLVER:
                 job.getEventSender().addListener(new ChallengeSolverJobListener() {
-
                     @Override
                     public void onSolverTimedOut(ChallengeSolver<?> parameter) {
                     }
@@ -56,5 +58,4 @@ public abstract class AbstractDialogSolver<T> extends ChallengeSolver<T> {
         }
         checkInterruption();
     }
-
 }

@@ -36,10 +36,12 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special return false */
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
+        } else if (!BrowserSolverService.getInstance().isOpenBrowserSupported()) {
+            return ChallengeVetoReason.UNSUPPORTED_BROWSER_NO_URL_OPEN;
         } else {
             return super.getChallengeVetoReason(c);
         }
@@ -57,14 +59,8 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    public ChallengeVetoReason getVetoReason(Challenge<?> c) {
-        final ChallengeVetoReason veto = super.getVetoReason(c);
-        if (veto == null && !BrowserSolverService.getInstance().isOpenBrowserSupported()) {
-            /* Looks good, now check if we can open browser windows on users' OS. */
-            return ChallengeVetoReason.UNSUPPORTED_BROWSER_NO_URL_OPEN;
-        } else {
-            return veto;
-        }
+    public SolverType getSolverType() {
+        return SolverType.JD_LOCAL_BROWSER;
     }
 
     public static boolean isSpecialReCaptchaEnterpriseChallenge(final Challenge<?> c) {
@@ -156,7 +152,7 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
                     handler.run();
                     final String response = handler.getResult();
                     if (response != null) {
-                        job.addAnswer(new BrowserResponse(captchaChallenge, this, response, 100));
+                        job.addAnswer(new BrowserResponse(captchaChallenge, this, response));
                     }
                 } finally {
                     job.getLogger().info("Dialog closed. Response far: " + job.getResponse());

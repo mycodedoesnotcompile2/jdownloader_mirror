@@ -5,7 +5,7 @@ import org.jdownloader.controlling.UniqueAlltimeID;
 
 public class AbstractResponse<T> {
     private final UniqueAlltimeID id                  = new UniqueAlltimeID();
-    private int                   priority;
+    private Integer               trustlevel          = null;
     private ValidationResult      validation          = null;
     private String                captchaSolverTaskID = null;
 
@@ -49,16 +49,20 @@ public class AbstractResponse<T> {
         }
     }
 
-    public int getPriority() {
-        return priority;
+    public Integer getTrustLevel() {
+        return trustlevel;
     }
 
     public UniqueAlltimeID getId() {
         return id;
     }
 
-    public void setPriority(int priority) {
-        this.priority = priority;
+    /**
+     * Set level of trust of captcha response in percent. Mostly used for old automatic captcha solvers which sometimes were not 100% sure
+     * if their answer was correct. <br>
+     */
+    public void setTrustLevel(Integer num) {
+        this.trustlevel = num;
     }
 
     public T getValue() {
@@ -77,15 +81,14 @@ public class AbstractResponse<T> {
         return solver;
     }
 
-    public AbstractResponse(Challenge<T> challenge, Object solver, int priority, T responseData) {
+    public AbstractResponse(Challenge<T> challenge, Object solver, T responseData) {
         this.solver = solver;
-        this.priority = priority;
         this.value = responseData;
         this.challenge = challenge;
     }
 
     public String toString() {
-        return getClass().getSimpleName() + ": Value:" + value + " Priority: " + priority + " Solved By: " + solver;
+        return getClass().getSimpleName() + ": Value:" + value + " Priority: " + trustlevel + " Solved By: " + solver;
     }
 
     public Challenge<T> getChallenge() {

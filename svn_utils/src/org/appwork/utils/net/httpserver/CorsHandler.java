@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -42,35 +42,33 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
 
 /**
  * Configuration and management class for CORS (Cross-Origin Resource Sharing) headers that should be added to HTTP responses.
- * 
- * <h2>Overview</h2>
- * This class provides a centralized way to configure and manage CORS-related HTTP response headers.
- * CORS headers control which origins are allowed to access resources on your server from web browsers.
- * 
- * <h2>Managed CORS Headers</h2>
- * This class manages the following CORS headers:
+ *
+ * <h2>Overview</h2> This class provides a centralized way to configure and manage CORS-related HTTP response headers. CORS headers control
+ * which origins are allowed to access resources on your server from web browsers.
+ *
+ * <h2>Managed CORS Headers</h2> This class manages the following CORS headers:
  * <ul>
- *   <li><b>Access-Control-Allow-Origin</b> - Specifies which origins are allowed to access the resource</li>
- *   <li><b>Access-Control-Expose-Headers</b> - Specifies which headers can be exposed to the client</li>
- *   <li><b>Access-Control-Allow-Methods</b> - Specifies which HTTP methods are allowed for cross-origin requests</li>
- *   <li><b>Access-Control-Allow-Headers</b> - Specifies which headers are allowed in cross-origin requests</li>
- *   <li><b>Access-Control-Max-Age</b> - Specifies how long the results of a preflight request can be cached</li>
+ * <li><b>Access-Control-Allow-Origin</b> - Specifies which origins are allowed to access the resource</li>
+ * <li><b>Access-Control-Expose-Headers</b> - Specifies which headers can be exposed to the client</li>
+ * <li><b>Access-Control-Allow-Methods</b> - Specifies which HTTP methods are allowed for cross-origin requests</li>
+ * <li><b>Access-Control-Allow-Headers</b> - Specifies which headers are allowed in cross-origin requests</li>
+ * <li><b>Access-Control-Max-Age</b> - Specifies how long the results of a preflight request can be cached</li>
  * </ul>
- * 
+ *
  * <h2>Default Configuration</h2>
  * <p>
- * By default, CORS is disabled (all fields are null). This means no CORS headers will be set unless explicitly configured.
- * For the HttpServer, this also means that requests containing an Origin header are rejected unless a CorsHandler is
- * explicitly configured. Requests without Origin headers are still allowed.
+ * By default, CORS is disabled (all fields are null). This means no CORS headers will be set unless explicitly configured. For the
+ * HttpServer, this also means that requests containing an Origin header are rejected unless a CorsHandler is explicitly configured.
+ * Requests without Origin headers are still allowed.
  * </p>
- * 
+ *
  * <h2>Usage Examples</h2>
- * 
+ *
  * <h3>Enable CORS for All Origins (Development Only)</h3>
+ *
  * <pre>{@code
  * CorsHandler corsHandler = new CorsHandler();
  * corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
@@ -78,8 +76,9 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
  * corsHandler.setExposeHeaders("X-Session, X-ServerTime");
  * server.setCorsHandler(corsHandler);
  * }</pre>
- * 
+ *
  * <h3>Enable CORS for Specific Origins</h3>
+ *
  * <pre>{@code
  * CorsHandler corsHandler = new CorsHandler();
  * java.util.Set<String> origins = new java.util.HashSet<String>();
@@ -89,20 +88,21 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
  * corsHandler.setAllowMethods(EnumSet.of(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS));
  * server.setCorsHandler(corsHandler);
  * }</pre>
- * 
+ *
  * <h3>Disable CORS</h3>
+ *
  * <pre>{@code
  * server.setCorsHandler(null); // Disables CORS headers
  * }</pre>
- * 
+ *
  * <h2>Security Considerations</h2>
  * <ul>
- *   <li><b>Never use "*" in production</b> unless you explicitly need to allow all origins. This is a security risk.</li>
- *   <li><b>Use explicit origins</b> when possible to prevent unauthorized access.</li>
- *   <li><b>CORS headers are only relevant for browser requests</b>. Server-to-server communication doesn't use CORS.</li>
- *   <li><b>CORS does not replace authentication</b>. Always implement proper authentication and authorization.</li>
+ * <li><b>Never use "*" in production</b> unless you explicitly need to allow all origins. This is a security risk.</li>
+ * <li><b>Use explicit origins</b> when possible to prevent unauthorized access.</li>
+ * <li><b>CORS headers are only relevant for browser requests</b>. Server-to-server communication doesn't use CORS.</li>
+ * <li><b>CORS does not replace authentication</b>. Always implement proper authentication and authorization.</li>
  * </ul>
- * 
+ *
  * @author AppWork
  */
 public class CorsHandler {
@@ -118,12 +118,12 @@ public class CorsHandler {
         return false;
     }
 
-    private Set<String> allowedOrigins;
-    private String exposeHeaders;
+    private Set<String>        allowedOrigins;
+    private String             exposeHeaders;
     private Set<RequestMethod> allowMethods;
-    private String allowHeaders;
-    private boolean allowHeadersFromRequest = false;
-    private Long maxAge;
+    private String             allowHeaders;
+    private boolean            allowHeadersFromRequest = false;
+    private Long               maxAge;
 
     /**
      * Creates a new CorsHandler with all fields set to null (CORS disabled by default).
@@ -134,7 +134,7 @@ public class CorsHandler {
 
     /**
      * Gets the allowed origins set.
-     * 
+     *
      * @return The allowed origins set or null if not set
      */
     public Set<String> getAllowedOrigins() {
@@ -143,27 +143,28 @@ public class CorsHandler {
 
     /**
      * Sets the allowed origins set.
-     * 
+     *
      * <p>
      * This can be:
      * </p>
      * <ul>
-     *   <li><b>Set containing "*"</b> - Allows all origins (use with caution in production)</li>
-     *   <li><b>Set containing "https://example.com"</b> - Allows only requests from https://example.com</li>
-     *   <li><b>null</b> - All Origin requests are forbidden</li>
+     * <li><b>Set containing "*"</b> - Allows all origins (use with caution in production)</li>
+     * <li><b>Set containing "https://example.com"</b> - Allows only requests from https://example.com</li>
+     * <li><b>null</b> - All Origin requests are forbidden</li>
      * </ul>
-     * 
-     * <p>
-     * <b>Default behavior (null):</b> When set to null, any request with an Origin header will be rejected.
-     * Requests without an Origin header are still allowed (direct navigation).
      *
      * <p>
-     * <b>Note:</b> If no CorsHandler is configured on the HttpServer at all, the server will reject any request that
-     * includes an Origin header, regardless of allowedOrigins.
+     * <b>Default behavior (null):</b> When set to null, any request with an Origin header will be rejected. Requests without an Origin
+     * header are still allowed (direct navigation).
+     *
+     * <p>
+     * <b>Note:</b> If no CorsHandler is configured on the HttpServer at all, the server will reject any request that includes an Origin
+     * header, regardless of allowedOrigins.
      * </p>
      * </p>
-     * 
-     * @param allowedOrigins The allowed origins set, a set containing "*" for all origins, or null to forbid all Origin requests
+     *
+     * @param allowedOrigins
+     *            The allowed origins set, a set containing "*" for all origins, or null to forbid all Origin requests
      */
     public void setAllowedOrigins(final Set<String> allowedOrigins) {
         if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
@@ -181,7 +182,7 @@ public class CorsHandler {
 
     /**
      * Gets the list of headers that can be exposed to the client.
-     * 
+     *
      * @return Comma-separated list of header names (e.g., "X-Session, X-ServerTime") or null
      */
     public String getExposeHeaders() {
@@ -190,13 +191,14 @@ public class CorsHandler {
 
     /**
      * Sets the list of headers that can be exposed to the client.
-     * 
+     *
      * <p>
-     * By default, only simple response headers are exposed to JavaScript. This setting allows you to expose
-     * additional custom headers that the client needs to access.
+     * By default, only simple response headers are exposed to JavaScript. This setting allows you to expose additional custom headers that
+     * the client needs to access.
      * </p>
-     * 
-     * @param exposeHeaders Comma-separated list of header names or null
+     *
+     * @param exposeHeaders
+     *            Comma-separated list of header names or null
      */
     public void setExposeHeaders(String exposeHeaders) {
         this.exposeHeaders = exposeHeaders;
@@ -204,7 +206,7 @@ public class CorsHandler {
 
     /**
      * Gets the set of allowed HTTP methods for cross-origin requests.
-     * 
+     *
      * @return Set of RequestMethod enum values or null
      */
     public Set<RequestMethod> getAllowMethods() {
@@ -213,13 +215,14 @@ public class CorsHandler {
 
     /**
      * Sets the set of allowed HTTP methods for cross-origin requests.
-     * 
+     *
      * <p>
-     * This is typically used in preflight (OPTIONS) responses to indicate which methods are allowed.
-     * The methods will be serialized as a comma-separated list in the Access-Control-Allow-Methods header.
+     * This is typically used in preflight (OPTIONS) responses to indicate which methods are allowed. The methods will be serialized as a
+     * comma-separated list in the Access-Control-Allow-Methods header.
      * </p>
-     * 
-     * @param allowMethods Set of RequestMethod enum values or null
+     *
+     * @param allowMethods
+     *            Set of RequestMethod enum values or null
      */
     public void setAllowMethods(Set<RequestMethod> allowMethods) {
         if (allowMethods != null && !allowMethods.isEmpty()) {
@@ -231,7 +234,7 @@ public class CorsHandler {
 
     /**
      * Gets the list of allowed headers in cross-origin requests.
-     * 
+     *
      * @return Comma-separated list of header names or null
      */
     public String getAllowHeaders() {
@@ -240,18 +243,19 @@ public class CorsHandler {
 
     /**
      * Sets the list of allowed headers in cross-origin requests.
-     * 
+     *
      * <p>
      * This is typically used in preflight (OPTIONS) responses to indicate which headers are allowed.
      * </p>
-     * 
+     *
      * <p>
-     * <b>Note:</b> If {@link #setAllowHeadersFromRequest(boolean)} is set to true, the value from
-     * Access-Control-Request-Headers in the request will be echoed back (like RemoteAPI.java), and this
-     * static value will be ignored. If allowHeadersFromRequest is false, this static value will be used.
+     * <b>Note:</b> If {@link #setAllowHeadersFromRequest(boolean)} is set to true, the value from Access-Control-Request-Headers in the
+     * request will be echoed back (like RemoteAPI.java), and this static value will be ignored. If allowHeadersFromRequest is false, this
+     * static value will be used.
      * </p>
-     * 
-     * @param allowHeaders Comma-separated list of header names or null
+     *
+     * @param allowHeaders
+     *            Comma-separated list of header names or null
      */
     public void setAllowHeaders(String allowHeaders) {
         this.allowHeaders = allowHeaders;
@@ -259,7 +263,7 @@ public class CorsHandler {
 
     /**
      * Gets the max age for preflight request caching.
-     * 
+     *
      * @return The max age in milliseconds or null
      */
     public Long getMaxAge() {
@@ -268,52 +272,53 @@ public class CorsHandler {
 
     /**
      * Sets the max age for preflight request caching.
-     * 
+     *
      * <p>
-     * This specifies how long (in milliseconds) the results of a preflight request can be cached.
-     * Common values are 30000 (30 seconds), 1800000 (30 minutes) or 86400000 (24 hours).
+     * This specifies how long (in milliseconds) the results of a preflight request can be cached. Common values are 30000 (30 seconds),
+     * 1800000 (30 minutes) or 86400000 (24 hours).
      * </p>
-     * 
+     *
      * <p>
-     * <b>Note:</b> The HTTP header Access-Control-Max-Age expects seconds, so this value will be
-     * automatically converted to seconds when added to the response header.
+     * <b>Note:</b> The HTTP header Access-Control-Max-Age expects seconds, so this value will be automatically converted to seconds when
+     * added to the response header.
      * </p>
-     * 
-     * @param maxAge The max age in milliseconds or null
+     *
+     * @param maxAge
+     *            The max age in milliseconds or null
      */
     public void setMaxAge(Long maxAge) {
         this.maxAge = maxAge;
     }
 
     /**
-     * Sets whether Access-Control-Allow-Headers should be dynamically taken from the
-     * Access-Control-Request-Headers header in the request (like RemoteAPI.java did).
-     * 
+     * Sets whether Access-Control-Allow-Headers should be dynamically taken from the Access-Control-Request-Headers header in the request
+     * (like RemoteAPI.java did).
+     *
      * <p>
      * <b>This is State-of-the-Art CORS behavior and the recommended setting.</b>
      * </p>
-     * 
+     *
      * <p>
-     * If true, the value from Access-Control-Request-Headers will be echoed back in
-     * Access-Control-Allow-Headers. This is the standard CORS behavior for preflight requests
-     * as defined in the CORS specification (W3C Fetch Standard).
+     * If true, the value from Access-Control-Request-Headers will be echoed back in Access-Control-Allow-Headers. This is the standard CORS
+     * behavior for preflight requests as defined in the CORS specification (W3C Fetch Standard).
      * </p>
-     * 
+     *
      * <p>
      * <b>Security Note:</b> This is safe because:
      * </p>
      * <ul>
-     *   <li>It only applies to preflight (OPTIONS) requests, not actual requests</li>
-     *   <li>The browser validates that the actual request headers match what was requested</li>
-     *   <li>The server can still validate and reject actual requests with unauthorized headers</li>
-     *   <li>This is the standard practice used by major frameworks (Spring, Express, etc.)</li>
+     * <li>It only applies to preflight (OPTIONS) requests, not actual requests</li>
+     * <li>The browser validates that the actual request headers match what was requested</li>
+     * <li>The server can still validate and reject actual requests with unauthorized headers</li>
+     * <li>This is the standard practice used by major frameworks (Spring, Express, etc.)</li>
      * </ul>
-     * 
+     *
      * <p>
      * If false (default), only the statically configured allowHeaders value will be used.
      * </p>
-     * 
-     * @param allowHeadersFromRequest true to enable dynamic allowHeaders from request (recommended), false otherwise
+     *
+     * @param allowHeadersFromRequest
+     *            true to enable dynamic allowHeaders from request (recommended), false otherwise
      */
     public void setAllowHeadersFromRequest(boolean allowHeadersFromRequest) {
         this.allowHeadersFromRequest = allowHeadersFromRequest;
@@ -321,7 +326,7 @@ public class CorsHandler {
 
     /**
      * Gets whether Access-Control-Allow-Headers should be dynamically taken from the request.
-     * 
+     *
      * @return true if allowHeaders should be taken from request, false otherwise
      */
     public boolean isAllowHeadersFromRequest() {
@@ -332,19 +337,19 @@ public class CorsHandler {
      * Validates whether the Origin header in the given request is allowed by this CORS configuration.
      *
      * <p>
-     * This method does not add any headers. It only determines whether the origin should be accepted
-     * based on the current configuration (allowedOrigins) or forbidden (null).
+     * This method does not add any headers. It only determines whether the origin should be accepted based on the current configuration
+     * (allowedOrigins) or forbidden (null).
      * </p>
      *
      * @param request
-     *            The HTTP request
+     *            The HTTP request (must implement CorsRequestInterface)
      * @return true if the origin is allowed or no Origin header is present, false otherwise
      */
-    public boolean isOriginAllowed(final HttpRequest request) {
-        if (request == null) {
+    public boolean isOriginAllowed(final HeaderCollection requestHeaders) {
+        if (requestHeaders == null) {
             return true;
         }
-        final String origin = request.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_ORIGIN);
+        final String origin = requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_ORIGIN);
         if (origin == null || origin.isEmpty()) {
             // No Origin header present - allow (direct browser navigation)
             return true;
@@ -360,26 +365,25 @@ public class CorsHandler {
 
     /**
      * Adds CORS headers to the response if CORS is enabled and the request is a cross-origin request.
-     * 
+     *
      * <p>
-     * This method checks if the request has an Origin header (indicating a cross-origin request).
-     * If CORS is enabled and the origin is allowed, it adds the appropriate CORS headers to the response.
+     * This method checks if the request has an Origin header (indicating a cross-origin request). If CORS is enabled and the origin is
+     * allowed, it adds the appropriate CORS headers to the response.
      * </p>
-     * 
+     *
      * <p>
      * <b>Note:</b> Headers are only added if they are not already present, allowing handlers to override defaults.
      * </p>
-     * 
-     * @param request The HTTP request
-     * @param responseHeaders The response headers collection
+     *
+     * @param requestHeaders
+     *            The HTTP request (must implement CorsRequestInterface)
+     * @param responseHeaders
+     *            The response headers collection
      */
-    public void addCorsHeaders(HttpRequest request, HeaderCollection responseHeaders) {
-        if (responseHeaders == null || request == null) {
-            return;
-        }
+    public void addCorsHeaders(HeaderCollection requestHeaders, HeaderCollection responseHeaders) {
 
         // Check if this is a cross-origin request (has Origin header)
-        String origin = request.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_ORIGIN);
+        String origin = requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_ORIGIN);
         if (origin == null || origin.isEmpty()) {
             // Not a cross-origin request, no CORS headers needed
             return;
@@ -440,7 +444,7 @@ public class CorsHandler {
         // Add Access-Control-Allow-Headers (typically for OPTIONS/preflight requests)
         // Support dynamic allowHeaders from request (like RemoteAPI.java)
         if (this.allowHeadersFromRequest) {
-            String requestedHeaders = request.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_CONTROL_HEADERS);
+            String requestedHeaders = requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_CONTROL_HEADERS);
             if (requestedHeaders != null && !requestedHeaders.isEmpty()) {
                 if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS) == null) {
                     responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, requestedHeaders));
@@ -463,4 +467,3 @@ public class CorsHandler {
         }
     }
 }
-

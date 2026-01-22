@@ -9,13 +9,6 @@ import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.nutils.encoding.Encoding;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -36,6 +29,13 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CHEAP_CAPTCHA;
 import org.seamless.util.io.IO;
+
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.nutils.encoding.Encoding;
 
 public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     private CheapCaptchaConfigInterface     config;
@@ -71,7 +71,7 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
             return null;
         } else {

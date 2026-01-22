@@ -25,7 +25,6 @@ import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.oauth.AccountLoginOAuthChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserSolver;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
@@ -53,13 +52,10 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     private final CaptchaMyJDownloaderRemoteSolverSettings config;
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         if (AbstractBrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special false case */
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
-        } else if (c instanceof AccountLoginOAuthChallenge) {
-            /* Special true case */
-            return null;
         } else {
             return super.getChallengeVetoReason(c);
         }
@@ -77,6 +73,11 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         return types;
+    }
+
+    @Override
+    public SolverType getSolverType() {
+        return SolverType.JD_REMOTE_API;
     }
 
     private final RemoteAPIConfig remoteAPIConfig = JsonConfig.create(RemoteAPIConfig.class);

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -46,11 +46,17 @@ import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
+ * Interface for HTTP server implementations that defines the contract for security,
+ * CORS, limits, and configuration functionality.
+ * 
+ * For convenience, most classes should extend {@link org.appwork.utils.net.httpserver.AbstractServerBasics}
+ * which provides default implementations of all methods in this interface.
+ * 
  * @author Thomas
  * @date 28.03.2017
- *
  */
 public interface HttpServerInterface {
+
     // /**
     // * @return
     // */
@@ -65,6 +71,7 @@ public interface HttpServerInterface {
     // * @return
     // */
     // public long getMaxPostProcessingBytes();
+
     /**
      * @param httpRequest
      * @param httpResponse
@@ -122,4 +129,5 @@ public interface HttpServerInterface {
      * @return the Server header value, or null to disable the Server header
      */
     String getResponseServerHeader();
+
 }

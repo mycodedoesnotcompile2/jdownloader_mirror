@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -69,17 +69,29 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
 /**
+ * Utility class for reading and verifying Authenticode signatures on Windows executables and DLLs.
+ * <p>
+ * This class provides methods to:
+ * <ul>
+ * <li>Extract code signing certificate information (subject, issuer, fingerprint, validity period)</li>
+ * <li>Read signing timestamps from both legacy Authenticode and RFC 3161 countersignatures</li>
+ * <li>Verify signature validity using Windows Trust API</li>
+ * </ul>
+ * </p>
+ * <p>
+ * The implementation uses JNA to access Windows Crypto API (crypt32.dll) and WinTrust API (wintrust.dll).
+ * </p>
+ *
  * @author thomas
  * @date 11.10.2025
- *
  */
 public class WindowsSignature {
     /**
-     *
+     * Key name for signing date in result maps
      */
     public static final String SIGN_DATE   = "signDate";
     /**
-     *
+     * Key name for certificate fingerprint in result maps
      */
     public static final String FINGERPRINT = "fingerprint";
 
@@ -99,27 +111,30 @@ public class WindowsSignature {
      */
     public static CodeSignature readCodeSignSignature(File file) throws InvalidNameException {
         if (file == null || !file.isFile()) {
-            System.err.println("❌ Invalid file.");
+            System.err.println("ERROR: Invalid file.");
             return null;
         }
-        // Prepare native file path
+        // Convert Java String to native wide-character (UTF-16) array for Windows API
         char[] fileChars = Native.toCharArray(file.getAbsolutePath());
         Pointer filePtr = new Memory((fileChars.length + 1L) * Native.WCHAR_SIZE);
         filePtr.write(0, fileChars, 0, fileChars.length);
+        // Output parameters for CryptQueryObject
         PointerByReference phCertStore = new PointerByReference();
         PointerByReference phMsg = new PointerByReference();
         PointerByReference ppvContext = new PointerByReference();
+        // Query the embedded PKCS#7 signature from the PE file
         boolean ok = Crypt32.INSTANCE.CryptQueryObject(WinCrypt.CERT_QUERY_OBJECT_FILE, filePtr, WinCrypt.CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, WinCrypt.CERT_QUERY_FORMAT_FLAG_BINARY, 0, new IntByReference(), new IntByReference(), new IntByReference(), phCertStore, phMsg, ppvContext);
         if (!ok) {
             int lastError = Kernel32.INSTANCE.GetLastError();
-            System.err.println("❌ CryptQueryObject failed, error: " + lastError);
+            System.err.println("ERROR: CryptQueryObject failed, error: " + lastError);
             return null;
         }
         HCERTSTORE hStore = new HCERTSTORE(phCertStore.getValue());
         HCRYPTMSG hMsg = new HCRYPTMSG(phMsg.getValue());
         try {
             // ------------------------------------------------------------
-            // Step 1: Get signer info from the PKCS#7 message
+            // Step 1: Extract signer info from the embedded PKCS#7 message
+            // The signer info contains issuer+serial to identify the signing certificate
             // ------------------------------------------------------------
             IntByReference pcbData = new IntByReference();
             if (!Crypt32Ext.INSTANCE.CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, Pointer.NULL, pcbData)) {
@@ -136,7 +151,8 @@ public class WindowsSignature {
             CMSG_SIGNER_INFO signerInfo = new CMSG_SIGNER_INFO(signerInfoMem);
             signerInfo.read();
             // ------------------------------------------------------------
-            // Step 2: Find matching signer certificate (avoid TSA cert)
+            // Step 2: Find the matching signer certificate in the certificate store
+            // We compare issuer+serial to avoid confusion with TSA certificates
             // ------------------------------------------------------------
             CERT_CONTEXT.ByReference current = null;
             CERT_CONTEXT.ByReference found = null;
@@ -147,20 +163,23 @@ public class WindowsSignature {
                 }
             }
             if (found == null) {
-                System.err.println("⚠ No matching signer certificate found.");
+                System.err.println("WARNING: No matching signer certificate found.");
                 return null;
             }
             CodeSignature sig = new CodeSignature();
             // ------------------------------------------------------------
-            // Step 3: Extract "Issued To" (Subject)
+            // Step 3: Extract certificate Subject (the "Issued To" entity)
+            // Contains CN, O, OU, L, S, C and other RDNs
             // ------------------------------------------------------------
             extractNameFromBlob(found.pCertInfo.Subject, sig.getIssuedTo());
             // ------------------------------------------------------------
-            // Step 4: Extract "Issued By" (Issuer)
+            // Step 4: Extract certificate Issuer (the Certificate Authority)
+            // Contains the CA's distinguished name
             // ------------------------------------------------------------
             extractNameFromBlob(found.pCertInfo.Issuer, sig.getIssuedBy());
             // ------------------------------------------------------------
-            // Step 5: Compute SHA-1 fingerprint
+            // Step 5: Compute SHA-1 fingerprint (thumbprint) of the certificate
+            // This is a unique identifier for the certificate
             // ------------------------------------------------------------
             Pointer pbEncoded = found.pbCertEncoded;
             int len = found.cbCertEncoded;
@@ -170,21 +189,23 @@ public class WindowsSignature {
                 sig.setFingerprint(sha1);
             }
             // ------------------------------------------------------------
-            // Step 6: Extract certificate validity end date (NotAfter)
+            // Step 6: Extract certificate validity period (NotAfter timestamp)
+            // Windows FILETIME is 100-nanosecond intervals since 1601-01-01
             // ------------------------------------------------------------
             if (found.pCertInfo.NotAfter != null) {
                 int high = found.pCertInfo.NotAfter.dwHighDateTime;
                 int low = found.pCertInfo.NotAfter.dwLowDateTime;
                 long filetime = ((long) high << 32) | (low & 0xFFFFFFFFL);
                 long msSince1601 = filetime / (10 * 1000l);
-                long epochDiff = 11644473600000L; // 1601→1970
+                long epochDiff = 11644473600000L; // milliseconds between 1601-01-01 and 1970-01-01
                 long msSince1970 = msSince1601 - epochDiff;
                 if (msSince1970 > 0) {
                     sig.setValidUntil(new Date(msSince1970));
                 }
             }
             // ------------------------------------------------------------
-            // Step 7: Extract signing date (PKCS#9 signingTime)
+            // Step 7: Extract signing timestamp from PKCS#9 attributes
+            // Checks both legacy signingTime and RFC 3161 countersignatures
             // ------------------------------------------------------------
             String signDate = getSigningTimeFromMessage(hMsg);
             if (signDate != null) {
@@ -203,7 +224,18 @@ public class WindowsSignature {
     }
 
     /**
-     * Parses an X.509 name (Subject or Issuer) and adds RDNs to a target map. Example: CN, O, OU, C, etc.
+     * Parses an X.509 distinguished name (Subject or Issuer) and extracts all Relative Distinguished Names (RDNs) into a map.
+     * <p>
+     * Common RDN types include: CN (Common Name), O (Organization), OU (Organizational Unit), L (Locality),
+     * S (State/Province), C (Country), STREET, SERIALNUMBER, etc.
+     * </p>
+     *
+     * @param blob
+     *            The encoded X.509 name blob from the certificate
+     * @param target
+     *            The map to populate with RDN key-value pairs
+     * @throws InvalidNameException
+     *             if the name cannot be parsed as a valid LDAP DN
      */
     private static void extractNameFromBlob(WinCrypt.DATA_BLOB blob, Map<String, String> target) throws InvalidNameException {
         if (target == null) {
@@ -226,7 +258,21 @@ public class WindowsSignature {
     }
 
     /**
-     * Compares Issuer+SerialNumber to match the correct signer certificate.
+     * Compares two certificate identifiers (Issuer + SerialNumber) to match the correct signer certificate.
+     * <p>
+     * This is used to identify the actual signing certificate and avoid confusion with timestamp authority (TSA) certificates
+     * that may also be present in the certificate store.
+     * </p>
+     *
+     * @param issuer1
+     *            Issuer blob from first certificate
+     * @param serial1
+     *            Serial number blob from first certificate
+     * @param issuer2
+     *            Issuer blob from second certificate
+     * @param serial2
+     *            Serial number blob from second certificate
+     * @return true if both issuer and serial number match exactly
      */
     private static boolean compareIssuerAndSerial(WinCrypt.DATA_BLOB issuer1, WinCrypt.DATA_BLOB serial1, WinCrypt.DATA_BLOB issuer2, WinCrypt.DATA_BLOB serial2) {
         if (issuer1.cbData != issuer2.cbData || serial1.cbData != serial2.cbData) {
@@ -239,6 +285,20 @@ public class WindowsSignature {
         return Arrays.equals(i1, i2) && Arrays.equals(s1, s2);
     }
 
+    /**
+     * Computes a cryptographic fingerprint (hash) of the given data using the specified algorithm.
+     * <p>
+     * The result is returned as an uppercase hexadecimal string (e.g., "AF2C88FF0B77...").
+     * </p>
+     *
+     * @param algo
+     *            Hash algorithm name (e.g., "SHA-1", "SHA-256")
+     * @param data
+     *            The byte array to hash
+     * @return Uppercase hex-encoded fingerprint string
+     * @throws Exception
+     *             if the algorithm is not available
+     */
     static String computeFingerprint(String algo, byte[] data) throws Exception {
         MessageDigest md = MessageDigest.getInstance(algo);
         byte[] digest = md.digest(data);
@@ -253,17 +313,44 @@ public class WindowsSignature {
         return sb.toString();
     }
 
-    // Missing constants from WinCrypt
-    public static final int CMSG_SIGNER_INFO_PARAM = 6;
     // ------------------------------------------------------------
-    /** OID for signingTime attribute (PKCS#9) */
-    static final String     OID_SIGNING_TIME       = "1.2.840.113549.1.9.5";
-    /** OID for counterSignature attribute (PKCS#9) */
-    static final String     OID_COUNTERSIGN        = "1.2.840.113549.1.9.6";
+    // Windows Crypto API Constants
+    // ------------------------------------------------------------
+    /**
+     * Parameter ID for retrieving signer info from a cryptographic message.
+     * Used with CryptMsgGetParam.
+     */
+    public static final int CMSG_SIGNER_INFO_PARAM = 6;
 
+    /**
+     * PKCS#9 OID for the signingTime authenticated attribute (1.2.840.113549.1.9.5).
+     * This attribute contains the time when the signature was created.
+     */
+    static final String OID_SIGNING_TIME = "1.2.840.113549.1.9.5";
+
+    /**
+     * PKCS#9 OID for the counterSignature unauthenticated attribute (1.2.840.113549.1.9.6).
+     * This attribute contains a timestamp from a trusted timestamp authority (TSA).
+     */
+    static final String OID_COUNTERSIGN = "1.2.840.113549.1.9.6";
+
+    /**
+     * Extracts the signing timestamp from an Authenticode-signed file.
+     * <p>
+     * This method attempts to find the signing time in two locations:
+     * <ol>
+     * <li>Direct signingTime attribute in authenticated attributes (legacy Authenticode)</li>
+     * <li>Countersignature attribute containing an RFC 3161 timestamp</li>
+     * </ol>
+     * </p>
+     *
+     * @param hMsg
+     *            Handle to the cryptographic message
+     * @return ISO-8601 formatted timestamp string (UTC) or null if not found
+     */
     static String getSigningTimeFromMessage(HCRYPTMSG hMsg) {
         IntByReference pcbData = new IntByReference();
-        // 1. Get size of signer info blob
+        // 1. Query size of signer info structure
         if (!Crypt32Ext.INSTANCE.CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, Pointer.NULL, pcbData)) {
             return null;
         }
@@ -271,35 +358,38 @@ public class WindowsSignature {
         if (cbData <= 0) {
             return null;
         }
-        // 2. Get actual signer info
+        // 2. Retrieve the actual signer info structure
         Memory signerInfoMem = new Memory(cbData);
         if (!Crypt32Ext.INSTANCE.CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, signerInfoMem, pcbData)) {
             return null;
         }
         CMSG_SIGNER_INFO signerInfo = new CMSG_SIGNER_INFO(signerInfoMem);
         signerInfo.read();
-        // 3. Try direct signingTime (legacy Authenticode)
+        // 3. Try to find signingTime in authenticated attributes (legacy Authenticode method)
         String time = findSigningTimeInAttrs(signerInfo.AuthAttrs);
         if (time != null) {
             return time;
         }
-        // 4. Try countersignature (RFC 3161 timestamp)
+        // 4. Try to find signingTime in countersignature (RFC 3161 trusted timestamp)
         time = findSigningTimeInCountersign(signerInfo.UnauthAttrs);
         if (time != null) {
             return time;
         }
-        // 5. No timestamp found
+        // 5. No timestamp found in either location
         return null;
     }
 
     /**
-     * Reads the certificate subject fields of the embedded Authenticode signature.
+     * Searches for a signingTime attribute (OID 1.2.840.113549.1.9.5) in the authenticated attributes.
+     * <p>
+     * The signingTime attribute is a PKCS#9 attribute that contains the time when the signature was created.
+     * It may be present in legacy Authenticode signatures or within countersignature attributes.
+     * </p>
      *
-     * @param file
-     *            signed executable file
-     * @return map of subject attributes (CN, O, C, etc.) or null if not found
+     * @param attrs
+     *            The authenticated attributes structure to search
+     * @return ISO-8601 formatted timestamp string (UTC) or null if not found
      */
-    /** Looks for signingTime (OID 1.2.840.113549.1.9.5) inside authenticated attributes */
     static String findSigningTimeInAttrs(CRYPT_ATTRIBUTES attrs) {
         if (attrs == null || attrs.cAttr <= 0 || attrs.rgAttr == null) {
             return null;
@@ -330,10 +420,25 @@ public class WindowsSignature {
         return null;
     }
 
-    /** Finds counterSignature (OID 1.2.840.113549.1.9.6) and extracts its embedded signingTime */
-    // #define PKCS7_SIGNER_INFO ((LPCSTR) 500)
+    /**
+     * Windows Crypto API structure type identifier for PKCS7_SIGNER_INFO.
+     * Used with CryptDecodeObject to decode countersignature blobs.
+     * Corresponds to: #define PKCS7_SIGNER_INFO ((LPCSTR) 500)
+     */
     private static final Pointer PKCS7_SIGNER_INFO = new Pointer(500);
 
+    /**
+     * Searches for a counterSignature attribute (OID 1.2.840.113549.1.9.6) and extracts its embedded signing time.
+     * <p>
+     * Countersignatures are used by RFC 3161 timestamp authorities to provide trusted timestamps.
+     * This method decodes the ASN.1-encoded countersignature blob and recursively searches for
+     * the signingTime attribute within it.
+     * </p>
+     *
+     * @param attrs
+     *            The unauthenticated attributes structure to search
+     * @return ISO-8601 formatted timestamp string (UTC) or null if not found
+     */
     static String findSigningTimeInCountersign(CRYPT_ATTRIBUTES attrs) {
         if (attrs == null || attrs.cAttr <= 0 || attrs.rgAttr == null) {
             return null;
@@ -353,6 +458,7 @@ public class WindowsSignature {
                     blob.read();
                     if (blob.cbData > 0 && blob.pbData != null) {
                         try {
+                            // Decode the ASN.1-encoded countersignature blob to CMSG_SIGNER_INFO structure
                             IntByReference pcbDecoded = new IntByReference();
                             boolean ok = Crypt32Ext.INSTANCE.CryptDecodeObject(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, PKCS7_SIGNER_INFO, blob.pbData, blob.cbData, 0, Pointer.NULL, pcbDecoded);
                             if (!ok || pcbDecoded.getValue() <= 0) {
@@ -363,6 +469,7 @@ public class WindowsSignature {
                             if (!ok) {
                                 continue;
                             }
+                            // Read the nested signer info and recursively search for signingTime
                             CMSG_SIGNER_INFO nested = new CMSG_SIGNER_INFO(decodedMem);
                             nested.read();
                             String parsed = findSigningTimeInAttrs(nested.AuthAttrs);
@@ -370,7 +477,7 @@ public class WindowsSignature {
                                 return parsed;
                             }
                         } catch (Throwable e) {
-                            // Skip invalid countersignature blobs
+                            // Silently skip invalid or malformed countersignature blobs
                         }
                     }
                 }
@@ -379,42 +486,75 @@ public class WindowsSignature {
         return null;
     }
 
-    /** Converts ASN.1 UTCTime / GeneralizedTime → ISO-8601 UTC */
+    /**
+     * Parses an ASN.1 DER-encoded time value and converts it to ISO-8601 format (UTC).
+     * <p>
+     * Supports both:
+     * <ul>
+     * <li>UTCTime (tag 0x17): YYMMDDHHMMSSZ format (e.g., 250122025712Z)</li>
+     * <li>GeneralizedTime (tag 0x18): YYYYMMDDHHMMSSZ format (e.g., 20250122025712Z)</li>
+     * </ul>
+     * </p>
+     *
+     * @param der
+     *            The DER-encoded ASN.1 time value
+     * @return ISO-8601 formatted string (YYYY-MM-DDTHH:MM:SSZ) or null if parsing fails
+     */
     private static String parseAsn1TimeToIso(byte[] der) {
         if (der == null || der.length < 2) {
             return null;
         }
         try {
             int idx = 0;
-            int tag = der[idx++] & 0xFF; // 0x17 = UTCTime, 0x18 = GeneralizedTime
+            // Read ASN.1 tag: 0x17 = UTCTime, 0x18 = GeneralizedTime
+            int tag = der[idx++] & 0xFF;
+            // Read length (supports both short and long form encoding)
             int len = der[idx++] & 0xFF;
             if ((len & 0x80) != 0) {
+                // Long form: next (len & 0x7F) bytes contain the actual length
                 int bytes = len & 0x7F;
                 len = 0;
                 for (int i = 0; i < bytes; i++) {
                     len = (len << 8) | (der[idx++] & 0xFF);
                 }
             }
+            // Bounds check
             if (idx + len > der.length) {
                 len = der.length - idx;
             }
+            // Extract the ASCII time string
             String s = new String(der, idx, len, "ASCII").trim();
             SimpleDateFormat in, out = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
             out.setTimeZone(TimeZone.getTimeZone("UTC"));
             if (s.endsWith("Z")) {
-                if (tag == 0x17) { // UTCTime (YYMMDDHHMMSSZ)
+                if (tag == 0x17) {
+                    // UTCTime: 2-digit year (YYMMDDHHMMSSZ)
                     in = new SimpleDateFormat("yyMMddHHmmss'Z'");
-                } else { // GeneralizedTime (YYYYMMDDHHMMSSZ)
+                } else {
+                    // GeneralizedTime: 4-digit year (YYYYMMDDHHMMSSZ)
                     in = new SimpleDateFormat("yyyyMMddHHmmss'Z'");
                 }
                 in.setTimeZone(TimeZone.getTimeZone("UTC"));
                 return out.format(in.parse(s));
             }
         } catch (Exception ignored) {
+            // Return null on any parsing error
         }
         return null;
     }
 
+    /**
+     * Legacy ASN.1 time parser (simplified version).
+     * <p>
+     * <b>Note:</b> This method is retained for compatibility but is not currently used.
+     * Use {@link #parseAsn1TimeToIso(byte[])} instead for proper DER decoding.
+     * </p>
+     *
+     * @param bytes
+     *            ASCII-encoded time string bytes
+     * @return Formatted time string or null if parsing fails
+     */
+    @SuppressWarnings("unused")
     private static String parseAsn1Time(byte[] bytes) {
         try {
             String s = new String(bytes, "ASCII").trim();
@@ -447,7 +587,7 @@ public class WindowsSignature {
         }
         File file = new File(filePath.getAbsolutePath());
         if (!file.isFile()) {
-            System.err.println("❌ File not found: " + filePath);
+            System.err.println("ERROR: File not found: " + filePath);
             return false;
         }
         WinTrust.WINTRUST_FILE_INFO fileInfo = new WinTrust.WINTRUST_FILE_INFO(file.getAbsolutePath());
@@ -457,13 +597,13 @@ public class WindowsSignature {
         if (result == WinError.ERROR_SUCCESS) {
             return true;
         } else if (result == WinError.TRUST_E_NOSIGNATURE) {
-            System.err.println("⚠ No digital signature found.");
+            System.err.println("WARNING: No digital signature found.");
         } else if (result == WinError.TRUST_E_BAD_DIGEST) {
-            System.err.println("⚠ Signature present but invalid.");
+            System.err.println("WARNING: Signature present but invalid.");
         } else if (result == WinError.CERT_E_REVOKED) {
-            System.err.println("⚠ Certificate revoked.");
+            System.err.println("WARNING: Certificate revoked.");
         } else {
-            System.err.println("⚠ WinVerifyTrust failed, code: 0x" + Integer.toHexString(result));
+            System.err.println("WARNING: WinVerifyTrust failed, code: 0x" + Integer.toHexString(result));
         }
         return false;
     }

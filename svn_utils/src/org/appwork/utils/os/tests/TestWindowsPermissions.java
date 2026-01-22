@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -35,24 +35,18 @@
 package org.appwork.utils.os.tests;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
-import org.appwork.utils.Application;
-import org.appwork.utils.IO;
 import org.appwork.utils.Joiner;
-import org.appwork.utils.Time;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.os.WindowsUtils.AccessPermission;
 import org.appwork.utils.os.WindowsUtils.AccessPermissionEntry;
-import org.appwork.utils.os.WindowsUtils.LockInfo;
 
 import com.sun.jna.platform.win32.Advapi32Util.Account;
 
@@ -199,33 +193,6 @@ public class TestWindowsPermissions extends AWTest {
         }
         testBasicFileAccess();
         testSetAndGetPermissions();
-        testHandleBlocks();
-    }
-
-    /**
-     * @throws Exception
-     *
-     */
-    private void testHandleBlocks() throws Exception {
-        final long myPID = CrossSystem.getPID();
-        final File file = Application.getTempFile("tests", Time.now() + "");
-        try {
-            IO.secureWrite(file, "abc".getBytes());
-            final FileOutputStream fos = new FileOutputStream(file, true);
-            try {
-                System.out.println("Run findLockingPids");
-                for (int i = 0; i < 10; i++) {
-                    final List<LockInfo> lockedBy = WindowsUtils.getLocksOnPath(file);
-                    assertTrue(lockedBy.size() == 1);
-                    assertThat(myPID).isNumber(lockedBy.get(0).getPid());
-                    logInfoAnyway("ROund " + i);
-                }
-            } finally {
-                fos.close();
-            }
-        } finally {
-            file.delete();
-        }
     }
 
     public static void main(String[] args) {

@@ -33,13 +33,21 @@ public abstract class ChallengeSolver<T> {
         }
     };
 
+    public enum SolverType {
+        JD_LOCAL,
+        JD_LOCAL_BROWSER,
+        JD_REMOTE_API,
+        EXTERNAL
+    }
+
     public enum ChallengeVetoReason {
+        SOLVER_DISABLED,
         UNSUPPORTED_BY_SOLVER,
         UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS,
         UNSUPPORTED_BROWSER_NO_URL_OPEN,
         UNSUITABLE_FOR_SOLVER,
         CHALLENGE_BLACKLISTED,
-        TYPE_DISABLED_BY_USER,
+        CAPTCHA_TYPE_DISABLED_BY_USER,
         ACCOUNT_DISABLED,
         ACCOUNT_IN_ERROR_STATE,
         ACCOUNT_NOT_ENOUGH_CREDITS
@@ -58,6 +66,12 @@ public abstract class ChallengeSolver<T> {
      * @return List of supported captcha types
      */
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        // TODO: Make this abstract
+        return null;
+    }
+
+    /* Returns type of solver e.g. browser solver, local image solver or external solver. */
+    public SolverType getSolverType() {
         // TODO: Make this abstract
         return null;
     }
@@ -203,38 +217,94 @@ public abstract class ChallengeSolver<T> {
         return resultType;
     }
 
-    protected ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+    /**
+     * Returns null if challenge can be handled by ChallengeSolver. <br>
+     * Returns nun null value if challenge cannot be solved by this ChallengeSolver.
+     */
+    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+        if (!this.isEnabled()) {
+            return ChallengeVetoReason.SOLVER_DISABLED;
+        }
+        if (!this.validateLogins()) {
+            return ChallengeVetoReason.SOLVER_DISABLED;
+        }
         final List<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
-        if (supported_types == null) {
-            return null;
-        }
         final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
-        final List<CAPTCHA_TYPE> disabled_types = this.getUserDisabledCaptchaTypes();
-        if (ctype != null && disabled_types != null && supported_types.contains(ctype) && disabled_types.contains(ctype)) {
-            /* Captcha type is supported by plugin but user has disabled this captcha type for this account. */
-            return ChallengeVetoReason.TYPE_DISABLED_BY_USER;
+        if (supported_types != null && ctype != null) {
+            final List<CAPTCHA_TYPE> disabled_types = this.getUserDisabledCaptchaTypes();
+            if (disabled_types != null && supported_types.contains(ctype) && disabled_types.contains(ctype)) {
+                /* Captcha type is supported by plugin but user has disabled this captcha type for this account. */
+                return ChallengeVetoReason.CAPTCHA_TYPE_DISABLED_BY_USER;
+            }
+            if (!supported_types.contains(ctype)) {
+                /* Challenge is not supported by solver */
+                return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+            }
         }
-        if (!supported_types.contains(ctype)) {
-            /* Challenge is not supported by solver */
-            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
-        }
-        /* We were unable to find a reason why this challenge cannot be handled by this solver. */
-        return null;
-    }
-
-    public ChallengeVetoReason getVetoReason(final Challenge<?> c) {
-        final ChallengeVetoReason veto = getChallengeVetoReason(c);
-        if (veto != null) {
-            return veto;
-        } else if (getResultType() != null && !getResultType().isAssignableFrom(c.getResultType())) {
+        if (getResultType() != null && !getResultType().isAssignableFrom(c.getResultType())) {
             // TODO: fix possible NPE in above condition, getResultType should never return null?
             // This should never happen?!
             return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
-        } else if (!validateBlackWhite(c)) {
+        } else if (!validateChallengeFilters(c)) {
             return ChallengeVetoReason.CHALLENGE_BLACKLISTED;
         } else {
             return null;
         }
+    }
+
+    public boolean isFilterListEnabled() {
+        // TODO: Make this abstract
+        return true;
+    }
+
+    public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
+        // TODO: Make this abstract
+        return null;
+    }
+
+    /**
+     * Validates challenge against CaptchaChallengeFilter list. Returns true if challenge is allowed, false if blocked.
+     *
+     * @param c
+     *            Challenge to validate
+     * @return true if allowed, false if blocked
+     */
+    protected boolean validateChallengeFilters(final Challenge<?> c) {
+        if (!this.isFilterListEnabled()) {
+            /* Filter list disabled by user -> No need to check */
+            return true;
+        }
+        final List<CaptchaChallengeFilter> filters = this.getCaptchaChallengeFilterList();
+        if (filters == null || filters.isEmpty()) {
+            /* No filters configured -> Allow */
+            return true;
+        }
+        /* Check each filter in order (sorted by position) */
+        for (int i = 0; i < filters.size(); i++) {
+            final CaptchaChallengeFilter filter = filters.get(i);
+            if (!filter._isValid()) {
+                /* Skip invalid filters */
+                continue;
+            }
+            final CompiledCaptchaChallengeFilter compiledFilter = new CompiledCaptchaChallengeFilter(filter);
+            if (!compiledFilter.isValid()) {
+                /* Skip invalid/disabled/broken filters */
+                continue;
+            }
+            if (!compiledFilter.matches(c)) {
+                /* Filter doesn't match this challenge */
+                continue;
+            }
+            /* Filter matches - apply action */
+            if (compiledFilter.getFilterType() == CaptchaChallengeFilter.CaptchaFilterType.BLACKLIST) {
+                return false;
+            } else {
+                /* WHITELIST */
+                return true;
+            }
+        }
+        /* No filter matched -> default behavior: allow */
+        return true;
     }
 
     public boolean isDomainBlacklistEnabled() {
@@ -261,7 +331,7 @@ public abstract class ChallengeSolver<T> {
      * @param c
      * @return
      */
-    protected boolean validateBlackWhite(final Challenge<?> c) {
+    protected final boolean validateBlackWhite(final Challenge<?> c) {
         if (!this.isDomainWhitelistEnabled() && !this.isDomainBlacklistEnabled()) {
             /* Black/Whitelist disabled by user -> No need to check */
             return true;

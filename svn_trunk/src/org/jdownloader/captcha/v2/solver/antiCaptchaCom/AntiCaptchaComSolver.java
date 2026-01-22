@@ -50,7 +50,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     }
 
     @Override
-    protected ChallengeVetoReason getChallengeVetoReason(Challenge<?> challenge) {
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> challenge) {
         if (challenge instanceof RecaptchaV2Challenge) {
             return null;
         } else if (challenge instanceof BasicCaptchaChallenge) {
