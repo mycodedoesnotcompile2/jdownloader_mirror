@@ -241,7 +241,7 @@ public class BuildDecisions {
         return INSTANCE.get(tag);
     }
 
-    private static boolean ENABLED = true;
+    private static boolean ENABLED = "true".equalsIgnoreCase(System.getProperty("BuildDecisions", "true"));
 
     /**
      * @param enabled

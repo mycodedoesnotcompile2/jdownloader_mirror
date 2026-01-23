@@ -22,6 +22,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -43,13 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52159 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -169,18 +169,18 @@ public class CooldebridCom extends PluginForHost {
         if (!br.getURL().contains("/generate.html")) {
             br.getPage("/generate.html");
         }
-        final String accountType = br.getRegex("(?i)(Free User|Premium User)\\s*</span>").getMatch(0);
+        final String accountType = br.getRegex("(Free User|Premium User)\\s*</span>").getMatch(0);
         if (accountType == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Regex usedTrafficRegex = br.getRegex("id=\"used_bw\">([^<]+)</span>\\s*/\\s*([^<]+)");
-        if (!usedTrafficRegex.matches()) {
+        if (!usedTrafficRegex.patternFind()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         ai.setTrafficMax(SizeFormatter.getSize(usedTrafficRegex.getMatch(1)));
         ai.setTrafficLeft(ai.getTrafficMax() - SizeFormatter.getSize(usedTrafficRegex.getMatch(0)));
-        final Regex usedLinksRegex = br.getRegex("(?i)id=\"used_links\">(\\d+)</span>\\s*/\\s*(\\d+)\\s*links");
-        if (!usedLinksRegex.matches()) {
+        final Regex usedLinksRegex = br.getRegex("id=\"used_links\">(\\d+)</span>\\s*/\\s*(\\d+)\\s*links");
+        if (!usedLinksRegex.patternFind()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final int linksPerDayUsed = Integer.parseInt(usedLinksRegex.getMatch(0));
@@ -193,8 +193,8 @@ public class CooldebridCom extends PluginForHost {
         ai.setStatus(accountType + " | " + "Daily links left: " + linksPerDayLeft + "/" + linksPerDayMax);
         if (accountType.equalsIgnoreCase("Premium User")) {
             account.setType(AccountType.PREMIUM);
-            final String daysLeft = br.getRegex("(?i)([\\d+\\.]+)\\s*Days\\s*Left\\s*<").getMatch(0);
-            final String hoursLeft = br.getRegex("(?i)([\\d+\\.]+)\\s*Hours\\s*Left\\s*<").getMatch(0);
+            final String daysLeft = br.getRegex("([\\d+\\.]+)\\s*Days\\s*Left\\s*<").getMatch(0);
+            final String hoursLeft = br.getRegex("([\\d+\\.]+)\\s*Hours\\s*Left\\s*<").getMatch(0);
             if (daysLeft != null) {
                 ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(daysLeft) * TimeUnit.DAYS.toMillis(1)), this.br);
             } else if (hoursLeft != null) {
@@ -276,72 +276,65 @@ public class CooldebridCom extends PluginForHost {
 
     private void login(final Account account, final boolean validateLogins) throws Exception {
         synchronized (account) {
-            try {
-                prepBR(this.br);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    logger.info("Trying to re-use cookies");
-                    br.setCookies(cookies);
-                    if (!validateLogins) {
-                        /* Trust cookies without checking. */
-                        return;
-                    }
-                    br.getPage(WEBSITE_BASE + "/generate.html");
-                    if (this.isLoggedinHTML(this.br)) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(br.getHost());
-                    }
+            prepBR(this.br);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                logger.info("Trying to re-use cookies");
+                br.setCookies(cookies);
+                if (!validateLogins) {
+                    /* Trust cookies without checking. */
+                    return;
                 }
-                logger.info("Performing full login");
-                br.getPage(WEBSITE_BASE);
-                final Form loginform = br.getFormbyProperty("id", "login_form");
-                if (loginform == null) {
-                    logger.warning("Failed to find loginform");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                br.getPage(WEBSITE_BASE + "/generate.html");
+                if (this.isLoggedinHTML(this.br)) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(br.getHost());
                 }
-                loginform.setAction("/api/login.php");
-                loginform.setMethod(MethodType.POST);
-                loginform.put("username", Encoding.urlEncode(account.getUser()));
-                loginform.put("userpass", Encoding.urlEncode(account.getPass()));
-                final String captcha = this.getCaptchaCode(WEBSITE_BASE + "/api/antibot/index.php", new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true));
-                loginform.put("antibot", Encoding.urlEncode(captcha));
-                final Browser brc = br.cloneBrowser();
-                setAjaxHeaders(brc);
-                brc.submitForm(loginform);
-                /* We expect a json response */
-                final Map<String, Object> root = restoreFromString(brc.toString(), TypeRef.MAP);
-                if (root.get("status").toString().equalsIgnoreCase("error")) {
-                    /*
-                     * Usually e.g. {"status":"error","msg":"Security Code Incorrect"} or
-                     * {"status":"error","msg":"Username Or Password Is Incorrect"}
-                     */
-                    final String msg = (String) root.get("msg");
-                    if (!StringUtils.isEmpty(msg)) {
-                        if (msg.equalsIgnoreCase("Security Code Incorrect")) {
-                            /* Invalid login captcha */
-                            throw new AccountUnavailableException(msg, 1 * 60 * 1000l);
-                        } else {
-                            throw new AccountInvalidException(msg);
-                        }
-                    } else {
-                        throw new AccountInvalidException();
-                    }
-                }
-                /*
-                 * {"status":"ok","msg":"Login Successful.."} --> Returns cookie user_lang, userid and userpw (some hash, always the same
-                 * per user [dangerous])
-                 */
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            } catch (PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Performing full login");
+            br.getPage(WEBSITE_BASE);
+            final Form loginform = br.getFormbyProperty("id", "login_form");
+            if (loginform == null) {
+                logger.warning("Failed to find loginform");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            loginform.setAction("/api/login.php");
+            loginform.setMethod(MethodType.POST);
+            loginform.put("username", Encoding.urlEncode(account.getUser()));
+            loginform.put("userpass", Encoding.urlEncode(account.getPass()));
+            final String captcha = this.getCaptchaCode(WEBSITE_BASE + "/api/antibot/index.php", new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true));
+            loginform.put("antibot", Encoding.urlEncode(captcha));
+            final Browser brc = br.cloneBrowser();
+            setAjaxHeaders(brc);
+            brc.submitForm(loginform);
+            /* We expect a json response */
+            final Map<String, Object> root = restoreFromString(brc.toString(), TypeRef.MAP);
+            if (root.get("status").toString().equalsIgnoreCase("error")) {
+                /*
+                 * Usually e.g. {"status":"error","msg":"Security Code Incorrect"} or
+                 * {"status":"error","msg":"Username Or Password Is Incorrect"}
+                 */
+                final String msg = (String) root.get("msg");
+                if (!StringUtils.isEmpty(msg)) {
+                    if (msg.equalsIgnoreCase("Security Code Incorrect")) {
+                        /* Invalid login captcha */
+                        throw new AccountUnavailableException(msg, 1 * 60 * 1000l);
+                    } else {
+                        throw new AccountInvalidException(msg);
+                    }
+                } else {
+                    throw new AccountInvalidException();
+                }
+            }
+            /*
+             * {"status":"ok","msg":"Login Successful.."} --> Returns cookie user_lang, userid and userpw (some hash, always the same per
+             * user [dangerous])
+             */
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 

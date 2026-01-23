@@ -6,7 +6,8 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultDoubleValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
-import org.appwork.storage.config.annotations.DefaultStringValue;
+import org.appwork.storage.config.annotations.DefaultJsonObject;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
 import org.appwork.storage.config.annotations.SpinnerValidator;
@@ -39,22 +40,6 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
 
         public String getFilterList_label() {
             return "Filter list";
-        }
-
-        public String getEnableDomainWhitelist_label() {
-            return "Enable domain whitelist";
-        }
-
-        public String getDomainWhitelistEnabled_label() {
-            return "Enable domain blacklist";
-        }
-
-        public String getDomainWhitelist_label() {
-            return "Domain whitelist";
-        }
-
-        public String getDomainBlacklist_label() {
-            return "Domain blacklist";
         }
 
         public String getMaxCaptchasPerHourEnabled_label() {
@@ -104,14 +89,6 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
     void setLowCreditsWarningThreshold(double threshold);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Enable domain whitelist")
-    @DefaultBooleanValue(true)
-    @Order(500)
-    boolean isDomainWhitelistEnabled();
-
-    void setDomainWhitelistEnabled(boolean b);
-
-    @AboutConfig
     @DescriptionForConfigEntry("Enable filter list")
     @DefaultBooleanValue(true)
     @Order(500)
@@ -122,34 +99,12 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
     @AboutConfig
     @Order(501)
     @DescriptionForConfigEntry("Filter list")
-    // TODO: Add default value?
+    @DefaultOnNull
+    @DefaultJsonObject("[{\"name\":\"Example Block Example.com\",\"domain\":\"example.com\",\"captchaTypes\":[],\"regex\":false,\"enabled\":false,\"captchaRequestTypes\":[],\"filterType\":\"BLACKLIST\",\"broken\":false,\"id\":null,\"created\":1706000000000,\"position\":0},{\"name\":\"Example Allow Mega.nz - All Types\",\"domain\":\"mega\\.nz\",\"captchaTypes\":[\"IMAGE\",\"IMAGE_SINGLE_CLICK_CAPTCHA\",\"IMAGE_MULTI_CLICK_CAPTCHA\",\"RECAPTCHA_V3\",\"RECAPTCHA_V3_ENTERPRISE\",\"RECAPTCHA_V2_INVISIBLE\",\"RECAPTCHA_V2_ENTERPRISE\",\"RECAPTCHA_V2\",\"HCAPTCHA\",\"CUTCAPTCHA\",\"GEETEST_V1\",\"GEETEST_V4\",\"CLOUDFLARE_TURNSTILE\",\"MT_CAPTCHA\",\"FRIENDLY_CAPTCHA\"],\"regex\":true,\"enabled\":false,\"captchaRequestTypes\":[\"HOSTER_LOGIN\",\"HOSTER\",\"DECRYPTER\"],\"filterType\":\"WHITELIST\",\"broken\":false,\"id\":null,\"created\":1706100000000,\"position\":5}]")
+    // TODO: Add better default (json) value?
     List<CaptchaChallengeFilter> getFilterList();
 
     void setFilterList(List<CaptchaChallengeFilter> list);
-
-    @AboutConfig
-    @DescriptionForConfigEntry("Comma-separated list of domains where captcha solving is enabled")
-    @DefaultStringValue("")
-    @Order(550)
-    String getDomainWhitelist();
-
-    void setDomainWhitelist(String domains);
-
-    @AboutConfig
-    @DescriptionForConfigEntry("Enable domain blacklist")
-    @DefaultBooleanValue(true)
-    @Order(551)
-    boolean isDomainBlacklistEnabled();
-
-    void setDomainBlacklistEnabled(boolean b);
-
-    @AboutConfig
-    @DescriptionForConfigEntry("Comma-separated list of domains where captcha solving is disabled")
-    @DefaultStringValue("")
-    @Order(550)
-    String getDomainBlacklist();
-
-    void setDomainBlacklist(String domains);
 
     @AboutConfig
     @DescriptionForConfigEntry("Limits max number of parallel captchas")

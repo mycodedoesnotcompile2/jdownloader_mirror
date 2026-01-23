@@ -46,7 +46,7 @@ import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.config.CaptchaSolverNinekwConfig;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -66,7 +66,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52145 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52163 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -96,11 +96,6 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         return "https://" + getHost() + "/?refid=1235181816";
     }
 
-    /**
-     * Returns the list of captcha types supported by this solver.
-     *
-     * @return List of supported captcha types
-     */
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
@@ -322,12 +317,6 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        /* deathbycaptcha API has no call to report valid captchas, only invalid. */
-        return false;
-    }
-
-    @Override
-    public boolean setValid(AbstractResponse<?> response, Account account) {
         /* API docs: https://deathbycaptcha.com/api#api_details_report */
         UrlQuery query = new UrlQuery();
         if (this.isLoginViaAuthtoken(account)) {
@@ -343,6 +332,12 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
             e.printStackTrace();
             return false;
         }
+    }
+
+    @Override
+    public boolean setValid(AbstractResponse<?> response, Account account) {
+        /* deathbycaptcha API has no call to report valid captchas, only invalid. */
+        return false;
     }
 
     private boolean isLoginViaAuthtoken(final Account account) {
@@ -722,8 +717,8 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     }
 
     @Override
-    public Class<? extends CaptchaSolverNinekwConfig> getConfigInterface() {
+    public Class<? extends CaptchaSolverPluginConfig> getConfigInterface() {
         // TODO: Replace this by custom config for deathbycaptcha, this is just for testing!
-        return CaptchaSolverNinekwConfig.class;
+        return CaptchaSolverPluginConfig.class;
     }
 }

@@ -14,6 +14,7 @@ public class CaptchaChallengeFilter implements Storable {
         WHITELIST
     }
 
+    private String                  name                = null;
     private String                  domain              = null;
     private Set<CAPTCHA_TYPE>       captchaTypes        = null;
     private boolean                 regex               = false;
@@ -27,6 +28,14 @@ public class CaptchaChallengeFilter implements Storable {
 
     public CaptchaChallengeFilter() {
         // __Storable__ constructor
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public boolean _isBroken() {
@@ -61,7 +70,6 @@ public class CaptchaChallengeFilter implements Storable {
         this.position = position;
     }
 
-    /* Returns domain or domain-regex. */
     public String getDomain() {
         return domain;
     }
@@ -141,6 +149,9 @@ public class CaptchaChallengeFilter implements Storable {
         sb.append("CaptchaChallengeFilter[");
         if (id != null) {
             sb.append("id=").append(id).append(", ");
+        }
+        if (name != null) {
+            sb.append("name=").append(name).append(", ");
         }
         sb.append("type=").append(filterType);
         sb.append(", domain=").append(domain);

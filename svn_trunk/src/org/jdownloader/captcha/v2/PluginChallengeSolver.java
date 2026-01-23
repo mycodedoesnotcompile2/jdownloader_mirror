@@ -5,7 +5,6 @@ import java.util.List;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
-import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 import jd.controlling.captcha.SkipException;
@@ -25,19 +24,23 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         if (plugin == null || account == null) {
             throw new IllegalArgumentException();
         }
-        this.service = new PluginForCaptchaSolverSolverService(plugin);
+        this.service = ChallengeResponseController.getInstance().getServiceByID(plugin.getHost());
         this.account = account;
         this.plugin = plugin;
     }
 
-    /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
-    protected boolean enoughBalanceFor(final Challenge<?> c, final Account account) throws Exception {
-        return plugin.enoughBalanceFor(c, account);
+    public Account getAccount() {
+        return account;
     }
 
     @Override
     public SolverType getSolverType() {
         return SolverType.EXTERNAL;
+    }
+
+    @Override
+    public List<FeedbackType> getSupportedFeedbackTypes() {
+        return plugin.getSupportedFeedbackTypes();
     }
 
     @Override
@@ -50,10 +53,6 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         return this.plugin.getUserDisabledCaptchaTypes(account);
     }
 
-    public Account getAccount() {
-        return account;
-    }
-
     @Override
     public boolean isEnabled() {
         return this.account.isEnabled();
@@ -61,14 +60,13 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     protected boolean validateLogins() {
-        // TODO: Remove this in the future as logins are controlled by the plugin in the future.
+        // TODO: Remove this in the future as logins will be controlled by the plugin in the future.
         // return true;
         return this.isEnabled();
     }
 
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
-        // TODO: Only call plugin.canHandle if there is an override or always call both
         final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
         if (veto != null) {
             return veto;
@@ -89,31 +87,16 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public boolean isDomainBlacklistEnabled() {
-        return plugin.isDomainBlacklistEnabled();
-    }
-
-    @Override
-    public List<String> getBlacklistedDomains() {
-        return plugin.getBlacklistedDomains(account);
-    }
-
-    @Override
-    public boolean isDomainWhitelistEnabled() {
-        return plugin.isDomainWhitelistEnabled();
-    }
-
-    @Override
-    public List<String> getWhitelistedDomains() {
-        return plugin.getWhitelistedDomains(account);
-    }
-
-    @Override
     public boolean setValid(AbstractResponse<?> response) {
-        /*
-         * TODO: Find a good place where to check if captcha feedback is disabled in plugin settings, then possibly don't call the feedback
-         * method.
-         */
+        final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
+        if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.REPORT_VALID_CAPTCHAS)) {
+            /* Feedback type is not supported by plugin. */
+            return false;
+        }
+        if (!plugin.isEnableCaptchaFeedback(account)) {
+            /* Feedback is disabled by user */
+            return false;
+        }
         try {
             return this.plugin.setValid(response, account);
         } catch (Exception e) {
@@ -125,10 +108,15 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response) {
-        /*
-         * TODO: Find a good place where to check if captcha feedback is disabled in plugin settings, then possibly don't call the feedback
-         * method.
-         */
+        final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
+        if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.REPORT_INVALID_CAPTCHAS)) {
+            /* Feedback type is not supported by plugin. */
+            return false;
+        }
+        if (!plugin.isEnableCaptchaFeedback(account)) {
+            /* Feedback is disabled by user */
+            return false;
+        }
         try {
             return this.plugin.setInvalid(response, account);
         } catch (Exception e) {
@@ -138,11 +126,17 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
     }
 
+    @Override
     public boolean setUnused(AbstractResponse<?> response) {
-        /*
-         * TODO: Find a good place where to check if captcha feedback is disabled in plugin settings, then possibly don't call the feedback
-         * method.
-         */
+        final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
+        if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.ABORT_CAPTCHAS)) {
+            /* Feedback type is not supported by plugin. */
+            return false;
+        }
+        if (!plugin.isEnableCaptchaFeedback(account)) {
+            /* Feedback is disabled by user */
+            return false;
+        }
         try {
             return this.plugin.setUnused(response, account);
         } catch (Exception e) {
@@ -158,6 +152,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         try {
             plugin.solve(cesJob, account);
         } catch (final PluginException e) {
+            // TODO: Set detailed failure feedback on SolverJob e.g. if failure was account related.
             plugin.handleAccountException(account, plugin.getLogger(), e);
         } catch (Exception e) {
             // TODO

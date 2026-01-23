@@ -20,7 +20,6 @@ import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.DebugMode;
-import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
 import org.jdownloader.captcha.v2.CaptchaHistoryManager;
 import org.jdownloader.gui.IconKey;
@@ -247,12 +246,7 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
 
             @Override
             public Icon getIcon(CaptchaType captchaType) {
-                final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
-                if (domain != null) {
-                    return DomainInfo.getInstance(domain).getFavIcon();
-                } else {
-                    return NewTheme.I().getIcon(IconKey.ICON_BEER, 16);
-                }
+                return captchaType.getCAPTCHA_TYPE_STATIC().getIcon();
             }
         };
     }
@@ -406,7 +400,7 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
      * Creates the "Demo URL" column
      */
     private ExtTextColumn<CaptchaType> createUsedForServicesColumn() {
-        return new ExtTextColumn<CaptchaType>("Used for services") {
+        return new ExtTextColumn<CaptchaType>("Used by you for services") {
             @Override
             public String getStringValue(final CaptchaType captchaType) {
                 final CAPTCHA_TYPE typeStatic = captchaType.getCAPTCHA_TYPE_STATIC();

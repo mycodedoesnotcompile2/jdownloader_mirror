@@ -17,6 +17,10 @@ import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Regex;
 
 public class JDClassLoaderLauncher {
+    static {
+        System.setProperty("BuildDecisions", "false");
+    }
+
     public static class JDCustomRootClassLoader extends URLClassLoader {
         private JDCustomRootClassLoader(URL[] urls) {
             super(urls);

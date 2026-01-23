@@ -440,6 +440,33 @@ public class HostPluginController extends PluginController<PluginForHost> {
         return ensureLoaded().values();
     }
 
+    /**
+     * Get all plugins that match the filter criteria
+     *
+     * @param filter
+     *            the filter to apply
+     * @return a list of plugins matching the filter criteria
+     */
+    public List<LazyHostPlugin> list(LazyHostPluginFilter filter) {
+        final Collection<LazyHostPlugin> allPlugins = ensureLoaded().values();
+        if (filter == null) {
+            return new ArrayList<LazyHostPlugin>(allPlugins);
+        }
+        final List<LazyHostPlugin> result = new ArrayList<LazyHostPlugin>();
+        final Integer maxResultsNum = filter.getMaxResultsNum();
+        for (final LazyHostPlugin plugin : allPlugins) {
+            if (!filter.matches(plugin)) {
+                continue;
+            }
+            result.add(plugin);
+            // Check if we've reached the maximum number of results
+            if (maxResultsNum != null && result.size() >= maxResultsNum.intValue()) {
+                break;
+            }
+        }
+        return result;
+    }
+
     public Map<String, LazyHostPlugin> ensureLoaded() {
         Map<String, LazyHostPlugin> localList = list;
         if (localList != null && isCacheInvalidated() == false) {
@@ -456,15 +483,15 @@ public class HostPluginController extends PluginController<PluginForHost> {
     }
 
     public LazyHostPlugin get(String displayName) {
-        if (displayName != null) {
-            final LazyHostPlugin ret = ensureLoaded().get(displayName.toLowerCase(Locale.ENGLISH));
-            if (ret != null) {
-                return ret;
-            } else {
-                if ("UpdateRequired".equalsIgnoreCase(displayName)) {
-                    return fallBackPlugin;
-                }
-            }
+        if (displayName == null) {
+            return null;
+        }
+        final LazyHostPlugin ret = ensureLoaded().get(displayName.toLowerCase(Locale.ENGLISH));
+        if (ret != null) {
+            return ret;
+        }
+        if ("UpdateRequired".equalsIgnoreCase(displayName)) {
+            return fallBackPlugin;
         }
         return null;
     }

@@ -760,9 +760,9 @@ public abstract class Plugin implements ActionListener {
             if (plugin != null) {
                 final Browser br;
                 if (plugin instanceof PluginForHost) {
-                    br = ((PluginForHost) plugin).getBrowser();
+                    br = plugin.getBrowser();
                 } else if (plugin instanceof PluginForDecrypt) {
-                    br = ((PluginForDecrypt) plugin).getBrowser();
+                    br = plugin.getBrowser();
                 } else {
                     br = null;
                 }
@@ -886,6 +886,8 @@ public abstract class Plugin implements ActionListener {
         DOWNLOAD,
         CRAWLER,
         LINK_CHECK,
+        /* TODO: Implement CAPTCHA_SOLVING */
+        CAPTCHA_SOLVING,
         ACCOUNT_CHECK;
 
         public boolean isCurrentPluginEnvironment() {

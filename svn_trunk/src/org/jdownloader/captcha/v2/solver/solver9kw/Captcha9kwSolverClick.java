@@ -38,7 +38,7 @@ public class Captcha9kwSolverClick extends AbstractCaptcha9kwSolver<ClickedPoint
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof ClickCaptchaChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

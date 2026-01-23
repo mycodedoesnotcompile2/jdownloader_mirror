@@ -2,7 +2,6 @@ package org.jdownloader.plugins.components.captchasolver;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
@@ -10,6 +9,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.CaptchaChallengeFilter;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
@@ -28,7 +28,7 @@ import jd.plugins.PluginForHost;
  * Abstract base class for captcha solver plugins.
  */
 public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
-    public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, Account account) throws Exception {
+    public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, final Account account) throws Exception {
         final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
         plugin.setBrowser(plugin.createNewBrowserInstance());
         return new PluginChallengeSolver<T>(plugin, account);
@@ -55,6 +55,10 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
+    }
+
+    public List<FeedbackType> getSupportedFeedbackTypes() {
+        return null;
     }
 
     public abstract String getBuyPremiumUrl();
@@ -108,12 +112,20 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return disabled_captcha_types;
     }
 
+    public boolean isEnableCaptchaFeedback(final Account account) {
+        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
+        if (cfg == null) {
+            return true;
+        }
+        return cfg.isEnableCaptchaFeedback();
+    }
+
     /**
      * Determines whether the user should be notified when the account balance is low.
      *
      * @return true if the user should be notified on low balance, false otherwise
      */
-    protected boolean notifyOnLowBalance(final Account account) {
+    public boolean notifyOnLowBalance(final Account account) {
         // TODO: Implement logic
         final CaptchaSolverPluginConfig cfg = getDefaultConfig();
         if (cfg == null) {
@@ -131,7 +143,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return cfg.getPollingIntervalSeconds() * 1000;
     }
 
-    protected int getMaxSimultaneousCaptchas(final Account account) {
+    public int getMaxSimultaneousCaptchas(final Account account) {
         final CaptchaSolverPluginConfig cfg = getDefaultConfig();
         if (cfg == null) {
             return Integer.MAX_VALUE;
@@ -153,71 +165,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             return null;
         }
         return cfg.getFilterList();
-    }
-
-    public boolean isDomainBlacklistEnabled() {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return false;
-        }
-        return cfg.isDomainBlacklistEnabled();
-    }
-
-    public List<String> getBlacklistedDomains(final Account account) {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return null;
-        }
-        return commaSeparatedDomainsToList(cfg.getDomainBlacklist());
-    }
-
-    public boolean isDomainWhitelistEnabled() {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return false;
-        }
-        return cfg.isDomainWhitelistEnabled();
-    }
-
-    public List<String> getWhitelistedDomains(final Account account) {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return null;
-        }
-        return commaSeparatedDomainsToList(cfg.getDomainWhitelist());
-    }
-
-    private List<String> commaSeparatedDomainsToList(final String input) {
-        final List<String> ret = new ArrayList<String>();
-        if (input == null || input.trim().length() == 0) {
-            return null;
-        }
-        final String[] parts = input.split(",");
-        for (int i = 0; i < parts.length; i++) {
-            final String domain = parts[i].trim().toLowerCase(Locale.ROOT);
-            if (isValidDomain(domain) && !ret.contains(domain)) {
-                ret.add(domain);
-            }
-        }
-        if (ret.size() > 0) {
-            return ret;
-        }
-        return null;
-    }
-
-    private final boolean isValidDomain(final String domain) {
-        if (domain == null || domain.length() == 0) {
-            return false;
-        }
-        // TODO: Move this function somewhere else
-        // Domain must contain at least one dot
-        if (!domain.contains(".")) {
-            return false;
-        }
-        // Regex pattern for domain validation
-        // Allows: letters, numbers, hyphens; must not start or end with hyphen
-        final String domainPattern = "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?$";
-        return domain.matches(domainPattern);
     }
 
     /** Returns interval used for polling when waiting for captcha solution from solver. */
@@ -251,21 +198,13 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         }
     }
 
-    @Override
-    public AvailableStatus requestFileInformation(DownloadLink parameter) throws Exception {
-        /* Must override but should never be called. */
-        throw new WTFException();
-    }
-
-    @Override
-    public void handleFree(DownloadLink link) throws Exception {
-        /* Must override but should never be called. */
-        throw new WTFException();
-    }
-
-    /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
+    /**
+     * Returns false if the solver does not have enough balance to solve the given captcha challenge. <br>
+     */
     public boolean enoughBalanceFor(final Challenge<?> c, final Account account) {
-        // TODO: Implement logic
+        if (account.getAccountInfo() != null && account.getAccountInfo().getAccountBalance() <= 0) {
+            return false;
+        }
         return true;
     }
 
@@ -276,7 +215,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The challenge to check
      * @return null if this solver can handle the challenge, ChallengeVetoReason otherwise
      */
-    public final ChallengeVetoReason getVetoReason(final Challenge<?> c, Account account) {
+    public final ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
         if (!account.isEnabled()) {
             return ChallengeVetoReason.ACCOUNT_DISABLED;
         }
@@ -302,5 +241,18 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         }
         final CaptchaSolverPluginConfig cfg = (CaptchaSolverPluginConfig) cfgO;
         return cfg;
+    }
+
+    /** Down below there are methods which we don't need but they need to be overridden. */
+    @Override
+    public AvailableStatus requestFileInformation(DownloadLink parameter) throws Exception {
+        /* Must override but should never be called. */
+        throw new WTFException();
+    }
+
+    @Override
+    public void handleFree(DownloadLink link) throws Exception {
+        /* Must override but should never be called. */
+        throw new WTFException();
     }
 }

@@ -2,6 +2,9 @@ package jd.plugins;
 
 import java.util.List;
 
+import javax.swing.Icon;
+
+import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
@@ -10,6 +13,8 @@ import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 public class CaptchaType {
@@ -491,6 +496,19 @@ public class CaptchaType {
          */
         public boolean isJDownloaderSupported() {
             return true;
+        }
+
+        /**
+         * Returns icon for service. <br>
+         * Can return null!!
+         */
+        public Icon getIcon() {
+            if (this.getDomain() != null) {
+                return DomainInfo.getInstance(this.getDomain()).getFavIcon();
+            } else {
+                /* Fallback icon */
+                return NewTheme.I().getIcon(IconKey.ICON_IMAGE, 16);
+            }
         }
 
         /**

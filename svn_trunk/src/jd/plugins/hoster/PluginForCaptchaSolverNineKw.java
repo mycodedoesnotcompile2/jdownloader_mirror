@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52110 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52163 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -51,11 +51,6 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         return "https://www." + getHost() + "/register.html";
     }
 
-    /**
-     * Returns the list of captcha types supported by this solver.
-     *
-     * @return List of supported captcha types
-     */
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();

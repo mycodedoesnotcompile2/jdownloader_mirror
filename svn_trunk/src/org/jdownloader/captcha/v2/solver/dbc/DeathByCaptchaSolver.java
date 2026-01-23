@@ -82,13 +82,13 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else if (c instanceof RecaptchaV2Challenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else if (c instanceof CutCaptchaChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else if (c instanceof CloudflareTurnstileChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

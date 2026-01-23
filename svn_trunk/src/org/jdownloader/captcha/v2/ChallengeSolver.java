@@ -33,6 +33,12 @@ public abstract class ChallengeSolver<T> {
         }
     };
 
+    public enum FeedbackType {
+        REPORT_INVALID_CAPTCHAS,
+        REPORT_VALID_CAPTCHAS,
+        ABORT_CAPTCHAS
+    }
+
     public enum SolverType {
         JD_LOCAL,
         JD_LOCAL_BROWSER,
@@ -56,12 +62,15 @@ public abstract class ChallengeSolver<T> {
     protected ChallengeSolver() {
     }
 
+    public List<FeedbackType> getSupportedFeedbackTypes() {
+        // TODO: Make this abstract
+        return null;
+    }
+
     /**
      * Returns the list of captcha types supported by this solver. <br>
      * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
      * !
-     *
-     *
      *
      * @return List of supported captcha types
      */
@@ -254,7 +263,8 @@ public abstract class ChallengeSolver<T> {
 
     public boolean isFilterListEnabled() {
         // TODO: Make this abstract
-        return true;
+        // TODO: Migrate to new captcha solver config system
+        return getService().getConfig().isBlackWhiteListingEnabled();
     }
 
     public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
@@ -331,6 +341,7 @@ public abstract class ChallengeSolver<T> {
      * @param c
      * @return
      */
+    @Deprecated
     protected final boolean validateBlackWhite(final Challenge<?> c) {
         if (!this.isDomainWhitelistEnabled() && !this.isDomainBlacklistEnabled()) {
             /* Black/Whitelist disabled by user -> No need to check */
@@ -384,6 +395,7 @@ public abstract class ChallengeSolver<T> {
         return true;
     }
 
+    @Deprecated
     private Boolean match(final Challenge<?> c, final String host, final Pattern pattern) {
         if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
             if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {

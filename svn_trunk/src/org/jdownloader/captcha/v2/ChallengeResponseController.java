@@ -17,6 +17,7 @@ import org.appwork.timetracker.TrackerRule;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -29,6 +30,7 @@ import org.jdownloader.captcha.blacklist.BlacklistEntry;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
 import org.jdownloader.captcha.event.ChallengeResponseEvent;
 import org.jdownloader.captcha.event.ChallengeResponseEventSender;
+import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
@@ -55,8 +57,14 @@ import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.plugins.controller.PluginClassLoader;
+import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
 
@@ -67,6 +75,8 @@ import jd.controlling.captcha.CaptchaSettings.INTERACTIVE_CAPTCHA_PRIVACY_LEVEL;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.plugins.Account;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -156,6 +166,22 @@ public class ChallengeResponseController {
         }
         addSolver(AccountOAuthSolver.getInstance());
         addSolver(CaptchaAPISolver.getInstance());
+        /* Add plugin captcha solver services */
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            final List<LazyHostPlugin> captchaSolverPlugins = HostPluginController.getInstance().list(new LazyHostPluginFilter().setFeatures(FEATURE.CAPTCHA_SOLVER));
+            for (final LazyHostPlugin plg : captchaSolverPlugins) {
+                final PluginClassLoaderChild pluginClassLoaderChild = PluginClassLoader.getThreadPluginClassLoaderChild();
+                abstractPluginForCaptchaSolver plugin;
+                try {
+                    plugin = Plugin.getNewPluginInstance(null, plg, pluginClassLoaderChild);
+                } catch (PluginException e) {
+                    e.printStackTrace();
+                    continue;
+                }
+                final PluginForCaptchaSolverSolverService solverservice = new PluginForCaptchaSolverSolverService(plugin);
+                addSolverService(solverservice);
+            }
+        }
     }
 
     public List<ChallengeSolver<?>> listSolvers() {
@@ -166,10 +192,16 @@ public class ChallengeResponseController {
     private final List<SolverService>            serviceList = new CopyOnWriteArrayList<SolverService>();
 
     private synchronized boolean addSolver(ChallengeSolver<?> solver) {
-        if (solverMap.put(solver.getService().getID(), solver.getService()) == null) {
-            serviceList.add(solver.getService());
-        }
+        addSolverService(solver.getService());
         return solverList.add(solver);
+    }
+
+    private synchronized boolean addSolverService(SolverService service) {
+        if (solverMap.put(service.getID(), service) == null) {
+            serviceList.add(service);
+            return true;
+        }
+        return false;
     }
 
     public <E> void fireNewAnswerEvent(SolverJob<E> job, AbstractResponse<E> abstractResponse) {
@@ -440,11 +472,15 @@ public class ChallengeResponseController {
     @SuppressWarnings("unchecked")
     private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
+        final HashSet<ChallengeVetoReason> vetoReasons = new HashSet<ChallengeVetoReason>();
         for (final ChallengeSolver<?> solver : solverList) {
             try {
-                if (solver.getChallengeVetoReason(c) == null) {
-                    ret.add((ChallengeSolver<T>) solver);
+                final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
+                if (veto != null) {
+                    vetoReasons.add(veto);
+                    continue;
                 }
+                ret.add((ChallengeSolver<T>) solver);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -462,7 +498,15 @@ public class ChallengeResponseController {
                     /* E.g. solver cannot handle challenge it gets presented */
                     continue;
                 }
-                if (solver.getChallengeVetoReason(c) != null) {
+                final SolverService service = solver.getService();
+                if (service != null && !service.isEnabled()) {
+                    // TODO: Move this into getChallengeVetoReason
+                    vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
+                    continue;
+                }
+                final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
+                if (veto != null) {
+                    vetoReasons.add(veto);
                     continue;
                 }
                 ret.add(solver);
@@ -478,7 +522,7 @@ public class ChallengeResponseController {
                 }
             }
         }
-        logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
+        logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
             /*
              * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account

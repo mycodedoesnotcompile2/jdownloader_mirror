@@ -50,13 +50,13 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     }
 
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> challenge) {
-        if (challenge instanceof RecaptchaV2Challenge) {
-            return null;
-        } else if (challenge instanceof BasicCaptchaChallenge) {
-            return null;
-        } else if (challenge instanceof CloudflareTurnstileChallenge) {
-            return null;
+    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (c instanceof RecaptchaV2Challenge) {
+            return super.getChallengeVetoReason(c);
+        } else if (c instanceof BasicCaptchaChallenge) {
+            return super.getChallengeVetoReason(c);
+        } else if (c instanceof CloudflareTurnstileChallenge) {
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

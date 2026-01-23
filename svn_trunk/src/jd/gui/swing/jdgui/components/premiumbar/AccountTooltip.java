@@ -168,10 +168,7 @@ public class AccountTooltip extends PanelToolTip {
                     JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
                     ret.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
                     ret.setText(ctype.getDisplayName());
-                    if (ctype.getDomain() != null) {
-                        // TODO: Add icons for items without domains
-                        ret.setIcon(DomainInfo.getInstance(ctype.getDomain()));
-                    }
+                    ret.setIcon(ctype.getIcon());
                     ret.setOpaque(false);
                     ret.setBackground(null);
                     return ret;

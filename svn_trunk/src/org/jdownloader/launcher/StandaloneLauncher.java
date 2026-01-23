@@ -40,6 +40,9 @@ import org.jdownloader.updatev2.JDClassLoaderLauncher;
 import org.jdownloader.updatev2.RestartController;
 
 public class StandaloneLauncher {
+    static {
+        System.setProperty("BuildDecisions", "false");
+    }
     private static LogSource LOGGER;
     static {
         // Set the Loggerfactory redirector (if no other is set

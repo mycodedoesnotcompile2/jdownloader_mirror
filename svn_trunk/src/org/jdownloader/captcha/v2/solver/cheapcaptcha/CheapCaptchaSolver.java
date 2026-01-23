@@ -73,7 +73,7 @@ public class CheapCaptchaSolver extends CESChallengeSolver<String> {
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof BasicCaptchaChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

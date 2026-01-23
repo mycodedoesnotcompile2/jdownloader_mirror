@@ -45,7 +45,7 @@ public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiCl
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof MultiClickCaptchaChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

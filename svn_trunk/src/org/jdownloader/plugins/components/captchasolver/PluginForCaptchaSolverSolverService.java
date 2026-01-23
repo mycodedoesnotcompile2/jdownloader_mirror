@@ -10,7 +10,6 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.ChallengeSolverConfig;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
-import org.jdownloader.gui.translate._GUI;
 
 import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
 import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
@@ -20,17 +19,20 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     protected final abstractPluginForCaptchaSolver plugin;
 
     public PluginForCaptchaSolverSolverService(final abstractPluginForCaptchaSolver plugin) {
+        if (plugin == null) {
+            throw new IllegalArgumentException();
+        }
         this.plugin = plugin;
     }
 
     @Override
     public String getType() {
-        return _GUI.T.CaptchaSolver_Type_paid_online();
+        // TODO: Add translation or return only name of host
+        return "Captcha solver plugin " + this.plugin.getHost();
     }
 
     @Override
     public Icon getIcon(int size) {
-        // TODO: Review this
         return DomainInfo.getInstance(plugin.getHost());
     }
 

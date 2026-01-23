@@ -62,7 +62,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         if (c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge || c instanceof HCaptchaChallenge) {
-            return null;
+            return super.getChallengeVetoReason(c);
         } else {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }

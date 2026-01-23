@@ -36,6 +36,9 @@ import org.appwork.utils.Application;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.CorsHandler;
+import org.appwork.utils.net.httpserver.HeaderValidationRules;
 import org.appwork.utils.net.httpserver.HttpConnection;
 import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.HttpConnectionRunnable;
@@ -46,8 +49,10 @@ import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HeadRequest;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -172,8 +177,18 @@ public class DeprecatedAPIServer extends HttpServer {
 
     public DeprecatedAPIServer(int port) {
         super(port);
+        setAllowedMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.HEAD, RequestMethod.OPTIONS);
+        CorsHandler cors = new CorsHandler();
+        setCorsHandler(cors);
+        HashMap<String, String> mandatory = new HashMap<String, String>();
+        HashMap<String, String> forbidden = new HashMap<String, String>();
+        HeaderValidationRules header = new HeaderValidationRules(mandatory, forbidden);
+        setHeaderValidationRules(header);
     }
-
+    @Override
+    public boolean onException(Throwable e, HttpRequest request, HttpResponse response) throws IOException {
+        return super.onException(e, request, response);
+    }
     @Override
     public HttpHandlerInfo registerRequestHandler(HttpRequestHandler handler) {
         return super.registerRequestHandler(handler);

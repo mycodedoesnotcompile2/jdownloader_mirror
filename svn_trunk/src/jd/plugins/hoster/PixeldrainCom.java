@@ -59,7 +59,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51754 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52161 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +87,7 @@ public class PixeldrainCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "pixeldrain.com", "pixeldrain.net", "pixeldra.in", "pixeldrain.dev" });
+        ret.add(new String[] { "pixeldrain.com", "pixeldrain.net", "pixeldra.in", "pixeldrain.nl", "pixeldrain.biz", "pixeldrain.tech", "pixeldrain.dev" });
         return ret;
     }
 
@@ -133,20 +133,19 @@ public class PixeldrainCom extends PluginForHost {
                     final String apiBase = "https://" + host + "/api";
                     final Browser br = plugin.createNewBrowserInstance();
                     br.setFollowRedirects(true);
-                    br.getPage(apiBase + "/file/BLOCK_CHECK/info");
+                    br.getPage(apiBase + "/misc/ping");
+                    /* Check for valid response */
+                    if (br.getRequest().getHtmlCode().equalsIgnoreCase("pong")) {
+                        // {"success":false,"value":"not_found","message":"The entity you requested could not be found"}
+                        plugin.getLogger().info("Auto detected api base:" + apiBase);
+                        API_BASE.set(apiBase);
+                        return getAPIBase(plugin);
+                    }
                     if (br.containsHTML(">\\s*Object not found\\s*<")) {
                         /* 2025-07-03: Spanish ISP block */
                         // <html><body>Object not found</body></html>
                         // See: https://board.jdownloader.org/showthread.php?t=97560
                         throw new IOException("Blocked!");
-                    }
-                    final Map<String, Object> response = plugin.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                    /* Check for valid/expected json response */
-                    if (response.get("success") instanceof Boolean && response.get("value") instanceof String) {
-                        // {"success":false,"value":"not_found","message":"The entity you requested could not be found"}
-                        plugin.getLogger().info("Auto detected api base:" + apiBase);
-                        API_BASE.set(apiBase);
-                        return getAPIBase(plugin);
                     }
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 } catch (Exception e) {
