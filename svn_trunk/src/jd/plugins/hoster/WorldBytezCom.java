@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
@@ -30,10 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 51328 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52167 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -140,13 +140,12 @@ public class WorldBytezCom extends XFileSharingProBasic {
 
     @Override
     protected void checkErrorsLastResort(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        if (br.containsHTML("(?i)>[^<]*Your account has been temporarily blocked due to multiple IPs") && account != null) {
+        if (br.containsHTML(">[^<]*Your account has been temporarily blocked due to multiple IPs") && account != null) {
             throw new AccountInvalidException("Your account has been temporarily blocked due to multiple IPs. Please change your password..after changing the password the account returns to normal");
         } else if (br.containsHTML(">\\s*If You Are Using VPN Please Disable To Continue Downloading\\s*<") && account != null) {
-
             /*
              * <h2 style="color: aliceblue;">Oops File Not Found</h2>
-             * 
+             *
              * <h2 style="color: aliceblue;">If You Are Using VPN Please Disable To Continue Downloading</h2> <h2 style="color: aliceblue;">
              * We apologize for any inconvenience caused.</h2>
              */
@@ -174,6 +173,15 @@ public class WorldBytezCom extends XFileSharingProBasic {
     @Override
     protected boolean supports_availablecheck_filesize_html() {
         /* 2023-10-09 */
+        return false;
+    }
+
+    @Override
+    protected boolean allowToGenerateAPIKeyInWebsiteMode() {
+        /*
+         * 2026-01-23: Looks like they've disabled the API but the URL to generate an API key still exists and will lead to a misleading
+         * "VPN blocked" page
+         */
         return false;
     }
 }

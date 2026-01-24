@@ -27,8 +27,17 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public String getType() {
-        // TODO: Add translation or return only name of host
-        return "Captcha solver plugin " + this.plugin.getHost();
+        return this.plugin.getHost();
+    }
+
+    @Override
+    public String getName() {
+        return this.plugin.getHost();
+    }
+
+    @Override
+    public String getID() {
+        return this.plugin.getHost();
     }
 
     @Override
@@ -42,20 +51,10 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     @Override
-    public String getName() {
-        return this.plugin.getHost();
-    }
-
-    @Override
     public ChallengeSolverConfig getConfig() {
         // return null;
         // TODO: Remove this dummy config
         return JsonConfig.create(TwoCaptchaConfigInterface.class);
-    }
-
-    @Override
-    public String getID() {
-        return this.plugin.getHost();
     }
 
     @Override

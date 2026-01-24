@@ -37,21 +37,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
-import org.appwork.utils.net.httpserver.ConnectionTimeouts;
-import org.appwork.utils.net.httpserver.CorsHandler;
-import org.appwork.utils.net.httpserver.HeaderValidationRules;
 import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
-import org.appwork.utils.net.httpserver.RequestSizeLimits;
-import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
-import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * @author daniel
@@ -93,7 +85,8 @@ public abstract class HttpRequest implements HttpRequestInterface {
     protected List<KeyValuePair>               requestedURLParameters = null;
     private List<String>                       remoteAddress          = new ArrayList<String>();
     protected final RawHttpConnectionInterface connection;
-    private HttpServerInterface                bridge;
+
+    private HttpServerInterface                server;
     private final long                         id;
 
     public RawHttpConnectionInterface getConnection() {
@@ -225,75 +218,75 @@ public abstract class HttpRequest implements HttpRequestInterface {
     /**
      * @param string
      */
-    public void setBridge(final HttpServerInterface bridge) {
-        this.bridge = bridge;
+    public void setServer(final HttpServerInterface server) {
+        this.server = server;
     }
 
-    @Deprecated
-    public void setBridge(final HTTPBridge deprecatedBridge) {
-        final HttpServerInterface previousServerInterface = getBridge();
-        setBridge(new HttpServerInterface() {
-            @Override
-            public boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse) {
-                return deprecatedBridge.canHandleChunkedEncoding(httpRequest, httpResponse);
-            }
-
-            @Override
-            public String getResponseServerHeader() {
-                return null;
-            }
-
-            @Override
-            public ResponseSecurityHeaders getResponseSecurityHeaders() {
-                return null;
-            }
-
-            @Override
-            public RequestSizeLimits getRequestSizeLimits() {
-                return null;
-            }
-
-            @Override
-            public HeaderValidationRules getHeaderValidationRules() {
-                return null;
-            }
-
-            @Override
-            public List<HttpRequestHandler> getHandler() {
-                return previousServerInterface.getHandler();
-            }
-
-            private final CorsHandler corsHandler = new CorsHandler() {
-                @Override
-                public boolean isAllowHeadersFromRequest() {
-                    return true;
-                }
-            };
-
-            @Override
-            public CorsHandler getCorsHandler() {
-                return corsHandler;
-            }
-
-            @Override
-            public ConnectionTimeouts getConnectionTimeouts() {
-                return null;
-            }
-
-            @Override
-            public Set<RequestMethod> getAllowedMethods() {
-                return null;
-            }
-        });
-    }
+    // @Deprecated
+    // public void setBridge(final HTTPBridge deprecatedBridge) {
+    // final HttpServerInterface previousServerInterface = getServer();
+    // setServer(new HttpServerInterface() {
+    // @Override
+    // public boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse) {
+    // return deprecatedBridge.canHandleChunkedEncoding(httpRequest, httpResponse);
+    // }
+    //
+    // @Override
+    // public String getResponseServerHeader() {
+    // return null;
+    // }
+    //
+    // @Override
+    // public ResponseSecurityHeaders getResponseSecurityHeaders() {
+    // return null;
+    // }
+    //
+    // @Override
+    // public RequestSizeLimits getRequestSizeLimits() {
+    // return null;
+    // }
+    //
+    // @Override
+    // public HeaderValidationRules getHeaderValidationRules() {
+    // return null;
+    // }
+    //
+    // @Override
+    // public List<HttpRequestHandler> getHandler() {
+    // return previousServerInterface.getHandler();
+    // }
+    //
+    // private final CorsHandler corsHandler = new CorsHandler() {
+    // @Override
+    // public boolean isAllowHeadersFromRequest() {
+    // return true;
+    // }
+    // };
+    //
+    // @Override
+    // public CorsHandler getCorsHandler() {
+    // return corsHandler;
+    // }
+    //
+    // @Override
+    // public ConnectionTimeouts getConnectionTimeouts() {
+    // return null;
+    // }
+    //
+    // @Override
+    // public Set<RequestMethod> getAllowedMethods() {
+    // return null;
+    // }
+    // });
+    // }
 
     /**
      * returns the server bridge. Exmaple: FCGI for the FCGI bridge
      *
      * @return
      */
-    public HttpServerInterface getBridge() {
-        return bridge;
+    public HttpServerInterface getServer() {
+        return server;
     }
 
     private Map<String, Object> properties = new HashMap<String, Object>();

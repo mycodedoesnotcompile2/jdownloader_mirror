@@ -33,9 +33,14 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver;
 
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
@@ -52,6 +57,10 @@ import org.appwork.utils.net.httpconnection.RequestMethod;
  * <h2>Managed CORS Headers</h2> This class manages the following CORS headers:
  * <ul>
  * <li><b>Access-Control-Allow-Origin</b> - Specifies which origins are allowed to access the resource</li>
+ * <li><b>Access-Control-Allow-Credentials</b> - Specifies whether credentials (cookies, authorization headers) can be included in
+ * cross-origin requests</li>
+ * <li><b>Access-Control-Allow-Private-Network</b> - Specifies whether private network access is allowed (for requests from public to
+ * private networks)</li>
  * <li><b>Access-Control-Expose-Headers</b> - Specifies which headers can be exposed to the client</li>
  * <li><b>Access-Control-Allow-Methods</b> - Specifies which HTTP methods are allowed for cross-origin requests</li>
  * <li><b>Access-Control-Allow-Headers</b> - Specifies which headers are allowed in cross-origin requests</li>
@@ -64,6 +73,15 @@ import org.appwork.utils.net.httpconnection.RequestMethod;
  * HttpServer, this also means that requests containing an Origin header are rejected unless a CorsHandler is explicitly configured.
  * Requests without Origin headers are still allowed.
  * </p>
+ *
+ * <p>
+ * <b>Security defaults (restrictive):</b>
+ * </p>
+ * <ul>
+ * <li><b>Access-Control-Allow-Credentials:</b> Disabled by default (false). Must be explicitly enabled if credentials are needed.</li>
+ * <li><b>Access-Control-Allow-Private-Network:</b> Disabled by default (false). Must be explicitly enabled if private network access is
+ * needed.</li>
+ * </ul>
  *
  * <h2>Usage Examples</h2>
  *
@@ -95,6 +113,29 @@ import org.appwork.utils.net.httpconnection.RequestMethod;
  * server.setCorsHandler(null); // Disables CORS headers
  * }</pre>
  *
+ * <h3>Pattern-based Rules for Credentials and Private Network Access</h3>
+ *
+ * <pre>{@code
+ * CorsHandler corsHandler = new CorsHandler();
+ * corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
+ *
+ * // Deny credentials for all origins by default
+ * corsHandler.addCredentialsRule(".*", false);
+ * // But allow credentials for specific trusted origin (higher priority - checked last)
+ * corsHandler.addCredentialsRule("https://example\\.com", true);
+ *
+ * // Same for Private Network Access
+ * corsHandler.addPrivateNetworkRequestRule(".*", false);
+ * corsHandler.addPrivateNetworkRequestRule("https://trusted\\.example\\.com", true);
+ *
+ * server.setCorsHandler(corsHandler);
+ * }</pre>
+ *
+ * <p>
+ * <b>Rule Priority:</b> Rules are checked in reverse order (last entry has highest priority). If the first rule is ".*":false and the
+ * second is "https://example\\.com":true, all origins are denied except example.com. Without any rules, the default is deny (false).
+ * </p>
+ *
  * <h2>Security Considerations</h2>
  * <ul>
  * <li><b>Never use "*" in production</b> unless you explicitly need to allow all origins. This is a security risk.</li>
@@ -118,12 +159,15 @@ public class CorsHandler {
         return false;
     }
 
-    private Set<String>        allowedOrigins;
-    private String             exposeHeaders;
-    private Set<RequestMethod> allowMethods;
-    private String             allowHeaders;
-    private boolean            allowHeadersFromRequest = false;
-    private Long               maxAge;
+    private Set<String>                     allowedOrigins;
+    private LinkedHashMap<Pattern, Boolean> credentialsRules           = new LinkedHashMap<Pattern, Boolean>();
+    private LinkedHashMap<Pattern, Boolean> privateNetworkRequestRules = new LinkedHashMap<Pattern, Boolean>();
+    private boolean                         enableSecurityValidation   = true;
+    private String                          exposeHeaders;
+    private Set<RequestMethod>              allowMethods;
+    private String                          allowHeaders;
+    private boolean                         allowHeadersFromRequest    = false;
+    private Long                            maxAge;
 
     /**
      * Creates a new CorsHandler with all fields set to null (CORS disabled by default).
@@ -163,8 +207,15 @@ public class CorsHandler {
      * </p>
      * </p>
      *
+     * <p>
+     * <b>Security Validation:</b> If allowCredentials is true, "*" cannot be used as an allowed origin. This will throw an
+     * IllegalArgumentException.
+     * </p>
+     *
      * @param allowedOrigins
      *            The allowed origins set, a set containing "*" for all origins, or null to forbid all Origin requests
+     * @throws IllegalArgumentException
+     *             if allowCredentials is true and allowedOrigins contains "*"
      */
     public void setAllowedOrigins(final Set<String> allowedOrigins) {
         if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
@@ -178,6 +229,53 @@ public class CorsHandler {
         } else {
             this.allowedOrigins = null;
         }
+        this.validate();
+    }
+
+    public final void setAllowMethods(RequestMethod... methods) {
+        setAllowMethods(new HashSet<RequestMethod>(Arrays.asList(methods)));
+
+    }
+
+    /**
+     * Gets whether credentials (cookies, authorization headers) are allowed in cross-origin requests for a specific origin.
+     *
+     * <p>
+     * This method checks pattern-based rules first (if configured), then falls back to the global allowCredentials setting.
+     * </p>
+     *
+     * <p>
+     * <b>Default: false (restrictive)</b> - Credentials are disabled by default. You must explicitly enable this if your service needs to
+     * accept credentials in cross-origin requests.
+     * </p>
+     *
+     * <p>
+     * <b>Pattern-based rules:</b> If credentialsRules are configured, they are checked in reverse order (last entry has highest priority).
+     * If no rule matches, the default is false (deny).
+     * </p>
+     *
+     * @param origin
+     *            The origin to check (e.g., "https://example.com"). If null, returns the global setting.
+     * @return true if credentials are allowed for the given origin, false otherwise (default: false)
+     */
+    public boolean isAllowCredentials(String origin) {
+        if (origin == null || origin.isEmpty()) {
+            // For null/empty origin, default deny
+            return false;
+        }
+        // Check pattern-based rules (in reverse order for priority)
+        if (!this.credentialsRules.isEmpty()) {
+            List<Map.Entry<Pattern, Boolean>> rulesList = new java.util.ArrayList<Map.Entry<Pattern, Boolean>>(this.credentialsRules.entrySet());
+            // Iterate in reverse order (last entry has highest priority)
+            for (int i = rulesList.size() - 1; i >= 0; i--) {
+                Map.Entry<Pattern, Boolean> rule = rulesList.get(i);
+                if (rule.getKey().matcher(origin).matches()) {
+                    return rule.getValue();
+                }
+            }
+        }
+        // No rule matched - default deny
+        return false;
     }
 
     /**
@@ -334,6 +432,162 @@ public class CorsHandler {
     }
 
     /**
+     * Gets whether Access-Control-Allow-Private-Network should be dynamically taken from the request for a specific origin.
+     *
+     * <p>
+     * This method checks pattern-based rules first (if configured), then falls back to the global allowPrivateNetworkFromRequest setting.
+     * </p>
+     *
+     * <p>
+     * <b>Default: false (restrictive)</b> - Private Network Access is disabled by default. You must explicitly enable it if your service
+     * needs to accept requests from public websites to private network endpoints.
+     * </p>
+     *
+     * <p>
+     * <b>Pattern-based rules:</b> If privateNetworkRequestRules are configured, they are checked in reverse order (last entry has highest
+     * priority). If no rule matches, the default is false (deny).
+     * </p>
+     *
+     * @param origin
+     *            The origin to check (e.g., "https://example.com"). If null, returns the global setting.
+     * @return true if Private Network Access should be allowed for the given origin, false otherwise (default: false)
+     */
+    public boolean isAllowPrivateNetworkFromRequest(String origin) {
+        if (origin == null || origin.isEmpty()) {
+            // For null/empty origin, default deny
+            return false;
+        }
+        // Check pattern-based rules (in reverse order for priority)
+        if (!this.privateNetworkRequestRules.isEmpty()) {
+            List<Map.Entry<Pattern, Boolean>> rulesList = new java.util.ArrayList<Map.Entry<Pattern, Boolean>>(this.privateNetworkRequestRules.entrySet());
+            // Iterate in reverse order (last entry has highest priority)
+            for (int i = rulesList.size() - 1; i >= 0; i--) {
+                Map.Entry<Pattern, Boolean> rule = rulesList.get(i);
+                if (rule.getKey().matcher(origin).matches()) {
+                    return rule.getValue();
+                }
+            }
+        }
+        // No rule matched - default deny
+        return false;
+    }
+
+    /**
+     * Adds a pattern-based rule for credentials. Rules are checked in reverse order (last entry has highest priority).
+     *
+     * <p>
+     * Example: If you add ".*":false first, then "https://example\\.com":true, all origins are denied except example.com.
+     * </p>
+     *
+     * @param pattern
+     *            The regex pattern to match against the origin (e.g., "https://example\\.com" or ".*")
+     * @param allow
+     *            true to allow credentials for matching origins, false to deny
+     */
+    public void addCredentialsRule(String pattern, boolean allow) {
+        this.credentialsRules.put(Pattern.compile(pattern), allow);
+        this.validate();
+    }
+
+    /**
+     * Removes all credentials rules.
+     */
+    public void clearCredentialsRules() {
+        this.credentialsRules.clear();
+        this.validate();
+    }
+
+    /**
+     * Gets a copy of the credentials rules map.
+     *
+     * @return A copy of the credentials rules map
+     */
+    public LinkedHashMap<Pattern, Boolean> getCredentialsRules() {
+        return new LinkedHashMap<Pattern, Boolean>(this.credentialsRules);
+    }
+
+    /**
+     * Adds a pattern-based rule for private network access. Rules are checked in reverse order (last entry has highest priority).
+     *
+     * <p>
+     * Example: If you add ".*":false first, then "https://example\\.com":true, all origins are denied except example.com.
+     * </p>
+     *
+     * @param pattern
+     *            The regex pattern to match against the origin (e.g., "https://example\\.com" or ".*")
+     * @param allow
+     *            true to allow private network access for matching origins, false to deny
+     */
+    public void addPrivateNetworkRequestRule(String pattern, boolean allow) {
+        this.privateNetworkRequestRules.put(Pattern.compile(pattern), allow);
+        this.validate();
+    }
+
+    /**
+     * Removes all private network request rules.
+     */
+    public void clearPrivateNetworkRequestRules() {
+        this.privateNetworkRequestRules.clear();
+        this.validate();
+    }
+
+    /**
+     * Gets a copy of the private network request rules map.
+     *
+     * @return A copy of the private network request rules map
+     */
+    public LinkedHashMap<Pattern, Boolean> getPrivateNetworkRequestRules() {
+        return new LinkedHashMap<Pattern, Boolean>(this.privateNetworkRequestRules);
+    }
+
+    /**
+     * Gets whether security validation is enabled.
+     *
+     * @return true if security validation is enabled (default: true), false otherwise
+     */
+    public boolean isEnableSecurityValidation() {
+        return this.enableSecurityValidation;
+    }
+
+    /**
+     * Sets whether security validation is enabled.
+     *
+     * <p>
+     * When enabled (default: true), the validate() method will check for dangerous or contradictory configurations and throw
+     * IllegalStateException if found. When disabled (false), only critical errors that would cause direct runtime failures are checked.
+     * </p>
+     *
+     * @param enableSecurityValidation
+     *            true to enable security validation (default), false to disable (only critical errors checked)
+     */
+    public void setEnableSecurityValidation(boolean enableSecurityValidation) {
+        this.enableSecurityValidation = enableSecurityValidation;
+    }
+
+    public void validate() {
+        if (!this.enableSecurityValidation) {
+            // Only check for critical errors that would cause direct runtime failures
+            // Currently no critical-only checks implemented
+            return;
+        }
+
+        // Check if "*" origin is combined with credentials rules that allow credentials
+        // CORS specification: When Access-Control-Allow-Origin is "*", Access-Control-Allow-Credentials cannot be "true"
+        if (this.allowedOrigins != null && this.allowedOrigins.contains("*")) {
+            // Check if any credentials rule allows credentials
+            for (Map.Entry<Pattern, Boolean> rule : this.credentialsRules.entrySet()) {
+                if (rule.getValue()) {
+                    // This rule allows credentials - this is incompatible with "*" origin
+                    // Note: Even if the rule only matches specific origins, the fact that "*" is in allowedOrigins
+                    // means the server could respond with "*" for some requests, which violates CORS spec when credentials are involved
+                    throw new IllegalStateException("Cannot use Access-Control-Allow-Origin \"*\" when credentials are allowed via pattern-based rules. This violates CORS specification and is a security risk. Use specific origins instead of \"*\" or remove/deny credentials rules that allow credentials.");
+                }
+            }
+        }
+
+    }
+
+    /**
      * Validates whether the Origin header in the given request is allowed by this CORS configuration.
      *
      * <p>
@@ -354,13 +608,14 @@ public class CorsHandler {
             // No Origin header present - allow (direct browser navigation)
             return true;
         }
-        if (this.allowedOrigins == null) {
+        Set<String> ao = getAllowedOrigins();
+        if (ao == null) {
             return false;
         }
-        if (this.allowedOrigins.contains("*")) {
+        if (ao.contains("*")) {
             return true;
         }
-        return containsOrigin(this.allowedOrigins, origin);
+        return containsOrigin(ao, origin);
     }
 
     /**
@@ -390,20 +645,7 @@ public class CorsHandler {
         }
 
         // Determine allowed origin
-        String allowedOrigin = null;
-        if (this.allowedOrigins != null) {
-            // If allowedOrigins contains "*", allow all; otherwise allow only if origin matches
-            if (this.allowedOrigins.contains("*")) {
-                allowedOrigin = "*";
-            } else if (containsOrigin(this.allowedOrigins, origin)) {
-                allowedOrigin = origin;
-            } else {
-                allowedOrigin = null;
-            }
-        } else {
-            // No allowed origins configured -> forbid all Origin requests
-            allowedOrigin = null;
-        }
+        String allowedOrigin = findAllowedOrigin(origin, requestHeaders, responseHeaders);
 
         // If no origin is allowed, don't add CORS headers
         if (allowedOrigin == null) {
@@ -411,24 +653,45 @@ public class CorsHandler {
         }
 
         // Add Access-Control-Allow-Origin
-        if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN) == null) {
+        HTTPHeader existingOriginHeader = responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
+        String finalAllowedOrigin = allowedOrigin;
+        if (existingOriginHeader != null) {
+            // Use existing header value if already set
+            finalAllowedOrigin = existingOriginHeader.getValue();
+        } else {
             responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin));
         }
 
+        // Security validation: Never allow credentials with "*" origin (CORS specification violation)
+        // Check if credentials are enabled (either via pattern-based rules, global setting, or manually set)
+        HTTPHeader existingCredentialsHeader = responseHeaders.get(HTTPConstants.ACCESS_CONTROL_ALLOW_CREDENTIALS);
+        boolean credentialsEnabled = isAllowCredentials(origin) || (existingCredentialsHeader != null && "true".equalsIgnoreCase(existingCredentialsHeader.getValue()));
+
+        if (credentialsEnabled && "*".equals(finalAllowedOrigin)) {
+            throw new IllegalStateException("Cannot set Access-Control-Allow-Credentials to true when Access-Control-Allow-Origin is \"*\". This violates CORS specification and is a security risk.");
+        }
+
+        // Add Access-Control-Allow-Credentials (only if not already set and credentials are enabled for this origin)
+        if (isAllowCredentials(origin) && existingCredentialsHeader == null) {
+            responseHeaders.add(new HTTPHeader(HTTPConstants.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+        }
+
         // Add Access-Control-Expose-Headers
-        if (this.exposeHeaders != null && !this.exposeHeaders.isEmpty()) {
+        String exposeHeadersValue = getExposeHeaders();
+        if (exposeHeadersValue != null && !exposeHeadersValue.isEmpty()) {
             if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_EXPOSE_HEADERS) == null) {
-                responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_EXPOSE_HEADERS, this.exposeHeaders));
+                responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_EXPOSE_HEADERS, exposeHeadersValue));
             }
         }
 
         // Add Access-Control-Allow-Methods (typically for OPTIONS/preflight requests)
-        if (this.allowMethods != null && !this.allowMethods.isEmpty()) {
+        Set<RequestMethod> allowMethodsValue = getAllowMethods();
+        if (allowMethodsValue != null && !allowMethodsValue.isEmpty()) {
             if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS) == null) {
                 // Convert Set<RequestMethod> to comma-separated string
                 StringBuilder methodsBuilder = new StringBuilder();
                 boolean first = true;
-                for (RequestMethod method : this.allowMethods) {
+                for (RequestMethod method : allowMethodsValue) {
                     if (!first) {
                         methodsBuilder.append(", ");
                     }
@@ -443,27 +706,73 @@ public class CorsHandler {
 
         // Add Access-Control-Allow-Headers (typically for OPTIONS/preflight requests)
         // Support dynamic allowHeaders from request (like RemoteAPI.java)
-        if (this.allowHeadersFromRequest) {
+        if (isAllowHeadersFromRequest()) {
             String requestedHeaders = requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_CONTROL_HEADERS);
             if (requestedHeaders != null && !requestedHeaders.isEmpty()) {
                 if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS) == null) {
                     responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, requestedHeaders));
                 }
             }
-        } else if (this.allowHeaders != null && !this.allowHeaders.isEmpty()) {
-            if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS) == null) {
-                responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, this.allowHeaders));
+        } else {
+            String allowHeadersValue = getAllowHeaders();
+            if (allowHeadersValue != null && !allowHeadersValue.isEmpty()) {
+                if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS) == null) {
+                    responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, allowHeadersValue));
+                }
             }
         }
 
         // Add Access-Control-Max-Age (typically for OPTIONS/preflight requests)
         // Note: HTTP header expects seconds, but we store milliseconds internally
-        if (this.maxAge != null) {
+        Long maxAgeValue = getMaxAge();
+        if (maxAgeValue != null) {
             if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE) == null) {
                 // Convert milliseconds to seconds for the HTTP header
-                long maxAgeSeconds = this.maxAge / 1000;
+                long maxAgeSeconds = maxAgeValue / 1000;
                 responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, String.valueOf(maxAgeSeconds)));
             }
         }
+
+        // Add Access-Control-Allow-Private-Network (for Private Network Access / PNA)
+        // IMPORTANT: This header is ONLY relevant for preflight (OPTIONS) requests, not for actual GET/POST/PUT/DELETE requests.
+        // The Access-Control-Request-Private-Network header is only sent by browsers during preflight requests.
+        // We only set the response header if the request header is present, ensuring we only respond to preflight requests.
+        // This is the correct behavior per CORS specification - we do NOT set this header unconditionally.
+        // Check pattern-based rules first, then fall back to global setting
+        if (isAllowPrivateNetworkFromRequest(origin)) {
+            String requestedPrivateNetwork = requestHeaders.getValue(HTTPConstants.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK);
+            if (requestedPrivateNetwork != null && !requestedPrivateNetwork.isEmpty()) {
+                // Only set the header if it was requested (which only happens in preflight requests)
+                // This ensures we don't unnecessarily set the header for non-preflight requests
+                if (responseHeaders.get(HTTPConstants.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK) == null) {
+                    responseHeaders.add(new HTTPHeader(HTTPConstants.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, requestedPrivateNetwork));
+                }
+            }
+        }
+    }
+
+    /**
+     * @param origin
+     * @param responseHeaders
+     * @param requestHeaders
+     * @return
+     */
+    protected String findAllowedOrigin(String origin, HeaderCollection requestHeaders, HeaderCollection responseHeaders) {
+        String allowedOrigin = null;
+        Set<String> ao = getAllowedOrigins();
+        if (ao != null) {
+            // If allowedOrigins contains "*", allow all; otherwise allow only if origin matches
+            if (ao.contains("*")) {
+                allowedOrigin = "*";
+            } else if (containsOrigin(ao, origin)) {
+                allowedOrigin = origin;
+            } else {
+                allowedOrigin = null;
+            }
+        } else {
+            // No allowed origins configured -> forbid all Origin requests
+            allowedOrigin = null;
+        }
+        return allowedOrigin;
     }
 }

@@ -94,6 +94,7 @@ import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByLink;
 import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByPackage;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
@@ -652,18 +653,18 @@ public abstract class PluginForHost extends Plugin {
         PluginProgress progress = null;
         try {
             if (isAccountLoginCaptchaChallenge(link, c)) {
-                /**
-                 * account login -> do not use anticaptcha services
-                 */
-                c.setAccountLogin(true);
-            } else if (link != null) {
-                progress = new CaptchaStepProgress(0, 1, null);
-                progress.setProgressSource(this);
-                progress.setDisplayInProgressColumnEnabled(false);
-                link.addPluginProgress(progress);
-                final SingleDownloadController controller = link.getDownloadLinkController();
-                if (controller != null) {
-                    setHasCaptcha(link, controller.getAccount(), true);
+                c.setCaptchaRequestType(CaptchaRequestType.HOSTER_LOGIN);
+            } else {
+                c.setCaptchaRequestType(CaptchaRequestType.HOSTER);
+                if (link != null) {
+                    progress = new CaptchaStepProgress(0, 1, null);
+                    progress.setProgressSource(this);
+                    progress.setDisplayInProgressColumnEnabled(false);
+                    link.addPluginProgress(progress);
+                    final SingleDownloadController controller = link.getDownloadLinkController();
+                    if (controller != null) {
+                        setHasCaptcha(link, controller.getAccount(), true);
+                    }
                 }
             }
             final BlacklistEntry<?> blackListEntry = CaptchaBlackList.getInstance().matches(c);

@@ -5,6 +5,7 @@ import java.util.List;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 import jd.controlling.captcha.SkipException;
@@ -24,9 +25,21 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         if (plugin == null || account == null) {
             throw new IllegalArgumentException();
         }
-        this.service = ChallengeResponseController.getInstance().getServiceByID(plugin.getHost());
+        final ChallengeResponseController crp = ChallengeResponseController.getInstance();
+        SolverService svs = ChallengeResponseController.getInstance().getServiceByID(plugin.getHost());
+        if (svs == null) {
+            // TODO: Check if this is necessary
+            svs = new PluginForCaptchaSolverSolverService(plugin);
+            crp.addSolverService(svs);
+        }
+        this.service = svs;
         this.account = account;
         this.plugin = plugin;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return this.service.isEnabled() && this.account.isEnabled();
     }
 
     public Account getAccount() {
@@ -54,18 +67,6 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public boolean isEnabled() {
-        return this.account.isEnabled();
-    }
-
-    @Override
-    protected boolean validateLogins() {
-        // TODO: Remove this in the future as logins will be controlled by the plugin in the future.
-        // return true;
-        return this.isEnabled();
-    }
-
-    @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
         final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
         if (veto != null) {
@@ -82,7 +83,6 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
-        // TODO: Make this abstract
         return this.plugin.getCaptchaChallengeFilterList();
     }
 

@@ -148,11 +148,6 @@ public abstract class ChallengeSolver<T> {
         return service;
     }
 
-    /* If logins are required for a solver, return false if they are invalid (e.g. empty API key field or invalid API key format). */
-    protected boolean validateLogins() {
-        return true;
-    }
-
     public boolean isEnabled() {
         return getService().getConfig().isEnabled();
     }
@@ -232,9 +227,6 @@ public abstract class ChallengeSolver<T> {
      */
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         if (!this.isEnabled()) {
-            return ChallengeVetoReason.SOLVER_DISABLED;
-        }
-        if (!this.validateLogins()) {
             return ChallengeVetoReason.SOLVER_DISABLED;
         }
         final List<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();

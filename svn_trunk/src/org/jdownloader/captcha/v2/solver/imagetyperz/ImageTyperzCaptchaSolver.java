@@ -87,7 +87,7 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
         job.getChallenge().sendStatsSolving(this);
         URLConnectionAdapter conn = null;
         try {
-            final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
+            final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();
             final Browser br = createNewBrowserInstance(challenge);
             br.setReadTimeout(5 * 60000);
             job.setStatus(SolverStatus.SOLVING);

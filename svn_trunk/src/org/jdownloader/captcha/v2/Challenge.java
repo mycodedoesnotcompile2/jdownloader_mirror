@@ -22,14 +22,14 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
 public abstract class Challenge<T> {
-    private final UniqueAlltimeID id           = new UniqueAlltimeID();
+    private final UniqueAlltimeID id                 = new UniqueAlltimeID();
     private final Class<T>        resultType;
-    private final long            created      = System.currentTimeMillis();
-    private volatile long         lastActivity = created;
-    private int                   timeout      = -1;
-    private volatile boolean      accountLogin = false;
+    private final long            created            = System.currentTimeMillis();
+    private volatile long         lastActivity       = created;
+    private int                   timeout            = -1;
     private final boolean         createdInsideAccountChecker;
-    private int                   round        = -1;
+    private int                   round              = -1;
+    private CaptchaRequestType    captchaRequestType = null;
 
     public enum CaptchaRequestType {
         HOSTER,
@@ -138,17 +138,9 @@ public abstract class Challenge<T> {
         }
     }
 
-    public boolean isAccountLogin() {
-        return accountLogin;
-    }
-
     /* can be overridden to validate a response before adding it to the job */
     public boolean validateResponse(AbstractResponse<T> response) {
         return true;
-    }
-
-    public void setAccountLogin(boolean accountLogin) {
-        this.accountLogin = accountLogin;
     }
 
     public UniqueAlltimeID getId() {
@@ -321,15 +313,6 @@ public abstract class Challenge<T> {
         }
     }
 
-    public CaptchaRequestType getRequestType() {
-        // TODO: Implement CaptchaRequestType.HOSTER
-        if (this.isAccountLogin()) {
-            return CaptchaRequestType.HOSTER_LOGIN;
-        } else {
-            return CaptchaRequestType.DECRYPTER;
-        }
-    }
-
     public SolverJob<T> getJob() {
         return job;
     }
@@ -368,5 +351,17 @@ public abstract class Challenge<T> {
 
     // is called in a 1000ms interval while solvers are active. can be used to check for external success (like oauth
     public void poll(SolverJob<T> job2) {
+    }
+
+    public CaptchaRequestType getCaptchaRequestType() {
+        return captchaRequestType;
+    }
+
+    public void setCaptchaRequestType(CaptchaRequestType captchaRequestType) {
+        this.captchaRequestType = captchaRequestType;
+    }
+
+    public boolean isAccountLogin() {
+        return this.getCaptchaRequestType() == CaptchaRequestType.HOSTER_LOGIN;
     }
 }

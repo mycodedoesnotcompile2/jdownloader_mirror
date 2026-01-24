@@ -144,13 +144,28 @@ public class HttpServerSecurityHeadersTest extends HttpServerTestBase {
         }
         LogV3.info("Content-Security-Policy header test passed: " + contentSecurityPolicy);
 
-        // Verify X-Frame-Options header is NOT present (CSP frame-ancestors is used instead)
+        // Verify X-Frame-Options header IS present (both X-Frame-Options and CSP frame-ancestors are set by default for browser compatibility)
+        // Default: X-Frame-Options: DENY + CSP frame-ancestors: 'none' (both are compatible - both block all framing)
         final String xFrameOptions = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
-        if (xFrameOptions != null) {
-            this.logContextOnFailure(context, "X-Frame-Options header should NOT be present when CSP frame-ancestors is used, but was: \"" + xFrameOptions + "\"");
+        if (xFrameOptions == null) {
+            this.logContextOnFailure(context, "X-Frame-Options header should be present (default: DENY, compatible with CSP frame-ancestors 'none')");
         }
-        this.assertTrueWithContext(xFrameOptions == null, "X-Frame-Options header should NOT be present when CSP frame-ancestors is used, but was: \"" + xFrameOptions + "\"", context);
-        LogV3.info("X-Frame-Options header test passed: Not present (using CSP frame-ancestors instead)");
+        this.assertTrueWithContext(xFrameOptions != null, "X-Frame-Options header should be present (default: DENY, compatible with CSP frame-ancestors 'none')", context);
+        if (xFrameOptions != null && !XFrameOptions.DENY.getValue().equalsIgnoreCase(xFrameOptions)) {
+            this.logContextOnFailure(context, "X-Frame-Options should be \"" + XFrameOptions.DENY.getValue() + "\" (default), was: \"" + xFrameOptions + "\"");
+        }
+        this.assertTrueWithContext(xFrameOptions != null && XFrameOptions.DENY.getValue().equalsIgnoreCase(xFrameOptions), "X-Frame-Options should be \"" + XFrameOptions.DENY.getValue() + "\" (default), was: \"" + xFrameOptions + "\"", context);
+        
+        // Verify that X-Frame-Options and CSP frame-ancestors are compatible (both should block all framing)
+        // DENY + 'none' is a compatible combination - both express the same policy
+        if (xFrameOptions != null && contentSecurityPolicy != null) {
+            final boolean isCompatible = XFrameOptions.DENY.getValue().equalsIgnoreCase(xFrameOptions) && contentSecurityPolicy.contains("frame-ancestors 'none'");
+            if (!isCompatible) {
+                this.logContextOnFailure(context, "X-Frame-Options and CSP frame-ancestors should be compatible. X-Frame-Options: \"" + xFrameOptions + "\", CSP: \"" + contentSecurityPolicy + "\"");
+            }
+            this.assertTrueWithContext(isCompatible, "X-Frame-Options and CSP frame-ancestors should be compatible. X-Frame-Options: \"" + xFrameOptions + "\", CSP: \"" + contentSecurityPolicy + "\"", context);
+        }
+        LogV3.info("X-Frame-Options header test passed: Present with value \"" + xFrameOptions + "\" (compatible with CSP frame-ancestors 'none')");
 
         // Verify Referrer-Policy header
         final String referrerPolicy = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);

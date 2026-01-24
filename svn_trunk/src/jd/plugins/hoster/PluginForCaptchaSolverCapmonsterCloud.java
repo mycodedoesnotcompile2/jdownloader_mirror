@@ -3,20 +3,20 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCapmonster;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52110 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52170 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
-
     // public Object getFavIcon(final String host) throws IOException {
     // // TODO: Fix missing fav-icon (missing due to Cloudflare blocking when accessing main page).
     // return null;
@@ -70,5 +70,10 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
     protected String getAPILoginHelpURL() {
         // TODO: Put correct url here
         return "https://" + getHost() + "/enterpage";
+    }
+
+    @Override
+    public Class<? extends CaptchaSolverPluginConfigCapmonster> getConfigInterface() {
+        return CaptchaSolverPluginConfigCapmonster.class;
     }
 }

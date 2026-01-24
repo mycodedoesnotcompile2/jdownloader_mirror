@@ -3,14 +3,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCaptchasIo;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52110 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52170 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -68,5 +69,10 @@ public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSo
     @Override
     protected String getAPILoginHelpURL() {
         return "https://app." + getHost() + "/clients/v2/index";
+    }
+
+    @Override
+    public Class<? extends CaptchaSolverPluginConfigCaptchasIo> getConfigInterface() {
+        return CaptchaSolverPluginConfigCaptchasIo.class;
     }
 }

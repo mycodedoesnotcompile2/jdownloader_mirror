@@ -34,13 +34,14 @@
 package org.appwork.utils.net.httpserver;
 
 import org.appwork.storage.StorableDoc;
+import org.appwork.utils.StringUtils;
 
 /**
  * Enum representing possible values for the X-Frame-Options HTTP header.
- * 
- * The X-Frame-Options header protects against clickjacking attacks by controlling whether
- * a page can be displayed in a frame, iframe, embed or object.
- * 
+ *
+ * The X-Frame-Options header protects against clickjacking attacks by controlling whether a page can be displayed in a frame, iframe, embed
+ * or object.
+ *
  * @author AppWork
  */
 @StorableDoc("Enum representing possible values for the X-Frame-Options HTTP header. The X-Frame-Options header protects against clickjacking attacks by controlling whether a page can be displayed in a frame, iframe, embed or object.")
@@ -50,16 +51,16 @@ public enum XFrameOptions {
      */
     @StorableDoc("The page cannot be displayed in a frame, regardless of the site attempting to do so. Header value: \"DENY\"")
     DENY("DENY"),
-    
+
     /**
      * The page can only be displayed in a frame on the same origin as the page itself.
      */
     @StorableDoc("The page can only be displayed in a frame on the same origin as the page itself. Header value: \"SAMEORIGIN\"")
     SAMEORIGIN("SAMEORIGIN"),
-    
+
     /**
-     * The page can be displayed in a frame only on the specified origin.
-     * Note: This value is deprecated and not widely supported. Use Content-Security-Policy frame-ancestors instead.
+     * The page can be displayed in a frame only on the specified origin. Note: This value is deprecated and not widely supported. Use
+     * Content-Security-Policy frame-ancestors instead.
      */
     @StorableDoc("The page can be displayed in a frame only on the specified origin. Note: This value is deprecated and not widely supported. Use Content-Security-Policy frame-ancestors instead. Header value: \"ALLOW-FROM <uri>\"")
     ALLOW_FROM("ALLOW-FROM");
@@ -72,7 +73,7 @@ public enum XFrameOptions {
 
     /**
      * Returns the header value as string.
-     * 
+     *
      * @return The header value (e.g., "DENY", "SAMEORIGIN", "ALLOW-FROM")
      */
     public String getValue() {
@@ -81,7 +82,7 @@ public enum XFrameOptions {
 
     /**
      * Converts a string to XFrameOptions (case-insensitive).
-     * 
+     *
      * @param value
      *            The header value string
      * @return The XFrameOptions enum value, or null if not found
@@ -101,12 +102,31 @@ public enum XFrameOptions {
 
     /**
      * Returns the header value as string.
-     * 
+     *
      * @return The header value
      */
     @Override
     public String toString() {
         return this.value;
     }
-}
 
+    /**
+     * @param value2
+     * @return
+     */
+    public static XFrameOptions get(String value) {
+        try {
+            return valueOf(value);
+        } catch (Exception e) {
+            for (XFrameOptions v : values()) {
+                if (StringUtils.equalsIgnoreCase(v.getValue(), value)) {
+                    return v;
+                }
+                if (StringUtils.equalsIgnoreCase(v.name(), value)) {
+                    return v;
+                }
+            }
+        }
+        return null;
+    }
+}

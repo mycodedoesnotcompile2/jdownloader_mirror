@@ -254,6 +254,7 @@ public class IDETestRunner2 {
 
             }
             boolean skip = true;
+            List<String> changedClasses = new ArrayList<String>();
             if (references.size() > known.size()) {
                 skip = false;
             } else {
@@ -265,15 +266,23 @@ public class IDETestRunner2 {
                     String cls = es.getKey();
                     String knownHash = known.get(cls);
                     if (knownHash == null) {
-                        AWTest.logInfoAnyway(testClass + " New File: " + cls + "(References: last known:" + known.size() + "/new:" + references.size() + ")");
+                        changedClasses.add(cls + " (new)");
                         skip = false;
-                        break;
-                    }
-                    if (!StringUtils.equalsIgnoreCase(knownHash, es.getValue())) {
-                        AWTest.logInfoAnyway(testClass + " Changed File: " + cls + "(References: last known:" + known.size() + "/new:" + references.size() + ")");
+                    } else if (!StringUtils.equalsIgnoreCase(knownHash, es.getValue())) {
+                        changedClasses.add(cls + " (changed)");
                         skip = false;
-                        break;
                     }
+                }
+            }
+            
+            if (!changedClasses.isEmpty()) {
+                AWTest.logInfoAnyway(testClass + " - Changed files (References: last known:" + known.size() + "/new:" + references.size() + "):");
+                int displayCount = Math.min(10, changedClasses.size());
+                for (int i = 0; i < displayCount; i++) {
+                    AWTest.logInfoAnyway("  - " + changedClasses.get(i));
+                }
+                if (changedClasses.size() > 10) {
+                    AWTest.logInfoAnyway("  [+ " + (changedClasses.size() - 10) + " more]");
                 }
             }
 

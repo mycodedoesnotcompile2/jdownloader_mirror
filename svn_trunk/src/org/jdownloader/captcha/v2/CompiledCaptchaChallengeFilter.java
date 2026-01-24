@@ -116,16 +116,7 @@ public class CompiledCaptchaChallengeFilter {
                     /* Pattern compilation failed */
                     return false;
                 }
-                /* Try matching different combinations */
-                if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-                    if (domainPattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                        return true;
-                    }
-                    if (domainPattern.matcher(host).matches()) {
-                        return true;
-                    }
-                }
-                if (domainPattern.matcher(c.getTypeID()).matches()) {
+                if (domainPattern.matcher(host).matches()) {
                     return true;
                 }
             } else {
@@ -170,7 +161,7 @@ public class CompiledCaptchaChallengeFilter {
             /* Empty list means match all request types */
             return true;
         }
-        final CaptchaRequestType requestType = c.getRequestType();
+        final CaptchaRequestType requestType = c.getCaptchaRequestType();
         if (requestType == null) {
             /* Challenge has no request type but filter requires specific types */
             return false;

@@ -116,7 +116,9 @@ public class HeaderValidationRules {
      * @return true if there are mandatory or forbidden headers defined
      */
     public boolean isEnabled() {
-        return !this.mandatoryHeaders.isEmpty() || !this.forbiddenHeaders.isEmpty();
+        Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
+        Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
+        return !mandatoryHeadersValue.isEmpty() || !forbiddenHeadersValue.isEmpty();
     }
 
     /**
@@ -135,7 +137,8 @@ public class HeaderValidationRules {
         }
 
         // Check mandatory headers
-        for (final Map.Entry<String, String> entry : this.mandatoryHeaders.entrySet()) {
+        Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
+        for (final Map.Entry<String, String> entry : mandatoryHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String requiredPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
@@ -154,7 +157,8 @@ public class HeaderValidationRules {
         }
 
         // Check forbidden headers
-        for (final Map.Entry<String, String> entry : this.forbiddenHeaders.entrySet()) {
+        Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
+        for (final Map.Entry<String, String> entry : forbiddenHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String forbiddenPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
@@ -192,7 +196,8 @@ public class HeaderValidationRules {
         }
 
         // Check mandatory headers
-        for (final Map.Entry<String, String> entry : this.mandatoryHeaders.entrySet()) {
+        Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
+        for (final Map.Entry<String, String> entry : mandatoryHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String requiredPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
@@ -211,7 +216,8 @@ public class HeaderValidationRules {
         }
 
         // Check forbidden headers
-        for (final Map.Entry<String, String> entry : this.forbiddenHeaders.entrySet()) {
+        Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
+        for (final Map.Entry<String, String> entry : forbiddenHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String forbiddenPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
@@ -252,19 +258,21 @@ public class HeaderValidationRules {
         final StringBuilder sb = new StringBuilder("HeaderValidationRules[");
         boolean hasContent = false;
 
-        if (!this.mandatoryHeaders.isEmpty()) {
-            sb.append("mandatoryHeaders=").append(this.mandatoryHeaders);
+        Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
+        if (!mandatoryHeadersValue.isEmpty()) {
+            sb.append("mandatoryHeaders=").append(mandatoryHeadersValue);
             hasContent = true;
         } else {
             sb.append("mandatoryHeaders={}");
             hasContent = true;
         }
 
-        if (!this.forbiddenHeaders.isEmpty()) {
+        Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
+        if (!forbiddenHeadersValue.isEmpty()) {
             if (hasContent) {
                 sb.append(", ");
             }
-            sb.append("forbiddenHeaders=").append(this.forbiddenHeaders);
+            sb.append("forbiddenHeaders=").append(forbiddenHeadersValue);
         } else {
             if (hasContent) {
                 sb.append(", ");

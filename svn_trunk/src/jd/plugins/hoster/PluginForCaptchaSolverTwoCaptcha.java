@@ -3,15 +3,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigTwoCaptcha;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52110 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52168 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -70,7 +70,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public Class<? extends CaptchaSolverPluginConfig> getConfigInterface() {
-        return CaptchaSolverPluginConfig.class;
+    public Class<? extends CaptchaSolverPluginConfigTwoCaptcha> getConfigInterface() {
+        return CaptchaSolverPluginConfigTwoCaptcha.class;
     }
 }

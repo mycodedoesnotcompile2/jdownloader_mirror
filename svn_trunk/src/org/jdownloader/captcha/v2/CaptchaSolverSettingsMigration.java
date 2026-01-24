@@ -14,7 +14,13 @@ import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzConfigInterface;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSettings;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigAntiCaptchaCom;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCheapcaptchaCom;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigDeathbycaptcha;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigEndcaptcha;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigImagetyperz;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigTwoCaptcha;
 
 import jd.controlling.AccountController;
 import jd.parser.Regex;
@@ -93,7 +99,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_anti_captcha_com() {
         final String host = "anti-captcha.com";
         final AntiCaptchaComConfigInterface cfgOld = JsonConfig.create(AntiCaptchaComConfigInterface.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigAntiCaptchaCom cfgNew = JsonConfig.create(CaptchaSolverPluginConfigAntiCaptchaCom.class);
         /* Migrate account */
         String apikey = cfgOld.getApiKey();
         if (apikey != null) {
@@ -138,7 +144,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_cheap_captcha() {
         final String host = "cheapcaptcha.com";
         final CheapCaptchaConfigInterface cfgOld = JsonConfig.create(CheapCaptchaConfigInterface.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigCheapcaptchaCom cfgNew = JsonConfig.create(CaptchaSolverPluginConfigCheapcaptchaCom.class);
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -187,7 +193,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_deathbycaptcha() {
         final String host = "deathbycaptcha.com";
         final DeathByCaptchaSettings cfgOld = JsonConfig.create(DeathByCaptchaSettings.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigDeathbycaptcha cfgNew = JsonConfig.create(CaptchaSolverPluginConfigDeathbycaptcha.class);
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -243,7 +249,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_endcaptcha() {
         final String host = "endcaptcha.com";
         final EndCaptchaConfigInterface cfgOld = JsonConfig.create(EndCaptchaConfigInterface.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigEndcaptcha cfgNew = JsonConfig.create(CaptchaSolverPluginConfigEndcaptcha.class);
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -292,7 +298,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_imagetyperz() {
         final String host = "imagetyperz.com";
         final ImageTyperzConfigInterface cfgOld = JsonConfig.create(ImageTyperzConfigInterface.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigImagetyperz cfgNew = JsonConfig.create(CaptchaSolverPluginConfigImagetyperz.class);
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -341,7 +347,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_2captcha() {
         final String host = "2captcha.com";
         final TwoCaptchaConfigInterface cfgOld = JsonConfig.create(TwoCaptchaConfigInterface.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigTwoCaptcha cfgNew = JsonConfig.create(CaptchaSolverPluginConfigTwoCaptcha.class);
         /* Migrate account */
         String apikey = cfgOld.getApiKey();
         if (apikey != null) {
@@ -386,7 +392,7 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_9kw() {
         final String host = "9kw.eu";
         final Captcha9kwSettings cfgOld = JsonConfig.create(Captcha9kwSettings.class);
-        final CaptchaSolverPluginConfig cfgNew = JsonConfig.create(CaptchaSolverPluginConfig.class);
+        final CaptchaSolverPluginConfigNinekw cfgNew = JsonConfig.create(CaptchaSolverPluginConfigNinekw.class);
         /* Migrate account */
         String apikey = cfgOld.getApiKey();
         if (apikey != null) {

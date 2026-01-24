@@ -13,6 +13,7 @@ import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -79,7 +80,9 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The captcha response to report as valid
      * @return true if the report was successfully sent, false otherwise
      */
-    public abstract boolean setValid(final AbstractResponse<?> response, final Account account) throws Exception;
+    public boolean setValid(final AbstractResponse<?> response, final Account account) throws Exception {
+        return false;
+    }
 
     public boolean setUnused(final AbstractResponse<?> response, final Account account) throws Exception {
         return false;
@@ -229,15 +232,19 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     private CaptchaSolverPluginConfig getDefaultConfig() {
-        // TODO: Maybe ensure that every captcha solver plugin has a config or throw exception
+        /*
+         * TODO: Maybe ensure that every captcha solver plugin has a config or throw exception <br> Every captcha solver plugin should have
+         * a config.
+         */
         final Object cfgO = this.getConfigInterface();
         if (cfgO == null) {
+            // TODO: Remove this fallback
             logger.warning("Solver has no config");
-            return null;
+            return PluginJsonConfig.get(CaptchaSolverPluginConfig.class);
         }
         if (!(cfgO instanceof CaptchaSolverPluginConfig)) {
             logger.warning("Unexpected solver config type");
-            return null;
+            throw new IllegalArgumentException("");
         }
         final CaptchaSolverPluginConfig cfg = (CaptchaSolverPluginConfig) cfgO;
         return cfg;

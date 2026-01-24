@@ -107,7 +107,8 @@ import org.appwork.utils.net.HeaderCollection;
      *   <li><b>If headers are incompatible:</b> An {@link IllegalArgumentException} is thrown immediately when you try
      *       to set incompatible values. This ensures configuration errors are caught early (at configuration time),
      *       not silently corrected at runtime.</li>
-     *   <li><b>Default:</b> Uses CSP frame-ancestors only (modern standard, recommended). X-Frame-Options is not set.</li>
+     *   <li><b>Default:</b> Both X-Frame-Options: DENY and CSP frame-ancestors: 'none' are set (compatible policies).
+     *       This provides maximum browser compatibility: older browsers respect X-Frame-Options, modern browsers respect CSP.</li>
      * </ul>
      * 
      * <p>
@@ -117,9 +118,10 @@ import org.appwork.utils.net.HeaderCollection;
      * </p>
      * 
      * <p>
-     * <b>Best Practice:</b> Use CSP frame-ancestors for modern applications. Only add X-Frame-Options if you
-     * need to support browsers that don't support CSP Level 2 (released in 2015, so very old browsers). If you
-     * do use both, ensure they express compatible policies (DENY + 'none' or SAMEORIGIN + 'self').
+     * <b>Best Practice:</b> By default, both X-Frame-Options and CSP frame-ancestors are set with compatible
+     * policies (DENY + 'none'). This provides maximum browser compatibility: older browsers respect X-Frame-Options,
+     * modern browsers respect CSP, and both policies are identical. If you need to customize, ensure both express
+     * compatible policies (DENY + 'none' or SAMEORIGIN + 'self').
      * </p>
  * 
  * <h2>Default Configuration for REST API Servers</h2>
@@ -335,7 +337,8 @@ public class ResponseSecurityHeaders {
      * <h3>Default Security Headers</h3>
      * <ul>
      *   <li><b>X-Content-Type-Options: nosniff</b> - Prevents MIME type sniffing attacks</li>
-     *   <li><b>Content-Security-Policy: default-src 'none'; frame-ancestors 'none'</b> - Prevents resource loading and clickjacking</li>
+     *   <li><b>X-Frame-Options: DENY</b> - Prevents clickjacking attacks (for older browser compatibility)</li>
+     *   <li><b>Content-Security-Policy: default-src 'none'; frame-ancestors 'none'</b> - Prevents resource loading and clickjacking (modern standard)</li>
      *   <li><b>Referrer-Policy: no-referrer</b> - Prevents referrer information leakage</li>
      * </ul>
      * 
@@ -357,11 +360,23 @@ public class ResponseSecurityHeaders {
      *       session IDs). By setting "no-referrer", we ensure this information never leaks through referrer headers.</li>
      * </ul>
      * 
+     * <h3>Why Both X-Frame-Options and CSP frame-ancestors?</h3>
+     * <p>
+     * Both headers are set by default (X-Frame-Options: DENY and CSP frame-ancestors: 'none') because they express
+     * compatible policies and provide defense in depth:
+     * </p>
+     * <ul>
+     *   <li><b>X-Frame-Options:</b> Supported by all browsers, including older versions that don't support CSP Level 2</li>
+     *   <li><b>CSP frame-ancestors:</b> Modern standard (CSP Level 2, supported since 2015) that takes precedence in modern browsers</li>
+     *   <li><b>Compatible policies:</b> DENY and 'none' both block all framing, so there's no conflict</li>
+     * </ul>
+     * <p>
+     * This ensures maximum compatibility: older browsers respect X-Frame-Options, modern browsers respect CSP,
+     * and both policies are identical, providing consistent protection across all browser versions.
+     * </p>
+     * 
      * <h3>What's NOT Included (and Why)</h3>
      * <ul>
-     *   <li><b>X-Frame-Options:</b> Not set by default because we use CSP frame-ancestors instead, which is
-     *       the modern standard. CSP frame-ancestors provides the same protection but is more flexible and
-     *       part of a comprehensive security policy framework.</li>
      *   <li><b>CSP default-src 'none':</b> The default CSP includes "default-src 'none'" to explicitly state that
      *       no resources should be loaded. This is appropriate for REST APIs because they don't serve HTML content
      *       that would load resources (scripts, stylesheets, images, etc.). This directive makes the security
@@ -378,9 +393,9 @@ public class ResponseSecurityHeaders {
      * </p>
      * <ul>
      *   <li>Your API serves HTML documentation or web interfaces (add appropriate CSP directives)</li>
-     *   <li>You need to allow same-origin framing (change frame-ancestors to 'self')</li>
+     *   <li>You need to allow same-origin framing (change both X-Frame-Options to SAMEORIGIN and CSP frame-ancestors to 'self')</li>
      *   <li>You need referrer information for analytics (change Referrer-Policy)</li>
-     *   <li>You need to support older browsers that don't support CSP (use X-Frame-Options instead)</li>
+     *   <li>You want to use only CSP (set X-Frame-Options to null) or only X-Frame-Options (set CSP to null)</li>
      * </ul>
      * 
      * @see #ResponseSecurityHeaders(XContentTypeOptions, XFrameOptions, ContentSecurityPolicy, ReferrerPolicy)
@@ -388,9 +403,12 @@ public class ResponseSecurityHeaders {
      */
     public ResponseSecurityHeaders() {
         this.xContentTypeOptions = XContentTypeOptions.NOSNIFF;
-        this.xFrameOptions = null; // Use CSP frame-ancestors instead
+        // Set X-Frame-Options: DENY for older browser compatibility
+        // This is compatible with CSP frame-ancestors 'none' (both block all framing)
+        this.xFrameOptions = XFrameOptions.DENY;
         // For REST APIs: default-src 'none' explicitly prevents any resource loading
         // frame-ancestors 'none' prevents framing (clickjacking protection)
+        // Both X-Frame-Options and CSP frame-ancestors are set for maximum browser compatibility
         final ContentSecurityPolicy csp = new ContentSecurityPolicy();
         csp.setFrameAncestors("'none'");
         csp.addDirective("default-src 'none'");
@@ -556,30 +574,34 @@ public class ResponseSecurityHeaders {
         // not here. This allows headers to be set and modified before final validation.
 
         // X-Content-Type-Options
-        if (this.xContentTypeOptions != null && responseHeaders.get(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS) == null) {
-            responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, this.xContentTypeOptions.getValue()));
+        XContentTypeOptions xContentTypeOptionsValue = getXContentTypeOptions();
+        if (xContentTypeOptionsValue != null && responseHeaders.get(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS) == null) {
+            responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, xContentTypeOptionsValue.getValue()));
         }
 
         // X-Frame-Options and CSP frame-ancestors
-        final boolean useXFrameOptions = this.xFrameOptions != null;
-        final boolean useCSP = this.contentSecurityPolicy != null;
+        XFrameOptions xFrameOptionsValue = getXFrameOptions();
+        final boolean useXFrameOptions = xFrameOptionsValue != null;
+        ContentSecurityPolicy contentSecurityPolicyValue = getContentSecurityPolicy();
+        final boolean useCSP = contentSecurityPolicyValue != null;
 
         // Add X-Frame-Options if configured
         if (useXFrameOptions && responseHeaders.get(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS) == null) {
-            responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS, this.xFrameOptions.getValue()));
+            responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS, xFrameOptionsValue.getValue()));
         }
 
         // Content-Security-Policy
         if (useCSP && responseHeaders.get(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY) == null) {
-            final String cspValue = this.contentSecurityPolicy.toHeaderString();
+            final String cspValue = contentSecurityPolicyValue.toHeaderString();
             if (cspValue != null && !cspValue.isEmpty()) {
                 responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY, cspValue));
             }
         }
 
         // Referrer-Policy
-        if (this.referrerPolicy != null && responseHeaders.get(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY) == null) {
-            responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY, this.referrerPolicy.getValue()));
+        ReferrerPolicy referrerPolicyValue = getReferrerPolicy();
+        if (referrerPolicyValue != null && responseHeaders.get(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY) == null) {
+            responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY, referrerPolicyValue.getValue()));
         }
     }
 
@@ -687,7 +709,7 @@ public class ResponseSecurityHeaders {
      * Returns the X-Frame-Options value.
      * 
      * @return The X-Frame-Options value, or null if this header is disabled.
-     *         Default is null (CSP frame-ancestors is used instead).
+     *         Default is {@link XFrameOptions#DENY} (set together with CSP frame-ancestors 'none' for maximum browser compatibility).
      */
     public XFrameOptions getXFrameOptions() {
         return this.xFrameOptions;
@@ -722,16 +744,15 @@ public class ResponseSecurityHeaders {
      * </p>
      * 
      * <p>
-     * <b>When to use:</b> Use X-Frame-Options (together with compatible CSP frame-ancestors) if:
+     * <b>Default behavior:</b> By default, this is set to {@link XFrameOptions#DENY} together with
+     * CSP frame-ancestors 'none' for maximum browser compatibility. Both headers express the same
+     * policy (block all framing), providing defense in depth: older browsers respect X-Frame-Options,
+     * modern browsers respect CSP, and both policies are identical.
      * </p>
-     * <ul>
-     *   <li>You need to support older browsers that don't support CSP Level 2</li>
-     *   <li>You want defense in depth (both headers provide the same protection for different browsers)</li>
-     * </ul>
      * 
      * <p>
-     * <b>Default behavior:</b> By default, this is null and CSP frame-ancestors is used instead,
-     * which is the modern standard.
+     * <b>When to disable:</b> Set to null if you want to use only CSP frame-ancestors (modern standard only).
+     * However, keeping both is recommended for maximum compatibility across all browser versions.
      * </p>
      * 
      * @param xFrameOptions
@@ -899,19 +920,21 @@ public class ResponseSecurityHeaders {
         final StringBuilder sb = new StringBuilder("ResponseSecurityHeaders[");
         boolean hasContent = false;
 
-        if (this.xContentTypeOptions != null) {
-            sb.append("X-Content-Type-Options=").append(this.xContentTypeOptions.getValue());
+        XContentTypeOptions xContentTypeOptionsValue = getXContentTypeOptions();
+        if (xContentTypeOptionsValue != null) {
+            sb.append("X-Content-Type-Options=").append(xContentTypeOptionsValue.getValue());
             hasContent = true;
         } else {
             sb.append("X-Content-Type-Options=null");
             hasContent = true;
         }
 
-        if (this.xFrameOptions != null) {
+        XFrameOptions xFrameOptionsValue = getXFrameOptions();
+        if (xFrameOptionsValue != null) {
             if (hasContent) {
                 sb.append(", ");
             }
-            sb.append("X-Frame-Options=").append(this.xFrameOptions.getValue());
+            sb.append("X-Frame-Options=").append(xFrameOptionsValue.getValue());
             hasContent = true;
         } else {
             if (hasContent) {
@@ -921,11 +944,12 @@ public class ResponseSecurityHeaders {
             hasContent = true;
         }
 
-        if (this.contentSecurityPolicy != null) {
+        ContentSecurityPolicy contentSecurityPolicyValue = getContentSecurityPolicy();
+        if (contentSecurityPolicyValue != null) {
             if (hasContent) {
                 sb.append(", ");
             }
-            sb.append("Content-Security-Policy=").append(this.contentSecurityPolicy.toString());
+            sb.append("Content-Security-Policy=").append(contentSecurityPolicyValue.toString());
             hasContent = true;
         } else {
             if (hasContent) {
@@ -935,11 +959,12 @@ public class ResponseSecurityHeaders {
             hasContent = true;
         }
 
-        if (this.referrerPolicy != null) {
+        ReferrerPolicy referrerPolicyValue = getReferrerPolicy();
+        if (referrerPolicyValue != null) {
             if (hasContent) {
                 sb.append(", ");
             }
-            sb.append("Referrer-Policy=").append(this.referrerPolicy.getValue());
+            sb.append("Referrer-Policy=").append(referrerPolicyValue.getValue());
             hasContent = true;
         } else {
             if (hasContent) {

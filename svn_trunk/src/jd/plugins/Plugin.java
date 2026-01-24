@@ -1166,30 +1166,30 @@ public abstract class Plugin implements ActionListener {
 
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         for (final Class<?> cls : getClass().getClasses()) {
-            if (PluginConfigInterface.class.isAssignableFrom(cls) && !AccountConfigInterface.class.isAssignableFrom(cls)) {
-                final PluginHost anno = cls.getAnnotation(PluginHost.class);
-                if (anno != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        final org.jdownloader.plugins.config.Type pluginType;
-                        if (Plugin.this instanceof PluginForDecrypt) {
-                            pluginType = org.jdownloader.plugins.config.Type.CRAWLER;
-                        } else if (Plugin.this instanceof PluginForHost) {
-                            pluginType = org.jdownloader.plugins.config.Type.HOSTER;
-                        } else {
-                            pluginType = null;
-                        }
-                        if (!StringUtils.equals(anno.host(), getHost())) {
-                            LogController.CL(true).log(new Exception("Please check:" + cls + "|host missmatch:" + anno.host() + "!=" + getHost()));
-                        }
-                        if (pluginType != null && pluginType != anno.type()) {
-                            LogController.CL(true).log(new Exception("Please check:" + cls + "|type missmatch:" + anno.type() + "!=" + pluginType));
-                        }
-                    }
-                    return (Class<? extends PluginConfigInterface>) cls;
+            if (!PluginConfigInterface.class.isAssignableFrom(cls)) {
+                continue;
+            }
+            if (AccountConfigInterface.class.isAssignableFrom(cls)) {
+                continue;
+            }
+            final PluginHost anno = cls.getAnnotation(PluginHost.class);
+            if (anno != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                final org.jdownloader.plugins.config.Type pluginType;
+                if (Plugin.this instanceof PluginForDecrypt) {
+                    pluginType = org.jdownloader.plugins.config.Type.CRAWLER;
+                } else if (Plugin.this instanceof PluginForHost) {
+                    pluginType = org.jdownloader.plugins.config.Type.HOSTER;
                 } else {
-                    return (Class<? extends PluginConfigInterface>) cls;
+                    pluginType = null;
+                }
+                if (!StringUtils.equals(anno.host(), getHost())) {
+                    LogController.CL(true).log(new Exception("Please check:" + cls + "|host missmatch:" + anno.host() + "!=" + getHost()));
+                }
+                if (pluginType != null && pluginType != anno.type()) {
+                    LogController.CL(true).log(new Exception("Please check:" + cls + "|type missmatch:" + anno.type() + "!=" + pluginType));
                 }
             }
+            return (Class<? extends PluginConfigInterface>) cls;
         }
         return null;
     }

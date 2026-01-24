@@ -448,7 +448,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         if (request == null) {
             throw new IOException("Unsupported " + requestLine);
         }
-        request.setBridge(server);
+        request.setServer(server);
         /* parse remoteClientAddresses */
         request.setRemoteAddress(this.getRemoteAddress(requestHeaders));
         request.setRequestedURLParameters(requestedURLParameters);
@@ -776,6 +776,8 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         Thread.interrupted();
         boolean closeConnection = true;
         try {
+            final HttpRequest request;
+            final HttpResponse response;
             try {
                 if (this.response == null) {
                     this.response = this.buildResponse();
@@ -785,8 +787,8 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                     this.request = this.buildRequest();
                 }
             } finally {
-                final HttpRequest request = this.request;
-                final HttpResponse response = this.response;
+                request = this.request;
+                response = this.response;
 
                 configure(request, response);
             }

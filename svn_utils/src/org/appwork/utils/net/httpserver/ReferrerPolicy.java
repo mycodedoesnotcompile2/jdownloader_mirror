@@ -34,13 +34,13 @@
 package org.appwork.utils.net.httpserver;
 
 import org.appwork.storage.StorableDoc;
+import org.appwork.utils.StringUtils;
 
 /**
  * Enum representing possible values for the Referrer-Policy HTTP header.
- * 
- * The Referrer-Policy header controls how much referrer information should be included
- * with requests made from a document.
- * 
+ *
+ * The Referrer-Policy header controls how much referrer information should be included with requests made from a document.
+ *
  * @author AppWork
  */
 @StorableDoc("Enum representing possible values for the Referrer-Policy HTTP header. The Referrer-Policy header controls how much referrer information should be included with requests made from a document.")
@@ -50,43 +50,43 @@ public enum ReferrerPolicy {
      */
     @StorableDoc("No referrer information is sent. Header value: \"no-referrer\"")
     NO_REFERRER("no-referrer"),
-    
+
     /**
      * No referrer information is sent when navigating from HTTPS to HTTP.
      */
     @StorableDoc("No referrer information is sent when navigating from HTTPS to HTTP. Header value: \"no-referrer-when-downgrade\"")
     NO_REFERRER_WHEN_DOWNGRADE("no-referrer-when-downgrade"),
-    
+
     /**
      * Only the origin is sent as referrer.
      */
     @StorableDoc("Only the origin is sent as referrer. Header value: \"origin\"")
     ORIGIN("origin"),
-    
+
     /**
      * Only the origin is sent as referrer when navigating from HTTPS to HTTP.
      */
     @StorableDoc("Only the origin is sent as referrer when navigating from HTTPS to HTTP. Header value: \"origin-when-cross-origin\"")
     ORIGIN_WHEN_CROSS_ORIGIN("origin-when-cross-origin"),
-    
+
     /**
      * Send full referrer for same-origin requests, but only origin for cross-origin requests.
      */
     @StorableDoc("Send full referrer for same-origin requests, but only origin for cross-origin requests. Header value: \"same-origin\"")
     SAME_ORIGIN("same-origin"),
-    
+
     /**
      * Send full referrer for same-origin requests, but no referrer for cross-origin requests.
      */
     @StorableDoc("Send full referrer for same-origin requests, but no referrer for cross-origin requests. Header value: \"strict-origin\"")
     STRICT_ORIGIN("strict-origin"),
-    
+
     /**
      * Send full referrer for same-origin requests, but only origin for cross-origin requests and when downgrading.
      */
     @StorableDoc("Send full referrer for same-origin requests, but only origin for cross-origin requests and when downgrading. Header value: \"strict-origin-when-cross-origin\"")
     STRICT_ORIGIN_WHEN_CROSS_ORIGIN("strict-origin-when-cross-origin"),
-    
+
     /**
      * Send full referrer information.
      */
@@ -101,7 +101,7 @@ public enum ReferrerPolicy {
 
     /**
      * Returns the header value as string.
-     * 
+     *
      * @return The header value (e.g., "no-referrer", "origin", "strict-origin-when-cross-origin")
      */
     public String getValue() {
@@ -110,7 +110,7 @@ public enum ReferrerPolicy {
 
     /**
      * Converts a string to ReferrerPolicy (case-insensitive).
-     * 
+     *
      * @param value
      *            The header value string
      * @return The ReferrerPolicy enum value, or null if not found
@@ -129,12 +129,32 @@ public enum ReferrerPolicy {
 
     /**
      * Returns the header value as string.
-     * 
+     *
      * @return The header value
      */
     @Override
     public String toString() {
         return this.value;
     }
-}
 
+    /**
+     * @param value2
+     * @return
+     */
+    public static ReferrerPolicy get(String value) {
+        try {
+            return valueOf(value);
+        } catch (Exception e) {
+            for (ReferrerPolicy v : values()) {
+                if (StringUtils.equalsIgnoreCase(v.getValue(), value)) {
+                    return v;
+                }
+                if (StringUtils.equalsIgnoreCase(v.name(), value)) {
+                    return v;
+                }
+            }
+        }
+        return null;
+    }
+
+}

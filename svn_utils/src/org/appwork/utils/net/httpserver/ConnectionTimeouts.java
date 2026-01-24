@@ -102,6 +102,6 @@ public class ConnectionTimeouts {
      */
     @Override
     public String toString() {
-        return "ConnectionTimeouts[socketTimeoutMs=" + this.socketTimeoutMs + "]";
+        return "ConnectionTimeouts[socketTimeoutMs=" + getSocketTimeoutMs() + "]";
     }
 }

@@ -7,6 +7,7 @@ import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 
+@Deprecated
 public interface ChallengeSolverConfig extends ConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(true)
@@ -34,5 +35,4 @@ public interface ChallengeSolverConfig extends ConfigInterface {
     void setBlacklistEntries(ArrayList<String> list);
 
     void setWhitelistEntries(ArrayList<String> list);
-
 }

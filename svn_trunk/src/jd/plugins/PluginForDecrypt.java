@@ -27,6 +27,48 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.timetracker.TimeTracker;
+import org.appwork.timetracker.TrackerJob;
+import org.appwork.uio.CloseReason;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.Files;
+import org.appwork.utils.Hash;
+import org.appwork.utils.IO;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.captcha.blacklist.BlacklistEntry;
+import org.jdownloader.captcha.blacklist.BlockAllCrawlerCaptchasEntry;
+import org.jdownloader.captcha.blacklist.BlockCrawlerCaptchasByHost;
+import org.jdownloader.captcha.blacklist.BlockCrawlerCaptchasByPackage;
+import org.jdownloader.captcha.blacklist.CaptchaBlackList;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.dialog.AskCrawlerPasswordDialogInterface;
+import org.jdownloader.gui.dialog.AskForCryptedLinkDialog;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.translate._JDT;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -49,47 +91,6 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.utils.JDUtilities;
-
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.timetracker.TimeTracker;
-import org.appwork.timetracker.TrackerJob;
-import org.appwork.uio.CloseReason;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.Files;
-import org.appwork.utils.Hash;
-import org.appwork.utils.IO;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.captcha.blacklist.BlacklistEntry;
-import org.jdownloader.captcha.blacklist.BlockAllCrawlerCaptchasEntry;
-import org.jdownloader.captcha.blacklist.BlockCrawlerCaptchasByHost;
-import org.jdownloader.captcha.blacklist.BlockCrawlerCaptchasByPackage;
-import org.jdownloader.captcha.blacklist.CaptchaBlackList;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeResponseController;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.dialog.AskCrawlerPasswordDialogInterface;
-import org.jdownloader.gui.dialog.AskForCryptedLinkDialog;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
-import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.translate._JDT;
 
 /**
  * Dies ist die Oberklasse für alle Plugins, die Links entschlüsseln können
@@ -145,16 +146,16 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
-     * build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
+     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure() {
         return getAdoptedCloudFolderStructure(null);
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
-     * build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
+     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure(final String fallback) {
         CrawledLink current = getCurrentLink();
@@ -745,10 +746,9 @@ public abstract class PluginForDecrypt extends Plugin {
         invalidateLastChallengeResponse();
         try {
             if (isAccountLoginCaptchaChallenge(c)) {
-                /**
-                 * account login -> do not use anticaptcha services
-                 */
-                c.setAccountLogin(true);
+                c.setCaptchaRequestType(CaptchaRequestType.HOSTER_LOGIN);
+            } else {
+                c.setCaptchaRequestType(CaptchaRequestType.DECRYPTER);
             }
             final BlacklistEntry<?> blackListEntry = CaptchaBlackList.getInstance().matches(c);
             if (blackListEntry != null) {

@@ -72,7 +72,6 @@ import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
@@ -187,91 +186,10 @@ public class RemoteAPI implements HttpRequestHandler {
         if (request != null) {
             final HttpRequest httpRequest = request.getHttpRequest();
             if (httpRequest != null) {
-                return httpRequest.getBridge();
+                return httpRequest.getServer();
             }
         }
         return null;
-    }
-
-    @Deprecated
-    public static OutputStream getOutputStream(final RemoteAPIResponse response, final RemoteAPIRequest request, final boolean gzip, final boolean wrapJQuery) throws IOException {
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "no-store, no-cache"));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json"));
-        DebugMode.debugger();
-        // HttpLimitProviderInputStream server = HttpConnection.getInputStreamByType(request.getInputStream(),
-        // HttpLimitProviderInputStream.class);
-        // final HTTPBridge bridge = response.getRemoteAPI().getHTTPBridge(request, response);
-        final boolean chunked;
-        if (request.getHttpRequest().getBridge().isChunkedEncodedResponseAllowed(request.getHttpRequest(), response.getHttpResponse())) {
-            chunked = true;
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
-        } else {
-            chunked = false;
-        }
-        if (gzip) {
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
-        }
-        response.setResponseCode(ResponseCode.SUCCESS_OK);
-        final OutputStream os;
-        if (chunked) {
-            os = new ChunkedOutputStream(response.getOutputStream(true));
-        } else {
-            os = response.getOutputStream(true);
-        }
-        final OutputStream uos;
-        final GZIPOutputStream out;
-        if (gzip) {
-            uos = out = new GZIPOutputStream(os);
-        } else {
-            out = null;
-            uos = os;
-        }
-        return new OutputStream() {
-            boolean wrapperHeader = wrapJQuery && request != null && request.getJqueryCallback() != null;
-            boolean wrapperEnd    = wrapJQuery && request != null && request.getJqueryCallback() != null;
-
-            @Override
-            public void close() throws IOException {
-                this.wrapperEnd();
-                if (out != null) {
-                    out.finish();
-                    out.flush();
-                }
-                uos.close();
-            }
-
-            @Override
-            public void flush() throws IOException {
-                uos.flush();
-            }
-
-            private void wrapperEnd() throws UnsupportedEncodingException, IOException {
-                if (this.wrapperEnd) {
-                    uos.write(")".getBytes("UTF-8"));
-                    this.wrapperEnd = false;
-                }
-            }
-
-            private void wrapperHeader() throws UnsupportedEncodingException, IOException {
-                if (this.wrapperHeader) {
-                    uos.write(request.getJqueryCallback().getBytes("UTF-8"));
-                    uos.write("(".getBytes("UTF-8"));
-                    this.wrapperHeader = false;
-                }
-            }
-
-            @Override
-            public void write(final byte[] b) throws IOException {
-                this.wrapperHeader();
-                uos.write(b);
-            }
-
-            @Override
-            public void write(final int b) throws IOException {
-                this.wrapperHeader();
-                uos.write(b);
-            }
-        };
     }
 
     public static boolean gzip(final HttpRequest request) {
@@ -914,7 +832,7 @@ public class RemoteAPI implements HttpRequestHandler {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
         }
         OutputStream os;
-        final HttpServerInterface bridge = request != null ? request.getBridge() : null;
+        final HttpServerInterface bridge = request != null ? request.getServer() : null;
         if (bridge == null || bridge.isChunkedEncodedResponseAllowed(request, response)) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
             os = new ChunkedOutputStream(response.getOutputStream(true));
@@ -993,7 +911,7 @@ public class RemoteAPI implements HttpRequestHandler {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
             }
             OutputStream os;
-            final HttpServerInterface bridge = request != null ? request.getBridge() : null;
+            final HttpServerInterface bridge = request != null ? request.getServer() : null;
             if (bridge == null || bridge.isChunkedEncodedResponseAllowed(request, response)) {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
                 os = new ChunkedOutputStream(response.getOutputStream(true));

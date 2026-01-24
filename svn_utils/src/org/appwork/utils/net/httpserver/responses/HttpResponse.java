@@ -35,10 +35,12 @@ package org.appwork.utils.net.httpserver.responses;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.net.protocol.http.ResponseCodeInterface;
 import org.appwork.utils.net.HeaderCollection;
+import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpserver.HttpConnection;
 import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
 
@@ -124,5 +126,42 @@ public class HttpResponse implements HttpResponseInterface {
      */
     public void setHook(ConnectionHook hook) {
         connection.setHook(hook);
+    }
+
+    /**
+     * Returns a string representation of the HTTP response as it would be sent over the wire,
+     * including the status line and all headers, but excluding the response body.
+     * 
+     * @return String representation of the HTTP response headers
+     */
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        
+        // Status line: HTTP/1.1 <code> <description>\r\n
+        sb.append("HTTP/1.1 ");
+        if (this.responseCode != null) {
+            sb.append(new String(this.responseCode.getBytes(), Charset.forName("ISO-8859-1")));
+        } else {
+            sb.append("200 OK");
+        }
+        sb.append("\r\n");
+        
+        // Headers: <key>: <value>\r\n
+        for (final HTTPHeader header : this.responseHeaders) {
+            // Skip headers with null values (they are used to "remove" headers)
+            if (header.getValue() == null) {
+                continue;
+            }
+            sb.append(header.getKey());
+            sb.append(": ");
+            sb.append(header.getValue());
+            sb.append("\r\n");
+        }
+        
+        // Empty line to separate headers from body
+        sb.append("\r\n");
+        
+        return sb.toString();
     }
 }

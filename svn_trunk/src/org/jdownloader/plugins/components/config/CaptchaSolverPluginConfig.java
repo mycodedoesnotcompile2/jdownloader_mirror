@@ -14,14 +14,15 @@ import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.captcha.v2.CaptchaChallengeFilter;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "2captcha.com", type = Type.HOSTER)
 public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
+        public String getEnabled_label() {
+            return "Enable this captcha solver?";
+        }
+
         public String getEnableCaptchaFeedback_label() {
             return "Report correct/incorrect captchas to captcha service?";
         }
@@ -62,6 +63,14 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
             return "Polling interval in seconds";
         }
     }
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Enable/Disable this captcha solver service")
+    @DefaultBooleanValue(true)
+    @Order(100)
+    boolean isEnabled();
+
+    void setEnabled(boolean b);
 
     @AboutConfig
     @DescriptionForConfigEntry("Send correct/incorrect captcha feedback to captcha service to improve recognition accuracy and avoid wasting credits")

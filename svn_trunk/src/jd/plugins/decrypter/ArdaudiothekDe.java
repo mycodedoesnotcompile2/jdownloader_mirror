@@ -20,10 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,7 +31,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52125 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52180 $", interfaceVersion = 3, names = {}, urls = {})
 public class ArdaudiothekDe extends PluginForDecrypt {
     public ArdaudiothekDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,6 @@ public class ArdaudiothekDe extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "ardaudiothek.de" });
         return ret;
     }
@@ -147,10 +146,6 @@ public class ArdaudiothekDe extends PluginForDecrypt {
                 }
             }
         } while ((infiniteLoopPreventionCounter <= 1 && urlToAccess != null));
-        // String tvRadioStationTitle = null;
-        // if (publicationService != null) {
-        // tvRadioStationTitle = publicationService.get("title").toString();
-        // }
         return ret;
     }
 

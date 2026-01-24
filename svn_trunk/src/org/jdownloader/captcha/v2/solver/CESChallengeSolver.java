@@ -36,6 +36,11 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
 
     protected abstract LogSource getLogger();
 
+    @Override
+    public boolean isEnabled() {
+        return super.isEnabled() && this.validateLogins();
+    }
+
     final public void solve(final SolverJob<T> job) throws InterruptedException, SolverException {
         if (!validateLogins()) {
             return;

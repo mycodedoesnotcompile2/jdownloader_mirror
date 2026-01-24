@@ -201,6 +201,10 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      *            The CORS handler instance, or null to disable CORS
      */
     public void setCorsHandler(final CorsHandler corsHandler) {
+        if (corsHandler != null) {
+            // Validate CORS configuration, including conflicts with security headers if configured
+            corsHandler.validate();
+        }
         this.corsHandler = corsHandler;
     }
 

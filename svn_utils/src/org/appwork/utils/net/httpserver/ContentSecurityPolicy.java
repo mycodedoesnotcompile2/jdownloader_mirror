@@ -113,12 +113,14 @@ public class ContentSecurityPolicy {
         final List<String> parts = new ArrayList<String>();
 
         // Add frame-ancestors if set
-        if (StringUtils.isNotEmpty(this.frameAncestors)) {
-            parts.add("frame-ancestors " + this.frameAncestors);
+        String frameAncestorsValue = getFrameAncestors();
+        if (StringUtils.isNotEmpty(frameAncestorsValue)) {
+            parts.add("frame-ancestors " + frameAncestorsValue);
         }
 
         // Add additional directives
-        parts.addAll(this.additionalDirectives);
+        List<String> additionalDirectivesValue = getAdditionalDirectives();
+        parts.addAll(additionalDirectivesValue);
 
         if (parts.isEmpty()) {
             return null;
@@ -157,6 +159,104 @@ public class ContentSecurityPolicy {
     }
 
     /**
+     * Parses a Content-Security-Policy header string and creates a ContentSecurityPolicy object.
+     * 
+     * <p>
+     * This method parses CSP header strings in the standard format, where directives are separated
+     * by semicolons. The frame-ancestors directive is extracted and set separately, while all other
+     * directives are added as additional directives.
+     * </p>
+     * 
+     * <p>
+     * Examples of valid header strings:
+     * </p>
+     * <ul>
+     * <li>"frame-ancestors 'none'"</li>
+     * <li>"frame-ancestors 'self'; default-src 'self'"</li>
+     * <li>"default-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'"</li>
+     * </ul>
+     * 
+     * <p>
+     * The parser handles:
+     * </p>
+     * <ul>
+     * <li>Whitespace trimming around directives</li>
+     * <li>Multiple directives separated by semicolons</li>
+     * <li>Extraction of frame-ancestors directive value</li>
+     * <li>Preservation of all other directives as-is</li>
+     * </ul>
+     * 
+     * <p>
+     * <b>Validation:</b> The parser validates the input and throws {@link IllegalArgumentException} if:
+     * </p>
+     * <ul>
+     * <li>Multiple frame-ancestors directives are found (only one is allowed)</li>
+     * <li>A frame-ancestors directive has no value</li>
+     * <li>A directive has no name (empty directive name after trimming)</li>
+     * </ul>
+     * 
+     * @param header
+     *            The Content-Security-Policy header string to parse, or null/empty to return an empty policy
+     * @return A ContentSecurityPolicy object parsed from the header string, or an empty policy if header is null/empty
+     * @throws IllegalArgumentException
+     *             if the header string contains invalid syntax or multiple frame-ancestors directives
+     */
+    public static ContentSecurityPolicy fromHeaderString(final String header) throws IllegalArgumentException {
+        final ContentSecurityPolicy csp = new ContentSecurityPolicy();
+        
+        if (StringUtils.isEmpty(header)) {
+            return csp;
+        }
+        
+        // Split by semicolon to get individual directives
+        final String[] directives = header.split(";");
+        
+        for (final String directive : directives) {
+            final String trimmed = directive.trim();
+            if (StringUtils.isEmpty(trimmed)) {
+                continue;
+            }
+            
+            // Check if this is the frame-ancestors directive
+            if (trimmed.toLowerCase().startsWith("frame-ancestors")) {
+                // Validate: frame-ancestors must have a value
+                final String value = trimmed.substring("frame-ancestors".length()).trim();
+                if (StringUtils.isEmpty(value)) {
+                    throw new IllegalArgumentException("frame-ancestors directive must have a value, but found: \"" + trimmed + "\" in header: \"" + header + "\"");
+                }
+                
+                // Validate: only one frame-ancestors directive is allowed
+                if (csp.getFrameAncestors() != null) {
+                    throw new IllegalArgumentException("Multiple frame-ancestors directives found in header. Only one frame-ancestors directive is allowed. Header: \"" + header + "\"");
+                }
+                
+                csp.setFrameAncestors(value);
+            } else {
+                // Validate: directive must have a name (at least one non-whitespace character)
+                // Check if directive has at least a name part
+                final int firstSpace = trimmed.indexOf(' ');
+                final String directiveName = firstSpace > 0 ? trimmed.substring(0, firstSpace) : trimmed;
+                
+                if (StringUtils.isEmpty(directiveName)) {
+                    throw new IllegalArgumentException("Invalid directive: directive name is empty in: \"" + trimmed + "\" (from header: \"" + header + "\")");
+                }
+                
+                // Basic validation: directive name should not contain obviously invalid characters
+                // Allow alphanumeric, hyphens, and underscores (some CSP directives might use these)
+                // But reject obviously invalid characters like @, #, etc.
+                if (directiveName.contains("@") || directiveName.contains("#") || directiveName.contains("!") || directiveName.contains("$") || directiveName.contains("%")) {
+                    throw new IllegalArgumentException("Invalid directive name: contains invalid characters: \"" + directiveName + "\" (from directive: \"" + trimmed + "\" in header: \"" + header + "\")");
+                }
+                
+                // Add as additional directive
+                csp.addDirective(trimmed);
+            }
+        }
+        
+        return csp;
+    }
+
+    /**
      * Returns a string representation of this CSP configuration for debugging purposes.
      * 
      * <p>
@@ -170,21 +270,23 @@ public class ContentSecurityPolicy {
         final StringBuilder sb = new StringBuilder("ContentSecurityPolicy[");
         boolean hasContent = false;
 
-        if (StringUtils.isNotEmpty(this.frameAncestors)) {
-            sb.append("frame-ancestors='").append(this.frameAncestors).append("'");
+        String frameAncestorsValue = getFrameAncestors();
+        if (StringUtils.isNotEmpty(frameAncestorsValue)) {
+            sb.append("frame-ancestors='").append(frameAncestorsValue).append("'");
             hasContent = true;
         }
 
-        if (!this.additionalDirectives.isEmpty()) {
+        List<String> additionalDirectivesValue = getAdditionalDirectives();
+        if (!additionalDirectivesValue.isEmpty()) {
             if (hasContent) {
                 sb.append(", ");
             }
             sb.append("directives=[");
-            for (int i = 0; i < this.additionalDirectives.size(); i++) {
+            for (int i = 0; i < additionalDirectivesValue.size(); i++) {
                 if (i > 0) {
                     sb.append(", ");
                 }
-                sb.append("'").append(this.additionalDirectives.get(i)).append("'");
+                sb.append("'").append(additionalDirectivesValue.get(i)).append("'");
             }
             sb.append("]");
             hasContent = true;

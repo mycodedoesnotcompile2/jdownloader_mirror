@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -454,10 +454,6 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
         return headersMap != null ? headersMap : new HashMap<String, String>();
     }
 
-    private void verifyHeadersMatchExactly(final Map<String, String> expectedHeaders, final Map<String, String> actualHeaders, final String testName) throws Exception {
-        this.verifyHeadersMatchExactly(expectedHeaders, actualHeaders, testName, null);
-    }
-
     private void verifyHeadersMatchExactly(final Map<String, String> expectedHeaders, final Map<String, String> actualHeaders, final String testName, final RequestContext context) throws Exception {
         final Set<String> missingHeaders = new HashSet<String>();
         for (final Map.Entry<String, String> expected : expectedHeaders.entrySet()) {
@@ -546,12 +542,13 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
         headers.put(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY, "no-referrer");
         headers.put("Connection", "close");
         headers.put("Cache-Control", "no-store, no-cache");
-        if (actualHeaders.containsKey("Server")) {
-            headers.put("Server", actualHeaders.get("Server"));
-        }
-        if (actualHeaders.containsKey("Content-Length")) {
-            headers.put("Content-Length", actualHeaders.get("Content-Length"));
-        }
+        // These headers should ALWAYS be present in responses:
+        // - Server: Always set by HttpServer
+        // - Content-Length: Required by HTTP/1.1 for responses with body
+        // - X-Frame-Options: Always set by default ResponseSecurityHeaders
+        headers.put("Server", actualHeaders.get("Server"));
+        headers.put("Content-Length", actualHeaders.get("Content-Length"));
+        headers.put(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS, actualHeaders.get(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS));
         return headers;
     }
 

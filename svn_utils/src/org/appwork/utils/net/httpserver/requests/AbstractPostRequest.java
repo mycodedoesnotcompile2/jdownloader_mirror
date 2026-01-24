@@ -193,7 +193,7 @@ public abstract class AbstractPostRequest extends HttpRequest {
             }
 
             // Apply post-processing limit AFTER decompression (if enabled)
-            RequestSizeLimits limits = getBridge().getRequestSizeLimits();
+            RequestSizeLimits limits = getServer().getRequestSizeLimits();
             if (limits != null) {
                 long maxPostProcessing = limits.getMaxPostProcessedSize();
                 if (maxPostProcessing > 0) {

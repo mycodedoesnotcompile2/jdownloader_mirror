@@ -18,7 +18,7 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.config.CaptchaSolverNinekwConfig;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52163 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52176 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -90,11 +90,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        return false;
-    }
-
-    @Override
-    public boolean setValid(AbstractResponse<?> response, Account account) {
+        // TODO: Implement this
         return false;
     }
 
@@ -215,7 +211,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         } catch (IOException e) {
             e.printStackTrace();
         }
-        final CaptchaSolverNinekwConfig cfg = PluginJsonConfig.get(CaptchaSolverNinekwConfig.class);
+        final CaptchaSolverPluginConfigNinekw cfg = PluginJsonConfig.get(this.getConfigInterface());
         q.appendEncoded("captchaperhour", cfg.getHour() + "");
         q.appendEncoded("captchapermin", cfg.getMinute() + "");
         q.appendEncoded("prio", cfg.getPrio() + "");
@@ -225,7 +221,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     @Override
-    public Class<? extends CaptchaSolverNinekwConfig> getConfigInterface() {
-        return CaptchaSolverNinekwConfig.class;
+    public Class<? extends CaptchaSolverPluginConfigNinekw> getConfigInterface() {
+        return CaptchaSolverPluginConfigNinekw.class;
     }
 }

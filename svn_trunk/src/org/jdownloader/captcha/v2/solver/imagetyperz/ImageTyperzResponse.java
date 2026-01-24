@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2.solver.imagetyperz;
 
+import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
@@ -17,6 +18,11 @@ public class ImageTyperzResponse extends CaptchaResponse {
     }
 
     public ImageTyperzResponse(RecaptchaV2Challenge challenge, ImageTyperzCaptchaSolver ImageTyperzSolver, String id, String text) {
+        super(challenge, ImageTyperzSolver, text);
+        this.captchaID = id;
+    }
+
+    public ImageTyperzResponse(HCaptchaChallenge challenge, ImageTyperzCaptchaSolver ImageTyperzSolver, String id, String text) {
         super(challenge, ImageTyperzSolver, text);
         this.captchaID = id;
     }

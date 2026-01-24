@@ -28,7 +28,7 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigEndcaptcha;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -43,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52165 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52176 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -201,12 +201,6 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public boolean setValid(AbstractResponse<?> response, Account account) {
-        /* API has no call to report valid captchas, only invalid. */
-        return false;
-    }
-
-    @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
         /* API docs: https://deathbycaptcha.com/api#api_details_report */
         final UrlQuery query = new UrlQuery();
@@ -227,12 +221,12 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
         }
     }
 
-    private Map<String, Object> callAPI(final Request req) throws IOException, PluginException, SolverException {
+    private void callAPI(final Request req) throws IOException, PluginException, SolverException {
         br.getPage(req);
         final String error = br.getRegex("^ERROR:(.+)").getMatch(0);
         if (error == null) {
             /* No error */
-            return null;
+            return;
         }
         /* Check if error is related to login or captcha solving */
         if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
@@ -244,8 +238,7 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public Class<? extends CaptchaSolverPluginConfig> getConfigInterface() {
-        // TODO: Replace this by custom config for deathbycaptcha, this is just for testing!
-        return CaptchaSolverPluginConfig.class;
+    public Class<? extends CaptchaSolverPluginConfigEndcaptcha> getConfigInterface() {
+        return CaptchaSolverPluginConfigEndcaptcha.class;
     }
 }

@@ -196,7 +196,7 @@ public class ChallengeResponseController {
         return solverList.add(solver);
     }
 
-    private synchronized boolean addSolverService(SolverService service) {
+    public synchronized boolean addSolverService(SolverService service) {
         if (solverMap.put(service.getID(), service) == null) {
             serviceList.add(service);
             return true;
