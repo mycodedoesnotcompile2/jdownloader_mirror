@@ -45,8 +45,8 @@ import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpconnection.RequestMethod;
-import org.appwork.utils.net.httpserver.HttpRequest;
-import org.appwork.utils.net.httpserver.HttpResponse;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.api.DeprecatedAPIServer;
 
 /**
@@ -75,11 +75,10 @@ import org.jdownloader.api.DeprecatedAPIServer;
  * @author AppWork
  */
 public class DeprecatedAPIServerCorsTest extends AWTest {
-
     private DeprecatedAPIServer deprecatedAPIServer;
     private RemoteAPI           remoteAPI;
     private int                 serverPort;
-    private HttpClient         httpClient;
+    private HttpClient          httpClient;
     private Throwable           lastServerException;
     private HttpRequest         lastRequest;
     private HttpResponse        lastResponse;
@@ -108,30 +107,24 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
      */
     protected void setupDeprecatedAPIServer() throws IOException, ParseException {
         LogV3.info("Starting DeprecatedAPIServer Setup...");
-
         // Create RemoteAPI and register Dummy API
         this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
-
         // Create DeprecatedAPIServer on a free port (0 = automatic)
         // DeprecatedAPIServer automatically creates a CorsHandler with default settings (allowedOrigins=null)
         this.deprecatedAPIServer = new DeprecatedAPIServer(0);
         this.deprecatedAPIServer.setLocalhostOnly(true);
-
         // Register RemoteAPI as request handler
         this.deprecatedAPIServer.registerRequestHandler(this.remoteAPI);
-
         // Start server
         this.deprecatedAPIServer.start();
         this.serverPort = this.deprecatedAPIServer.getActualPort();
-
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
         this.httpClient.setConnectTimeout(5000);
         this.httpClient.setReadTimeout(30000);
         // Set default mandatory header for all requests (x-appwork header)
         this.httpClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");
-
         LogV3.info("DeprecatedAPIServer started on port: " + this.serverPort);
     }
 
@@ -158,7 +151,6 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
         final String allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
         final String maxAge = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE);
         final String exposeHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_EXPOSE_HEADERS);
-
         assertTrue(allowOrigin == null, messagePrefix + ": Access-Control-Allow-Origin header should not be present, but was: " + allowOrigin);
         assertTrue(allowMethods == null, messagePrefix + ": Access-Control-Allow-Methods header should not be present, but was: " + allowMethods);
         assertTrue(allowHeaders == null, messagePrefix + ": Access-Control-Allow-Headers header should not be present, but was: " + allowHeaders);
@@ -176,16 +168,12 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testCrossOriginRequestBlocked() throws Exception {
         LogV3.info("Test 1: Cross-origin request from foreign domain blocked");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(url));
         final int responseCode = context.getCode();
-
         // Cross-origin requests should be rejected with 403 Forbidden
         assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Cross-Origin request should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
-
         // Check that no CORS headers are present in the response (request was blocked)
         this.assertNoCorsHeaders(context, "Cross-origin request blocked");
-
         LogV3.info("Test 1 passed: Cross-origin request blocked with " + responseCode + ", no CORS headers present");
     }
 
@@ -200,15 +188,12 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testDirectServerRequestAllowed() throws Exception {
         LogV3.info("Test 2: Direct server-to-server request (no Origin) allowed");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
         // Don't set Origin header - should be allowed (server-to-server communication)
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
         assertTrue(responseCode == 200, "Direct server-to-server request (no Origin) should return 200, was: " + responseCode);
-
         // No CORS headers should be present (no Origin = no CORS)
         this.assertNoCorsHeaders(context, "Direct server request");
-
         LogV3.info("Test 2 passed: Direct server-to-server request successful: " + responseCode);
     }
 
@@ -223,7 +208,6 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testLocalhostOriginBlocked() throws Exception {
         LogV3.info("Test 3: Localhost Origin blocked");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://localhost:" + this.serverPort).setUrl(url));
         final int responseCode = context.getCode();
         assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Localhost Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
@@ -237,7 +221,6 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testEmptyOriginHeaderBlocked() throws Exception {
         LogV3.info("Test 4: Empty Origin header blocked");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
         final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "").setUrl(url));
         final int responseCode = context.getCode();
         assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Empty Origin header should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
@@ -256,15 +239,12 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testNoCorsHeadersInResponse() throws Exception {
         LogV3.info("Test 5: No CORS headers in response");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
         // Request without Origin (should succeed)
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
         assertTrue(responseCode == 200, "Request should return 200, was: " + responseCode);
-
         // Verify no CORS headers are present
         this.assertNoCorsHeaders(context, "No CORS headers in response");
-
         LogV3.info("Test 5 passed: No CORS headers present in response");
     }
 
@@ -278,7 +258,6 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testMultipleOriginValuesBlocked() throws Exception {
         LogV3.info("Test 6: Multiple Origin values blocked");
         final String[] origins = { "https://example.com", "https://evil.com", "http://localhost", "http://127.0.0.1", "null", "   " };
-
         for (final String origin : origins) {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
             final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
@@ -287,7 +266,6 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
             this.assertNoCorsHeaders(context, "Origin '" + origin + "' blocked");
             LogV3.info("  Origin '" + origin + "' correctly blocked with " + responseCode);
         }
-
         LogV3.info("Test 6 passed: All Origin values blocked");
     }
 }

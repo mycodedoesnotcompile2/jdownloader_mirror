@@ -46,6 +46,7 @@ import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.tests.DummyTestAPIImpl;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.HeaderValidationRules;
 import org.appwork.utils.net.httpserver.HttpServer;
@@ -105,8 +106,11 @@ public abstract class HttpServerTestBase extends AWTest {
      * Server Setup: Creates and starts an HTTP Server with Dummy API
      */
     protected void setupServer() throws IOException, ParseException {
-        LogV3.info("Starting HTTP Server Setup...");
 
+        LogV3.info("re-warm IPv6 (isGlobalIPv6Available) availability check to cache result and avoid delays during tests...");
+        // Pre-warm IPv6 availability check to cache result and avoid delays during tests
+        HTTPConnectionUtils.isGlobalIPv6Available(5000, 5000, 60 * 60 * 1000L);
+        LogV3.info("Starting HTTP Server Setup...");
         // Create RemoteAPI and register Dummy API
         this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());

@@ -25,7 +25,7 @@ import org.appwork.utils.XML;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.httpserver.HttpConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.jdownloader.logging.LogController;
 import org.w3c.dom.Document;
@@ -342,7 +342,7 @@ public class Scriptvalidator {
                 }
                 int i = 1;
                 try {
-                    for (KeyValuePair pa : HttpConnection.parseParameterList(url.getQuery())) {
+                    for (KeyValuePair pa : HttpServerConnection.parseParameterList(url.getQuery())) {
                         append(sb, "\tParameter #" + (i++) + ": \t" + pa.key + "\t=\t" + URLDecoder.decode(pa.value, "ASCII"));
                         onParameter(pa.key, pa.value);
                     }
@@ -366,11 +366,11 @@ public class Scriptvalidator {
                 }
                 int i = 1;
                 try {
-                    for (KeyValuePair pa : HttpConnection.parseParameterList(url.getQuery())) {
+                    for (KeyValuePair pa : HttpServerConnection.parseParameterList(url.getQuery())) {
                         append(sb, "\tParameter #" + (i++) + ": \t" + pa.key + "\t=\t" + URLDecoder.decode(pa.value, "ASCII"));
                         onParameter(pa.key, pa.value);
                     }
-                    for (KeyValuePair pa : HttpConnection.parseParameterList(poster)) {
+                    for (KeyValuePair pa : HttpServerConnection.parseParameterList(poster)) {
                         append(sb, "\tParameter #" + (i++) + ": \t" + pa.key + "\t=\t" + URLDecoder.decode(pa.value, "ASCII"));
                         onParameter(pa.key, pa.value);
                     }

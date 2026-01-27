@@ -43,10 +43,13 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.requests.OptionsRequest;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * Configuration and management class for CORS (Cross-Origin Resource Sharing) headers that should be added to HTTP responses.
@@ -473,19 +476,21 @@ public class CorsHandler {
     }
 
     /**
-     * Adds a pattern-based rule for credentials. Rules are checked in reverse order (last entry has highest priority).
+     * Adds a pattern-based rule for credentials using a Pattern instance. Rules are checked in reverse order (last entry has highest
+     * priority).
      *
      * <p>
-     * Example: If you add ".*":false first, then "https://example\\.com":true, all origins are denied except example.com.
+     * Example: If you add Pattern.compile(".*"):false first, then Pattern.compile("https://example\\.com"):true, all origins are denied
+     * except example.com.
      * </p>
      *
      * @param pattern
-     *            The regex pattern to match against the origin (e.g., "https://example\\.com" or ".*")
+     *            The Pattern instance to match against the origin
      * @param allow
      *            true to allow credentials for matching origins, false to deny
      */
-    public void addCredentialsRule(String pattern, boolean allow) {
-        this.credentialsRules.put(Pattern.compile(pattern), allow);
+    public void addCredentialsRule(Pattern pattern, boolean allow) {
+        this.credentialsRules.put(pattern, allow);
         this.validate();
     }
 
@@ -507,19 +512,21 @@ public class CorsHandler {
     }
 
     /**
-     * Adds a pattern-based rule for private network access. Rules are checked in reverse order (last entry has highest priority).
+     * Adds a pattern-based rule for private network access using a Pattern instance. Rules are checked in reverse order (last entry has
+     * highest priority).
      *
      * <p>
-     * Example: If you add ".*":false first, then "https://example\\.com":true, all origins are denied except example.com.
+     * Example: If you add Pattern.compile(".*"):false first, then Pattern.compile("https://example\\.com"):true, all origins are denied
+     * except example.com.
      * </p>
      *
      * @param pattern
-     *            The regex pattern to match against the origin (e.g., "https://example\\.com" or ".*")
+     *            The Pattern instance to match against the origin
      * @param allow
      *            true to allow private network access for matching origins, false to deny
      */
-    public void addPrivateNetworkRequestRule(String pattern, boolean allow) {
-        this.privateNetworkRequestRules.put(Pattern.compile(pattern), allow);
+    public void addPrivateNetworkRequestRule(Pattern pattern, boolean allow) {
+        this.privateNetworkRequestRules.put(pattern, allow);
         this.validate();
     }
 
@@ -774,5 +781,74 @@ public class CorsHandler {
             allowedOrigin = null;
         }
         return allowedOrigin;
+    }
+
+    /**
+     * Handles an HTTP OPTIONS preflight request by preparing the complete response.
+     *
+     * <p>
+     * This method should be called for OPTIONS requests when CORS is configured. It will:
+     * <ul>
+     * <li>Check if CORS is enabled (allowedOrigins is configured)</li>
+     * <li>Validate that the origin is allowed</li>
+     * <li>Ensure CORS headers are added via {@link #addCorsHeaders(HeaderCollection, HeaderCollection)}</li>
+     * <li>Set the response code to 200 OK</li>
+     * <li>Set Content-Length to 0</li>
+     * </ul>
+     * </p>
+     *
+     * <p>
+     * <b>Note:</b> CORS headers are typically already added in configure() via addCorsHeaders(), but this method ensures they are present
+     * before preparing the response.
+     * </p>
+     *
+     * <p>
+     * <b>Usage example:</b>
+     * </p>
+     *
+     * <pre>{@code
+     * if (request instanceof OptionsRequest) {
+     *     CorsHandler corsHandler = server.getCorsHandler();
+     *     if (corsHandler != null && corsHandler.answerOptionsRequest((OptionsRequest) request, response)) {
+     *         response.getOutputStream(true).flush();
+     *         return; // Request handled
+     *     }
+     *     // Fall through to normal handler processing if CORS is not configured or origin is not allowed
+     * }
+     * }</pre>
+     *
+     * @param request
+     *            The OPTIONS request
+     * @param response
+     *            The HTTP response to prepare
+     * @return true if the OPTIONS request was handled (CORS is enabled and origin is allowed), false otherwise
+     * @throws java.io.IOException
+     *             if an I/O error occurs while preparing the response
+     */
+    public boolean answerOptionsRequest(OptionsRequest request, HttpResponse response) throws java.io.IOException {
+        // Check if CORS is enabled (allowedOrigins is configured)
+        if (this.allowedOrigins == null || this.allowedOrigins.isEmpty()) {
+            // CORS is not enabled - don't handle OPTIONS request
+            return false;
+        }
+
+        // Check if origin is allowed
+        if (!isOriginAllowed(request.getRequestHeaders())) {
+            // Origin is not allowed - don't handle OPTIONS request
+            return false;
+        }
+
+        // CORS is enabled and origin is allowed - prepare the OPTIONS response
+        // Ensure CORS headers are added (they may already be added in configure(), but ensure they're present)
+        addCorsHeaders(request.getRequestHeaders(), response.getResponseHeaders());
+
+        // Set response code to 200 OK
+        response.setResponseCode(ResponseCode.SUCCESS_OK);
+
+        // Set Content-Length to 0 (OPTIONS requests have no body)
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
+
+        // Response is ready to be sent
+        return true;
     }
 }

@@ -33,9 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver;
 
-import org.appwork.utils.ReadableBytes;
-import org.appwork.utils.duration.TimeSpan;
-
 /**
  * Configuration class for request size limits.
  *
@@ -44,51 +41,51 @@ import org.appwork.utils.duration.TimeSpan;
 public class RequestSizeLimits {
 
     /**
-     * Maximum allowed size for request headers including request line, headers, and GET parameters. Set to null to disable this limit.
+     * Maximum allowed size for request headers including request line, headers, and GET parameters. Set to -1 to disable this limit.
      */
-    private final ReadableBytes maxHeaderSize;
+    private final long maxHeaderSize;
 
     /**
-     * Maximum allowed size for POST body. Set to null to disable this limit.
+     * Maximum allowed size for POST body. Set to -1 to disable this limit.
      */
-    private final ReadableBytes maxPostBodySize;
+    private final long maxPostBodySize;
 
     /**
-     * Maximum allowed size for processed POST data (after decompression, decryption, etc.). Set to null to disable this limit.
+     * Maximum allowed size for processed POST data (after decompression, decryption, etc.). Set to -1 to disable this limit.
      */
-    private final ReadableBytes maxPostProcessedSize;
+    private final long maxPostProcessedSize;
 
     /**
-     * Maximum bytes to drain from input stream on limit exceeded to prevent TCP RST. Set to null to disable draining.
+     * Maximum bytes to drain from input stream on limit exceeded to prevent TCP RST. Set to -1 to disable draining.
      */
-    private final ReadableBytes maxDrainInputStreamBytes;
+    private final long maxDrainInputStreamBytes;
 
     /**
-     * Timeout for draining input stream. Draining stops when timeout is reached or maxDrainInputStreamBytes is reached. Set to null to
+     * Timeout for draining input stream in milliseconds. Draining stops when timeout is reached or maxDrainInputStreamBytes is reached. Set to -1 to
      * disable timeout (draining only limited by maxDrainInputStreamBytes).
      */
-    private final TimeSpan      drainInputStreamTimeout;
+    private final long drainInputStreamTimeout;
 
     /** Default maximum header size: 16 KB */
-    public static final ReadableBytes DEFAULT_MAX_HEADER_SIZE               = ReadableBytes.fromBytes(16 * 1024);
+    public static final long DEFAULT_MAX_HEADER_SIZE               = 16 * 1024L;
     /** Default maximum POST body size: 2 MB */
-    public static final ReadableBytes DEFAULT_MAX_POST_BODY_SIZE            = ReadableBytes.fromBytes(2 * 1024 * 1024);
+    public static final long DEFAULT_MAX_POST_BODY_SIZE            = 2 * 1024 * 1024L;
     /** Default maximum processed POST data size: 10 MB (after decompression, decryption, etc.) */
-    public static final ReadableBytes DEFAULT_MAX_POST_PROCESSED_SIZE       = ReadableBytes.fromBytes(10 * 1024 * 1024);
+    public static final long DEFAULT_MAX_POST_PROCESSED_SIZE       = 10 * 1024 * 1024L;
     /** Default maximum bytes to drain from input stream: 10 MB */
-    public static final ReadableBytes DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES  = ReadableBytes.fromBytes(10 * 1024 * 1024);
-    /** Default timeout for draining input stream: 5 seconds */
-    public static final TimeSpan      DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT    = TimeSpan.fromMillis(5000);
+    public static final long DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES  = 10 * 1024 * 1024L;
+    /** Default timeout for draining input stream: 5 seconds (5000 ms) */
+    public static final long DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT    = 5000L;
 
     /**
      * Creates a new RequestSizeLimits configuration.
      *
      * @param maxHeaderSize
-     *            Maximum size for headers (request line + headers + GET parameters). Use null to disable.
+     *            Maximum size for headers (request line + headers + GET parameters) in bytes. Use -1 to disable.
      * @param maxPostBodySize
-     *            Maximum size for POST body. Use null to disable.
+     *            Maximum size for POST body in bytes. Use -1 to disable.
      */
-    public RequestSizeLimits(final ReadableBytes maxHeaderSize, final ReadableBytes maxPostBodySize) {
+    public RequestSizeLimits(final long maxHeaderSize, final long maxPostBodySize) {
         this(maxHeaderSize, maxPostBodySize, DEFAULT_MAX_POST_PROCESSED_SIZE, DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
     }
 
@@ -96,13 +93,13 @@ public class RequestSizeLimits {
      * Creates a new RequestSizeLimits configuration.
      *
      * @param maxHeaderSize
-     *            Maximum size for headers (request line + headers + GET parameters). Use null to disable.
+     *            Maximum size for headers (request line + headers + GET parameters) in bytes. Use -1 to disable.
      * @param maxPostBodySize
-     *            Maximum size for POST body. Use null to disable.
+     *            Maximum size for POST body in bytes. Use -1 to disable.
      * @param maxPostProcessedSize
-     *            Maximum size for processed POST data (after decompression, decryption, etc.). Use null to disable.
+     *            Maximum size for processed POST data (after decompression, decryption, etc.) in bytes. Use -1 to disable.
      */
-    public RequestSizeLimits(final ReadableBytes maxHeaderSize, final ReadableBytes maxPostBodySize, final ReadableBytes maxPostProcessedSize) {
+    public RequestSizeLimits(final long maxHeaderSize, final long maxPostBodySize, final long maxPostProcessedSize) {
         this(maxHeaderSize, maxPostBodySize, maxPostProcessedSize, DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
     }
 
@@ -110,15 +107,15 @@ public class RequestSizeLimits {
      * Creates a new RequestSizeLimits configuration.
      *
      * @param maxHeaderSize
-     *            Maximum size for headers (request line + headers + GET parameters). Use null to disable.
+     *            Maximum size for headers (request line + headers + GET parameters) in bytes. Use -1 to disable.
      * @param maxPostBodySize
-     *            Maximum size for POST body. Use null to disable.
+     *            Maximum size for POST body in bytes. Use -1 to disable.
      * @param maxPostProcessedSize
-     *            Maximum size for processed POST data (after decompression, decryption, etc.). Use null to disable.
+     *            Maximum size for processed POST data (after decompression, decryption, etc.) in bytes. Use -1 to disable.
      * @param maxDrainInputStreamBytes
-     *            Maximum bytes to drain from input stream on limit exceeded to prevent TCP RST. Use null to disable.
+     *            Maximum bytes to drain from input stream on limit exceeded to prevent TCP RST. Use -1 to disable.
      */
-    public RequestSizeLimits(final ReadableBytes maxHeaderSize, final ReadableBytes maxPostBodySize, final ReadableBytes maxPostProcessedSize, final ReadableBytes maxDrainInputStreamBytes) {
+    public RequestSizeLimits(final long maxHeaderSize, final long maxPostBodySize, final long maxPostProcessedSize, final long maxDrainInputStreamBytes) {
         this(maxHeaderSize, maxPostBodySize, maxPostProcessedSize, maxDrainInputStreamBytes, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
     }
 
@@ -126,17 +123,17 @@ public class RequestSizeLimits {
      * Creates a new RequestSizeLimits configuration.
      *
      * @param maxHeaderSize
-     *            Maximum size for headers (request line + headers + GET parameters). Use null to disable.
+     *            Maximum size for headers (request line + headers + GET parameters) in bytes. Use -1 to disable.
      * @param maxPostBodySize
-     *            Maximum size for POST body. Use null to disable.
+     *            Maximum size for POST body in bytes. Use -1 to disable.
      * @param maxPostProcessedSize
-     *            Maximum size for processed POST data (after decompression, decryption, etc.). Use null to disable.
+     *            Maximum size for processed POST data (after decompression, decryption, etc.) in bytes. Use -1 to disable.
      * @param maxDrainInputStreamBytes
-     *            Maximum bytes to drain from input stream on limit exceeded to prevent TCP RST. Use null to disable.
+     *            Maximum bytes to drain from input stream on limit exceeded to prevent TCP RST. Use -1 to disable.
      * @param drainInputStreamTimeout
-     *            Timeout for draining. Draining stops when this timeout is reached. Use null to disable timeout.
+     *            Timeout for draining in milliseconds. Draining stops when this timeout is reached. Use -1 to disable timeout.
      */
-    public RequestSizeLimits(final ReadableBytes maxHeaderSize, final ReadableBytes maxPostBodySize, final ReadableBytes maxPostProcessedSize, final ReadableBytes maxDrainInputStreamBytes, final TimeSpan drainInputStreamTimeout) {
+    public RequestSizeLimits(final long maxHeaderSize, final long maxPostBodySize, final long maxPostProcessedSize, final long maxDrainInputStreamBytes, final long drainInputStreamTimeout) {
         this.maxHeaderSize = maxHeaderSize;
         this.maxPostBodySize = maxPostBodySize;
         this.maxPostProcessedSize = maxPostProcessedSize;
@@ -152,7 +149,7 @@ public class RequestSizeLimits {
     }
 
     /**
-     * Backwards-compatible constructor for int/long values. Converts primitive values to ReadableBytes. Use -1 or 0 to disable limits.
+     * Backwards-compatible constructor for int/long values. Use -1 or 0 to disable limits.
      *
      * @param maxHeaderSize
      *            Maximum size for headers in bytes. Use -1 or 0 to disable.
@@ -162,11 +159,11 @@ public class RequestSizeLimits {
      *            Maximum size for processed POST data in bytes. Use -1 or 0 to disable.
      */
     public RequestSizeLimits(final int maxHeaderSize, final long maxPostBodySize, final long maxPostProcessedSize) {
-        this(maxHeaderSize > 0 ? ReadableBytes.fromBytes(maxHeaderSize) : null, maxPostBodySize > 0 ? ReadableBytes.fromBytes(maxPostBodySize) : null, maxPostProcessedSize > 0 ? ReadableBytes.fromBytes(maxPostProcessedSize) : null, DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
+        this(maxHeaderSize > 0 ? (long) maxHeaderSize : -1, maxPostBodySize > 0 ? maxPostBodySize : -1, maxPostProcessedSize > 0 ? maxPostProcessedSize : -1, DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
     }
 
     /**
-     * Backwards-compatible constructor for int/long values. Converts primitive values to ReadableBytes. Use -1 or 0 to disable limits.
+     * Backwards-compatible constructor for int/long values. Use -1 or 0 to disable limits.
      *
      * @param maxHeaderSize
      *            Maximum size for headers in bytes. Use -1 or 0 to disable.
@@ -174,89 +171,88 @@ public class RequestSizeLimits {
      *            Maximum size for POST body in bytes. Use -1 or 0 to disable.
      */
     public RequestSizeLimits(final int maxHeaderSize, final long maxPostBodySize) {
-        this(maxHeaderSize > 0 ? ReadableBytes.fromBytes(maxHeaderSize) : null, maxPostBodySize > 0 ? ReadableBytes.fromBytes(maxPostBodySize) : null, DEFAULT_MAX_POST_PROCESSED_SIZE, DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
+        this(maxHeaderSize > 0 ? (long) maxHeaderSize : -1, maxPostBodySize > 0 ? maxPostBodySize : -1, DEFAULT_MAX_POST_PROCESSED_SIZE, DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES, DEFAULT_DRAIN_INPUT_STREAM_TIMEOUT);
     }
 
     /**
      * Returns the maximum allowed header size in bytes.
      *
-     * @return Maximum header size in bytes, or 0 if disabled (null is treated as 0)
+     * @return Maximum header size in bytes, or -1 if disabled
      */
     public long getMaxHeaderSize() {
-        return maxHeaderSize != null ? maxHeaderSize.getBytes() : 0;
+        return maxHeaderSize;
     }
 
     /**
      * Returns the maximum allowed POST body size in bytes.
      *
-     * @return Maximum POST body size in bytes, or 0 if disabled (null is treated as 0)
+     * @return Maximum POST body size in bytes, or -1 if disabled
      */
     public long getMaxPostBodySize() {
-        return maxPostBodySize != null ? maxPostBodySize.getBytes() : 0;
+        return maxPostBodySize;
     }
 
     /**
      * Checks if header size limit is enabled.
      *
-     * @return true if header size limit is enabled (not null and > 0)
+     * @return true if header size limit is enabled (> 0)
      */
     public boolean isHeaderSizeLimitEnabled() {
-        return maxHeaderSize != null && maxHeaderSize.getBytes() > 0;
+        return maxHeaderSize > 0;
     }
 
     /**
      * Checks if POST body size limit is enabled.
      *
-     * @return true if POST body size limit is enabled (not null and > 0)
+     * @return true if POST body size limit is enabled (> 0)
      */
     public boolean isPostBodySizeLimitEnabled() {
-        return maxPostBodySize != null && maxPostBodySize.getBytes() > 0;
+        return maxPostBodySize > 0;
     }
 
     /**
      * Returns the maximum allowed processed POST data size in bytes.
      *
-     * @return Maximum processed POST data size in bytes, or 0 if disabled (null is treated as 0)
+     * @return Maximum processed POST data size in bytes, or -1 if disabled
      */
     public long getMaxPostProcessedSize() {
-        return maxPostProcessedSize != null ? maxPostProcessedSize.getBytes() : 0;
+        return maxPostProcessedSize;
     }
 
     /**
      * Checks if processed POST data size limit is enabled.
      *
-     * @return true if processed POST data size limit is enabled (not null and > 0)
+     * @return true if processed POST data size limit is enabled (> 0)
      */
     public boolean isPostProcessedSizeLimitEnabled() {
-        return maxPostProcessedSize != null && maxPostProcessedSize.getBytes() > 0;
+        return maxPostProcessedSize > 0;
     }
 
     /**
      * Returns the maximum bytes to drain from input stream on limit exceeded.
      *
-     * @return Maximum bytes to drain, or 0 if draining is disabled (null is treated as 0)
+     * @return Maximum bytes to drain, or -1 if draining is disabled
      */
     public long getMaxDrainInputStreamBytes() {
-        return maxDrainInputStreamBytes != null ? maxDrainInputStreamBytes.getBytes() : 0;
+        return maxDrainInputStreamBytes;
     }
 
     /**
-     * Returns the timeout for draining input stream.
+     * Returns the timeout for draining input stream in milliseconds.
      *
-     * @return Timeout for draining, or null if no timeout is configured
+     * @return Timeout for draining in milliseconds, or -1 if no timeout is configured
      */
-    public TimeSpan getDrainInputStreamTimeout() {
+    public long getDrainInputStreamTimeout() {
         return drainInputStreamTimeout;
     }
 
     /**
-     * Checks if input stream draining is enabled. Draining is enabled if timeout is not null OR maxDrainInputStreamBytes is not null and
-     * > 0.
+     * Checks if input stream draining is enabled. Draining is enabled if timeout is not -1 OR maxDrainInputStreamBytes is > 0.
      *
      * @return true if draining is enabled
      */
     public boolean isDrainInputStreamEnabled() {
-        return drainInputStreamTimeout != null || (maxDrainInputStreamBytes != null && maxDrainInputStreamBytes.getBytes() > 0);
+        return drainInputStreamTimeout != -1 || maxDrainInputStreamBytes > 0;
     }
 
     /**
@@ -267,13 +263,13 @@ public class RequestSizeLimits {
      * </p>
      *
      * <pre>
-     * RequestSizeLimits[maxHeaderSize=8192, maxPostBodySize=1048576, maxPostProcessedSize=-1, maxDrainInputStreamBytes=10485760, drainInputStreamTimeout=5s]
+     * RequestSizeLimits[maxHeaderSize=8192, maxPostBodySize=1048576, maxPostProcessedSize=-1, maxDrainInputStreamBytes=10485760, drainInputStreamTimeout=5000ms]
      * </pre>
      *
      * @return A string representation of this request size limits configuration
      */
     @Override
     public String toString() {
-        return "RequestSizeLimits[maxHeaderSize=" + this.maxHeaderSize + ", maxPostBodySize=" + this.maxPostBodySize + ", maxPostProcessedSize=" + this.maxPostProcessedSize + ", maxDrainInputStreamBytes=" + this.maxDrainInputStreamBytes + ", drainInputStreamTimeout=" + this.drainInputStreamTimeout + "]";
+        return "RequestSizeLimits[maxHeaderSize=" + this.maxHeaderSize + ", maxPostBodySize=" + this.maxPostBodySize + ", maxPostProcessedSize=" + this.maxPostProcessedSize + ", maxDrainInputStreamBytes=" + this.maxDrainInputStreamBytes + ", drainInputStreamTimeout=" + this.drainInputStreamTimeout + "ms]";
     }
 }

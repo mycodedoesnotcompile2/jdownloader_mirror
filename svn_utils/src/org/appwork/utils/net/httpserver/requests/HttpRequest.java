@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**

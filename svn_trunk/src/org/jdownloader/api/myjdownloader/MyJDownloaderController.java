@@ -1,9 +1,21 @@
 package org.jdownloader.api.myjdownloader;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.GZIPOutputStream;
 
 import org.appwork.console.AbstractConsole;
 import org.appwork.console.ConsoleDialog;
+import org.appwork.loggingv3.LogV3;
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.remoteapi.RemoteAPIRequest;
+import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.shutdown.ExceptionShutdownRequest;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
@@ -19,6 +31,21 @@ import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.ChunkedOutputStream;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.net.HeaderCollection;
+import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.AbstractServerBasics;
+import org.appwork.utils.net.httpserver.ContentSecurityPolicy;
+import org.appwork.utils.net.httpserver.CorsHandler;
+import org.appwork.utils.net.httpserver.HeaderValidationRules;
+import org.appwork.utils.net.httpserver.ReferrerPolicy;
+import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
+import org.appwork.utils.net.httpserver.XContentTypeOptions;
+import org.appwork.utils.net.httpserver.XFrameOptions;
+import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.RemoteAPIConfig;
 import org.jdownloader.api.myjdownloader.MyJDownloaderSettings.MyJDownloaderError;
@@ -34,7 +61,7 @@ import org.jdownloader.myjdownloader.client.json.MyCaptchaSolution.RESULT;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
 import org.jdownloader.translate._JDT;
 
-public class MyJDownloaderController implements ShutdownVetoListener, GenericConfigEventListener<Boolean> {
+public class MyJDownloaderController extends AbstractServerBasics implements ShutdownVetoListener, GenericConfigEventListener<Boolean> {
     private static final MyJDownloaderController INSTANCE = new MyJDownloaderController();
 
     public static MyJDownloaderController getInstance() {
@@ -107,13 +134,159 @@ public class MyJDownloaderController implements ShutdownVetoListener, GenericCon
         return Application.isHeadless() && (remoteAPIConfig.isHeadlessMyJDownloaderMandatory() || !remoteAPIConfig.isDeprecatedApiEnabled());
     }
 
+    @Deprecated
+    public static OutputStream getOutputStream(final RemoteAPIResponse response, final RemoteAPIRequest request, final boolean gzip, final boolean wrapJQuery) throws IOException {
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "no-store, no-cache"));
+        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json"));
+        // HttpLimitProviderInputStream server = HttpConnection.getInputStreamByType(request.getInputStream(),
+        // HttpLimitProviderInputStream.class);
+        // final HTTPBridge bridge = response.getRemoteAPI().getHTTPBridge(request, response);
+        final boolean chunked;
+        if (request.getHttpRequest().getServer().isChunkedEncodedResponseAllowed(request.getHttpRequest(), response.getHttpResponse())) {
+            chunked = true;
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
+        } else {
+            chunked = false;
+        }
+        if (gzip) {
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
+        }
+        response.setResponseCode(ResponseCode.SUCCESS_OK);
+        final OutputStream os;
+        if (chunked) {
+            os = new ChunkedOutputStream(response.getOutputStream(true));
+        } else {
+            os = response.getOutputStream(true);
+        }
+        final OutputStream uos;
+        final GZIPOutputStream out;
+        if (gzip) {
+            uos = out = new GZIPOutputStream(os);
+        } else {
+            out = null;
+            uos = os;
+        }
+        return new OutputStream() {
+            boolean wrapperHeader = wrapJQuery && request != null && request.getJqueryCallback() != null;
+            boolean wrapperEnd    = wrapJQuery && request != null && request.getJqueryCallback() != null;
+
+            @Override
+            public void close() throws IOException {
+                this.wrapperEnd();
+                if (out != null) {
+                    out.finish();
+                    out.flush();
+                }
+                uos.close();
+            }
+
+            @Override
+            public void flush() throws IOException {
+                uos.flush();
+            }
+
+            private void wrapperEnd() throws UnsupportedEncodingException, IOException {
+                if (this.wrapperEnd) {
+                    uos.write(")".getBytes("UTF-8"));
+                    this.wrapperEnd = false;
+                }
+            }
+
+            private void wrapperHeader() throws UnsupportedEncodingException, IOException {
+                if (this.wrapperHeader) {
+                    uos.write(request.getJqueryCallback().getBytes("UTF-8"));
+                    uos.write("(".getBytes("UTF-8"));
+                    this.wrapperHeader = false;
+                }
+            }
+
+            @Override
+            public void write(final byte[] b) throws IOException {
+                this.wrapperHeader();
+                uos.write(b);
+            }
+
+            @Override
+            public void write(final int b) throws IOException {
+                this.wrapperHeader();
+                uos.write(b);
+            }
+        };
+    }
+
     private MyJDownloaderController() {
+        super("my.jdownloader");
         logger = LogController.getInstance().getLogger(MyJDownloaderController.class.getName());
         eventSender = new MyJDownloaderEventSender();
+        configureBasics();
         if (isAlwaysConnectRequired() || CFG_MYJD.AUTO_CONNECT_ENABLED.isEnabled()) {
             start();
         }
         CFG_MYJD.AUTO_CONNECT_ENABLED.getEventSender().addListener(this);
+    }
+
+    protected void configureBasics() {
+        setAllowedMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.HEAD, RequestMethod.OPTIONS);
+        HashMap<String, String> mandatory = new HashMap<String, String>();
+        HashMap<String, String> forbidden = new HashMap<String, String>();
+        HeaderValidationRules header = new HeaderValidationRules(mandatory, forbidden);
+        setHeaderValidationRules(header);
+        CorsHandler cors = new CorsHandler() {
+            {
+                setMaxAge(TimeUnit.MINUTES.toMillis(30));
+                setAllowMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS);
+                setAllowHeadersFromRequest(true);
+            }
+
+            @Override
+            protected String findAllowedOrigin(String requestOrigin, HeaderCollection requestHeaders, HeaderCollection responseHeaders) {
+                if (requestOrigin != null) {
+                    return requestOrigin;
+                } else if (StringUtils.containsIgnoreCase(requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_HOST), "my.jdownloader.org")) {
+                    return "https://my.jdownloader.org";
+                } else {
+                    return "*";
+                }
+            }
+        };
+        setCorsHandler(cors);
+        final RemoteAPIConfig cfg = JsonConfig.create(RemoteAPIConfig.class);
+        ResponseSecurityHeaders securityHeaders = new ResponseSecurityHeaders() {
+            @Override
+            public ContentSecurityPolicy getContentSecurityPolicy() {
+                if (StringUtils.isEmpty(cfg.getLocalAPIServerHeaderContentSecurityPolicy())) {
+                    return null;
+                }
+                try {
+                    ContentSecurityPolicy ret = ContentSecurityPolicy.fromHeaderString(cfg.getLocalAPIServerHeaderContentSecurityPolicy());
+                    return ret;
+                } catch (Exception e) {
+                    LogV3.log(e);
+                    return new ContentSecurityPolicy() {
+                        public String toHeaderString() {
+                            return cfg.getLocalAPIServerHeaderContentSecurityPolicy();
+                        };
+                    };
+                }
+            }
+
+            @Override
+            public ReferrerPolicy getReferrerPolicy() {
+                String value = cfg.getLocalAPIServerHeaderReferrerPolicy();
+                return ReferrerPolicy.get(value);
+            }
+
+            @Override
+            public XContentTypeOptions getXContentTypeOptions() {
+                return super.getXContentTypeOptions();
+            }
+
+            @Override
+            public XFrameOptions getXFrameOptions() {
+                return XFrameOptions.DENY;
+            }
+        };
+        setResponseSecurityHeaders(securityHeaders);
     }
 
     protected void start() {
@@ -441,5 +614,15 @@ public class MyJDownloaderController implements ShutdownVetoListener, GenericCon
         if (ct != null) {
             ct.terminateSession(connectToken);
         }
+    }
+
+    @Override
+    public List<HttpRequestHandler> getHandler() {
+        return null;
+    }
+
+    @Override
+    public boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse) {
+        return true;
     }
 }

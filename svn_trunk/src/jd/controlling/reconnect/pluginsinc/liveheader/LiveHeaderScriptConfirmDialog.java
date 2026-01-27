@@ -48,7 +48,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.httpserver.HttpConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
@@ -591,7 +591,7 @@ public class LiveHeaderScriptConfirmDialog extends AbstractDialog<Object> {
                     append(sb, "\tAuthorization:\t" + decode(authorization));
                 }
                 int i = 1;
-                for (KeyValuePair pa : HttpConnection.parseParameterList(url.getQuery())) {
+                for (KeyValuePair pa : HttpServerConnection.parseParameterList(url.getQuery())) {
                     append(sb, "\tParameter #" + (i++) + ": \t" + decode(pa.key) + "\t=\t" + decode(pa.value));
                 }
                 // sb.getPage(protocoll + host + path);
@@ -608,10 +608,10 @@ public class LiveHeaderScriptConfirmDialog extends AbstractDialog<Object> {
                     append(sb, "\tAuthorization:\t" + decode(authorization));
                 }
                 int i = 1;
-                for (KeyValuePair pa : HttpConnection.parseParameterList(url.getQuery())) {
+                for (KeyValuePair pa : HttpServerConnection.parseParameterList(url.getQuery())) {
                     append(sb, "\tParameter #" + (i++) + ": \t" + decode(pa.key) + "\t=\t" + decode(pa.value));
                 }
-                for (KeyValuePair pa : HttpConnection.parseParameterList(poster)) {
+                for (KeyValuePair pa : HttpServerConnection.parseParameterList(poster)) {
                     append(sb, "\tParameter #" + (i++) + ": \t" + decode(pa.key) + "\t=\t" + decode(pa.value));
                 }
                 // sb.postPageRaw(protocoll + host + path, poster);

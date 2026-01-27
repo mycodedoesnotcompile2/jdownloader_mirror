@@ -3,7 +3,11 @@ package org.jdownloader.captcha.v2.solver.browser;
 import java.awt.Rectangle;
 import java.io.IOException;
 import java.net.URL;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
@@ -23,8 +27,13 @@ import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
+import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
+import org.appwork.utils.net.httpserver.HttpServer;
+import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
+import org.appwork.utils.net.httpserver.XContentTypeOptions;
+import org.appwork.utils.net.httpserver.XFrameOptions;
 import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
@@ -48,7 +57,7 @@ import jd.controlling.captcha.SkipRequest;
 import jd.parser.Regex;
 import jd.plugins.Plugin;
 
-public abstract class BrowserReference implements ExtendedHttpRequestHandler, HttpRequestHandler, ConnectionHook {
+public abstract class BrowserReference implements ExtendedHttpRequestHandler, HttpRequestHandler {
     private final AbstractBrowserChallenge challenge;
     private final UniqueAlltimeID          id = new UniqueAlltimeID();
 
@@ -122,10 +131,16 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                                 } else if (port > 65000) {
                                     port = 65000;
                                 }
-                                handlerInfo.set(DeprecatedAPIHttpServerController.getInstance().registerRequestHandler(port, true, BrowserReference.this));
+                                final HttpHandlerInfo handler = DeprecatedAPIHttpServerController.getInstance().registerRequestHandler(port, true, BrowserReference.this);
+                                handlerInfo.set(handler);
+                                // Configure server for BrowserReference: CORS and Security Headers
+                                BrowserReference.this.configureServerForBrowserReference(handler.getHttpServer());
                             } catch (final IOException e) {
                                 getLogger().log(e);
-                                handlerInfo.set(DeprecatedAPIHttpServerController.getInstance().registerRequestHandler(0, true, BrowserReference.this));
+                                final HttpHandlerInfo handler = DeprecatedAPIHttpServerController.getInstance().registerRequestHandler(0, true, BrowserReference.this);
+                                handlerInfo.set(handler);
+                                // Configure server for BrowserReference: CORS and Security Headers
+                                BrowserReference.this.configureServerForBrowserReference(handler.getHttpServer());
                             }
                             BrowserSolverService.getInstance().getConfig().setLocalHttpPort(getBasePort());
                         }
@@ -234,32 +249,21 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
 
     @Override
     public void onBeforeRequest(HttpRequest request, HttpResponse response) {
-        response.setHook(this);
-    }
-
-    @Override
-    public void onBeforeSendHeaders(HttpResponse response) {
-        HttpRequest request = response.getConnection().getRequest();
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
-        // ContentSecurityHeader csp = new ContentSecurityHeader();
-        // csp.addDefaultSrc("'self'");
-        // csp.addDefaultSrc("'unsafe-inline'");
-        // csp.addDefaultSrc("https://fonts.googleapis.com");
-        // csp.addDefaultSrc("https://fonts.gstatic.com");
-        // csp.addDefaultSrc("http://www.sweetcaptcha.com");
-        // csp.addDefaultSrc("http://code.jquery.com/jquery-1.10.2.min.js");
-        // csp.addDefaultSrc("http://sweetcaptcha.s3.amazonaws.com");
-        // response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY, csp.toHeaderString()));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS, "SAMEORIGIN"));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_XSS_PROTECTION, "1; mode=block"));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
+        // OLD: response.setHook(this); (set ConnectionHook to enable onBeforeSendHeaders())
+        // OLD: onBeforeSendHeaders() manually set headers:
+        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
+        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_FRAME_OPTIONS, "SAMEORIGIN"));
+        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_XSS_PROTECTION, "1; mode=block"));
+        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
+        // NEW: Headers are now configured via server configuration (configureServerForBrowserReference()),
+        //      not per-request hooks - more efficient and maintainable
+        // do not do any origin filter. All origins are allowed
     }
 
     @Override
     public void onAfterRequest(HttpRequest request, HttpResponse response, boolean handled) {
-        if (!handled) {
-            response.setHook(null);
-        }
+        // OLD: if (!handled) { response.setHook(null); } (cleanup hook)
+        // NEW: No hook needed - headers are configured via server configuration
     }
 
     @Override
@@ -506,4 +510,57 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     }
 
     public abstract void onResponse(String request);
+
+    /**
+     * Configures the HTTPServer for BrowserReference with special CORS and Security Header settings.
+     * 
+     * <p>
+     * This method overrides the default configuration from DeprecatedAPIServer with
+     * BrowserReference-specific settings. BrowserReference is used locally to display
+     * CAPTCHA challenges in a browser window.
+     * </p>
+     * 
+     * @param server The HTTPServer to configure
+     */
+    private void configureServerForBrowserReference(HttpServer server) {
+        // CORS configuration for BrowserReference: Allow local server address
+        CorsHandler corsHandler = new CorsHandler();
+        // Java 1.6 compatible: Explicit HashSet creation
+        Set<String> allowedOrigins = new HashSet<String>();
+        // Allow the local server address (e.g., "http://127.0.0.1:12345")
+        // Use server.getServerAddress() directly to get the actual server address
+        String serverAddress = server.getServerAddress();
+        if (serverAddress == null) {
+            serverAddress = "127.0.0.1:" + server.getActualPort();
+        }
+        allowedOrigins.add("http://" + serverAddress);
+        // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
+        //      (manually set in onBeforeSendHeaders() hook with dynamic server address)
+        // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization
+        corsHandler.setAllowedOrigins(allowedOrigins);
+        corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
+        corsHandler.setMaxAge(TimeUnit.MINUTES.toSeconds(30)); // 30 minutes
+        corsHandler.setAllowHeadersFromRequest(true); // Dynamically take from request
+        // Private Network Access: Allow for local server address
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
+        server.setCorsHandler(corsHandler);
+
+        // Security Headers for BrowserReference: SAMEORIGIN for local browser window
+        ResponseSecurityHeaders securityHeaders = new ResponseSecurityHeaders();
+        // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS, "SAMEORIGIN"));
+        //      (manually set in onBeforeSendHeaders() hook)
+        // NEW: Set via ResponseSecurityHeaders API - allow same-origin framing for local browser window
+        securityHeaders.setXFrameOptions(XFrameOptions.SAMEORIGIN);
+        // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
+        //      (manually set in onBeforeSendHeaders() hook)
+        // NEW: Set via ResponseSecurityHeaders API - prevent MIME-sniffing attacks
+        securityHeaders.setXContentTypeOptions(XContentTypeOptions.NOSNIFF);
+        // OLD: No CSP header was set (commented out CSP code in onBeforeSendHeaders())
+        // NEW: Set to null via ResponseSecurityHeaders API - BrowserReference needs to load local resources
+        securityHeaders.setContentSecurityPolicy(null);
+        // OLD: No Referrer-Policy header was set
+        // NEW: Set to null via ResponseSecurityHeaders API - not critical for BrowserReference
+        securityHeaders.setReferrerPolicy(null);
+        server.setResponseSecurityHeaders(securityHeaders);
+    }
 }

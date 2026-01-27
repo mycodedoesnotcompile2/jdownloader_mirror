@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.net.SocketException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -27,11 +25,8 @@ import javax.crypto.spec.SecretKeySpec;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.SessionRemoteAPIRequest;
-import org.appwork.remoteapi.exceptions.ApiInterfaceNotAvailable;
-import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
-import org.appwork.remoteapi.exceptions.InternalApiException;
 import org.appwork.storage.config.MinTimeWeakReference;
-import org.appwork.utils.Exceptions;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.Base64OutputStream;
@@ -39,9 +34,9 @@ import org.appwork.utils.net.ChunkedOutputStream;
 import org.appwork.utils.net.DeChunkingOutputStream;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import org.appwork.utils.net.httpserver.AbstractServerBasics;
 import org.appwork.utils.net.httpserver.EmptyRequestException;
-import org.appwork.utils.net.httpserver.HttpConnection;
-import org.appwork.utils.net.httpserver.HttpConnectionExceptionHandler;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HeadRequest;
@@ -49,7 +44,6 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
-import org.bouncycastle.tls.TlsNoCloseNotifyException;
 import org.jdownloader.api.RemoteAPIController;
 import org.jdownloader.api.myjdownloader.MyJDownloaderConnectThread.SessionInfoWrapper;
 import org.jdownloader.api.myjdownloader.api.MyJDownloaderAPI;
@@ -59,7 +53,7 @@ import org.jdownloader.myjdownloader.client.exceptions.MyJDownloaderException;
 import org.jdownloader.myjdownloader.client.exceptions.TokenException;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
 
-public class MyJDownloaderHttpConnection extends HttpConnection {
+public class MyJDownloaderHttpConnection extends HttpServerConnection {
     protected final static ArrayList<HttpRequestHandler> requestHandler = new ArrayList<HttpRequestHandler>();
     static {
         requestHandler.add(RemoteAPIController.getInstance().getRequestHandler());
@@ -157,22 +151,22 @@ public class MyJDownloaderHttpConnection extends HttpConnection {
         return logger;
     }
 
-    public MyJDownloaderHttpConnection(Socket clientConnection, MyJDownloaderAPI api) throws IOException {
-        super(null, clientConnection);
+    public MyJDownloaderHttpConnection(AbstractServerBasics server, Socket clientConnection, MyJDownloaderAPI api) throws IOException {
+        super(server, clientConnection);
         this.api = api;
         this.socketStream = null;
         logger = api.getLogger();
     }
 
-    public MyJDownloaderHttpConnection(SocketStreamInterface socketStream, MyJDownloaderAPI api) throws IOException {
-        super(null, socketStream.getSocket(), socketStream.getInputStream(), socketStream.getOutputStream());
+    public MyJDownloaderHttpConnection(AbstractServerBasics server, SocketStreamInterface socketStream, MyJDownloaderAPI api) throws IOException {
+        super(server, socketStream.getSocket(), socketStream.getInputStream(), socketStream.getOutputStream());
         this.socketStream = socketStream;
         this.api = api;
         logger = api.getLogger();
     }
 
-    public MyJDownloaderHttpConnection(final Socket clientSocket, final InputStream is, final OutputStream os, MyJDownloaderAPI api) throws IOException {
-        super(null, clientSocket, is, os);
+    public MyJDownloaderHttpConnection(AbstractServerBasics server, final Socket clientSocket, final InputStream is, final OutputStream os, MyJDownloaderAPI api) throws IOException {
+        super(server, clientSocket, is, os);
         this.socketStream = null;
         this.api = api;
         logger = api.getLogger();
@@ -224,31 +218,31 @@ public class MyJDownloaderHttpConnection extends HttpConnection {
     }
 
     protected void onUnhandled(final HttpRequest request, final HttpResponse response) throws IOException {
-        onException(new ApiInterfaceNotAvailable(), request, response);
+        DebugMode.debugger();
+        // onException(new ApiInterfaceNotAvailable(), request, response);
     }
-
-    @Override
-    public boolean onException(Throwable e, final HttpRequest request, final HttpResponse response) throws IOException {
-        if (Exceptions.containsInstanceOf(e, SocketException.class, ClosedChannelException.class)) {
-            // socket already closed
-            return true;
-        } else if (Exceptions.containsInstanceOf(e, TlsNoCloseNotifyException.class)) {
-            // TLS socket already closed
-            return true;
-        } else if (e instanceof HttpConnectionExceptionHandler) {
-            return ((HttpConnectionExceptionHandler) e).handle(request, response);
-        } else {
-            final BasicRemoteAPIException apiException;
-            if (!(e instanceof BasicRemoteAPIException)) {
-                apiException = new InternalApiException(e);
-            } else {
-                apiException = (BasicRemoteAPIException) e;
-            }
-            logger.log(apiException);
-            this.response = new HttpResponse(this);
-            return apiException.handle(this.response);
-        }
-    }
+    // @Override
+    // public boolean onException(Throwable e, final HttpRequest request, final HttpResponse response) throws IOException {
+    // if (Exceptions.containsInstanceOf(e, SocketException.class, ClosedChannelException.class)) {
+    // // socket already closed
+    // return true;
+    // } else if (Exceptions.containsInstanceOf(e, TlsNoCloseNotifyException.class)) {
+    // // TLS socket already closed
+    // return true;
+    // } else if (e instanceof HttpConnectionExceptionHandler) {
+    // return ((HttpConnectionExceptionHandler) e).handle(request, response);
+    // } else {
+    // final BasicRemoteAPIException apiException;
+    // if (!(e instanceof BasicRemoteAPIException)) {
+    // apiException = new InternalApiException(e);
+    // } else {
+    // apiException = (BasicRemoteAPIException) e;
+    // }
+    // logger.log(apiException);
+    // this.response = new HttpResponse(this);
+    // return apiException.handle(this.response);
+    // }
+    // }
 
     public String getRequestConnectToken() {
         return requestConnectToken;
@@ -257,7 +251,7 @@ public class MyJDownloaderHttpConnection extends HttpConnection {
     @Override
     protected HttpRequest buildRequest() throws IOException {
         final HttpRequest ret = super.buildRequest();
-        ret.setBridge(MyJDownloaderController.getInstance().getConnectThread());
+        // ret.setBridge(MyJDownloaderController.getInstance().getConnectThread());
         /* we do not allow gzip output */
         final HTTPHeader xAcceptEncoding = ret.getRequestHeaders().get("X-Accept-Encoding");
         if (xAcceptEncoding != null && (StringUtils.containsIgnoreCase(xAcceptEncoding.getValue(), "gazeisp") || StringUtils.containsIgnoreCase(xAcceptEncoding.getValue(), "gzip_aes"))) {

@@ -93,6 +93,15 @@ public class ReadableBytes {
         String unit(boolean k) {
             return k ? kiName : kName;
         }
+
+        public long toKibiBytes(long i) {
+            return i * kibytes;
+
+        }
+
+        public long toBytes(long i) {
+            return i * bytes;
+        }
     }
 
     public static final TypeRef<ReadableBytes> TYPE = new SimpleTypeRef<ReadableBytes>(ReadableBytes.class);

@@ -8,11 +8,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-import jd.controlling.AccountController;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountTrafficView;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.APIQuery;
 import org.appwork.remoteapi.RemoteAPI;
@@ -24,10 +19,16 @@ import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.net.HTTPHeader;
 import org.jdownloader.DomainInfo;
+import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.myjdownloader.client.json.JsonMap;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
+
+import jd.controlling.AccountController;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountTrafficView;
 
 @Deprecated
 public class AccountAPIImpl implements AccountAPI {
@@ -132,7 +133,7 @@ public class AccountAPIImpl implements AccountAPI {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
             final LazyHostPlugin plugin = HostPluginController.getInstance().get(premiumHoster);
             if (plugin != null) {
                 ImageProvider.writeImage(IconIO.toBufferedImage(DomainInfo.getInstance(plugin.getHost()).getFavIcon(false)), "png", out);

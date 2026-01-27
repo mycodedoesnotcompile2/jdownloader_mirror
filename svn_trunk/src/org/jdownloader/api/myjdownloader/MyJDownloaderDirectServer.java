@@ -17,9 +17,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import jd.controlling.reconnect.pluginsinc.upnp.cling.StreamClientImpl;
-import jd.controlling.reconnect.pluginsinc.upnp.cling.UPNPDeviceScanner;
-
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
@@ -30,7 +27,7 @@ import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.HTTPProxyUtils;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
-import org.appwork.utils.net.httpserver.HttpConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.fourthline.cling.DefaultUpnpServiceConfiguration;
 import org.fourthline.cling.UpnpServiceImpl;
 import org.fourthline.cling.model.action.ActionInvocation;
@@ -56,6 +53,9 @@ import org.jdownloader.api.DeprecatedAPIServer.AutoSSLHttpConnectionFactory;
 import org.jdownloader.api.myjdownloader.MyJDownloaderSettings.DIRECTMODE;
 import org.jdownloader.api.myjdownloader.api.MyJDownloaderAPI;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
+
+import jd.controlling.reconnect.pluginsinc.upnp.cling.StreamClientImpl;
+import jd.controlling.reconnect.pluginsinc.upnp.cling.UPNPDeviceScanner;
 
 public class MyJDownloaderDirectServer extends Thread implements ShutdownVetoListener {
     private final AtomicReference<ServerSocket> currentServerSocket    = new AtomicReference<ServerSocket>(null);
@@ -434,10 +434,10 @@ public class MyJDownloaderDirectServer extends Thread implements ShutdownVetoLis
             @Override
             public void run() {
                 try {
-                    final HttpConnection httpConnection = DeprecatedAPIServer.autoWrapSSLConnection(clientSocket, new AutoSSLHttpConnectionFactory() {
+                    final HttpServerConnection httpConnection = DeprecatedAPIServer.autoWrapSSLConnection(clientSocket, new AutoSSLHttpConnectionFactory() {
                         @Override
                         public MyJDownloaderDirectHttpConnection create(Socket clientSocket, InputStream is, OutputStream os) throws IOException {
-                            return new MyJDownloaderDirectHttpConnection(clientSocket, is, os, api);
+                            return new MyJDownloaderDirectHttpConnection(MyJDownloaderController.getInstance(), clientSocket, is, os, api);
                         }
                     });
                     if (httpConnection != null) {

@@ -36,6 +36,7 @@ package org.appwork.utils.net.httpserver.tests;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -542,12 +543,12 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         assertFalse(corsHandler.isAllowCredentials("https://example.com"), "No rules should deny credentials");
 
         // Test: Add rule to allow specific origin
-        corsHandler.addCredentialsRule("https://example\\.com", true);
+        corsHandler.addCredentialsRule(Pattern.compile("https://example\\.com"), true);
         assertTrue(corsHandler.isAllowCredentials("https://example.com"), "Rule should allow credentials for matching origin");
         assertFalse(corsHandler.isAllowCredentials("https://other.com"), "Rule should deny credentials for non-matching origin");
 
         // Test: Add rule to deny all
-        corsHandler.addCredentialsRule(".*", false);
+        corsHandler.addCredentialsRule(Pattern.compile(".*"), false);
         assertFalse(corsHandler.isAllowCredentials("https://other.com"), "Deny-all rule should deny credentials");
 
         LogV3.info("Test 16 passed: Pattern-based credentials rules work correctly");
@@ -564,9 +565,9 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
 
         // Add deny-all rule first
-        corsHandler.addCredentialsRule(".*", false);
+        corsHandler.addCredentialsRule(Pattern.compile(".*"), false);
         // Add allow rule for specific origin (higher priority - checked last)
-        corsHandler.addCredentialsRule("https://example\\.com", true);
+        corsHandler.addCredentialsRule(Pattern.compile("https://example\\.com"), true);
 
         // Test: Specific origin should be allowed (last rule wins)
         assertTrue(corsHandler.isAllowCredentials("https://example.com"), "Last rule should have highest priority - example.com should be allowed");
@@ -575,8 +576,8 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         assertFalse(corsHandler.isAllowCredentials("https://other.com"), "Other origins should be denied");
 
         // Test: Multiple specific rules - last one wins
-        corsHandler.addCredentialsRule("https://trusted\\.com", true);
-        corsHandler.addCredentialsRule("https://trusted\\.com", false); // Override
+        corsHandler.addCredentialsRule(Pattern.compile("https://trusted\\.com"), true);
+        corsHandler.addCredentialsRule(Pattern.compile("https://trusted\\.com"), false); // Override
         assertFalse(corsHandler.isAllowCredentials("https://trusted.com"), "Last rule for trusted.com should deny");
 
         LogV3.info("Test 17 passed: Pattern-based credentials rules priority works correctly");
@@ -593,7 +594,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
 
         // Add rule for specific pattern
-        corsHandler.addCredentialsRule("https://example\\.com", true);
+        corsHandler.addCredentialsRule(Pattern.compile("https://example\\.com"), true);
 
         // Test: Matching origin should be allowed
         assertTrue(corsHandler.isAllowCredentials("https://example.com"), "Matching origin should be allowed");
@@ -605,8 +606,8 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.clearCredentialsRules();
         assertFalse(corsHandler.isAllowCredentials("https://example.com"), "After clearing rules, should default to deny (false)");
 
-        // Test: Add ".*":true rule to allow credentials for all origins
-        corsHandler.addCredentialsRule(".*", true);
+        // Test: Add Pattern.compile(".*"):true rule to allow credentials for all origins
+        corsHandler.addCredentialsRule(Pattern.compile(".*"), true);
         // This should now allow all origins
         assertTrue(corsHandler.isAllowCredentials("https://example.com"), "After adding \".*\":true rule, should allow all origins");
         assertTrue(corsHandler.isAllowCredentials("https://other.com"), "After adding \".*\":true rule, should allow all origins");
@@ -626,12 +627,12 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         assertFalse(corsHandler.isAllowPrivateNetworkFromRequest("https://example.com"), "No rules should deny private network access");
 
         // Test: Add rule to allow specific origin
-        corsHandler.addPrivateNetworkRequestRule("https://example\\.com", true);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile("https://example\\.com"), true);
         assertTrue(corsHandler.isAllowPrivateNetworkFromRequest("https://example.com"), "Rule should allow private network access for matching origin");
         assertFalse(corsHandler.isAllowPrivateNetworkFromRequest("https://other.com"), "Rule should deny private network access for non-matching origin");
 
         // Test: Add rule to deny all
-        corsHandler.addPrivateNetworkRequestRule(".*", false);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), false);
         assertFalse(corsHandler.isAllowPrivateNetworkFromRequest("https://other.com"), "Deny-all rule should deny private network access");
 
         LogV3.info("Test 19 passed: Pattern-based private network access rules work correctly");
@@ -646,9 +647,9 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
 
         // Add deny-all rule first
-        corsHandler.addPrivateNetworkRequestRule(".*", false);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), false);
         // Add allow rule for specific origin (higher priority - checked last)
-        corsHandler.addPrivateNetworkRequestRule("https://example\\.com", true);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile("https://example\\.com"), true);
 
         // Test: Specific origin should be allowed (last rule wins)
         assertTrue(corsHandler.isAllowPrivateNetworkFromRequest("https://example.com"), "Last rule should have highest priority - example.com should be allowed");
@@ -668,7 +669,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
 
         // Add rule for specific pattern
-        corsHandler.addPrivateNetworkRequestRule("https://example\\.com", true);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile("https://example\\.com"), true);
 
         // Test: Matching origin should be allowed
         assertTrue(corsHandler.isAllowPrivateNetworkFromRequest("https://example.com"), "Matching origin should be allowed");
@@ -680,8 +681,8 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.clearPrivateNetworkRequestRules();
         assertFalse(corsHandler.isAllowPrivateNetworkFromRequest("https://example.com"), "After clearing rules, should default to deny (false)");
 
-        // Test: Add ".*":true rule to allow private network access for all origins
-        corsHandler.addPrivateNetworkRequestRule(".*", true);
+        // Test: Add Pattern.compile(".*"):true rule to allow private network access for all origins
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
         // This should now allow all origins
         assertTrue(corsHandler.isAllowPrivateNetworkFromRequest("https://example.com"), "After adding \".*\":true rule, should allow all origins");
         assertTrue(corsHandler.isAllowPrivateNetworkFromRequest("https://other.com"), "After adding \".*\":true rule, should allow all origins");
@@ -707,9 +708,9 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowHeadersFromRequest(true);
 
         // Deny credentials for all by default
-        corsHandler.addCredentialsRule(".*", false);
+        corsHandler.addCredentialsRule(Pattern.compile(".*"), false);
         // Allow credentials for trusted.com only
-        corsHandler.addCredentialsRule("https://trusted\\.com", true);
+        corsHandler.addCredentialsRule(Pattern.compile("https://trusted\\.com"), true);
 
         this.httpServer.setCorsHandler(corsHandler);
 
@@ -744,9 +745,9 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowHeadersFromRequest(true);
 
         // Deny private network access for all by default
-        corsHandler.addPrivateNetworkRequestRule(".*", false);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), false);
         // Allow private network access for trusted.com only
-        corsHandler.addPrivateNetworkRequestRule("https://trusted\\.com", true);
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile("https://trusted\\.com"), true);
 
         this.httpServer.setCorsHandler(corsHandler);
 
@@ -774,7 +775,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
 
         try {
-            corsHandler.addCredentialsRule(".*", true);
+            corsHandler.addCredentialsRule((Pattern.compile(".*")), true);
 
             AWTest.assertFalse(true, "Should throw IllegalStateException when \"*\" origin is combined with credentials rule that allows credentials");
         } catch (IllegalStateException e) {
@@ -784,7 +785,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         // Test: "*" origin with credentials rule that denies credentials should be OK
         corsHandler.clearCredentialsRules();
-        corsHandler.addCredentialsRule(".*", false);
+        corsHandler.addCredentialsRule((Pattern.compile(".*")), false);
         corsHandler.validate(); // Should not throw
 
         // Test: Specific origin with credentials rule that allows credentials should be OK
@@ -792,7 +793,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
         specificOrigins.add("https://example.com");
         corsHandler.setAllowedOrigins(specificOrigins);
         corsHandler.clearCredentialsRules();
-        corsHandler.addCredentialsRule("https://example\\.com", true);
+        corsHandler.addCredentialsRule(Pattern.compile("https://example\\.com"), true);
         corsHandler.validate(); // Should not throw
 
         LogV3.info("Test 24 passed: CORS handler validation works correctly");
@@ -810,7 +811,7 @@ public class HttpServerCorsTest extends HttpServerTestBase {
 
         // Test: "*" origin with credentials rule that allows credentials should NOT throw when validation is disabled
         corsHandler.setAllowedOrigins(java.util.Collections.singleton("*"));
-        corsHandler.addCredentialsRule(".*", true);
+        corsHandler.addCredentialsRule(Pattern.compile(".*"), true);
         corsHandler.validate(); // Should not throw when validation is disabled
 
         // Re-enable validation

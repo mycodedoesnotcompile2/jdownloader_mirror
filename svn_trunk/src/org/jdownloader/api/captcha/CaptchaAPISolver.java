@@ -158,7 +158,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         }
         try {
             final Challenge<?> challenge = job.getChallenge();
-            final OutputStream out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), true);
+            final OutputStream out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), true);
             try {
                 final HashMap<String, Object> captchaResponseData = new HashMap<String, Object>();
                 captchaResponseData.put("data", challenge.getAPIStorable(format));

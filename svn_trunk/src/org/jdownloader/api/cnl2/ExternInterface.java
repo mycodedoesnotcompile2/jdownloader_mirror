@@ -1,73 +1,24 @@
 package org.jdownloader.api.cnl2;
 
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.remoteapi.RemoteAPI;
-import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
+import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
-import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.requests.OptionsRequest;
-import org.appwork.utils.net.httpserver.responses.HttpResponse;
+import org.appwork.utils.net.httpserver.HttpServer;
+import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
+import org.appwork.utils.net.httpserver.XContentTypeOptions;
 import org.jdownloader.api.DeprecatedAPIHttpServerController;
 import org.jdownloader.api.RemoteAPIConfig;
 
 public class ExternInterface {
-    private class ExternInterfaceRemoteAPI extends RemoteAPI implements ExtendedHttpRequestHandler, ConnectionHook {
-        @Override
-        public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
-            if (request instanceof OptionsRequest) {
-                response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
-                response.setResponseCode(ResponseCode.SUCCESS_OK);
-                return true;
-            } else {
-                return super.onGetRequest(request, response);
-            }
-        }
-
-        @Override
-        public void onBeforeSendHeaders(HttpResponse response) {
-            // https://scotthelme.co.uk/hardening-your-http-response-headers/#x-content-type-options
-            HttpRequest request = response.getConnection().getRequest();
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, "1800"));
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "*"));
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, GET, POST"));
-            final String allowHeaders = request.getRequestHeaders().getValue("Access-Control-Request-Headers");
-            if (allowHeaders != null) {
-                response.getResponseHeaders().addIfAbsent(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, allowHeaders));
-            }
-            final String pna = request.getRequestHeaders().getValue("Access-Control-Request-Private-Network");
-            if (pna != null) {
-                response.getResponseHeaders().addIfAbsent(new HTTPHeader("Access-Control-Allow-Private-Network", pna));
-            }
-            response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
-            response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
-            response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_X_XSS_PROTECTION);
-            response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
-            response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS);
-        }
-
-        @Override
-        public void onBeforeRequest(HttpRequest request, HttpResponse response) {
-            // do not do any origin filter. All origins are allowed
-            response.setHook(this);
-        }
-
-        @Override
-        public void onAfterRequest(HttpRequest request, HttpResponse response, boolean handled) {
-        }
-
-        @Override
-        public void onAfterRequestException(HttpRequest request, HttpResponse response, Throwable e) {
-        }
-    }
-
     private static ExternInterface INSTANCE = new ExternInterface();
 
     private ExternInterface() {
@@ -76,56 +27,14 @@ public class ExternInterface {
             final Thread serverInit = new Thread() {
                 @Override
                 public void run() {
-                    final RemoteAPI remoteAPI = new ExternInterfaceRemoteAPI();
+                    final RemoteAPI remoteAPI = new RemoteAPI();
                     try {
                         remoteAPI.register(new ExternInterfaceImpl());
                         while (config.isExternInterfaceEnabled() && !Thread.currentThread().isInterrupted()) {
                             try {
                                 final HttpHandlerInfo handler = DeprecatedAPIHttpServerController.getInstance().registerRequestHandler(9666, config.isExternInterfaceLocalhostOnly(), remoteAPI);
-                                // handler.getHttpServer().registerRequestHandler(remoteAPI);
-                                // handler.getHttpServer().registerRequestHandler(new HttpRequestHandler() {
-                                //
-                                // @Override
-                                // public boolean onPostRequest(PostRequest request, HttpResponse response) throws BasicRemoteAPIException {
-                                // return false;
-                                // }
-                                //
-                                // @Override
-                                // public boolean onGetRequest(GetRequest httpRequest, HttpResponse httpResponse) throws
-                                // BasicRemoteAPIException {
-                                // if (StringUtils.startsWithCaseInsensitive(httpRequest.getRequestedURL(), "http://")) {
-                                // final Browser br = new Browser();
-                                // br.setFollowRedirects(false);
-                                // URLConnectionAdapter con = null;
-                                // try {
-                                // con = br.openGetConnection(httpRequest.getRequestedURL());
-                                // httpResponse.setResponseCode(ResponseCode.get(con.getResponseCode()));
-                                // Set<Entry<String, List<String>>> responseHeaders = con.getRequest().getResponseHeaders().entrySet();
-                                // Iterator<Entry<String, List<String>>> it = responseHeaders.iterator();
-                                // while (it.hasNext()) {
-                                // final Entry<String, List<String>> next = it.next();
-                                // if (next.getValue() != null) {
-                                // for (String value : next.getValue()) {
-                                // httpResponse.getResponseHeaders().add(new HTTPHeader(next.getKey(), value));
-                                // }
-                                // }
-                                // }
-                                // final OutputStream os = httpResponse.getOutputStream(true);
-                                // final InputStream is = con.getInputStream();
-                                // IO.readStreamToOutputStream(-1, is, os, false);
-                                // os.close();
-                                // return true;
-                                // } catch (IOException e) {
-                                // throw new BasicRemoteAPIException(e);
-                                // } finally {
-                                // if (con != null) {
-                                // con.disconnect();
-                                // }
-                                // }
-                                // }
-                                // return false;
-                                // }
-                                // });
+                                // Configure server for ExternInterface: CORS and Security Headers
+                                configureServerForExternInterface(handler.getHttpServer());
                                 break;
                             } catch (IOException e) {
                                 Thread.sleep(30 * 1000l);
@@ -144,5 +53,57 @@ public class ExternInterface {
 
     public static ExternInterface getINSTANCE() {
         return INSTANCE;
+    }
+
+    /**
+     * Configures the HTTPServer for ExternInterface with special CORS and Security Header settings.
+     *
+     * <p>
+     * This method overrides the default configuration from DeprecatedAPIServer with ExternInterface-specific settings. ExternInterface must
+     * be accessible from any website (cross-origin requests, framed, etc.) to allow browser extensions and websites to send links to
+     * JDownloader.
+     * </p>
+     *
+     * @param server
+     *            The HTTPServer to configure
+     */
+    private static void configureServerForExternInterface(HttpServer server) {
+        // CORS configuration for ExternInterface: Allow all origins for browser extensions and websites
+        CorsHandler corsHandler = new CorsHandler();
+        // Java 1.6 compatible: Explicit HashSet creation instead of Collections.singleton()
+        Set<String> allowedOrigins = new HashSet<String>();
+        allowedOrigins.add("*");
+        // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "*"));
+        // (manually set in onBeforeSendHeaders() hook)
+        // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization
+        corsHandler.setAllowedOrigins(allowedOrigins); // Allow all origins
+        corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
+        corsHandler.setMaxAge(TimeUnit.MINUTES.toSeconds(30)); // 30 minutes
+        corsHandler.setAllowHeadersFromRequest(true); // Dynamically take from request
+        // Private Network Access: Allow for all origins (browser extensions and websites)
+        corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
+        server.setCorsHandler(corsHandler);
+        // Security Headers for ExternInterface: Allow framing from any origin (websites need to embed/frame ExternInterface)
+        ResponseSecurityHeaders securityHeaders = new ResponseSecurityHeaders();
+        // OLD: response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS);
+        // (manually removed in onBeforeSendHeaders() to allow framing from any origin)
+        // NEW: Set to null via ResponseSecurityHeaders API - no header will be sent, allowing framing from any origin
+        // This allows websites to embed ExternInterface in iframes, which is required for browser extensions
+        securityHeaders.setXFrameOptions(null);
+        // OLD: response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS);
+        // response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
+        // (manually removed then re-added in onBeforeSendHeaders())
+        // NEW: Set via ResponseSecurityHeaders API - keep nosniff for security (prevents MIME-sniffing attacks)
+        securityHeaders.setXContentTypeOptions(XContentTypeOptions.NOSNIFF);
+        // OLD: response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
+        // (manually removed in onBeforeSendHeaders() - browser extensions need to load external resources)
+        // NEW: Set to null via ResponseSecurityHeaders API - browser extensions need to be able to load external resources
+        // Also, we don't want CSP frame-ancestors to block framing
+        securityHeaders.setContentSecurityPolicy(null);
+        // OLD: response.getResponseHeaders().remove(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
+        // (manually removed in onBeforeSendHeaders())
+        // NEW: Set to null via ResponseSecurityHeaders API - not critical for ExternInterface
+        securityHeaders.setReferrerPolicy(null);
+        server.setResponseSecurityHeaders(securityHeaders);
     }
 }

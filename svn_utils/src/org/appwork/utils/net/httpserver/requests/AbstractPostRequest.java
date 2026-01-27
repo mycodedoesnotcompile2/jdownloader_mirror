@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver.requests;
 
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -56,7 +55,7 @@ import org.appwork.utils.net.StreamValidEOF;
 import org.appwork.utils.net.httpconnection.CountingGZIPInputStream;
 import org.appwork.utils.net.httpconnection.CountingInflaterInputStream;
 import org.appwork.utils.net.httpconnection.RequestMethod;
-import org.appwork.utils.net.httpserver.HttpConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.LimitedInputStreamWithException;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 import org.appwork.utils.net.httpserver.RequestSizeLimits;
@@ -88,7 +87,7 @@ public abstract class AbstractPostRequest extends HttpRequest {
         UNKNOWN
     }
 
-    protected class PostRequestInputStream extends FilterInputStream implements StreamValidEOF {
+    protected class PostRequestInputStream extends CountingInputStream implements StreamValidEOF {
         protected PostRequestInputStream(InputStream in) {
             super(in);
         }
@@ -335,7 +334,7 @@ public abstract class AbstractPostRequest extends HttpRequest {
                 final byte[] formBytes = IO.readStream(-1, inputStream);
                 String formString = new String(formBytes, charSet);
                 formString = modifyByContentType(content_type, formString);
-                return HttpConnection.parseParameterList(formString);
+                return HttpServerConnection.parseParameterList(formString);
             }
             case UNKNOWN:
             default:

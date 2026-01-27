@@ -54,6 +54,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
@@ -72,6 +73,8 @@ import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.LineParsingOutputStream;
 import org.appwork.utils.reflection.CompiledType;
+import org.appwork.app.launcher.parameterparser.CommandSwitch;
+import org.appwork.app.launcher.parameterparser.ParameterParser;
 
 /**
  * @author thomas
@@ -151,8 +154,10 @@ public class IDETestRunner2 {
                 LogV3.severe("stderr> " + sb.substring(startIndex, endIndex));
             }
         }));
+        ParameterParser parser = new ParameterParser(args).parse();
         try {
-            runClasspathTests();
+            List<String> excludePatterns = parseExcludePatterns(parser);
+            runClasspathTests(excludePatterns);
         } catch (Throwable e) {
             AWTest.setLoggerSilent(false, true);
             LogV3.log(e);
@@ -160,13 +165,83 @@ public class IDETestRunner2 {
             System.setErr(errBefore);
             System.setOut(outBefore);
         }
-        if (!Arrays.asList(args).contains("-noexit")) {
+        if (!parser.hasCommandSwitch("noexit")) {
             LogV3.disableSysout();
             System.exit(0);
         }
     }
 
+    /**
+     * Parses -exclude <pattern> arguments from command line using ParameterParser
+     *
+     * @param parser
+     *            ParameterParser instance with parsed arguments
+     * @return list of exclude patterns
+     */
+    private static List<String> parseExcludePatterns(ParameterParser parser) {
+        List<String> excludePatterns = new ArrayList<String>();
+        // Collect all exclude patterns from all -exclude switches
+        for (CommandSwitch cmdSwitch : parser.getList()) {
+            if ("exclude".equalsIgnoreCase(cmdSwitch.getCaseInsensitiveSwitchCommand())) {
+                // Add all parameters from this exclude switch
+                for (String param : cmdSwitch.getParameters()) {
+                    if (StringUtils.isNotEmpty(param)) {
+                        excludePatterns.add(param);
+                    }
+                }
+            }
+        }
+        return excludePatterns;
+    }
+
+    /**
+     * Checks if a test class name matches any of the exclude patterns
+     *
+     * @param testClass
+     *            the test class name to check
+     * @param excludePatterns
+     *            list of exclude patterns (supports wildcards like * and regex)
+     * @return true if the test class should be excluded
+     */
+    private static boolean shouldExcludeTest(String testClass, List<String> excludePatterns) {
+        if (excludePatterns == null || excludePatterns.isEmpty()) {
+            return false;
+        }
+        for (String pattern : excludePatterns) {
+            if (StringUtils.isEmpty(pattern)) {
+                continue;
+            }
+            try {
+                String regexPattern = pattern;
+                // Check if pattern looks like a regex (starts with ^ or contains regex special chars)
+                boolean isRegex = pattern.startsWith("^") || pattern.endsWith("$") || pattern.contains("\\.") || pattern.contains("\\+") || pattern.contains("\\(") || pattern.contains("\\[");
+
+                if (!isRegex && pattern.contains("*")) {
+                    // Simple wildcard pattern: convert * to .*
+                    regexPattern = "^" + pattern.replace(".", "\\.").replace("*", ".*") + "$";
+                } else if (!isRegex) {
+                    // Simple string match - convert to regex with anchors
+                    regexPattern = "^" + Pattern.quote(pattern) + "$";
+                }
+
+                if (Pattern.matches(regexPattern, testClass)) {
+                    return true;
+                }
+            } catch (Exception e) {
+                // If pattern compilation fails, try simple contains check as fallback
+                if (testClass.contains(pattern)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public static void runClasspathTests() throws URISyntaxException, ClassNotFoundException, IOException {
+        runClasspathTests(null);
+    }
+
+    public static void runClasspathTests(List<String> excludePatterns) throws URISyntaxException, ClassNotFoundException, IOException {
         AWTest.pauseLogger();
         final ArrayList<String> testClasses = new ArrayList<String>();
         final ArrayList<String> lastExecutedTestClasses = new ArrayList<String>();
@@ -199,6 +274,11 @@ public class IDETestRunner2 {
                             if (file.isFile()) {
                                 final String testClass = rel.replace("/", ".").substring(0, rel.length() - ".class".length());
                                 try {
+                                    // Check if test should be excluded
+                                    if (shouldExcludeTest(testClass, excludePatterns)) {
+                                        AWTest.logInfoAnyway("Excluded test: " + testClass);
+                                        continue;
+                                    }
                                     final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
                                     if (TestInterface.class.isAssignableFrom(cls) && TestInterface.class != cls && cls != AWTest.class) {
                                         testClasses.add(testClass);
@@ -274,7 +354,7 @@ public class IDETestRunner2 {
                     }
                 }
             }
-            
+
             if (!changedClasses.isEmpty()) {
                 AWTest.logInfoAnyway(testClass + " - Changed files (References: last known:" + known.size() + "/new:" + references.size() + "):");
                 int displayCount = Math.min(10, changedClasses.size());

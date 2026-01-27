@@ -11,8 +11,6 @@ import java.util.Map;
 
 import javax.swing.Icon;
 
-import jd.plugins.FavitIcon;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.RemoteAPI;
@@ -37,6 +35,7 @@ import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.api.RemoteAPIController;
+import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.views.components.MergedIcon;
 import org.jdownloader.images.AbstractIcon;
@@ -46,11 +45,13 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.myjdownloader.client.bindings.interfaces.ContentInterface;
 import org.jdownloader.myjdownloader.client.json.IconDescriptor;
 
+import jd.plugins.FavitIcon;
+
 public class ContentAPIImplV2 implements ContentAPIV2 {
     private final String                                      usedByWebInterface     = IconKey.ICON_FOLDER_OPEN + IconKey.ICON_DOWNLOADPASSWORD + IconKey.ICON_ADDCONTAINER;
     private final File                                        descriptorMapCacheFile = Application.getResource("tmp/iconIDMapCache");
     private final static TypeRef<Map<String, IconDescriptor>> TYPE_REF               = new TypeRef<Map<String, IconDescriptor>>() {
-    };
+                                                                                     };
     private final HashMap<String, IconDescriptor>             descriptorMap          = new HashMap<String, IconDescriptor>();
 
     public ContentAPIImplV2() {
@@ -123,7 +124,7 @@ public class ContentAPIImplV2 implements ContentAPIV2 {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
             ImageProvider.writeImage(IconIO.toBufferedImage(favIcon), "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
@@ -143,7 +144,7 @@ public class ContentAPIImplV2 implements ContentAPIV2 {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
             ImageProvider.writeImage(IconIO.toBufferedImage(CrossSystem.getMime().getFileIcon(extension, 16, 16)), "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
@@ -206,7 +207,7 @@ public class ContentAPIImplV2 implements ContentAPIV2 {
                     throw new APIFileNotFoundException();
                 }
                 BufferedImage ico = IconIO.toBufferedImage(createIcon(desc, size));
-                out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+                out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
                 ImageProvider.writeImage(ico, "png", out);
             } else if (key.startsWith("kc.")) {
                 IconDescriptor desc = getIconDescription(key);
@@ -214,11 +215,11 @@ public class ContentAPIImplV2 implements ContentAPIV2 {
                     throw new APIFileNotFoundException();
                 }
                 BufferedImage ico = IconIO.toBufferedImage(createIcon(desc, size));
-                out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+                out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
                 ImageProvider.writeImage(ico, "png", out);
             } else {
                 BufferedImage ico = IconIO.toBufferedImage(new AbstractIcon(key, size));
-                out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+                out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
                 ImageProvider.writeImage(ico, "png", out);
             }
         } catch (IOException e) {

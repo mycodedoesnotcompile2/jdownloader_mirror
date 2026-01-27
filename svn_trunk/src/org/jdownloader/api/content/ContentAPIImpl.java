@@ -16,6 +16,7 @@ import org.appwork.utils.images.IconIO;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.DomainInfo;
+import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 
 @Deprecated
 public class ContentAPIImpl implements ContentAPI {
@@ -31,7 +32,7 @@ public class ContentAPIImpl implements ContentAPI {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
             ImageProvider.writeImage(IconIO.toBufferedImage(favIcon), "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
@@ -52,7 +53,7 @@ public class ContentAPIImpl implements ContentAPI {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
             ImageProvider.writeImage(IconIO.toBufferedImage(CrossSystem.getMime().getFileIcon(extension, 16, 16)), "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);

@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52083 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52182 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -60,9 +60,6 @@ public class DdownloadCom extends XFileSharingProBasic {
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
-     * limit-info: 2019-05-22: premium untested, set FREE account limits <br />
-     * captchatype-info: 2020-05-18: reCaptchaV2<br />
-     * other:<br />
      */
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
@@ -209,16 +206,12 @@ public class DdownloadCom extends XFileSharingProBasic {
 
     @Override
     protected String regExTrafficLeft(final Browser br) {
-        /* 2019-11-03: Special */
-        final String src = this.getCorrectBR(br);
-        final Regex trafficleft = new Regex(src, "<[^>]*>\\s*Traffic available\\s*</[^>]*>\\s*<div[^>]*>*>\\s*<sup>\\s*([^<>]+)\\s*</sup>\\s*(-?\\d+)\\s*</div>");
-        final String trafficleftUnit = trafficleft.getMatch(0);
-        final String trafficleftTmp = trafficleft.getMatch(1);
-        if (trafficleftUnit != null && trafficleftTmp != null) {
-            final String ret = trafficleftTmp + trafficleftUnit;
-            return ret;
+        /* 2026-01-26 */
+        final String trafficLeftMB = br.getRegex("data-traffic=\"(\\d+)\"").getMatch(0);
+        if (trafficLeftMB != null) {
+            return trafficLeftMB + "MB";
         }
-        /* Fallback to template handling */
+        logger.warning("Special trafficleft regexes failed -> Website has changed?"); /* Fallback to template handling */
         return super.regExTrafficLeft(br);
     }
 
@@ -301,6 +294,7 @@ public class DdownloadCom extends XFileSharingProBasic {
          * https://board.jdownloader.org/showthread.php?t=82525&page=2
          */
         /* 2020-06-29: API returns wrong trafficleft values --> Don't trust it - obtain trafficleft value from website instead! */
+        /* 2026-01-26: Still broken */
         if (trafficleftStr != null && trafficleftStr.matches("\\d+")) {
             final boolean trustAPITrafficLeft = false;
             long traffic_left = SizeFormatter.getSize(trafficleftStr + "MB");

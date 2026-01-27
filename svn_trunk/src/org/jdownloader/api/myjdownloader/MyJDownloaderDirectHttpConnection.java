@@ -6,18 +6,15 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpserver.AbstractServerBasics;
 import org.appwork.utils.net.httpserver.EmptyRequestException;
 import org.jdownloader.api.myjdownloader.api.MyJDownloaderAPI;
 import org.jdownloader.myjdownloader.RequestLineParser;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
 
 public class MyJDownloaderDirectHttpConnection extends MyJDownloaderHttpConnection {
-    public MyJDownloaderDirectHttpConnection(Socket clientConnection, MyJDownloaderAPI api) throws IOException {
-        super(clientConnection, api);
-    }
-
-    public MyJDownloaderDirectHttpConnection(final Socket clientSocket, final InputStream is, final OutputStream os, MyJDownloaderAPI api) throws IOException {
-        super(clientSocket, is, os, api);
+    public MyJDownloaderDirectHttpConnection(AbstractServerBasics basics, final Socket clientSocket, final InputStream is, final OutputStream os, MyJDownloaderAPI api) throws IOException {
+        super(basics, clientSocket, is, os, api);
     }
 
     @Override

@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.awt.Container;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -19,24 +18,19 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.ImageProvider.ImageProvider;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -49,13 +43,13 @@ import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigImagetyperz;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.seamless.util.io.IO;
 
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.Request;
-import jd.http.requests.PostFormDataRequest;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
@@ -66,7 +60,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52176 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52185 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -112,18 +106,16 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        /** TODO: Test and add more captcha types, see their API docs. They even claim to support hCaptcha. */
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
-        types.add(CAPTCHA_TYPE.CUTCAPTCHA);
+        // types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         // types.add(CAPTCHA_TYPE.HCAPTCHA);
-        types.add(CAPTCHA_TYPE.MT_CAPTCHA);
-        types.add(CAPTCHA_TYPE.GEETEST_V1);
-        types.add(CAPTCHA_TYPE.GEETEST_V4);
-        types.add(CAPTCHA_TYPE.FRIENDLY_CAPTCHA);
+        // types.add(CAPTCHA_TYPE.GEETEST_V1);
+        // types.add(CAPTCHA_TYPE.GEETEST_V4);
         return types;
     }
 
@@ -217,89 +209,121 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         // TODO
         // challenge.sendStatsSolving(this);
         job.setStatus(SolverStatus.UPLOADING);
-        final UrlQuery query = new UrlQuery();
-        final UrlQuery queryPolling = new UrlQuery();
-        final String path;
-        String pathPolling = "/captchaapi/GetRecaptchaTextToken.ashx";
+        boolean expectImmediateAnswer = false;
+        String uploadPath = null;
+        final UrlQuery uploadQuery = new UrlQuery();
+        uploadQuery.addAndReplace("action", "UPLOADCAPTCHA");
+        final UrlQuery pollingQuery = new UrlQuery();
+        String pollingPath = "/captchaapi/GetRecaptchaTextToken.ashx";
         if (this.isLoginViaAuthtoken(account)) {
-            query.addAndReplace("token", account.getPass());
-            queryPolling.addAndReplace("token", account.getPass());
-            path = "/captchaapi/UploadRecaptchaToken.ashx";
+            uploadQuery.addAndReplace("token", account.getPass());
+            pollingQuery.addAndReplace("token", account.getPass());
+            uploadPath = "/captchaapi/UploadRecaptchaToken.ashx";
         } else {
-            query.addAndReplace("username", account.getUser());
-            query.addAndReplace("password", account.getPass());
-            queryPolling.addAndReplace("username", account.getUser());
-            queryPolling.addAndReplace("password", account.getPass());
-            path = "/captchaapi/UploadRecaptchaV1.ashx";
+            uploadQuery.addAndReplace("username", account.getUser());
+            uploadQuery.addAndReplace("password", account.getPass());
+            pollingQuery.addAndReplace("username", account.getUser());
+            pollingQuery.addAndReplace("password", account.getPass());
+            uploadPath = "/captchaapi/UploadRecaptchaV1.ashx";
         }
         final String type;
         if (c instanceof RecaptchaV2Challenge) {
             type = "reCaptcha";
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) c;
-            final PostFormDataRequest upload;
             if (challenge.isEnterprise()) {
-                upload = new PostFormDataRequest("https://captchatypers.com/captchaapi/UploadRecaptchaEnt.ashx");
+                uploadPath = "/captchaapi/UploadRecaptchaEnt.ashx";
             } else {
-                upload = new PostFormDataRequest("https://captchatypers.com/captchaapi/UploadRecaptchaV1.ashx");
-            }
-            query.addAndReplace("action", "UPLOADCAPTCHA");
-            query.addAndReplace("pageurl", challenge.getSiteDomain());
-            query.addAndReplace("googlekey", challenge.getSiteKey());
-            String enterprise_type = "v2";// default
-            if (challenge.isInvisible()) {
-                enterprise_type = "v2";// invisible
-                query.addAndReplace("isinvisible", "1");
-            }
-            if (challenge.isV3()) {
-                enterprise_type = "v3";// v3
-            }
-            if (challenge.getV3Action() != null) {
-                final String action = (String) challenge.getV3Action().get("action");
-                if (action != null) {
-                    enterprise_type = "v3";// v3
-                    query.addAndReplace("captchaaction", action);
+                /* For 'normal' reCaptcha captchas, API calls differ depending on login type */
+                if (this.isLoginViaAuthtoken(account)) {
+                    uploadPath = "/captchaapi/UploadRecaptchaToken.ashx";
+                } else {
+                    uploadPath = "/captchaapi/UploadRecaptchaV1.ashx";
                 }
             }
-            query.addAndReplace("enterprise_type", enterprise_type);
+            uploadQuery.addAndReplace("pageurl", challenge.getSiteDomain());
+            uploadQuery.addAndReplace("googlekey", challenge.getSiteKey());
+            if (challenge.isEnterprise()) {
+                String enterprise_type = "v2";// default
+                if (challenge.isInvisible()) {
+                    enterprise_type = "v2";// invisible
+                    uploadQuery.addAndReplace("isinvisible", "1");
+                }
+                if (challenge.isV3()) {
+                    enterprise_type = "v3";// v3
+                }
+                if (challenge.getV3Action() != null) {
+                    final String action = (String) challenge.getV3Action().get("action");
+                    if (action != null) {
+                        enterprise_type = "v3";// v3
+                        uploadQuery.addAndReplace("captchaaction", action);
+                    }
+                }
+                uploadQuery.addAndReplace("enterprise_type", enterprise_type);
+            } else {
+                if (challenge.isInvisible()) {
+                    uploadQuery.addAndReplace("recaptchatype", "3");
+                } else if (challenge.isV3()) {
+                    uploadQuery.addAndReplace("recaptchatype", "2");
+                } else {
+                    uploadQuery.addAndReplace("recaptchatype", "1");
+                }
+            }
+            if (challenge.getMinScore() != null) {
+                uploadQuery.addAndReplace("score", Double.toString(challenge.getMinScore()));
+            }
+            /* Set polling params */
+            if (this.isLoginViaAuthtoken(account)) {
+                pollingPath = "/captchaapi/GetRecaptchaTextToken.ashx";
+            } else {
+                pollingPath = "/captchaapi/GetRecaptchaText.ashx";
+            }
         } else if (c instanceof ImageCaptchaChallenge) {
             type = "Image";
-            final ImageCaptchaChallenge bcc = (ImageCaptchaChallenge) c;
-            final BufferedImage image = ImageProvider.read(bcc.getImageFile());
-            final byte[] bytes = IconIO.toJpgBytes(image);
+            if (this.isLoginViaAuthtoken(account)) {
+                uploadPath = "/Forms/UploadFileAndGetTextNEWToken.ashx";
+            } else {
+                uploadPath = "/Forms/UploadFileAndGetTextNew.ashx";
+            }
+            final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge) c;
             // TODO: Change to base64 string
             // r.addFormData(new FormData("captchafile", "captcha", "application/octet-stream", bytes));
+            final byte[] data = IO.readBytes(challenge.getImageFile());
+            uploadQuery.addAndReplace("file", Base64.encodeToString(data, false));
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
-        this.callAPI(br.createPostRequest(path, query));
-        final String captchaID = br.getRequest().getHtmlCode();
-        if (!captchaID.matches("\\d+")) {
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Invalid captcha_id format or invalid response");
-        }
-        job.setStatus(SolverStatus.SOLVING);
-        long startTime = System.currentTimeMillis();
-        Map<String, Object> pollresp = null;
-        while (true) {
-            this.sleep(this.getPollingIntervalMillis(account), null);
-            br.getPage(getApiBase() + "/captcha/" + captchaID);
-            pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final int status = ((Number) pollresp.get("status")).intValue();
-            final boolean is_correct = ((Boolean) pollresp.get("is_correct")).booleanValue();
-            if (is_correct) {
-                break;
+        this.callAPI(br.createPostRequest(uploadPath, uploadQuery));
+        String solution = null;
+        final String captchaID;
+        if (expectImmediateAnswer) {
+            final String resp = br.getRequest().getHtmlCode();
+            final String[] captcha_id_and_response = br.getRequest().getHtmlCode().split("\\|");
+            if (captcha_id_and_response == null || captcha_id_and_response.length != 2) {
+                throw new SolverException("Failed:" + resp);
             }
-            if (status == 255) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solution incorrect");
-            } else if (status != 0) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solve error: status " + status);
-            } else if (System.currentTimeMillis() - startTime > 60 * 60 * 1000) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solve timeout");
+            captchaID = captcha_id_and_response[0];
+            solution = captcha_id_and_response[1];
+        } else {
+            captchaID = br.getRequest().getHtmlCode();
+            if (!captchaID.matches("\\d+")) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Invalid captcha_id format or invalid response");
+            }
+            job.setStatus(SolverStatus.SOLVING);
+            pollingQuery.addAndReplace("captchaID", captchaID);
+            while (true) {
+                this.sleep(this.getPollingIntervalMillis(account), null);
+                this.callAPI(br.createPostRequest(pollingPath, pollingQuery));
+                if (!br.containsHTML("NOT_DECODED")) {
+                    solution = br.getRequest().getHtmlCode();
+                    break;
+                }
+                /* Not done yet -> Continue */
+                checkInterruption();
             }
         }
-        final String solution = (String) pollresp.get("text");
         job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
         AbstractResponse resp = null;
-        if (c instanceof RecaptchaV2Challenge || c instanceof HCaptchaChallenge || c instanceof CloudflareTurnstileChallenge || c instanceof CutCaptchaChallenge) {
+        if (c instanceof RecaptchaV2Challenge) {
             resp = new TokenCaptchaResponse((Challenge<String>) c, this, solution);
         } else {
             resp = new CaptchaResponse((Challenge<String>) c, this, solution);
@@ -346,6 +370,13 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             return;
         }
         error = error.trim();
+        if (error.equalsIgnoreCase("NOT_DECODED")) {
+            /*
+             * Copy & paste from API docs: This is not really an error, just informs the captcha is still under completion. When you get
+             * this, retry after 5 seconds
+             */
+            return;
+        }
         /* Check if error is related to login or captcha solving */
         if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
             throw new AccountInvalidException(error);

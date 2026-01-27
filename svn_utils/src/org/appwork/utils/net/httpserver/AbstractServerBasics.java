@@ -267,7 +267,10 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      *             if the origin is not allowed (CORS validation fails)
      */
     public void validateRequest(HttpRequest request) throws IOException, ForbiddenHeaderException, ForbiddenOriginException {
-
+        final long validateStartTime = org.appwork.utils.Time.systemIndependentCurrentJVMTimeMillis();
+        if (this.isVerboseLogEnabled()) {
+            LogV3.fine("validateRequest: Starting validation for " + request.getRequestMethod() + " " + request.getRequestedURL());
+        }
         final HeaderCollection requestHeaders = request.getRequestHeaders();
 
         // Header validation
@@ -315,13 +318,24 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
                 try {
                     final long contentLength = Long.parseLong(contentLengthHeader.getValue());
                     final long maxPostBodySize = limits.getMaxPostBodySize();
+                    if (this.isVerboseLogEnabled()) {
+                        LogV3.fine("validateRequest: Checking Content-Length: " + contentLength + " bytes against limit: " + maxPostBodySize + " bytes");
+                    }
                     if (contentLength > maxPostBodySize) {
+                        final long validateElapsed = org.appwork.utils.Time.systemIndependentCurrentJVMTimeMillis() - validateStartTime;
+                        if (this.isVerboseLogEnabled()) {
+                            LogV3.fine("validateRequest: Content-Length limit exceeded after " + validateElapsed + "ms. Throwing RequestSizeLimitExceededException");
+                        }
                         throw new RequestSizeLimitExceededException("Request size limit exceeded. Content-Length: " + contentLength + " bytes exceeds maximum allowed size: " + maxPostBodySize + " bytes");
                     }
                 } catch (NumberFormatException e) {
                     // Invalid Content-Length header, let it fail during body reading
                 }
             }
+        }
+        final long validateElapsed = org.appwork.utils.Time.systemIndependentCurrentJVMTimeMillis() - validateStartTime;
+        if (this.isVerboseLogEnabled()) {
+            LogV3.fine("validateRequest: Validation completed in " + validateElapsed + "ms");
         }
 
     }
@@ -556,6 +570,19 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.log(e);
             return true;
         }
+    }
+
+    /**
+     * Checks if verbose logging is enabled for this server.
+     * 
+     * <p>
+     * This method checks if the server is an instance of {@link HttpServer} and if verbose logging is enabled.
+     * </p>
+     * 
+     * @return {@code true} if verbose logging is enabled, {@code false} otherwise
+     */
+    public boolean isVerboseLogEnabled() {
+        return this instanceof HttpServer && ((HttpServer) this).isVerboseLog();
     }
 
 }

@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.appwork.utils.net.CountingInputStream;
+import org.appwork.utils.net.LimitedInputStreamInterface;
 
 /**
  * Extended LimitedInputStream that throws an exception when the limit is exceeded instead of just returning -1. Based on
@@ -44,7 +45,7 @@ import org.appwork.utils.net.CountingInputStream;
  *
  * @author AppWork
  */
-public class LimitedInputStreamWithException extends CountingInputStream {
+public class LimitedInputStreamWithException extends CountingInputStream implements LimitedInputStreamInterface {
 
     protected final byte[] skipBuffer = new byte[32767];
 
@@ -62,6 +63,23 @@ public class LimitedInputStreamWithException extends CountingInputStream {
         super(inputStream);
         this.limit = limit;
 
+    }
+
+    /**
+     * @param limit
+     *            the limit to set. Use -1 to disable the limit.
+     */
+    @Override
+    public void setLimit(long limit) {
+        this.limit = limit;
+    }
+
+    /**
+     * @return the current limit, or -1 if the limit is disabled
+     */
+    @Override
+    public long getLimit() {
+        return this.limit;
     }
 
     @Override

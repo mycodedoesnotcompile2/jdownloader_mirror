@@ -31,81 +31,27 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpserver;
-
-import java.io.IOException;
-import java.net.Socket;
-
-import org.appwork.utils.net.httpserver.AbstractServerBasics;
+package org.appwork.utils.net;
 
 /**
- * @author daniel
- *
+ * Interface for input streams that support a configurable size limit.
+ * 
+ * @author AppWork
  */
-public class HttpConnectionThread extends Thread {
+public interface LimitedInputStreamInterface {
 
-    private volatile HttpServerConnection currentConnection = null;
-    private volatile Socket         socket            = null;
-    private int                     serverThreadID    = 0;
+    /**
+     * Sets the size limit for this input stream.
+     * 
+     * @param limit
+     *            the limit in bytes. Use -1 to disable the limit (unlimited reading).
+     */
+    void setLimit(long limit);
 
-    public HttpConnectionThread(final AbstractServerBasics server, final Runnable r) {
-        super(r);
-        this.setDaemon(true);
-    }
-
-    protected void setName(final HttpServer server, Socket socket) {
-        if (socket != null) {
-            this.setName("HttpConnectionThread:" + serverThreadID + ":" + socket.getLocalSocketAddress() + "<-" + socket.getRemoteSocketAddress());
-        } else {
-            this.setName("HttpConnectionThread:" + serverThreadID + ":" + server.getPort() + ":" + server.isLocalhostOnly());
-        }
-    }
-
-    protected void setServerThreadID(int serverThreadID) {
-        this.serverThreadID = serverThreadID;
-    }
-
-    public HttpServerConnection getCurrentConnection() {
-        return this.currentConnection;
-    }
-
-    public Socket getCurrentSocket() {
-        final Socket socket = this.socket;
-        if (socket != null) {
-            return socket;
-        } else {
-            final HttpServerConnection connection = this.currentConnection;
-            if (connection != null) {
-                return connection.getClientSocket();
-            } else {
-                return null;
-            }
-        }
-    }
-
-    @Override
-    public void interrupt() {
-        try {
-            final HttpServerConnection lcurrentConnection = this.getCurrentConnection();
-            if (lcurrentConnection != null) {
-                lcurrentConnection.closeConnection();
-                lcurrentConnection.close();
-            } else {
-                final Socket lSocket = this.getCurrentSocket();
-                if (lSocket != null) {
-                    try {
-                        lSocket.close();
-                    } catch (IOException ignore) {
-                    }
-                }
-            }
-        } finally {
-            super.interrupt();
-        }
-    }
-
-    public void setCurrentConnection(final HttpServerConnection currentConnection, Socket socket) {
-        this.currentConnection = currentConnection;
-        this.socket = socket;
-    }
+    /**
+     * Gets the current size limit for this input stream.
+     * 
+     * @return the current limit in bytes, or -1 if the limit is disabled
+     */
+    long getLimit();
 }

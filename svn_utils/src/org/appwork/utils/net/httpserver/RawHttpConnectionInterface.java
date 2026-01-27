@@ -37,7 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.appwork.utils.net.httpserver.HttpConnection.ConnectionHook;
+import org.appwork.utils.net.httpserver.HttpServerConnection.ConnectionHook;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 
 /**

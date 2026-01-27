@@ -13,7 +13,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.net.Base64InputStream;
 import org.appwork.utils.net.CharSequenceInputStream;
-import org.appwork.utils.net.httpserver.HttpConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.jdownloader.myjdownloader.client.json.JSonRequest;
@@ -85,7 +85,7 @@ public class MyJDownloaderGetRequest extends GetRequest implements MyJDownloader
         return ret;
     }
 
-    public MyJDownloaderGetRequest(HttpConnection connection) {
+    public MyJDownloaderGetRequest(HttpServerConnection connection) {
         super(connection);
     }
 

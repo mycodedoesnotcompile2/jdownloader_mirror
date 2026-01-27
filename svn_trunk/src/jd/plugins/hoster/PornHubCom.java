@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51345 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52185 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -151,6 +151,7 @@ public class PornHubCom extends PluginForHost {
     public static final String                    PROPERTY_UPLOADER_TYPE                             = "uploader_type";
     public static final String                    PROPERTY_VIDEODATA_JS                              = "videodata_js";
     public static final String                    PROPERTY_INTERNAL_VIDEO_ID                         = "internal_video_id";
+    public static final String                    PROPERTY_WEBM_PREFERENCE                           = "webm";
 
     public static List<String[]> getPluginDomains() {
         return PornHubComVideoCrawler.getPluginDomains();
@@ -564,7 +565,7 @@ public class PornHubCom extends PluginForHost {
         } else if (link.getPluginPatternMatcher().matches(type_gif_webm)) {
             final String linkHost = Browser.getHost(link.getPluginPatternMatcher());
             /* Offline links should also have nice filenames */
-            boolean webm = link.getBooleanProperty("webm", getPluginConfig().getBooleanProperty(GIFS_WEBM, true));
+            boolean webm = link.getBooleanProperty(PROPERTY_WEBM_PREFERENCE, getPluginConfig().getBooleanProperty(GIFS_WEBM, true));
             link.setName(viewKey + ".webm");
             br.setFollowRedirects(true);
             getPage(br, createPornhubGifLink(this.getHost(), getPreferredSubdomain(link.getPluginPatternMatcher()), linkHost, viewKey, null));
@@ -582,27 +583,35 @@ public class PornHubCom extends PluginForHost {
                 /* Fallback */
                 html_filename = viewKey;
             }
-            if (!webm) {
-                // link or default is gif, check for gif
-                html_filename += ".gif";
-                dlUrl = br.getRegex("data\\-gif\\s*=\\s*\"(https?[^\"]+" + Pattern.quote(viewKey) + "[^\\\"]*\\.gif)\"").getMatch(0);
-                if (dlUrl == null) {
-                    logger.info("gif not found for:" + viewKey);
-                }
+            String gif_url = br.getRegex("data-gif=\"(https?://[^\"]+)").getMatch(0);
+            if (gif_url == null) {
+                logger.info("gif not found for:" + viewKey);
             }
-            if (dlUrl == null) {
+            String webm_url = br.getRegex("data-webm=\"(https?://[^\"]+)").getMatch(0);
+            if (webm_url == null) {
+                logger.info("webm not found for:" + viewKey);
+            }
+            if (!webm) {
+                this.dlUrl = gif_url;
+            }
+            if (dlUrl == null && webm_url != null) {
                 // gif -> don't fail but fallback to webm
                 webm = true;
-                html_filename += ".webm";
-                dlUrl = br.getRegex("data\\-webm\\s*=\\s*\"(https?[^\"]+" + Pattern.quote(viewKey) + "[^\\\"]*\\.webm)\"").getMatch(0);
-                if (dlUrl == null) {
-                    dlUrl = br.getRegex("fileWebm\\s*=\\s*'(https?[^']+" + Pattern.quote(viewKey) + "[^']*\\.webm)'").getMatch(0);
-                }
-                if (dlUrl == null) {
-                    logger.info("webm not found for:" + viewKey);
-                }
+                this.dlUrl = webm_url;
             }
-            link.setProperty("webm", webm);
+            if (dlUrl == null && gif_url != null) {
+                logger.info("Auto fallback to gif format");
+                this.dlUrl = gif_url;
+            }
+            if (webm) {
+                html_filename += ".webm";
+            } else {
+                html_filename += ".gif";
+            }
+            if (this.dlUrl != null) {
+                /* Save this so if user re-downloads this item, same format is used. */
+                link.setProperty(PROPERTY_WEBM_PREFERENCE, webm);
+            }
         } else {
             /* Required later if e.g. directurl has to be refreshed! */
             isVideo = true;
@@ -1879,9 +1888,10 @@ public class PornHubCom extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
-        if (link != null) {
-            // link.removeProperty("webm");
+        if (link == null) {
+            return;
         }
+        link.removeProperty(PROPERTY_WEBM_PREFERENCE);
     }
 
     @Override

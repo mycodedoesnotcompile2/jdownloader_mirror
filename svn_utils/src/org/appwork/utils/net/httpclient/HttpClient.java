@@ -592,6 +592,7 @@ public class HttpClient {
     protected int                           readTimeout          = 30000;
     protected final HashMap<String, String> requestHeader;
     private final List<RequestContext>      requests             = new CopyOnWriteArrayList<RequestContext>();
+    private boolean                         verboseLog           = false;
 
     public HttpClient() {
         this.requestHeader = new HashMap<String, String>();
@@ -632,12 +633,29 @@ public class HttpClient {
      * @throws UnknownHostException
      */
     protected HTTPOutputStream connect(final RequestContext context, final boolean returnOutputStream) throws IOException, InterruptedException, UnknownHostException {
+        final long connectMethodStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+        if (this.isVerboseLog()) {
+            LogV3.fine("HttpClient.connect: Starting connect method, returnOutputStream=" + returnOutputStream);
+        }
         int lookupTry = 0;
         try {
             while (true) {
                 try {
+                    final long connectStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.connect: Starting connection.connect() to " + context.getUrl());
+                    }
                     context.getConnection().connect();
+                    final long connectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.connect: connection.connect() completed in " + connectElapsed + "ms");
+                    }
+                    final long onConnectedStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     context.onConnected();
+                    final long onConnectedElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectedStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.connect: context.onConnected() completed in " + onConnectedElapsed + "ms");
+                    }
                     if (Thread.interrupted()) {
                         throw new InterruptedException();
                     }
@@ -650,16 +668,39 @@ public class HttpClient {
                         throw new InterruptedException();
                     }
                     /* dns lookup failed, short wait and try again */
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.connect: DNS lookup failed, retrying in 200ms (attempt " + lookupTry + "/3)");
+                    }
                     Thread.sleep(200);
                 }
             }
         } catch (final IOException e) {
+            final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
+            if (this.isVerboseLog()) {
+                LogV3.fine("HttpClient.connect: connect method failed after " + connectMethodElapsed + "ms: " + e.getMessage());
+            }
             throw new HttpClientException(context, new ReadIOException(e));
         }
         if (!returnOutputStream) {
+            final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
+            if (this.isVerboseLog()) {
+                LogV3.fine("HttpClient.connect: connect method completed (no output stream) in " + connectMethodElapsed + "ms");
+            }
             return null;
         } else {
+            final long getOutputStreamStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+            if (this.isVerboseLog()) {
+                LogV3.fine("HttpClient.connect: Starting getOutputStream()");
+            }
             final HTTPOutputStream raw = context.getConnection().getOutputStream();
+            final long getOutputStreamElapsed = Time.systemIndependentCurrentJVMTimeMillis() - getOutputStreamStartTime;
+            if (this.isVerboseLog()) {
+                LogV3.fine("HttpClient.connect: getOutputStream() completed in " + getOutputStreamElapsed + "ms");
+            }
+            final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
+            if (this.isVerboseLog()) {
+                LogV3.fine("HttpClient.connect: connect method completed (with output stream) in " + connectMethodElapsed + "ms");
+            }
             return raw;
         }
     }
@@ -956,46 +997,93 @@ public class HttpClient {
      * @throws HttpClientException
      */
     public RequestContext execute(final RequestContext context) throws InterruptedException, HttpClientException {
+        final long executeStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+        LogV3.fine("HttpClient.execute: Starting request to " + context.getUrl());
         context.executed = true;
         context.client = this;
         this.requests.add(context);
+        final long createConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
         final HTTPConnection connection = this.createHTTPConnection(context);
+        final long createConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - createConnectionStartTime;
+        if (this.isVerboseLog()) {
+            LogV3.fine("HttpClient.execute: createHTTPConnection completed in " + createConnectionElapsed + "ms");
+        }
         boolean followRedirect = false;
         context.linkInterrupt();
 
         try {
 
             try {
+                final long prepareConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                 this.prepareConnection(context);
+                final long prepareConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - prepareConnectionStartTime;
+                if (this.isVerboseLog()) {
+                    LogV3.fine("HttpClient.execute: prepareConnection completed in " + prepareConnectionElapsed + "ms");
+                }
                 boolean rangeRequest = false;
                 final long rp = context.getResumePosition();
                 if (rp >= 0) {
                     connection.setRequestProperty(HTTPConstants.HEADER_REQUEST_RANGE, "bytes=" + rp + "-");
                     rangeRequest = true;
                 }
+                final long onConnectStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                 context.onConnect();
+                final long onConnectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectStartTime;
+                if (this.isVerboseLog()) {
+                    LogV3.fine("HttpClient.execute: context.onConnect() completed in " + onConnectElapsed + "ms");
+                }
 
                 if (context.getPostDataStream() != null) {
-                    final HTTPOutputStream directHTTPConnectionOutputStream = this.connect(context, true);
-                    final OutputStream outputStream = this.wrapPostOutputStream(connection, directHTTPConnectionOutputStream);
-                    final InputStream input = context.getPostDataStream();
-                    context.onPostStart();
-                    if (context.getPostDataLength() > 0) {
-
-                        final byte[] buffer = new byte[32767];
-                        int len;
-                        while ((len = input.read(buffer)) != -1) {
-                            if (Thread.currentThread().isInterrupted()) {
-                                throw new InterruptedException();
-                            }
-                            if (len > 0) {
-                                outputStream.write(buffer, 0, len);
-                                context.onBytesPosted(buffer, 0, len);
-                            }
-                        }
-                        input.close();
-
+                    final long postStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+                    LogV3.fine("HttpClient.post: Starting POST data sending, postDataLength=" + context.getPostDataLength());
+                    if (context.getPostDataLength() < 0) {
+                        connection.setRequestProperty(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
                     }
+                    final long connectStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+                    final HTTPOutputStream directHTTPConnectionOutputStream = this.connect(context, true);
+                    final long connectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: connect() completed in " + connectElapsed + "ms, total time since postStart: " + (connectElapsed) + "ms");
+                    }
+                    final long wrapOutputStreamStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+
+                    final OutputStream outputStream = this.wrapPostOutputStream(connection, directHTTPConnectionOutputStream);
+                    final long wrapOutputStreamElapsed = Time.systemIndependentCurrentJVMTimeMillis() - wrapOutputStreamStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: wrapPostOutputStream completed in " + wrapOutputStreamElapsed + "ms");
+                    }
+                    final InputStream input = context.getPostDataStream();
+                    final long onPostStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+                    context.onPostStart();
+                    final long onPostStartElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onPostStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: context.onPostStart() completed in " + onPostStartElapsed + "ms");
+                    }
+                    // if (context.getPostDataLength() > 0) {
+                    final long dataSendStartTime = Time.systemIndependentCurrentJVMTimeMillis();
+                    LogV3.fine("HttpClient.post: Starting to send " + context.getPostDataLength() + " bytes of POST data");
+
+                    final byte[] buffer = new byte[32767];
+                    int len;
+                    long totalSent = 0;
+                    while ((len = input.read(buffer)) != -1) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            throw new InterruptedException();
+                        }
+                        if (len > 0) {
+                            outputStream.write(buffer, 0, len);
+                            context.onBytesPosted(buffer, 0, len);
+                            totalSent += len;
+                        }
+                    }
+                    input.close();
+                    final long dataSendElapsed = Time.systemIndependentCurrentJVMTimeMillis() - dataSendStartTime;
+                    LogV3.fine("HttpClient.post: Sent " + totalSent + " bytes of POST data in " + dataSendElapsed + "ms");
+
+                    // } else {
+                    // LogV3.fine("HttpClient.post: postDataLength <= 0, skipping data send");
+                    // }
+                    final long beforeFlushTime = Time.systemIndependentCurrentJVMTimeMillis();
                     final boolean before = directHTTPConnectionOutputStream.isClosingAllowed();
                     try {
                         directHTTPConnectionOutputStream.setClosingAllowed(false);
@@ -1006,8 +1094,22 @@ public class HttpClient {
                     } finally {
                         directHTTPConnectionOutputStream.setClosingAllowed(before);
                     }
+                    final long flushElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeFlushTime;
+                    LogV3.fine("HttpClient.post: Flush and close completed in " + flushElapsed + "ms");
+                    final long finalizeConnectStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     connection.finalizeConnect();
+                    final long finalizeConnectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - finalizeConnectStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: finalizeConnect() completed in " + finalizeConnectElapsed + "ms");
+                    }
+                    final long onConnectedStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     context.onConnected();
+                    final long onConnectedElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectedStartTime;
+                    if (this.isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: context.onConnected() completed in " + onConnectedElapsed + "ms");
+                    }
+                    final long postElapsed = Time.systemIndependentCurrentJVMTimeMillis() - postStartTime;
+                    LogV3.fine("HttpClient.post: Total POST data sending time: " + postElapsed + "ms");
                 } else {
                     this.connect(context, false);
                 }
@@ -1053,6 +1155,8 @@ public class HttpClient {
             throw e;
         } finally {
             context.unlinkInterrupt();
+            final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
+            LogV3.fine("HttpClient.execute: Request completed in " + executeElapsed + "ms");
         }
         if (followRedirect) {
             if (context.redirectsStarted > 0 && Time.systemIndependentCurrentJVMTimeMillis() - context.redirectsStarted >= this.getRedirectTimeout(context)) {
@@ -1098,6 +1202,8 @@ public class HttpClient {
             // the redirect will not be a POST again
             return this.execute(context);
         }
+        final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
+        LogV3.fine("HttpClient.execute: Returning context after " + executeElapsed + "ms, response code: " + context.getCode());
         return context;
     }
 
@@ -1135,6 +1241,21 @@ public class HttpClient {
 
     public void setReadTimeout(final int readTimeout) {
         this.readTimeout = Math.max(1000, readTimeout);
+    }
+
+    /**
+     * @return the verboseLog
+     */
+    public boolean isVerboseLog() {
+        return verboseLog;
+    }
+
+    /**
+     * @param verboseLog
+     *            the verboseLog to set
+     */
+    public void setVerboseLog(final boolean verboseLog) {
+        this.verboseLog = verboseLog;
     }
 
     /*

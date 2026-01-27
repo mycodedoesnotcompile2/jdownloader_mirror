@@ -42,6 +42,7 @@ import org.appwork.utils.os.CrossSystem.ARCHFamily;
 import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.controlling.ffmpeg.FFMpegException.ERROR;
+import org.jdownloader.downloader.hls.FFMpegBridgeServer;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
 
@@ -495,8 +496,7 @@ public abstract class AbstractFFmpegBinary {
         if (sourceBrowser == null) {
             return;
         }
-        server = new HttpServer(0);
-        server.setLocalhostOnly(true);
+        server = new FFMpegBridgeServer(0);
         final HttpServer finalServer = server;
         server.start();
         final AtomicReference<M3U8Playlist> m3u8 = new AtomicReference<M3U8Playlist>();

@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.Time;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
@@ -76,9 +77,78 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
     private volatile Thread                                serverThread               = null;
     private boolean                                        localhostOnly              = true;
     private boolean                                        debug                      = false;
+    private boolean                                        verboseLog                 = false;
     private final CopyOnWriteArrayList<HttpRequestHandler> requestHandlers            = new CopyOnWriteArrayList<HttpRequestHandler>();
 
     private ThreadPoolExecutor                             threadPool;
+
+    /**
+     * Maximum thread pool size for concurrent HTTP connections.
+     * 
+     * <p>
+     * <b>Default: 20</b>
+     * </p>
+     * 
+     * <p>
+     * <b>Rationale:</b> 20 threads provide a good compromise between parallelism and resource consumption.
+     * HTTP requests are typically I/O-bound (network, file system), so a few threads can efficiently handle many
+     * concurrent connections. A higher value would consume more memory and stack space per thread
+     * (typically ~1MB stack per thread) without providing significant benefit for I/O-bound operations.
+     * For most use cases (local APIs, internal services) 20 is sufficient. For very high load or
+     * CPU-intensive handlers, this value can be increased.
+     * </p>
+     * 
+     * <p>
+     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used
+     * differently or as a real web server, these values should be adjusted accordingly.
+     * </p>
+     */
+    private int                                             maxThreadPoolSize         = 20;
+
+    /**
+     * Queue size for waiting requests in the thread pool.
+     * 
+     * <p>
+     * <b>Default: 100</b>
+     * </p>
+     * 
+     * <p>
+     * <b>Rationale:</b> A queue size of 100 allows buffering of up to 100 waiting requests before new
+     * threads need to be created. This prevents {@link RejectedExecutionException} during short load spikes and
+     * enables smooth load distribution. The memory overhead is minimal (only references to Runnable objects).
+     * For very high load, this value can be increased to buffer more requests, though {@link #maxThreadPoolSize}
+     * should also be adjusted accordingly to limit wait times in the queue.
+     * </p>
+     * 
+     * <p>
+     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used
+     * differently or as a real web server, these values should be adjusted accordingly.
+     * </p>
+     */
+    private int                                             threadPoolQueueSize       = 100;
+
+    /**
+     * Keep-alive time for inactive threads in the pool (in milliseconds).
+     * 
+     * <p>
+     * <b>Default: 10000 (10 seconds)</b>
+     * </p>
+     * 
+     * <p>
+     * <b>Rationale:</b> 10 seconds is a balanced value that automatically terminates threads under low load to
+     * save resources, while keeping threads quickly available during active use. The time is long enough to
+     * bridge short pauses between request bursts (e.g., in interactive applications), but short enough to
+     * avoid unnecessarily binding memory and system resources. Since {@link ThreadPoolExecutor#allowCoreThreadTimeOut(boolean)}
+     * is set to {@code true}, core threads are also terminated after this time, which is useful for local/internal
+     * servers that are not permanently under load.
+     * </p>
+     * 
+     * <p>
+     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used
+     * differently or as a real web server, these values should be adjusted accordingly.
+     * </p>
+     */
+    private long                                            threadPoolKeepAliveTime   = 10000L;
 
     public HttpServer(final int port) {
         super("AppWork GmbH HttpServer");
@@ -87,7 +157,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     protected HttpConnectionRunnable createHttpConnection(Socket clientSocket) throws IOException {
         InputStream inputStream = clientSocket.getInputStream();
-        HttpConnection con = new HttpConnection(this, clientSocket, inputStream, null);
+        HttpServerConnection con = new HttpServerConnection(this, clientSocket, inputStream, null);
 
         return con;
     }
@@ -231,7 +301,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                 return;
             }
             final AtomicInteger threadsStarted = new AtomicInteger(0);
-            threadPool = new ThreadPoolExecutor(0, 20, 10000l, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(100), new ThreadFactory() {
+            threadPool = new ThreadPoolExecutor(0, this.maxThreadPoolSize, this.threadPoolKeepAliveTime, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(this.threadPoolQueueSize), new ThreadFactory() {
                 public Thread newThread(final Runnable r) {
                     final HttpConnectionThread ret = new HttpConnectionThread(HttpServer.this, r);
                     ret.setServerThreadID(threadsStarted.incrementAndGet());
@@ -271,7 +341,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                     }
                     if (t instanceof HttpConnectionThread) {
                         final HttpConnectionThread httpT = ((HttpConnectionThread) t);
-                        final HttpConnection connection = (r instanceof HttpConnection) ? (HttpConnection) r : null;
+                        final HttpServerConnection connection = (r instanceof HttpServerConnection) ? (HttpServerConnection) r : null;
                         final Socket socket = (r instanceof HttpConnectionRunnable) ? ((HttpConnectionRunnable) r).getClientSocket() : null;
                         ((HttpConnectionThread) t).setCurrentConnection(connection, socket);
                         httpT.setName(HttpServer.this, socket);
@@ -290,11 +360,19 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                     public void run() {
                         while (HttpServer.this.controlSockets.get() == controlSockets) {
                             try {
+                                final long beforeAcceptTime = Time.systemIndependentCurrentJVMTimeMillis();
+                                if (HttpServer.this.verboseLog) {
+                                    LogV3.fine("HttpServer: Waiting for connection on " + controlSocket.getLocalSocketAddress());
+                                }
                                 final Socket clientSocket = controlSocket.accept();
+                                final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
+                                if (HttpServer.this.verboseLog) {
+                                    LogV3.fine("HttpServer: Connection accepted from " + clientSocket.getRemoteSocketAddress() + " after SocketIDLE " + acceptElapsed + "ms");
+                                }
                                 boolean closeSocket = true;
                                 try {
                                     // Check if connection is from localhost when server is bound to localhost only
-                                    // TODO:sinnvoll?
+                                    // TODO: Is this check meaningful/useful?
                                     if (HttpServer.this.localhostOnly) {
                                         final InetAddress clientAddress = clientSocket.getInetAddress();
                                         if (!HttpServer.this.isFromLocalhost(clientAddress)) {
@@ -309,10 +387,20 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                         }
                                     }
 
+                                    final long createConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                     final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
+                                    final long createConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - createConnectionStartTime;
+                                    if (HttpServer.this.verboseLog) {
+                                        LogV3.fine("HttpServer: createHttpConnection completed in " + createConnectionElapsed + "ms");
+                                    }
 
                                     if (connection != null) {
+                                        final long executeStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                         threadPool.execute(connection);
+                                        final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
+                                        if (HttpServer.this.verboseLog) {
+                                            LogV3.fine("HttpServer: threadPool.execute() completed in " + executeElapsed + "ms");
+                                        }
                                         closeSocket = false;
                                     }
                                 } catch (final RejectedExecutionException e) {
@@ -385,6 +473,111 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
      */
     public void setLocalhostOnly(final boolean localhostOnly) {
         this.localhostOnly = localhostOnly;
+    }
+
+    /**
+     * @return the verboseLog
+     */
+    public boolean isVerboseLog() {
+        return verboseLog;
+    }
+
+    /**
+     * @param verboseLog
+     *            the verboseLog to set
+     */
+    public void setVerboseLog(final boolean verboseLog) {
+        this.verboseLog = verboseLog;
+    }
+
+    /**
+     * Sets the maximum thread pool size for concurrent HTTP connections.
+     * 
+     * <p>
+     * This setting only takes effect on the next server start. Changes while the server is running have no
+     * effect.
+     * </p>
+     * 
+     * @param maxThreadPoolSize
+     *            maximum number of threads (must be >= 1)
+     * @throws IllegalArgumentException
+     *             if maxThreadPoolSize < 1
+     * @see #maxThreadPoolSize for details on default value and rationale
+     */
+    public void setMaxThreadPoolSize(final int maxThreadPoolSize) {
+        if (maxThreadPoolSize < 1) {
+            throw new IllegalArgumentException("Max thread pool size must be at least 1, was: " + maxThreadPoolSize);
+        }
+        this.maxThreadPoolSize = maxThreadPoolSize;
+    }
+
+    /**
+     * Returns the currently configured maximum thread pool size.
+     * 
+     * @return maximum thread pool size
+     */
+    public int getMaxThreadPoolSize() {
+        return this.maxThreadPoolSize;
+    }
+
+    /**
+     * Sets the queue size for waiting requests in the thread pool.
+     * 
+     * <p>
+     * This setting only takes effect on the next server start. Changes while the server is running have no
+     * effect.
+     * </p>
+     * 
+     * @param threadPoolQueueSize
+     *            queue size (must be >= 1)
+     * @throws IllegalArgumentException
+     *             if threadPoolQueueSize < 1
+     * @see #threadPoolQueueSize for details on default value and rationale
+     */
+    public void setThreadPoolQueueSize(final int threadPoolQueueSize) {
+        if (threadPoolQueueSize < 1) {
+            throw new IllegalArgumentException("Thread pool queue size must be at least 1, was: " + threadPoolQueueSize);
+        }
+        this.threadPoolQueueSize = threadPoolQueueSize;
+    }
+
+    /**
+     * Returns the currently configured thread pool queue size.
+     * 
+     * @return thread pool queue size
+     */
+    public int getThreadPoolQueueSize() {
+        return this.threadPoolQueueSize;
+    }
+
+    /**
+     * Sets the keep-alive time for inactive threads in the pool.
+     * 
+     * <p>
+     * This setting only takes effect on the next server start. Changes while the server is running have no
+     * effect.
+     * </p>
+     * 
+     * @param threadPoolKeepAliveTime
+     *            keep-alive time in milliseconds (must be >= 0, 0 = threads are terminated immediately when inactive)
+     * @throws IllegalArgumentException
+     *             if threadPoolKeepAliveTime < 0
+     * @see #threadPoolKeepAliveTime for details on default value and rationale
+     */
+    public void setThreadPoolKeepAliveTime(final long threadPoolKeepAliveTime) {
+        if (threadPoolKeepAliveTime < 0) {
+            throw new IllegalArgumentException("Thread pool keep-alive time must be non-negative, was: " + threadPoolKeepAliveTime);
+        }
+        this.threadPoolKeepAliveTime = threadPoolKeepAliveTime;
+    }
+
+    /**
+     * Returns the currently configured keep-alive time for threads in the pool.
+     * 
+     * @return keep-alive time in milliseconds
+     */
+    public long getThreadPoolKeepAliveTime() {
+        return this.threadPoolKeepAliveTime;
     }
 
     public synchronized void shutdown() {

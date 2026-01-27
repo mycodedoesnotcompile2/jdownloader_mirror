@@ -12,14 +12,6 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
-import jd.gui.swing.jdgui.components.toolbar.MainToolBar;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.APIQuery;
 import org.appwork.remoteapi.RemoteAPI;
@@ -32,11 +24,20 @@ import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
 import org.jdownloader.api.jdanywhere.api.interfaces.IDashboardApi;
 import org.jdownloader.api.jdanywhere.api.storable.RunningObjectStorable;
+import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.api.polling.PollingAPIImpl;
 import org.jdownloader.api.polling.PollingResultAPIStorable;
 import org.jdownloader.api.toolbar.JDownloaderToolBarAPIImpl;
 import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
+
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
+import jd.gui.swing.jdgui.components.toolbar.MainToolBar;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 public class DashboardApi implements IDashboardApi {
     PollingAPIImpl            plAPI      = new PollingAPIImpl();
@@ -267,7 +268,7 @@ public class DashboardApi implements IDashboardApi {
              * response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
              */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = RemoteAPI.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
             ImageProvider.writeImage(bufferedImage, "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);

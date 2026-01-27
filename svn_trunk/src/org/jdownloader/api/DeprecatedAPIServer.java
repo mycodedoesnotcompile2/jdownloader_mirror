@@ -26,24 +26,34 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.handler.StorageHandler;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.ConnectionTimeouts;
+import org.appwork.utils.net.httpserver.ContentSecurityPolicy;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HeaderValidationRules;
-import org.appwork.utils.net.httpserver.HttpConnection;
-import org.appwork.utils.net.httpserver.HttpConnection.HttpConnectionType;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.HttpConnectionRunnable;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.HttpServer;
+import org.appwork.utils.net.httpserver.ReferrerPolicy;
+import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
+import org.appwork.utils.net.httpserver.XContentTypeOptions;
+import org.appwork.utils.net.httpserver.XFrameOptions;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
@@ -152,49 +162,114 @@ public class DeprecatedAPIServer extends HttpServer {
     }
 
     public static final class DeprecatedPostRequest extends PostRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedPostRequest(HttpConnection connection) {
+        public DeprecatedPostRequest(HttpServerConnection connection) {
             super(connection);
         }
     }
 
     public static final class DeprecatedOptionsRequest extends OptionsRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedOptionsRequest(HttpConnection connection) {
+        public DeprecatedOptionsRequest(HttpServerConnection connection) {
             super(connection);
         }
     }
 
     public static final class DeprecatedHeadRequest extends HeadRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedHeadRequest(HttpConnection connection) {
+        public DeprecatedHeadRequest(HttpServerConnection connection) {
             super(connection);
         }
     }
 
     public static final class DeprecatedGetRequest extends GetRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedGetRequest(HttpConnection connection) {
+        public DeprecatedGetRequest(HttpServerConnection connection) {
             super(connection);
         }
     }
 
     public DeprecatedAPIServer(int port) {
         super(port);
+        final RemoteAPIConfig cfg = JsonConfig.create(RemoteAPIConfig.class);
         setAllowedMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.HEAD, RequestMethod.OPTIONS);
-        CorsHandler cors = new CorsHandler();
+        CorsHandler cors = new CorsHandler() {
+            @Override
+            public Set<String> getAllowedOrigins() {
+                HashSet<String> set = new HashSet<String>();
+                String allowed = cfg.getLocalAPIServerHeaderAccessControllAllowOrigin();
+                if (StringUtils.isNotEmpty(allowed)) {
+                    set.add(allowed);
+                }
+                return set;
+            }
+            // HTTPHeader originHeader = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ORIGIN);
+            // if (originHeader != null) {
+            // String origin = originHeader.getValue().replaceAll("^https?://", "");
+            // String value = JsonConfig.create(RemoteAPIConfig.class).getLocalAPIServerHeaderAccessControllAllowOrigin();
+            // if (StringUtils.isNotEmpty(origin) && !"*".equals(value)) {
+            // throw new org.appwork.remoteapi.exceptions.AuthException("Bad Origin");
+            // }
+            // // TODO Validate origin
+            // }
+        };
+        // NEVER!
+        cors.addCredentialsRule(Pattern.compile(".*"), false);
+        // if the browser requests PNA , allow it.
+        cors.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
         setCorsHandler(cors);
+        ResponseSecurityHeaders securityHeaders = new ResponseSecurityHeaders() {
+            @Override
+            public ContentSecurityPolicy getContentSecurityPolicy() {
+                if (StringUtils.isEmpty(cfg.getLocalAPIServerHeaderContentSecurityPolicy())) {
+                    return null;
+                }
+                try {
+                    ContentSecurityPolicy ret = ContentSecurityPolicy.fromHeaderString(cfg.getLocalAPIServerHeaderContentSecurityPolicy());
+                    return ret;
+                } catch (Exception e) {
+                    LogV3.log(e);
+                    return new ContentSecurityPolicy() {
+                        public String toHeaderString() {
+                            return cfg.getLocalAPIServerHeaderContentSecurityPolicy();
+                        };
+                    };
+                }
+            }
+
+            @Override
+            public ReferrerPolicy getReferrerPolicy() {
+                String value = cfg.getLocalAPIServerHeaderReferrerPolicy();
+                return ReferrerPolicy.get(value);
+            }
+
+            @Override
+            public XContentTypeOptions getXContentTypeOptions() {
+                return super.getXContentTypeOptions();
+            }
+
+            @Override
+            public XFrameOptions getXFrameOptions() {
+                String value = cfg.getLocalAPIServerHeaderXFrameOptions();
+                return XFrameOptions.get(value);
+            }
+        };
+        setResponseSecurityHeaders(securityHeaders);
         HashMap<String, String> mandatory = new HashMap<String, String>();
         HashMap<String, String> forbidden = new HashMap<String, String>();
         HeaderValidationRules header = new HeaderValidationRules(mandatory, forbidden);
         setHeaderValidationRules(header);
+        ConnectionTimeouts connectionTimeouts = new ConnectionTimeouts();
+        setConnectionTimeouts(connectionTimeouts);
     }
+
     @Override
     public boolean onException(Throwable e, HttpRequest request, HttpResponse response) throws IOException {
         return super.onException(e, request, response);
     }
+
     @Override
     public HttpHandlerInfo registerRequestHandler(HttpRequestHandler handler) {
         return super.registerRequestHandler(handler);
     }
 
-    public class CustomHttpConnection extends HttpConnection {
+    public class CustomHttpConnection extends HttpServerConnection {
         protected CustomHttpConnection(HttpServer server, Socket clientSocket, InputStream is, OutputStream os) throws IOException {
             super(server, clientSocket, is, os);
         }
@@ -339,10 +414,10 @@ public class DeprecatedAPIServer extends HttpServer {
     }
 
     public static interface AutoSSLHttpConnectionFactory {
-        HttpConnection create(Socket clientSocket, InputStream is, OutputStream os) throws IOException;
+        HttpServerConnection create(Socket clientSocket, InputStream is, OutputStream os) throws IOException;
     }
 
-    public static HttpConnection autoWrapSSLConnection(final Socket clientSocket, AutoSSLHttpConnectionFactory factory) throws IOException {
+    public static HttpServerConnection autoWrapSSLConnection(final Socket clientSocket, AutoSSLHttpConnectionFactory factory) throws IOException {
         boolean finallyCloseSocket = true;
         try {
             clientSocket.setSoTimeout(60 * 1000);
@@ -489,9 +564,9 @@ public class DeprecatedAPIServer extends HttpServer {
             @Override
             public void run() {
                 try {
-                    final HttpConnection httpConnection = autoWrapSSLConnection(clientSocket, new AutoSSLHttpConnectionFactory() {
+                    final HttpServerConnection httpConnection = autoWrapSSLConnection(clientSocket, new AutoSSLHttpConnectionFactory() {
                         @Override
-                        public HttpConnection create(Socket clientSocket, InputStream is, OutputStream os) throws IOException {
+                        public HttpServerConnection create(Socket clientSocket, InputStream is, OutputStream os) throws IOException {
                             return new CustomHttpConnection(DeprecatedAPIServer.this, clientSocket, is, os);
                         }
                     });
