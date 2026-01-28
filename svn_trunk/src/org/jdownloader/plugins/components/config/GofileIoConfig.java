@@ -14,7 +14,7 @@ public interface GofileIoConfig extends PluginConfigInterface {
 
     public static class TRANSLATION {
         public String getAllowMaliciousFileDownload_label() {
-            return "Allow download of files flagged as 'malicious' by gofile.io?";
+            return "Allow download of files flagged as 'malicious' by download website?";
         }
     }
 

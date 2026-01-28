@@ -37,7 +37,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49696 $", interfaceVersion = 3, names = { "girlsreleased.com" }, urls = { "https?://(?:www\\.)?girlsreleased\\.com/.*#?(set|site|model)s?/?.*" })
+@DecrypterPlugin(revision = "$Revision: 52189 $", interfaceVersion = 3, names = { "girlsreleased.com" }, urls = { "https?://(?:www\\.)?girlsreleased\\.com/.*#?(set|site|model)s?/?.*" })
 public class GirlsReleasedCom extends antiDDoSForDecrypt {
     public GirlsReleasedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,18 +77,18 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        final PageType pageType = PageType.parse(parameter);
+        final PageType pageType = PageType.parse(contenturl);
         if (pageType == PageType.GR_UNKNOWN) {
             getLogger().warning("Unable to determine page type!");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(parameter);
+        getPage(contenturl);
         // Build API payload
         String[][] idList = null;
         String payload = null;
-        idList = new Regex(parameter, "#\\w+/([^$\\/\\?]+)").getMatches();
+        idList = new Regex(contenturl, "#\\w+/([^$\\/\\?]+)").getMatches();
         String setID = null;
         if (pageType == PageType.GR_SET) {
             if (idList != null && idList.length > 0) {
@@ -109,7 +109,7 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
             payload = "{\"tasks\":[\"getsites\"],\"sites\":{\"page\":0,\"count\":999999999,\"model\":0,\"modelname\":null,\"search\":null,\"modelid\":null}}";
         } else if (pageType == PageType.GR_MODEL) {
             if (idList != null && idList.length > 0) {
-                idList = new Regex(parameter, "/#\\w+/([^$\\/]+)/([^$\\/\\s\\?]+)").getMatches();
+                idList = new Regex(contenturl, "/#\\w+/([^$\\/]+)/([^$\\/\\s\\?]+)").getMatches();
                 if (idList != null && idList.length > 0 && idList[0].length > 1) {
                     payload = "{\"tasks\":[\"getsets\"],\"sets\":{\"count\":999999999,\"model\":\"" + idList[0][0] + "\"},\"modelname\":\"" + idList[0][1] + "\"}";
                 }
@@ -118,34 +118,50 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
             payload = "{\"tasks\":[\"getmodels\"],\"models\":{\"page\":0,\"count\":999999999,\"site\":null,\"sort\":null,\"search\":null}}";
         }
         if (pageType == PageType.GR_SET) {
-            final Request request = br.createGetRequest("https://girlsreleased.com/api/0.1/set/" + setID);
+            final Request request = br.createGetRequest("https://girlsreleased.com/api/0.3/set/" + setID);
             sendRequest(br, request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final Map<String, Object> infomap = (Map<String, Object>) entries.get("set");
-            final List<List<Object>> imgs = (List<List<Object>>) infomap.get("images");
-            for (final List<Object> imgInfo : imgs) {
-                String link = Encoding.htmlDecode(imgInfo.get(3).toString());
-                if (link.startsWith("/")) {
-                    link = br.getURL(link).toExternalForm();
+            final List<Object> set = (List<Object>) entries.get("set");
+            final String setTitle = (String) set.get(1); // Optional
+            final String website = set.get(3).toString();
+            final List<List<Object>> imgs = (List<List<Object>>) set.get(4);
+            for (final List<Object> img : imgs) {
+                String rl = img.get(3).toString();
+                final String filename = img.get(5).toString();
+                if (rl.startsWith("/")) {
+                    rl = br.getURL(rl).toExternalForm();
                 }
-                if (this.canHandle(link)) {
+                if (this.canHandle(rl)) {
+                    /* Skip items which would again be handled by this plugin */
                     continue;
                 }
-                ret.add(createDownloadlink(link));
+                final DownloadLink link = createDownloadlink(rl);
+                link.setName(filename);
+                link.setAvailable(true);
+                ret.add(link);
             }
-            final List<Object> modelInfo = (List<Object>) JavaScriptEngineFactory.walkJson(infomap, "models/{0}");
-            final String fpName = infomap.get("site") + " - " + modelInfo.get(1) + " - " + "Set " + setID;
+            final List<Object> modelInfo = (List<Object>) JavaScriptEngineFactory.walkJson(set, "{5}/{0}");
+            final String modelName = modelInfo.get(1).toString();
+            String fpName = website + " - " + modelName + " - " + "Set " + setID + " - " + setTitle;
+            if (setTitle != null) {
+                fpName += " - " + setTitle;
+            }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(Encoding.htmlDecode(fpName).trim());
             fp.setAllowMerge(true);
             fp.addLinks(ret);
         } else if (pageType == PageType.GR_MODEL) {
             /* Crawl all sets of a model. */
-            final String modelID = new Regex(param.getCryptedUrl(), PATTERN_MODEL).getMatch(0);
-            final Request request = br.createGetRequest("https://girlsreleased.com/api/0.1/sets/model/" + modelID);
+            /* 2026-01-27: Site is needed now */
+            final String site = new Regex(contenturl, "/site/([^/]+)").getMatch(0);
+            final String modelID = new Regex(contenturl, PATTERN_MODEL).getMatch(0);
+            if (site == null || modelID == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final Request request = br.createGetRequest("https://www.girlsreleased.com/api/0.3/sets/site/" + site + "/model/" + modelID + "/sort/date" + modelID);
             sendRequest(br, request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

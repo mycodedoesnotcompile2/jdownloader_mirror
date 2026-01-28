@@ -31,72 +31,81 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net;
+package org.appwork.utils.net.httpserver;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
 
 /**
- * @author daniel
- *
+ * Base class for SSL-wrapped HTTP connections.
+ * 
+ * <p>
+ * This class is similar to {@code AutoWrappedSSLHttpConnection} in CoreAPIServer but does not depend on BouncyCastle.
+ * Implementations (e.g., in CoreAPIServer) can extend this class and provide the actual client certificate type.
+ * </p>
+ * 
+ * <p>
+ * This connection wrapper automatically sets the HTTPS flag on requests to indicate they came over an encrypted connection.
+ * </p>
+ * 
+ * @author AppWork
  */
-public class LimitedInputStream extends CountingInputStream implements StreamValidEOF, LimitedInputStreamInterface {
-    private long limit;
-
+public class SSLConnectionWrapper extends HttpServerConnection {
+    private final boolean ssl;
+    private final Object clientCertificate; // Object to avoid BouncyCastle dependency
+    
     /**
-     * @param limit
-     *            the limit to set. Use -1 to disable the limit.
+     * Creates a new SSL-wrapped HTTP connection.
+     * 
+     * @param server
+     *            The HTTP server instance
+     * @param ssl
+     *            true if this is an SSL/TLS connection
+     * @param clientSocket
+     *            The client socket
+     * @param is
+     *            The wrapped input stream (TLS-decrypted)
+     * @param os
+     *            The wrapped output stream (TLS-encrypted)
+     * @param clientCertificate
+     *            Optional client certificate (can be null), implementation-specific type
+     * @throws IOException
+     *             if the connection cannot be created
      */
-    @Override
-    public void setLimit(long limit) {
-        this.limit = limit;
+    public SSLConnectionWrapper(final AbstractServerBasics server, final boolean ssl, final Socket clientSocket, final InputStream is, final OutputStream os, final Object clientCertificate) throws IOException {
+        super(server, clientSocket, is, os);
+        this.ssl = ssl;
+        this.clientCertificate = clientCertificate;
     }
-
-    protected final byte[] skipBuffer = new byte[32767];
-
-    public LimitedInputStream(final InputStream in, final long limit) {
-        super(in);
-        this.limit = limit;
-    }
-
+    
     @Override
-    public long getLimit() {
-        return this.limit;
+    protected HttpRequest buildRequest() throws IOException {
+        final HttpRequest ret = super.buildRequest();
+        ret.setHttps(this.ssl);
+        return ret;
     }
-
-    @Override
-    public int read() throws IOException {
-        if (this.limit >= 0 && this.transferedBytes() >= this.getLimit()) {
-            return -1;
-        }
-        return super.read();
+    
+    /**
+     * Returns the client certificate if available.
+     * 
+     * <p>
+     * The actual type depends on the SSL implementation (e.g., BouncyCastle Certificate in CoreAPIServer).
+     * </p>
+     * 
+     * @return The client certificate (implementation-specific type, can be null)
+     */
+    public Object getClientCertificate() {
+        return this.clientCertificate;
     }
-
-    @Override
-    public int read(final byte[] b, final int off, int len) throws IOException {
-        if (this.limit >= 0) {
-            final long left = this.getLimit() - this.transferedBytes();
-            if (left == 0) {
-                return -1;
-            }
-            if (left < len) {
-                len = (int) left;
-            }
-        }
-        return super.read(b, off, len);
-    }
-
-    @Override
-    public long skip(long n) throws IOException {
-        if (n < this.skipBuffer.length) {
-            return this.read(this.skipBuffer, 0, (int) n);
-        } else {
-            return this.read(this.skipBuffer);
-        }
-    }
-
-    @Override
-    public boolean isValidEOF() {
-        return this.limit >= 0 && this.transferedBytes() == this.getLimit();
+    
+    /**
+     * @return true if this is an SSL/TLS connection
+     */
+    public boolean isSsl() {
+        return this.ssl;
     }
 }

@@ -76,6 +76,7 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
     @Override
     public void runTest() throws Exception {
         try {
+
             this.setupServer();
             this.testPostSizeLimitExceededWithinDrainLimit();
             this.testPostSizeLimitExceededExceedsDrainLimit();
@@ -106,6 +107,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 Long.valueOf(30000L)); // 30s drain timeout (30000 ms)
         this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
+        httpServer.setVerboseLog(true);
+        httpClient.setVerboseLog(true);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {

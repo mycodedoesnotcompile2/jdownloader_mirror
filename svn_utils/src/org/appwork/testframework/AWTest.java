@@ -95,6 +95,14 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @date 16.12.2021
      *
      */
+
+    static {
+        if (System.getProperty("java.net.preferIPv6Addresses") == null) {
+            // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/net/doc-files/net-properties.html
+            System.setProperty("java.net.preferIPv6Addresses", "system");
+        }
+    }
+
     public static class LogCache extends AbstractSink {
         private final CopyOnWriteArrayList<LogRecord2> buffer = new CopyOnWriteArrayList<LogRecord2>();
 

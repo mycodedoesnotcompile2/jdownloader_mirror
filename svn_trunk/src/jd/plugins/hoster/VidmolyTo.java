@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52187 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class VidmolyTo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidmoly.net", "vidmoly.me", "vidmoly.to" });
+        ret.add(new String[] { "vidmoly.biz", "vidmoly.me", "vidmoly.to", "vidmoly.net" });
         return ret;
     }
 
@@ -69,6 +69,7 @@ public class VidmolyTo extends XFileSharingProBasic {
     @Override
     public String rewriteHost(final String host) {
         /* 2025-09-19: Changed main domain from vidmoly.to to vidmoly.net */
+        /* 2026-01-27: Changed main domain from vidmoly.net to vidmoly.biz */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
@@ -180,8 +181,12 @@ public class VidmolyTo extends XFileSharingProBasic {
     public String[] scanInfo(final String[] fileInfo) {
         /* 2020-05-18: Special */
         super.scanInfo(fileInfo);
-        if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = br.getRegex(">([^>]+)</span><br>\\s+<span style=").getMatch(0);
+        String betterFilename = br.getRegex(">([^>]+)</span><br>\\s+<span style=").getMatch(0);
+        if (betterFilename == null && StringUtils.containsIgnoreCase(br._getURL().getPath(), "/embed-")) {
+            betterFilename = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        }
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
         }
         final String betterFilesize = br.getRegex(">\\((\\d+[^<]+)\\) Download\\s*</a>").getMatch(0);
         if (betterFilesize != null) {

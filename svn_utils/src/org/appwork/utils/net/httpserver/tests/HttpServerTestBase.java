@@ -109,7 +109,7 @@ public abstract class HttpServerTestBase extends AWTest {
 
         LogV3.info("re-warm IPv6 (isGlobalIPv6Available) availability check to cache result and avoid delays during tests...");
         // Pre-warm IPv6 availability check to cache result and avoid delays during tests
-        HTTPConnectionUtils.isGlobalIPv6Available(5000, 5000, 60 * 60 * 1000L);
+        HTTPConnectionUtils.isGlobalIPv6Available(5000, 5000, -1);
         LogV3.info("Starting HTTP Server Setup...");
         // Create RemoteAPI and register Dummy API
         this.remoteAPI = new RemoteAPI();

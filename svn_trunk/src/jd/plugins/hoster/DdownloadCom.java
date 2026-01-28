@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52182 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52190 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -205,17 +205,6 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected String regExTrafficLeft(final Browser br) {
-        /* 2026-01-26 */
-        final String trafficLeftMB = br.getRegex("data-traffic=\"(\\d+)\"").getMatch(0);
-        if (trafficLeftMB != null) {
-            return trafficLeftMB + "MB";
-        }
-        logger.warning("Special trafficleft regexes failed -> Website has changed?"); /* Fallback to template handling */
-        return super.regExTrafficLeft(br);
-    }
-
-    @Override
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (checkShowFreeDialog(getHost())) {
             showFreeDialog(getHost());
@@ -279,7 +268,7 @@ public class DdownloadCom extends XFileSharingProBasic {
         /* Original XFS API ('API Mod') does not return trafficleft but theirs is modified and more useful! */
         /* 2019-11-27: Not sure but this must be the traffic you can buy via 'extend traffic': /?op=payments */
         if (AccountType.PREMIUM != account.getType()) {
-            /* Not a premium accout -> No reason to look for additional traffic information */
+            /* Not a premium account -> No reason to look for additional traffic information */
             /*
              * They will return "traffic_left":"0" for free accounts which is wrong. It is unlimited on their website. By setting it to
              * unlimited here it will be re-checked via website by our XFS template!
@@ -357,14 +346,31 @@ public class DdownloadCom extends XFileSharingProBasic {
     @Override
     protected void fetchAccountInfoWebsiteTraffic(Browser br, Account account, AccountInfo ai) throws Exception {
         super.fetchAccountInfoWebsiteTraffic(br, account, ai);
+        final String trafficLeftMB = br.getRegex("data-traffic=\"(\\d+)\"").getMatch(0);
+        if (trafficLeftMB != null) {
+            ai.setTrafficLeft(Long.parseLong(trafficLeftMB) * 1000 * 1000);
+        } else {
+            logger.warning("Special trafficleft regexes failed -> Website has changed?"); /* Fallback to template handling */
+            final String trafficleftStr = super.regExTrafficLeft(br);
+            if (trafficleftStr != null) {
+                ai.setTrafficLeft(SizeFormatter.getSize(trafficleftStr));
+            }
+        }
         if (ai.getTrafficLeft() > 0) {
             /**
              * var trafficLeftMB = parseFloat(trafficBar.attr('data-traffic')) || 0; <br>
              * var totalTrafficMB = 200000; // 200000 MB daily limit
              */
-            final String totalTrafficMB = br.getRegex("var\\s*totalTrafficMB\\s*=\\s*(\\d+)").getMatch(0);
-            if (totalTrafficMB != null) {
-                ai.setTrafficMax(SizeFormatter.getSize(totalTrafficMB + " MB"));
+            final String trafficMaxMB = br.getRegex("var\\s*totalTrafficMB\\s*=\\s*(\\d+)").getMatch(0);
+            if (trafficMaxMB != null) {
+                ai.setTrafficMax(Long.parseLong(trafficMaxMB) * 1000 * 1000);
+            } else {
+                /* Use static fallback value */
+                logger.warning("Failed to find trafficMaxMB");
+                final long trafficMaxStatic = 200000 * 1000 * 1000;
+                if (ai.getTrafficLeft() <= trafficMaxStatic) {
+                    ai.setTrafficMax(trafficMaxStatic);
+                }
             }
         }
     }

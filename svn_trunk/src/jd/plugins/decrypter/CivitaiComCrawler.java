@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -49,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52080 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52188 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public static final String API_BASE = "https://civitai.com/api/v1";
@@ -125,17 +124,23 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             modelName = entries.get("name").toString();
             final List<Map<String, Object>> _modelVersions_ = (List<Map<String, Object>>) entries.get("modelVersions");
+            Map<String, Object> desiredModelVersion = null;
             if (modelVersionId != null && _modelVersions_.size() > 1) {
                 /* User wants specific model version -> Ignore/delete all others */
-                final Iterator<Map<String, Object>> it = modelVersions.iterator();
-                while (it.hasNext()) {
-                    final Map<String, Object> next = it.next();
-                    if (!modelVersionId.equals(StringUtils.valueOfOrNull(next.get("id")))) {
-                        it.remove();
+                for (final Map<String, Object> modelVersion : _modelVersions_) {
+                    final String thisModelVersionID = modelVersion.get("id").toString();
+                    if (thisModelVersionID.equals(modelVersionId)) {
+                        desiredModelVersion = modelVersion;
+                        break;
                     }
                 }
             }
-            modelVersions.addAll(_modelVersions_);
+            if (desiredModelVersion != null) {
+                /* Add desired modelVersion only if we found one. */
+                modelVersions.add(desiredModelVersion);
+            } else {
+                modelVersions.addAll(_modelVersions_);
+            }
             final ModelCrawlMode mode = cfg.getModelCrawlerMode();
             if (mode == ModelCrawlMode.MODEL_DATA_AND_POSTS) {
                 crawlModelPostsBeforeEnd = true;

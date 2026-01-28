@@ -61,14 +61,17 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 52073 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52190 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MediafireComFolder.class })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
-    private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
-    public static final String  PROPERTY_FILE_ID                  = "fileid";
-    public static final String  PROPERTY_PRIVATE_FILE             = "privatefile";
-    public static final String  PROPERTY_ACCOUNT_SESSION_TOKEN    = "session_token";
+    private static final String  FREE_TRIGGER_RECONNECT_ON_CAPTCHA         = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
+    private static final boolean default_FREE_TRIGGER_RECONNECT_ON_CAPTCHA = false;
+    private static final String  ALLOW_MALICIOUS_FILE_DOWNLOAD             = "ALLOW_MALICIOUS_FILE_DOWNLOAD";
+    private static final boolean default_ALLOW_MALICIOUS_FILE_DOWNLOAD     = false;
+    public static final String   PROPERTY_FILE_ID                          = "fileid";
+    public static final String   PROPERTY_PRIVATE_FILE                     = "privatefile";
+    public static final String   PROPERTY_ACCOUNT_SESSION_TOKEN            = "session_token";
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -304,11 +307,11 @@ public class MediafireCom extends PluginForHost {
         }
         final String directurlproperty = getDirecturlProperty(link, account);
         final String storedDirecturl = link.getStringProperty(directurlproperty);
-        String finalDownloadurl = null;
+        String dllink = null;
         if (storedDirecturl != null) {
             /* Download of previously stored directurl */
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
-            finalDownloadurl = storedDirecturl;
+            dllink = storedDirecturl;
         } else if (account != null && AccountType.PREMIUM.equals(account.getType())) {
             /* Premium download */
             final UrlQuery query = new UrlQuery();
@@ -316,8 +319,8 @@ public class MediafireCom extends PluginForHost {
             query.appendEncoded("quick_key", this.getFUID(link));
             final Map<String, Object> resp = apiCommand(link, account, "file/get_links.php", query);
             final Map<String, Object> linkmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp, "links/{0}");
-            finalDownloadurl = (String) linkmap.get("direct_download");
-            if (StringUtils.isEmpty(finalDownloadurl)) {
+            dllink = (String) linkmap.get("direct_download");
+            if (StringUtils.isEmpty(dllink)) {
                 /* Check for errors */
                 // {"response":{"action":"file\/get_links","links":[{"quickkey":"removed","error":"User lacks
                 // permissions"}],"result":"Success","current_api_version":"1.5"}}
@@ -404,35 +407,60 @@ public class MediafireCom extends PluginForHost {
                         captchSuccess = true;
                         break;
                     }
-                } while (trycounter <= 3 && finalDownloadurl == null);
+                } while (trycounter <= 3 && dllink == null);
                 if (!captchSuccess) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
             }
             this.handlePW(link);
-            finalDownloadurl = br.getRegex("kNO\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
-            if (finalDownloadurl == null) {
-                /* pw protected files can directly redirect to download */
-                finalDownloadurl = br.getRedirectLocation();
+            if (br.containsHTML("class=\"MalwareAdvisory\"")) {
+                /* Download of files that were detected as malware require a different step */
+                if (!this.getPluginConfig().getBooleanProperty(ALLOW_MALICIOUS_FILE_DOWNLOAD, default_ALLOW_MALICIOUS_FILE_DOWNLOAD)) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "This file was flagged as to contain malicious software! You can allow download of such files in the plugin settings. Once allowed, reset this item once and you will be able to download it.");
+                }
+                final String securitytoken = br.getRegex("security_token=(ey[a-zA-Z0-9_/\\+\\=\\-\\.]+)").getMatch(0);
+                final String pass = br.getRegex("pass:\\s*'([a-zA-Z0-9]+)'").getMatch(0);
+                if (securitytoken == null || pass == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("security_token", securitytoken);
+                br.postPage("/download_link.php", query);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                dllink = entries.get("download_url").toString();
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, "pass=" + pass, this.isResumeable(link, account), this.getMaxChunks(account));
+                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                    br.followConnection(true);
+                    handleServerErrors();
+                    handleNonAPIErrors(link, br);
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                dl.startDownload();
+                return;
             }
-            if (finalDownloadurl == null) {
-                finalDownloadurl = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)\"\\s*id\\s*=\\s*\"downloadButton\"").getMatch(0);
-                if (finalDownloadurl == null) {
-                    finalDownloadurl = br.getRegex("(" + MediafireComFolder.TYPE_DIRECT + ")").getMatch(0);
+            dllink = br.getRegex("kNO\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
+            if (dllink == null) {
+                /* pw protected files can directly redirect to download */
+                dllink = br.getRedirectLocation();
+            }
+            if (dllink == null) {
+                dllink = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)\"\\s*id\\s*=\\s*\"downloadButton\"").getMatch(0);
+                if (dllink == null) {
+                    dllink = br.getRegex("(" + MediafireComFolder.TYPE_DIRECT + ")").getMatch(0);
                 }
             }
-            if (finalDownloadurl == null) {
+            if (dllink == null) {
                 final String data_scrambled_url = br.getRegex("data-scrambled-url\\s*=\\s*\"(.*?)\"").getMatch(0);
-                finalDownloadurl = data_scrambled_url == null ? null : Base64.decodeToString(data_scrambled_url);
+                dllink = data_scrambled_url == null ? null : Base64.decodeToString(data_scrambled_url);
             }
         }
-        if (StringUtils.isEmpty(finalDownloadurl)) {
+        if (StringUtils.isEmpty(dllink)) {
             this.handleNonAPIErrors(link, br);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        link.setProperty(directurlproperty, finalDownloadurl);
+        link.setProperty(directurlproperty, dllink);
         try {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, finalDownloadurl, this.isResumeable(link, account), this.getMaxChunks(account));
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 handleServerErrors();
@@ -463,7 +491,7 @@ public class MediafireCom extends PluginForHost {
     }
 
     private void handleReconnectBehaviorOnCaptcha(final Account account) throws PluginException {
-        if (this.getPluginConfig().getBooleanProperty(FREE_TRIGGER_RECONNECT_ON_CAPTCHA, false)) {
+        if (this.getPluginConfig().getBooleanProperty(FREE_TRIGGER_RECONNECT_ON_CAPTCHA, default_FREE_TRIGGER_RECONNECT_ON_CAPTCHA)) {
             if (account != null) {
                 logger.info("Captcha reconnect setting active & free account used --> TEMPORARILY_UNAVAILABLE");
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Waiting some time to avoid captcha in free account mode", 30 * 60 * 1000l);
@@ -902,7 +930,8 @@ public class MediafireCom extends PluginForHost {
     }
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), FREE_TRIGGER_RECONNECT_ON_CAPTCHA, "Free downloads: Reconnect if captcha input needed?\r\n<html><p style=\"color:#F62817\"><b>WARNING: This setting can prevent captchas but it can also lead to an infinite reconnect loop!</b></p></html>").setDefaultValue(false));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), FREE_TRIGGER_RECONNECT_ON_CAPTCHA, "Free downloads: Reconnect if captcha input needed?\r\n<html><p style=\"color:#F62817\"><b>WARNING: This setting can prevent captchas but it can also lead to an infinite reconnect loop!</b></p></html>").setDefaultValue(default_FREE_TRIGGER_RECONNECT_ON_CAPTCHA));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ALLOW_MALICIOUS_FILE_DOWNLOAD, "Allow download of files flagged as 'malicious' by download website?").setDefaultValue(default_ALLOW_MALICIOUS_FILE_DOWNLOAD));
     }
 
     @Override
