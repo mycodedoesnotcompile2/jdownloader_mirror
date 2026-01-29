@@ -20,11 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.ProgressController;
@@ -44,7 +39,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48354 $", interfaceVersion = 3, names = { "4shared.com" }, urls = { "https?://(?:www\\.)?4shared(?:\\-china)?\\.com/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/(?:\\d+/)?[A-Za-z0-9\\-_]+" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "4shared.com" }, urls = { "https?://(?:www\\.)?4shared(?:\\-china)?\\.com/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/(?:\\d+/)?[A-Za-z0-9\\-_]+" })
 public class FourSharedComFolder extends PluginForDecrypt {
     public FourSharedComFolder(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,7 +57,7 @@ public class FourSharedComFolder extends PluginForDecrypt {
     private String                  foldername                  = null;
     private String                  parameter                   = null;
     private String                  pass                        = null;
-    private Browser                 br2                         = new Browser();
+    private Browser                 br2                         = createNewBrowserInstance();
     private ArrayList<DownloadLink> decryptedLinks              = new ArrayList<DownloadLink>();
     private String                  type_folder_with_pagenumber = "https?://(?:www\\.)?4shared(?:\\-china)?\\.com/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/\\d+/[A-Za-z0-9\\-_]+";
 

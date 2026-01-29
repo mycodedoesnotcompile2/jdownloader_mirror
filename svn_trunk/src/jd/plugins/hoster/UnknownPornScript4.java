@@ -34,7 +34,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "luxuretv.com", "homemoviestube.com" }, urls = { "https?://(?:www\\.|en\\.)?luxuretv\\.com/videos/[a-z0-9\\-]+\\-\\d+\\.html", "https?://(?:www\\.)?homemoviestube\\.com/videos/\\d+/[a-z0-9\\-]+\\.html" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "luxuretv.com", "homemoviestube.com" }, urls = { "https?://(?:www\\.|en\\.)?luxuretv\\.com/videos/[a-z0-9\\-]+\\-\\d+\\.html", "https?://(?:www\\.)?homemoviestube\\.com/videos/\\d+/[a-z0-9\\-]+\\.html" })
 public class UnknownPornScript4 extends PluginForHost {
     public UnknownPornScript4(PluginWrapper wrapper) {
         super(wrapper);
@@ -126,7 +126,7 @@ public class UnknownPornScript4 extends PluginForHost {
             dllink = new Regex(flashvars, "(https?://(?:www\\.)?[^/]+/playerConfig\\.php[^<>\"/\\&]+)").getMatch(0);
             if (dllink != null) {
                 dllink = Encoding.htmlDecode(dllink);
-                final Browser brc = new Browser();
+                final Browser brc = createNewBrowserInstance();
                 brc.getPage(dllink);
                 dllink = brc.getRegex("flvMask:(.*?)(%7C|;)").getMatch(0);
                 dllink = Encoding.htmlDecode(dllink);

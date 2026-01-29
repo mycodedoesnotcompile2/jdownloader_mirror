@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "shutterstock.com" }, urls = { "http://(www\\.)?shutterstock\\.com/pic\\-\\d+/[a-z0-9\\-]+\\.html" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "shutterstock.com" }, urls = { "http://(www\\.)?shutterstock\\.com/pic\\-\\d+/[a-z0-9\\-]+\\.html" })
 public class ShutterStockCom extends PluginForHost {
     public ShutterStockCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +113,7 @@ public class ShutterStockCom extends PluginForHost {
                         return;
                     }
                 }
-                br = new Browser();
+                br = createNewBrowserInstance();
                 br.setFollowRedirects(true);
                 br.getPage("https://www.shutterstock.com/login.mhtml");
                 final String lang = System.getProperty("user.language");

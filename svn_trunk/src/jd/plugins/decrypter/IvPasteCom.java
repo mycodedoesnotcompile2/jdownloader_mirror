@@ -17,11 +17,8 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -32,7 +29,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = { "ivpaste.com" }, urls = { "https?://(www\\.)?ivpaste\\.com/(v/|view\\.php\\?id=)[A-Za-z0-9]+" })
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "ivpaste.com" }, urls = { "https?://(www\\.)?ivpaste\\.com/(v/|view\\.php\\?id=)[A-Za-z0-9]+" })
 public class IvPasteCom extends PluginForDecrypt {
     public IvPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,7 +40,7 @@ public class IvPasteCom extends PluginForDecrypt {
     private static final String RECAPTCHAFAILED = "(The reCAPTCHA wasn\\'t entered correctly\\.|Go back and try it again\\.)";
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         final String parameter = param.toString();
         br.getPage(parameter);

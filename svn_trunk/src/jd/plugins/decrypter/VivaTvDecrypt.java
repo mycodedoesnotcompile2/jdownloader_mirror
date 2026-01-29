@@ -47,7 +47,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = { "mtv.de", "mtviggy.com", "southpark.de", "southpark.cc.com", "southparkstudios.com", "mtv.com.au", "mtv.co.uk", "mtv.com", "cc.com", "funnyclips.cc", "comedycentral.tv", "nick.de", "tvland.com", "spike.com", "thedailyshow.cc.com", "tosh.cc.com", "mtvu.com" }, urls = { "https?://(?:www\\.)?mtv\\.de/.+", "https?://(?:www\\.)?(?:mtviggy|mtvdesi|mtvk)\\.com/.+", "https?://(?:www\\.)?southpark\\.de/.+", "https?://southpark\\.cc\\.com/.+", "https?://(?:www\\.)?southparkstudios\\.com/.+", "https?://(?:www\\.)?mtv\\.com\\.au/.+", "https?://(?:www\\.)?mtv\\.co\\.uk/.+", "https?://(?:www\\.)?mtv\\.com/.+", "https?://(?:www\\.)?cc\\.com/.+", "https?://de\\.funnyclips\\.cc/.+", "https?://(?:www\\.)?comedycentral\\.tv/.+", "https?://(?:www\\.)?nick\\.de/.+", "https?://(?:www\\.)?tvland\\.com/.+",
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "mtv.de", "mtviggy.com", "southpark.de", "southpark.cc.com", "southparkstudios.com", "mtv.com.au", "mtv.co.uk", "mtv.com", "cc.com", "funnyclips.cc", "comedycentral.tv", "nick.de", "tvland.com", "spike.com", "thedailyshow.cc.com", "tosh.cc.com", "mtvu.com" }, urls = { "https?://(?:www\\.)?mtv\\.de/.+", "https?://(?:www\\.)?(?:mtviggy|mtvdesi|mtvk)\\.com/.+", "https?://(?:www\\.)?southpark\\.de/.+", "https?://southpark\\.cc\\.com/.+", "https?://(?:www\\.)?southparkstudios\\.com/.+", "https?://(?:www\\.)?mtv\\.com\\.au/.+", "https?://(?:www\\.)?mtv\\.co\\.uk/.+", "https?://(?:www\\.)?mtv\\.com/.+", "https?://(?:www\\.)?cc\\.com/.+", "https?://de\\.funnyclips\\.cc/.+", "https?://(?:www\\.)?comedycentral\\.tv/.+", "https?://(?:www\\.)?nick\\.de/.+", "https?://(?:www\\.)?tvland\\.com/.+",
         "https?://(?:www\\.)?spike\\.com/.+", "https?://thedailyshow\\.cc\\.com/.+", "https?://tosh\\.cc\\.com/.+", "https?://(?:www\\.)?mtvu\\.com/.+" })
 public class VivaTvDecrypt extends PluginForDecrypt {
     public VivaTvDecrypt(PluginWrapper wrapper) {
@@ -212,7 +212,7 @@ public class VivaTvDecrypt extends PluginForDecrypt {
                 if (parts.size() > 1) {
                     filenameBase += "_pt_" + pf.format(partNumber);
                 }
-                final Browser hlsBR = new Browser();
+                final Browser hlsBR = createNewBrowserInstance();
                 for (final Map<String, Object> videoStream : videoStreams) {
                     // final String origination_date = (String) videoStream.get("origination_date");
                     final List<Map<String, Object>> videoRenditions = (List<Map<String, Object>>) videoStream.get("rendition");

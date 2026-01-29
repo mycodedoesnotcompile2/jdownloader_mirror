@@ -22,12 +22,15 @@ import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52193 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52198 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilekeeperNet extends XFileSharingProBasic {
     public FilekeeperNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -38,7 +41,7 @@ public class FilekeeperNet extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null 4dignum, reCaptchaV2, hcaptcha<br />
+     * captchatype-info: 2026-01-28: reCaptchaV2 <br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
@@ -98,6 +101,37 @@ public class FilekeeperNet extends XFileSharingProBasic {
             return waitStr;
         }
         return super.regexWaittime(html);
+    }
+
+    @Override
+    protected Form findFormDownload2Free(final Browser br) {
+        Form form = super.findFormDownload2Free(br);
+        if (form != null) {
+            return form;
+        }
+        final String fuidFromHTML = br.getRegex("data-code=\"([a-z0-9]+)").getMatch(0);
+        if (br.containsHTML("'op': 'download2'") && fuidFromHTML != null) {
+            /* 2026-01-28: Special */
+            form = new Form();
+            form.setMethod(MethodType.POST);
+            form.put("op", "download2");
+            form.put("id", fuidFromHTML);
+            form.put("rand", "");
+            form.put("referer", "");
+            form.put("method_free", "Free download");
+            form.put("down_direct", "1");
+            return form;
+        }
+        return null;
+    }
+
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "link=\"https?://[^/]+/[a-z0-9]{12}/([^\"/]+)\"").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
+        }
+        return fileInfo;
     }
 
     @Override

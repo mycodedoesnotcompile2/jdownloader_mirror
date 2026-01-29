@@ -18,9 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -42,7 +39,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51152 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
 public class MvpdjCom extends PluginForHost {
     public MvpdjCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -180,7 +180,7 @@ public class MvpdjCom extends PluginForHost {
             dllink = br.getURL(dllink).toExternalForm();
             if (this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD && !link.isSizeSet()) {
                 /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
-                final Browser br2 = new Browser();
+                final Browser br2 = createNewBrowserInstance();
                 // In case the link redirects to the finallink
                 URLConnectionAdapter con = null;
                 try {
@@ -220,7 +220,7 @@ public class MvpdjCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
-        final Browser dlbrowser = new Browser();
+        final Browser dlbrowser = createNewBrowserInstance();
         dl = jd.plugins.BrowserAdapter.openDownload(dlbrowser, link, dllink, true, 0);
         handleConnectionErrors(dlbrowser, dl.getConnection());
         dl.startDownload();

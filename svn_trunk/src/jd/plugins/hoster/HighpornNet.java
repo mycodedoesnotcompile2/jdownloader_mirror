@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Date;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -39,7 +35,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 3, names = { "highporn.net" }, urls = { "highporndecrypted://(.+)" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "highporn.net" }, urls = { "highporndecrypted://(.+)" })
 public class HighpornNet extends antiDDoSForHost {
     @Override
     public String[] siteSupportedNames() {
@@ -193,7 +193,7 @@ public class HighpornNet extends antiDDoSForHost {
                 } catch (final Throwable e) {
                 }
                 dl = null;
-                br = new Browser();
+                br = createNewBrowserInstance();
             }
         }
         if (dllink == null) {

@@ -17,11 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -32,7 +28,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "filehorse.com" }, urls = { "https?://(www\\.)?(mac\\.)?filehorse\\.com/download\\-([a-z0-9\\-]+)/(\\d+/)?" })
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "filehorse.com" }, urls = { "https?://(www\\.)?(mac\\.)?filehorse\\.com/download\\-([a-z0-9\\-]+)/(\\d+/)?" })
 public class FileHorseCom extends PluginForHost {
     public FileHorseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +46,7 @@ public class FileHorseCom extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         // Offline links should also have nice filenames
         link.setName(new Regex(link.getDownloadURL(), "filehorse\\.com/download\\-(.+)").getMatch(0));
-        br = new Browser();
+        br = createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.getPage(link.getDownloadURL());
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(>404 Error \\- Page Not Found<|>Page Not Found)")) {

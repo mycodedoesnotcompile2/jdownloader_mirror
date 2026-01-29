@@ -39,7 +39,6 @@ import jd.plugins.PluginForHost;
 import jd.utils.JDHexUtils;
 
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -47,7 +46,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "rtve.es" }, urls = { "https?://(?:www\\.)?rtve\\.es/(?:(?:alacarta|play)/(?:videos|audios)/[\\w\\-]+/[\\w\\-]+/\\d+/?(\\?modl=COMTS)?|infantil/serie/[^/]+/video/[^/]+/\\d+/)" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "rtve.es" }, urls = { "https?://(?:www\\.)?rtve\\.es/(?:(?:alacarta|play)/(?:videos|audios)/[\\w\\-]+/[\\w\\-]+/\\d+/?(\\?modl=COMTS)?|infantil/serie/[^/]+/video/[^/]+/\\d+/)" })
 public class RtveEs extends PluginForHost {
     /*
      * 2020-03-23: Attention: Do not accept 'audios' URLs in host plugin anymore as they may lead to 'overview' pages with a lot of content
@@ -247,7 +246,7 @@ public class RtveEs extends PluginForHost {
             /* 2021-06-01: Usually this will have the value "banebdyede" */
             final String manager = (String) entries.get("manager");
             final String thumbnailB64URL = "https://ztnr.rtve.es/ztnr/movil/thumbnail/" + manager + "/videos/" + this.getFID(link) + ".png?q=v2";
-            final Browser brd = new Browser();
+            final Browser brd = createNewBrowserInstance();
             brd.getPage(thumbnailB64URL);
             brd.getHeaders().put("Origin", "https://www.rtve.es");
             brd.getHeaders().put("Referer", "https://www.rtve.es");

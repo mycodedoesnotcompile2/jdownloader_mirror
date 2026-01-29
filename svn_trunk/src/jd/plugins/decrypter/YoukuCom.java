@@ -42,7 +42,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 /** See also youtube-dl: https://github.com/rg3/youtube-dl/blob/master/youtube_dl/extractor/youku.py */
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "youku.com", "video.tudou.com", "tudou.com" }, urls = { "https?://v\\.youku\\.com/v_show/id_[A-Za-z0-9=]+", "https?://video\\.tudou\\.com/v/[A-Za-z0-9=]+", "https?://(?:www\\.)?tudou\\.com/programs/view/[A-Za-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "youku.com", "video.tudou.com", "tudou.com" }, urls = { "https?://v\\.youku\\.com/v_show/id_[A-Za-z0-9=]+", "https?://video\\.tudou\\.com/v/[A-Za-z0-9=]+", "https?://(?:www\\.)?tudou\\.com/programs/view/[A-Za-z0-9\\-_]+" })
 public class YoukuCom extends PluginForDecrypt {
     public YoukuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,7 +110,7 @@ public class YoukuCom extends PluginForDecrypt {
         }
         final String videoid = jd.plugins.hoster.YoukuCom.getURLName(parameter);
         /* Important: Use fresh Browser here!! */
-        this.br = prepBR(new Browser());
+        this.br = prepBR(createNewBrowserInstance());
         accessVideoJson(this.br, parameter);
         try {
             jd.plugins.hoster.YoukuCom.handleGeneralErrors(this.br);

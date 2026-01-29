@@ -517,13 +517,14 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
     }
 
     /**
-     * Formats elapsed time in milliseconds to a human-readable string. Examples: "1 minute ago", "2 hours ago", "3 days ago", "never"
+     * Formats elapsed time in milliseconds to a human-readable string. Examples: "1 minute ago", "2 hours ago", "3 days ago", "never" TODO:
+     * Move this somewhere else (TimeFormatter?) and add localization.
      *
      * @param elapsedMillis
      *            The elapsed time in milliseconds
      * @return A formatted string representing the elapsed time
      */
-    private String formatElapsedTime(final long elapsedMillis) {
+    public static String formatElapsedTime(final long elapsedMillis) {
         if (elapsedMillis < 0) {
             return "never";
         }

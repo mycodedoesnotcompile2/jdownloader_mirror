@@ -68,7 +68,7 @@ import org.jdownloader.plugins.components.containers.VimeoContainer.Quality;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51208 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimeoComDecrypter extends PluginForDecrypt {
     private final String type_player_private_external_direct = "(?i)https?://player\\.vimeo.com/external/\\d+\\.(source|hd|sd)\\.(mp4|mov|wmv|avi|flv).+";
     private final String type_player_private_play_direct     = "(?i)https?://player\\.vimeo.com/play/\\d+.+";
@@ -365,7 +365,7 @@ public class VimeoComDecrypter extends PluginForDecrypt {
             return ret;
         }
         // when testing and dropping to frame, components will fail without clean browser.
-        br = new Browser();
+        br = createNewBrowserInstance();
         br = prepBrowser(br);
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(new int[] { 400, 410 });

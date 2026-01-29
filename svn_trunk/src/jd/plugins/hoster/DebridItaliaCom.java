@@ -46,7 +46,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
 public class DebridItaliaCom extends antiDDoSForHost {
     public DebridItaliaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -275,7 +275,7 @@ public class DebridItaliaCom extends antiDDoSForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         URLConnectionAdapter con = null;
         try {
             br.setFollowRedirects(true);

@@ -26,14 +26,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ImageExtensions;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -49,7 +41,15 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BrightcoveDecrypter.BrightcoveEdgeContainer.Protocol;
 
-@DecrypterPlugin(revision = "$Revision: 48050 $", interfaceVersion = 2, names = { "brightcove.com" }, urls = { "" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ImageExtensions;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52210 $", interfaceVersion = 2, names = { "brightcove.com" }, urls = { "" })
 public class BrightcoveDecrypter extends PluginForDecrypt {
     public BrightcoveDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -949,8 +949,7 @@ public class BrightcoveDecrypter extends PluginForDecrypt {
 
     /**
      * Handles quality selection of given HashMap 'inputmap' with errorhandling for bad user selection! <br />
-     * No matter what the user does - if his selection is bad, this function will simply return all the contents of the inputmap as
-     * result.<br />
+     * No matter what the user does - if his selection is bad, this function will simply return all the contents of the inputmap as result.<br />
      *
      * @param inputmap
      *            : HashMap with previously found BrightcoveEdgeContainer objects

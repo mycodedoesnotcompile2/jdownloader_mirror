@@ -24,7 +24,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52134 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52206 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -166,9 +166,12 @@ public class SaintTo extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             /* Only new website contains filename and md5 hash in html code */
-            String filename = br.getRegex("filename:\\s*\"([^\"]+)\"").getMatch(0);
+            String filename = br.getRegex("id=\"fileName\"[^>]*>([^<]+)</div>").getMatch(0);
             if (filename == null) {
                 filename = br.getRegex("originalFilename:\\s*\"([^\"]+)\"").getMatch(0);
+                if (filename == null) {
+                    filename = br.getRegex("filename:\\s*\"([^\"]+)\"").getMatch(0);
+                }
             }
             if (filename != null) {
                 link.setFinalFileName(filename);
@@ -254,7 +257,10 @@ public class SaintTo extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_FATAL, entries.get("error").toString());
                 }
                 dllink = entries.get("url").toString();
-                final String filename = (String) entries.get("filename");
+                String filename = (String) entries.get("original_filename");
+                if (StringUtils.isEmpty(filename)) {
+                    filename = (String) entries.get("filename");
+                }
                 if (!StringUtils.isEmpty(filename)) {
                     link.setFinalFileName(filename);
                 }

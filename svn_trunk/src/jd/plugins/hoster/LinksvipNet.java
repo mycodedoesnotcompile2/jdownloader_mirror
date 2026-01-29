@@ -21,10 +21,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -44,7 +40,11 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linksvip.net" }, urls = { "" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "linksvip.net" }, urls = { "" })
 public class LinksvipNet extends PluginForHost {
     private static final String                            NICE_HOST                 = "linksvip.net";
     private static final String                            NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
@@ -280,7 +280,7 @@ public class LinksvipNet extends PluginForHost {
                     return;
                 }
                 /* Clear cookies to prevent unknown errors as we'll perform a full login below now. */
-                this.br = prepBRWebsite(new Browser());
+                this.br = prepBRWebsite(createNewBrowserInstance());
             }
             br.getPage("https://" + this.getHost() + "/");
             br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");

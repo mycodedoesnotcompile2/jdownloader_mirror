@@ -19,10 +19,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,7 +30,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51078 $", interfaceVersion = 3, names = { "focus.de" }, urls = { "https?://(?:www\\.)?focus\\.de/.+" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "focus.de" }, urls = { "https?://(?:www\\.)?focus\\.de/.+" })
 public class FocusDe extends PluginForHost {
     public FocusDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,10 +95,10 @@ public class FocusDe extends PluginForHost {
         String description = null;
         if (videoplayerLicenseKey != null && vms_id != null) {
             /**
-             * Prefer information from this API over information from html. </br>
-             * Also for some items, the streaming URL inside html code is broken so this is the better source.
+             * Prefer information from this API over information from html. </br> Also for some items, the streaming URL inside html code is
+             * broken so this is the better source.
              */
-            final Browser brc = new Browser();
+            final Browser brc = createNewBrowserInstance();
             brc.getHeaders().put("Accept", "*/*");
             brc.getHeaders().put("Origin", "https://www.focus.de");
             brc.getHeaders().put("Referer", "https://www.focus.de/");

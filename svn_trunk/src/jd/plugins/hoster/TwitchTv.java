@@ -61,7 +61,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
 
-@HostPlugin(revision = "$Revision: 51938 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
 public class TwitchTv extends PluginForHost {
     public TwitchTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,7 +100,7 @@ public class TwitchTv extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink downloadLink) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         dllink = downloadLink.getStringProperty("plain_directlink", downloadLink.getStringProperty("m3u", null));
         if (dllink == null && isChatDownload(downloadLink)) {
             // incase the user updates the formatting in configs between decrypter and download.
@@ -577,7 +577,7 @@ public class TwitchTv extends PluginForHost {
                     if (currentBrowser != null) {
                         br = currentBrowser.cloneBrowser();
                     } else {
-                        br = new Browser();
+                        br = plugin.createNewBrowserInstance();
                     }
                     br.setFollowRedirects(true);
                     br.getPage("https://www.twitch.tv/");

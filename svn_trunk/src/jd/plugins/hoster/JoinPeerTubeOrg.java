@@ -19,17 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.components.config.JoinPeerTubeOrgConfig;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -42,7 +31,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49770 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.components.config.JoinPeerTubeOrgConfig;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52210 $", interfaceVersion = 3, names = {}, urls = {})
 public class JoinPeerTubeOrg extends antiDDoSForHost {
     public JoinPeerTubeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -137,9 +137,9 @@ public class JoinPeerTubeOrg extends antiDDoSForHost {
 
     /**
      * Debug function which can find new instances compatible with this code/plugin/template from:
-     * https://instances.joinpeertube.org/instances </br>
-     * Important: Do NOT overwrite old entries with these ones! Looks like this list is not reliably collecting "all" peertube instances
-     * and/or single peertube instances can turn off some kind of "allow my instance to appear on tht list" setting!
+     * https://instances.joinpeertube.org/instances </br> Important: Do NOT overwrite old entries with these ones! Looks like this list is
+     * not reliably collecting "all" peertube instances and/or single peertube instances can turn off some kind of
+     * "allow my instance to appear on tht list" setting!
      */
     private static ArrayList<String> findNewScriptInstances() {
         if (false) {

@@ -61,7 +61,7 @@ import org.jdownloader.plugins.components.config.NitroflareConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
 public class NitroFlareCom extends PluginForHost {
     private final String         staticBaseURL             = "https://nitroflare.com";
     /* Documentation | docs: https://nitroflare.com/member?s=api */
@@ -176,7 +176,7 @@ public class NitroFlareCom extends PluginForHost {
                 if (br != null) {
                     brc = br.cloneBrowser();
                 } else {
-                    brc = new Browser();
+                    brc = plugin.createNewBrowserInstance();
                 }
                 brc.setFollowRedirects(true);
                 for (final String siteSupportedName : getSupportedNamesStatic(plugin.getHost())) {
@@ -762,11 +762,11 @@ public class NitroFlareCom extends PluginForHost {
             } else if (StringUtils.isEmpty(user) || !user.matches(".+@.+")) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nYou haven't provided a valid username (must be email address)!", PluginException.VALUE_ID_PREMIUM_DISABLE);
             } else
-                // check to see if the user added the email username with caps.. this can make login incorrect
-                if (!user.equals(account.getUser())) {
-                    logger.info("Corrected username: Old: " + account.getUser() + " | New: " + user);
-                    account.setUser(user);
-                }
+            // check to see if the user added the email username with caps.. this can make login incorrect
+            if (!user.equals(account.getUser())) {
+                logger.info("Corrected username: Old: " + account.getUser() + " | New: " + user);
+                account.setUser(user);
+            }
             // urlencode required!
             return "user=" + Encoding.urlEncode(user) + "&premiumKey=" + Encoding.urlEncode(pass);
         }

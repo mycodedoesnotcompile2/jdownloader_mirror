@@ -1,9 +1,13 @@
 package jd.plugins;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.packagecontroller.AbstractNode;
 
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
@@ -12,9 +16,6 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.controlling.download.DownloadControllerListener;
 import org.jdownloader.gui.translate._GUI;
-
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.packagecontroller.AbstractNode;
 
 public class MultiHostHost implements DownloadControllerListener {
     public enum MultihosterHostStatus implements LabelInterface {
@@ -62,26 +63,27 @@ public class MultiHostHost implements DownloadControllerListener {
         };
     }
 
-    private Boolean               enabled                         = null;
-    private String                name                            = null;
-    private List<String>          domains                         = new ArrayList<String>();
-    private Boolean               isUnlimitedTraffic              = null;
-    private Boolean               isUnlimitedLinks                = null;
-    private long                  linksLeft                       = -1;
-    private long                  linksMax                        = -1;
-    private long                  trafficLeft                     = -1;
-    private long                  trafficMax                      = -1;
-    private String                unavailableStatusText           = null;
-    private long                  unavailableUntilTimestamp       = -1;
-    private Short                 trafficCalculationFactorPercent = null;
-    private int                   maxChunks                       = 0;
-    private int                   maxDownloads                    = -1;
-    private Boolean               resume                          = null;
-    private String                statusText                      = null;
-    private MultihosterHostStatus status                          = null;
-    private static final long     MAX_UNAVAILABLE_TIME            = 5 * 60 * 1000;
-    private AccountInfo           accountInfo                     = null;
-    private final AtomicBoolean   propertyListenerEnabled         = new AtomicBoolean(false);
+    protected Boolean               enabled                         = null;
+    protected String                name                            = null;
+    protected List<String>          domains                         = new ArrayList<String>();
+    protected Boolean               isUnlimitedTraffic              = null;
+    protected Boolean               isUnlimitedLinks                = null;
+    protected Long                  linksLeft                       = null;
+    protected Long                  linksMax                        = null;
+    protected Long                  trafficLeft                     = null;
+    protected Long                  trafficMax                      = null;
+    protected String                unavailableStatusText           = null;
+    protected Long                  unavailableUntilTimestamp       = null;
+    protected Short                 trafficCalculationFactorPercent = null;
+    protected Integer               maxChunks                       = null;
+    protected Integer               maxDownloads                    = null;
+    protected Boolean               resume                          = null;
+    protected String                statusText                      = null;
+    protected MultihosterHostStatus status                          = null;
+    private static final long       MAX_UNAVAILABLE_TIME            = 5 * 60 * 1000;
+    protected AccountInfo           accountInfo                     = null;
+    protected final AtomicBoolean   propertyListenerEnabled         = new AtomicBoolean(false);
+    protected long                  createdTimestamp                = System.currentTimeMillis();
 
     public AccountInfo getAccountInfo() {
         return accountInfo;
@@ -125,7 +127,7 @@ public class MultiHostHost implements DownloadControllerListener {
         this.enabled = enabled;
         final Account ac = getAccount();
         if (ac != null) {
-            ac.setProperty(getEnabledProperty(), this.enabled);
+            ac.setProperty(getEnabledProperty(), enabled);
         }
         if (enabled) {
             clearErrorStatus();
@@ -137,6 +139,7 @@ public class MultiHostHost implements DownloadControllerListener {
      * domains.
      */
     public String getName() {
+        final String name = this.name;
         if (name != null) {
             return name;
         } else {
@@ -158,15 +161,6 @@ public class MultiHostHost implements DownloadControllerListener {
         }
     }
 
-    private DomainInfo domainInfo = null;
-
-    public DomainInfo getDomainInfo() {
-        if (domainInfo == null || !StringUtils.equalsIgnoreCase(getDomain(), domainInfo.getDomain())) {
-            domainInfo = DomainInfo.getInstance(getDomain());
-        }
-        return domainInfo;
-    }
-
     public void addDomains(final List<String> domains) {
         if (domains == null) {
             throw new IllegalArgumentException();
@@ -181,8 +175,7 @@ public class MultiHostHost implements DownloadControllerListener {
         if (domain == null) {
             throw new IllegalArgumentException();
         }
-        this.domains.clear();
-        this.domains.add(domain);
+        this.domains = new ArrayList<String>(Arrays.asList(domain));
     }
 
     /** Sets domains. Overwrites previously set values! */
@@ -190,55 +183,68 @@ public class MultiHostHost implements DownloadControllerListener {
         if (domains == null) {
             throw new IllegalArgumentException();
         }
-        this.domains = domains;
+        this.domains = new ArrayList<String>(domains);
     }
 
     public long getLinksLeft() {
-        return linksLeft;
+        final Long value = linksLeft;
+        return value != null ? value : -1;
     }
 
     public void setLinksLeft(long num) {
         this.linksLeft = num;
-        this.isUnlimitedLinks = false;
+        setUnlimitedLinks(false);
     }
 
     public long getLinksMax() {
-        return linksMax;
+        final Long value = linksMax;
+        return value != null ? value : -1;
     }
 
     public void setLinksMax(long num) {
         this.linksMax = num;
-        this.isUnlimitedLinks = false;
+        setUnlimitedLinks(false);
+    }
+
+    /** Set traffic left and max with one call. */
+    public void setLinksLeftAndMax(long left, final long max) {
+        this.setLinksLeft(left);
+        this.setLinksMax(max);
     }
 
     public long getTrafficLeft() {
-        return trafficLeft;
+        final Long value = trafficLeft;
+        return value != null ? value : -1;
     }
 
     public void setTrafficLeft(long trafficLeft) {
         this.trafficLeft = trafficLeft;
-        this.isUnlimitedTraffic = false;
+        setUnlimitedTraffic(false);
     }
 
     public long getTrafficMax() {
-        return trafficMax;
+        final Long value = trafficMax;
+        return value != null ? value : -1;
     }
 
-    public void setTrafficMax(long bytes) {
-        this.trafficMax = bytes;
-        this.isUnlimitedTraffic = false;
+    public void setTrafficMax(long num) {
+        this.trafficMax = Math.max(0, num);
+        setUnlimitedTraffic(false);
+    }
+
+    /** Set traffic left and max with one call. */
+    public void setTrafficLeftAndMax(long left, final long max) {
+        this.setTrafficLeft(left);
+        this.setTrafficMax(max);
     }
 
     /**
-     * How much traffic is needed- and credited from the account when downloading from this host? </br>
-     * 500 = 5 times the size of the downloaded file.
+     * How much traffic is needed- and credited from the account when downloading from this host? </br> 500 = 5 times the size of the
+     * downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
-        if (trafficCalculationFactorPercent == null) {
-            return 100;
-        } else {
-            return trafficCalculationFactorPercent;
-        }
+        final Short value = trafficCalculationFactorPercent;
+        return value != null ? value : 100;
     }
 
     public void setTrafficCalculationFactorPercent(short num) {
@@ -246,32 +252,32 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     public boolean isUnlimitedLinks() {
-        return isUnlimitedLinks == null || isUnlimitedLinks.booleanValue();
+        return isEnabled(isUnlimitedLinks);
     }
 
     public void setUnlimitedLinks(Boolean param) {
         this.isUnlimitedLinks = param;
-        if (param == null || param.equals(Boolean.TRUE)) {
-            this.linksLeft = -1;
-            this.linksMax = -1;
+        if (isEnabled(param)) {
+            this.linksLeft = null;
+            this.linksMax = null;
         }
     }
 
     public boolean isUnlimitedTraffic() {
-        return isUnlimitedTraffic == null || isUnlimitedTraffic.booleanValue();
+        return isEnabled(isUnlimitedTraffic);
     }
 
     public void setUnlimitedTraffic(Boolean param) {
         this.isUnlimitedTraffic = param;
-        if (param == null || param.equals(Boolean.TRUE)) {
-            this.trafficLeft = -1;
-            this.trafficMax = -1;
+        if (isEnabled(param)) {
+            this.trafficLeft = null;
+            this.trafficMax = null;
         }
     }
 
     /**
-     * Returns custom set status text. </br>
-     * Typically used to describe why this host is currently not working but can also be used as an informative field.
+     * Returns custom set status text. </br> Typically used to describe why this host is currently not working but can also be used as an
+     * informative field.
      */
     public String getStatusText() {
         return statusText;
@@ -283,10 +289,12 @@ public class MultiHostHost implements DownloadControllerListener {
 
     /** Returns title for this entry which is either its' name, the first entry in the domain list or null. */
     public String getTitle() {
-        if (this.name != null) {
-            return this.name;
-        } else if (this.domains != null && this.domains.size() > 0) {
-            return this.domains.get(0);
+        final String name = this.name;
+        final List<String> domains;
+        if (name != null) {
+            return name;
+        } else if ((domains = getDomains()) != null && domains.size() > 0) {
+            return domains.get(0);
         } else {
             return null;
         }
@@ -303,13 +311,14 @@ public class MultiHostHost implements DownloadControllerListener {
     public void clearErrorStatus() {
         // this.setStatus(MultihosterHostStatus.WORKING);
         this.setUnavailableStatusText(null);
-        this.setUnavailableTimestamp(-1);
+        this.setUnavailableTimestamp(null);
         if (propertyListenerEnabled.compareAndSet(true, false)) {
             DownloadController.getInstance().getEventSender().removeListener(this);
         }
     }
 
     public MultihosterHostStatus getStatus() {
+        final MultihosterHostStatus status = this.status;
         if (status != null) {
             return status;
         } else {
@@ -327,7 +336,8 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     public int getMaxChunks() {
-        return maxChunks;
+        final Integer value = maxChunks;
+        return value != null ? value : 0;
     }
 
     public void setMaxChunks(int maxChunks) {
@@ -335,11 +345,7 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     public boolean isResumable() {
-        if (resume == null) {
-            return true;
-        } else {
-            return resume;
-        }
+        return isEnabled(resume);
     }
 
     public void setResumable(boolean resume) {
@@ -381,37 +387,52 @@ public class MultiHostHost implements DownloadControllerListener {
     }
 
     public long getUnavailableUntilTimestamp() {
-        return unavailableUntilTimestamp;
+        final Long value = unavailableUntilTimestamp;
+        return value != null ? value : -1;
     }
 
-    private final void setUnavailableTimestamp(final long num) {
+    private void setUnavailableTimestamp(final Long num) {
         this.unavailableUntilTimestamp = num;
     }
 
-    private final void setUnavailableTime(long milliseconds) {
+    private void setUnavailableTime(long milliseconds) {
         final long timestampFinal = Math.min(milliseconds, MAX_UNAVAILABLE_TIME);
         setUnavailableTimestamp(Time.systemIndependentCurrentJVMTimeMillis() + timestampFinal);
     }
 
     /**
-     * Returns time this item is unavailable for. </br>
-     * This can return negative values.
+     * Returns time this item is unavailable for. </br> This can return negative values.
      */
     public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();
-        if (unavailableTimestamp > 0) {
-            return this.getUnavailableUntilTimestamp() - Time.systemIndependentCurrentJVMTimeMillis();
-        } else {
-            return 0;
-        }
+        return Math.max(0, unavailableTimestamp - Time.systemIndependentCurrentJVMTimeMillis());
     }
 
     public int getMaxDownloads() {
-        return maxDownloads;
+        final Integer value = maxDownloads;
+        return value != null ? value : Integer.MAX_VALUE;
     }
 
     public void setMaxDownloads(int maxDownloads) {
         this.maxDownloads = maxDownloads;
+    }
+
+    public long getCreatedTimestamp() {
+        return createdTimestamp;
+    }
+
+    public void setCreatedTimestamp(long createdTimestamp) {
+        this.createdTimestamp = createdTimestamp;
+    }
+
+    protected DomainInfo domainInfo = null;
+
+    public DomainInfo getDomainInfo() {
+        final DomainInfo domainInfo = this.domainInfo;
+        if (domainInfo == null || !StringUtils.equalsIgnoreCase(getDomain(), domainInfo.getDomain())) {
+            return this.domainInfo = DomainInfo.getInstance(getDomain());
+        }
+        return domainInfo;
     }
 
     @Override

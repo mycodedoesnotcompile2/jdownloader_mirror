@@ -321,6 +321,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Pass or cookies:" })
     String jd_gui_swing_components_AccountDialog_pass_or_cookies();
 
+    @Default(lngs = { "en", "de" }, values = { "Two-factor authentication required", "Zwei-Faktor-Authentifizierungscode erforderlich" })
+    String jd_gui_swing_components_AccountDialog_2FA_title();
+
     @Default(lngs = { "en", "de" }, values = { "Enter two-factor authentication code", "Gib den Zwei-Faktor-Authentifizierungscode ein" })
     String jd_gui_swing_components_AccountDialog_2FA_login();
 

@@ -19,15 +19,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -41,7 +36,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.hoster.FilesMonsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 50810 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://(?:www\\.)?filesmonster\\.com/(?:download\\.php\\?id=[A-Za-z0-9_-]+(?:\\&wbst=[^\\&]+)?|player/v\\d+/video/[A-Za-z0-9_-]+|dl/[A-Za-z0-9_-]+/free/.+)" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://(?:www\\.)?filesmonster\\.com/(?:download\\.php\\?id=[A-Za-z0-9_-]+(?:\\&wbst=[^\\&]+)?|player/v\\d+/video/[A-Za-z0-9_-]+|dl/[A-Za-z0-9_-]+/free/.+)" })
 public class FilesMonsterDecrypter extends PluginForDecrypt {
     public FilesMonsterDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,7 +56,7 @@ public class FilesMonsterDecrypter extends PluginForDecrypt {
      * https://board.jdownloader.org/showpost.php?p=343469&postcount=6
      */
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String FAILED = null;
         final String referer_url = UrlQuery.parse(param.toString()).get("wbst");

@@ -19,7 +19,6 @@ import java.util.ArrayList;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
@@ -31,14 +30,14 @@ import jd.plugins.PluginException;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 40583 $", interfaceVersion = 3, names = { "short.am" }, urls = { "https?://(?:www\\.)?s(ho)?rt\\.am/(?!images|include|login|templates|js|assets|join|manage)[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "short.am" }, urls = { "https?://(?:www\\.)?s(ho)?rt\\.am/(?!images|include|login|templates|js|assets|join|manage)[A-Za-z0-9]+" })
 public class ShortAm extends antiDDoSForDecrypt {
     public ShortAm(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         final String parameter = param.toString();
         br.setFollowRedirects(true);

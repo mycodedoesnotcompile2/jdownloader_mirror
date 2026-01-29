@@ -21,15 +21,6 @@ import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.UdemyComConfig;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.downloadcontroller.SingleDownloadController;
@@ -51,7 +42,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "udemy.com" }, urls = { "https?://(?:www\\.)?udemydecrypted\\.com/(.+\\?dtcode=[A-Za-z0-9]+|lecture_id/\\d+)" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.UdemyComConfig;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "udemy.com" }, urls = { "https?://(?:www\\.)?udemydecrypted\\.com/(.+\\?dtcode=[A-Za-z0-9]+|lecture_id/\\d+)" })
 public class UdemyCom extends PluginForHost {
     public UdemyCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -176,13 +176,11 @@ public class UdemyCom extends PluginForHost {
                 final boolean drm;
                 if ((Boolean) asset.get("course_is_drmed") == Boolean.TRUE) {
                     /**
-                     * Indicates that most of all courses' items are DRM protected but not necessary all of them! </br>
-                     * Also course owners can enable official download functionality for their courses which would probably not change this
-                     * boolean! </br>
-                     * How to find non-DRM protected items: </br>
-                     * 1. Open any course in your browser when logged in into any udemy.com account. </br>
-                     * 2. Click on ""Preview this course" in the top right corner. </br>
-                     * --> All items you can preview there (seems like random clips throughout the course) are streamable without DRM!
+                     * Indicates that most of all courses' items are DRM protected but not necessary all of them! </br> Also course owners
+                     * can enable official download functionality for their courses which would probably not change this boolean! </br> How
+                     * to find non-DRM protected items: </br> 1. Open any course in your browser when logged in into any udemy.com account.
+                     * </br> 2. Click on ""Preview this course" in the top right corner. </br> --> All items you can preview there (seems
+                     * like random clips throughout the course) are streamable without DRM!
                      */
                     drm = true;
                     link.setProperty(PROPERTY_IS_DRM_PROTECTED, true);
@@ -442,7 +440,7 @@ public class UdemyCom extends PluginForHost {
             link.setComment(description);
         }
         if (StringUtils.startsWithCaseInsensitive(dllink, "http") && !dllink.contains(".m3u8")) {
-            final Browser br2 = new Browser();
+            final Browser br2 = createNewBrowserInstance();
             // In case the link redirects to the finallink
             br2.setFollowRedirects(true);
             URLConnectionAdapter con = null;
@@ -519,7 +517,7 @@ public class UdemyCom extends PluginForHost {
              * Remove old cookies and headers from Browser as they are not needed for their downloadurls in fact using them get you server
              * response 400.
              */
-            this.br = new Browser();
+            this.br = createNewBrowserInstance();
             if (dllink.contains(".m3u8")) {
                 drmCheck(link);
                 /* 2016-08-23: HLS is preferred over http by their system */

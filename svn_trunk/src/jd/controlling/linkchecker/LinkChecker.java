@@ -403,7 +403,7 @@ public class LinkChecker<E extends CheckableLink> {
                                                     /* try mass link check */
                                                     logger.clear();
                                                     if (downloadLinks.size() > 0) {
-                                                        this.plugin.setBrowser(new Browser());
+                                                        this.plugin.setBrowser(plugin.createNewBrowserInstance());
                                                         this.plugin.reset();
                                                     }
                                                     if (downloadLinks.size() == 0 || this.plugin.checkLinks(downloadLinks.toArray(new DownloadLink[downloadLinks.size()]))) {

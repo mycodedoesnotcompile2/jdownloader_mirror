@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 47482 $", interfaceVersion = 2, names = { "gotporn.com" }, urls = { "https?://(?:www\\.)?gotporn\\.com/[a-z0-9\\-]+/video\\-\\d+|https?://(?:www\\.)?gotporn\\.com/video/\\d+" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "gotporn.com" }, urls = { "https?://(?:www\\.)?gotporn\\.com/[a-z0-9\\-]+/video\\-\\d+|https?://(?:www\\.)?gotporn\\.com/video/\\d+" })
 public class GotpornCom extends antiDDoSForHost {
     public GotpornCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,7 +127,7 @@ public class GotpornCom extends antiDDoSForHost {
             }
         }
         if (enable_mobile && dllink == null) {
-            this.br = new Browser();
+            this.br = createNewBrowserInstance();
             this.br.setFollowRedirects(true);
             this.br.getHeaders().put("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2.1; en-us; Nexus One Build/FRG83) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile");
             this.br.setCookie("http://hardsextube.com/", "video_quality", "hq");

@@ -17,9 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -29,7 +26,10 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
-@DecrypterPlugin(revision = "$Revision: 45822 $", interfaceVersion = 2, names = { "porn4k.to" }, urls = { "https?://(?:www\\.)?(?:xxx-blog|porn4k)\\.to/(?!wp-content)[a-z0-9\\-]+" })
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "porn4k.to" }, urls = { "https?://(?:www\\.)?(?:xxx-blog|porn4k)\\.to/(?!wp-content)[a-z0-9\\-]+" })
 public class Porn4kTo extends antiDDoSForDecrypt {
     public Porn4kTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class Porn4kTo extends antiDDoSForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         final String parameter = param.toString().replace("xxx-blog.to", "porn4k.to");
         final ArrayList<String> pwList = new ArrayList<String>();

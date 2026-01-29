@@ -546,7 +546,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
         final GregorianCalendar calendar = new GregorianCalendar();
         calendar.setTimeInMillis(System.currentTimeMillis());
         final int year = calendar.get(Calendar.YEAR);
-        return Math.max(2025, year);
+        return Math.max(2026, year);
     }
 
     private String get7ZipJBindingDetails() {

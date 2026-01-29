@@ -27,12 +27,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "doublej.net.au" }, urls = { "https?://(?:www\\.)?doublej\\.net\\.au/programs/[a-z0-9\\-]+/.+|https://(?:www\\.)?abc\\.net\\.au/doublej/programs/[a-z0-9\\-]+/[a-z0-9\\-]+/\\d+" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "doublej.net.au" }, urls = { "https?://(?:www\\.)?doublej\\.net\\.au/programs/[a-z0-9\\-]+/.+|https://(?:www\\.)?abc\\.net\\.au/doublej/programs/[a-z0-9\\-]+/[a-z0-9\\-]+/\\d+" })
 public class DoubleJNetAu extends PluginForHost {
     // raztoki embed video player template.
     private Browser ajax = null;
@@ -118,7 +117,7 @@ public class DoubleJNetAu extends PluginForHost {
 
     private void getAjax(final String url) throws IOException {
         // no cookie session
-        ajax = new Browser();
+        ajax = createNewBrowserInstance();
         ajax.getHeaders().put("User-Agent", br.getHeaders().get("User-Agent"));
         ajax.getHeaders().put("Accept-Language", "en-AU,en;q=0.9");
         ajax.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
@@ -132,7 +131,7 @@ public class DoubleJNetAu extends PluginForHost {
     private void getM3u(String url) throws IOException {
         // cookie _alid_ gets set on first request.
         if (m3u == null) {
-            m3u = new Browser();
+            m3u = createNewBrowserInstance();
         }
         m3u.getHeaders().put("User-Agent", br.getHeaders().get("User-Agent"));
         m3u.getHeaders().put("Accept-Language", "en-AU,en;q=0.9");

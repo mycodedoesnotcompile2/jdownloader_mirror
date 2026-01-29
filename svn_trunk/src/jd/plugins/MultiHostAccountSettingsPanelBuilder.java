@@ -9,6 +9,8 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -134,16 +136,24 @@ public class MultiHostAccountSettingsPanelBuilder {
     private ExtTableModel<MultiHostHost> createTableModel() {
         /* Determine default visibility states for some columns */
         boolean shouldShowLinkLimitColumns = false;
-        boolean shouldShowTrafficLimitColumns = false;
+        boolean shouldShowLinksMaxColumn = false;
+        boolean shouldShowTrafficLeftColumns = false;
+        boolean shouldShowTrafficMaxInfo = false;
         boolean shouldShowTrafficCalculationColumn = false;
         boolean shouldShowUnavailableForColumn = false;
         boolean containsItemsWithCustomStatusText = false;
         for (final MultiHostHost mhost : hosts) {
             if (!shouldShowLinkLimitColumns && !mhost.isUnlimitedLinks()) {
                 shouldShowLinkLimitColumns = true;
+                if (!shouldShowLinksMaxColumn && mhost.getLinksMax() > 0) {
+                    shouldShowLinksMaxColumn = true;
+                }
             }
-            if (!shouldShowTrafficLimitColumns && !mhost.isUnlimitedTraffic()) {
-                shouldShowTrafficLimitColumns = true;
+            if (!shouldShowTrafficLeftColumns && !mhost.isUnlimitedTraffic()) {
+                shouldShowTrafficLeftColumns = true;
+                if (!shouldShowTrafficMaxInfo && mhost.getTrafficMax() > 0) {
+                    shouldShowTrafficMaxInfo = true;
+                }
             }
             if (!shouldShowTrafficCalculationColumn && mhost.getTrafficCalculationFactorPercent() != 100) {
                 shouldShowTrafficCalculationColumn = true;
@@ -154,13 +164,15 @@ public class MultiHostAccountSettingsPanelBuilder {
             if (!containsItemsWithCustomStatusText && mhost.getStatusText() != null) {
                 containsItemsWithCustomStatusText = true;
             }
-            if (shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCalculationColumn && shouldShowUnavailableForColumn) {
+            if (shouldShowTrafficLeftColumns && shouldShowLinkLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficMaxInfo && shouldShowTrafficCalculationColumn && shouldShowUnavailableForColumn) {
                 /* All default disabled columns shall be displayed -> Early abort this loop. */
                 break;
             }
         }
         final boolean shouldShowLinkLimitColumns_final = shouldShowLinkLimitColumns;
-        final boolean shouldShowTrafficLimitColumns_final = shouldShowTrafficLimitColumns;
+        final boolean shouldShowLinksMaxColumn_final = shouldShowLinksMaxColumn;
+        final boolean shouldShowTrafficLeftColumns_final = shouldShowTrafficLeftColumns;
+        final boolean shouldShowTrafficMaxInfo_final = shouldShowTrafficMaxInfo;
         final boolean shouldShowTrafficCalculationColumn_final = shouldShowTrafficCalculationColumn;
         final boolean shouldShowUnavailableForColumn_final = shouldShowUnavailableForColumn;
         final boolean shouldShowInternalStatusColumn_final = containsItemsWithCustomStatusText;
@@ -185,16 +197,21 @@ public class MultiHostAccountSettingsPanelBuilder {
                 if (shouldShowLinkLimitColumns_final) {
                     addColumn(createLinksProgressColumn());
                     addColumn(createLinksLeftColumn(formatter));
+                }
+                if (shouldShowLinksMaxColumn_final) {
                     addColumn(createLinksMaxColumn(formatter));
                 }
-                if (shouldShowTrafficLimitColumns_final) {
+                if (shouldShowTrafficLeftColumns_final) {
                     addColumn(createTrafficProgressColumn(formatter));
                     addColumn(createTrafficLeftColumn(formatter));
+                }
+                if (shouldShowTrafficMaxInfo_final) {
                     addColumn(createTrafficMaxColumn(formatter));
                 }
                 if (shouldShowTrafficCalculationColumn_final) {
                     addColumn(createTrafficCalculationFactorColumn());
                 }
+                addColumn(createCreatedColumn());
             }
         };
     }
@@ -468,7 +485,7 @@ public class MultiHostAccountSettingsPanelBuilder {
                 if (mhost.isUnlimitedLinks()) {
                     return _GUI.T.lit_unlimited();
                 } else {
-                    return mhost.getLinksLeft() + "/" + mhost.getLinksMax();
+                    return mhost.getLinksLeft() + "/" + this.getMax(mhost);
                 }
             }
 
@@ -476,8 +493,11 @@ public class MultiHostAccountSettingsPanelBuilder {
             protected long getMax(MultiHostHost mhost) {
                 if (mhost.isUnlimitedLinks()) {
                     return Long.MAX_VALUE;
-                } else {
+                } else if (mhost.getLinksMax() > 0) {
                     return mhost.getLinksMax();
+                } else {
+                    /* No max value given -> Return links left value as max */
+                    return mhost.getLinksLeft();
                 }
             }
 
@@ -529,7 +549,11 @@ public class MultiHostAccountSettingsPanelBuilder {
         return new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_max()) {
             @Override
             protected long getLong(MultiHostHost mhost) {
-                return mhost.getLinksMax();
+                if (mhost.getLinksMax() > 0) {
+                    return mhost.getLinksMax();
+                } else {
+                    return mhost.getLinksLeft();
+                }
             }
 
             @Override
@@ -589,7 +613,8 @@ public class MultiHostAccountSettingsPanelBuilder {
                 if (mhost.isUnlimitedTraffic()) {
                     return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
                 } else {
-                    return getSizeString(mhost.getTrafficLeft()) + "/" + getSizeString(mhost.getTrafficMax());
+                    /* Max traffic is given -> Display both traffic left and max */
+                    return _GUI.T.premiumaccounttablemodel_column_trafficleft_left_(getSizeString(Math.max(0, mhost.getTrafficLeft())), getSizeString(getMax(mhost)));
                 }
             }
 
@@ -601,8 +626,10 @@ public class MultiHostAccountSettingsPanelBuilder {
             protected long getMax(MultiHostHost mhost) {
                 if (mhost.isUnlimitedTraffic()) {
                     return Long.MAX_VALUE;
-                } else {
+                } else if (mhost.getTrafficMax() > 0) {
                     return mhost.getTrafficMax();
+                } else {
+                    return mhost.getTrafficLeft();
                 }
             }
 
@@ -611,7 +638,7 @@ public class MultiHostAccountSettingsPanelBuilder {
                 if (mhost.isUnlimitedTraffic()) {
                     return Long.MAX_VALUE;
                 } else {
-                    return mhost.getTrafficLeft();
+                    return Math.max(0, mhost.getTrafficLeft());
                 }
             }
 
@@ -631,7 +658,7 @@ public class MultiHostAccountSettingsPanelBuilder {
                 if (mhost.isUnlimitedTraffic()) {
                     return _GUI.T.lit_unlimited();
                 } else {
-                    return getSizeString(mhost.getTrafficLeft());
+                    return getSizeString(Math.max(0, mhost.getTrafficLeft()));
                 }
             }
 
@@ -641,8 +668,9 @@ public class MultiHostAccountSettingsPanelBuilder {
             }
 
             @Override
-            protected long getBytes(MultiHostHost val) {
-                return val.getTrafficLeft();
+            protected long getBytes(MultiHostHost mhost) {
+                /* Do not allow for negative numbers since table progress would display this as unlimited. */
+                return Math.max(0, mhost.getTrafficLeft());
             }
 
             @Override
@@ -677,7 +705,12 @@ public class MultiHostAccountSettingsPanelBuilder {
 
             @Override
             protected long getBytes(MultiHostHost val) {
-                return val.getTrafficMax();
+                if (val.getTrafficMax() > 0) {
+                    return val.getTrafficMax();
+                } else {
+                    /* Fallback */
+                    return val.getTrafficLeft();
+                }
             }
 
             @Override
@@ -707,6 +740,41 @@ public class MultiHostAccountSettingsPanelBuilder {
             @Override
             public boolean isEnabled(final MultiHostHost mhost) {
                 return mhost.isEnabled();
+            }
+        };
+    }
+
+    private ExtTextColumn<MultiHostHost> createCreatedColumn() {
+        return new ExtTextColumn<MultiHostHost>("Data age") {
+            @Override
+            public String getStringValue(final MultiHostHost mhost) {
+                final long timestamp = mhost.getCreatedTimestamp();
+                if (timestamp <= 0) {
+                    return "unknown";
+                }
+                final long currentTime = System.currentTimeMillis();
+                final long elapsedMillis = currentTime - timestamp;
+                return CaptchaSolverAccountSettingsPanelBuilder.formatElapsedTime(elapsedMillis);
+            }
+
+            @Override
+            protected String getTooltipText(final MultiHostHost mhost) {
+                final long timestamp = mhost.getCreatedTimestamp();
+                if (timestamp <= 0) {
+                    return null;
+                }
+                final String formattedDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(timestamp));
+                return formattedDate;
+            }
+
+            @Override
+            public boolean isEnabled(final MultiHostHost mhost) {
+                return mhost.isEnabled();
+            }
+
+            @Override
+            public boolean isDefaultVisible() {
+                return false;
             }
         };
     }

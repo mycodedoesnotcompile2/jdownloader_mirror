@@ -26,26 +26,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.DiskYandexNetConfig;
-import org.jdownloader.plugins.components.config.DiskYandexNetConfig.ActionForMovedFiles;
-import org.jdownloader.plugins.components.config.DiskYandexNetConfig.ActionForQuotaLimitedFiles;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -70,7 +50,28 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DiskYandexNetFolder;
 
-@HostPlugin(revision = "$Revision: 51121 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.DiskYandexNetConfig;
+import org.jdownloader.plugins.components.config.DiskYandexNetConfig.ActionForMovedFiles;
+import org.jdownloader.plugins.components.config.DiskYandexNetConfig.ActionForQuotaLimitedFiles;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNet extends PluginForHost {
     public DiskYandexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,8 +95,12 @@ public class DiskYandexNet extends PluginForHost {
         return br;
     }
 
-    private void prepBR(final Browser br) {
+    public void prepBR(final Browser br) {
         br.getHeaders().put("Accept-Language", "en-us;q=0.7,en;q=0.3");
+        /*
+         * 2026-01-28: Folder URLs ("/d/...") will for 'unsupported' user-agent values and our default User-Agent value is unsupported now.
+         */
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36");
         br.setCookie(getCurrentDiskDomain(), "ys", "");
         br.setAllowedResponseCodes(new int[] { 429, 500 });
         br.setFollowRedirects(true);
@@ -288,11 +293,10 @@ public class DiskYandexNet extends PluginForHost {
         link.removeProperty(PROPERTY_LAST_AUTH_SK);
         final String contenturl = getMainLink(link, account);
         /**
-         * Why do we need to use the crawler plugin here? </br>
-         * - If the item is password protected and the 'passToken' cookie has expired, it will be refreshed by the crawler (abvoids the need
-         * for duplicated code) </br>
-         * - If the item was not password protected but it is password protected now, the crawler will handle that </br>
-         * - If any single-file properties which only our crawler finds change, we will get them
+         * Why do we need to use the crawler plugin here? </br> - If the item is password protected and the 'passToken' cookie has expired,
+         * it will be refreshed by the crawler (abvoids the need for duplicated code) </br> - If the item was not password protected but it
+         * is password protected now, the crawler will handle that </br> - If any single-file properties which only our crawler finds
+         * change, we will get them
          */
         final CryptedLink cryptedlink = new CryptedLink(contenturl, link);
         final DiskYandexNetFolder crawler = (DiskYandexNetFolder) this.getNewPluginForDecryptInstance(this.getHost());
@@ -380,8 +384,8 @@ public class DiskYandexNet extends PluginForHost {
             link.setVerifiedFileSize(filesize.longValue());
         }
         /**
-         * Array of direct-URLs -> Find best quality version / original and store that URL. </br>
-         * We expect this array to be sorted from best to worst.
+         * Array of direct-URLs -> Find best quality version / original and store that URL. </br> We expect this array to be sorted from
+         * best to worst.
          */
         final String directurlOfficialDownload = (String) entries.get("file");
         if (!StringUtils.isEmpty(directurlOfficialDownload)) {
@@ -716,9 +720,8 @@ public class DiskYandexNet extends PluginForHost {
             link.removeProperty(PROPERTY_PATH_INTERNAL);
             if (emptyWholeTrashCan) {
                 /**
-                 * Empty whole trash can.</br>
-                 * This is not a necessary step but can be useful when downloading a lot of quota limited files so that files which we
-                 * failed to delete from trash will be deleted as well.
+                 * Empty whole trash can.</br> This is not a necessary step but can be useful when downloading a lot of quota limited files
+                 * so that files which we failed to delete from trash will be deleted as well.
                  */
                 try {
                     plg.logger.info("Trying to empty trash");
@@ -842,8 +845,8 @@ public class DiskYandexNet extends PluginForHost {
     }
 
     /**
-     * Generates a direct-URL for quota limited files. </br>
-     * If no account is given or if the user does not allow us to move such files into his account, this handling will throw an exception.
+     * Generates a direct-URL for quota limited files. </br> If no account is given or if the user does not allow us to move such files into
+     * his account, this handling will throw an exception.
      */
     private String generateDirecturlQuotaLimitedFile(final Browser br3, final DownloadLink link, final Account account) throws Exception {
         final ActionForQuotaLimitedFiles action = PluginJsonConfig.get(DiskYandexNetConfig.class).getActionForQuotaLimitedFiles();
@@ -910,10 +913,9 @@ public class DiskYandexNet extends PluginForHost {
         if (!foundStoredInternalPath) {
             logger.info("MoveFileIntoAccount: No internal filepath available --> Trying to move file into account");
             /**
-             * 2021-02-10: Possible values for "source": public_web_copy, public_web_copy_limit </br>
-             * public_web_copy_limit is usually used if the files is currently quota limited and cannot be downloaded at all at this moment.
-             * </br>
-             * Both will work but we'll try to choose the one which would also be used via browser.
+             * 2021-02-10: Possible values for "source": public_web_copy, public_web_copy_limit </br> public_web_copy_limit is usually used
+             * if the files is currently quota limited and cannot be downloaded at all at this moment. </br> Both will work but we'll try to
+             * choose the one which would also be used via browser.
              */
             final String copySource;
             if (fileDownloadQuotaReached) {
@@ -1001,10 +1003,9 @@ public class DiskYandexNet extends PluginForHost {
     }
 
     /**
-     * Downloads items which are officially not downloadable. </br>
-     * Only call this if you believe that official download of this file is possible. </br>
-     * This is pretty much only working when user is logged in. In most of all other cases, their bot protection kicks in and blocks this
-     * handling.
+     * Downloads items which are officially not downloadable. </br> Only call this if you believe that official download of this file is
+     * possible. </br> This is pretty much only working when user is logged in. In most of all other cases, their bot protection kicks in
+     * and blocks this handling.
      */
     private void downloadReadonlyFile(final Browser br, final DownloadLink link, final Account account) throws Exception {
         logger.info("Attempting to download read-only file");
@@ -1313,10 +1314,8 @@ public class DiskYandexNet extends PluginForHost {
             accountUser = account.getUser();
         }
         /**
-         * Description of fields: </br>
-         * message: error message in currently selected language </br>
-         * description: Description of error in English </br>
-         * error: Unique error string e.g. "DiskNotFoundError"
+         * Description of fields: </br> message: error message in currently selected language </br> description: Description of error in
+         * English </br> error: Unique error string e.g. "DiskNotFoundError"
          */
         if (errormessage.equalsIgnoreCase("DiskNotFoundError")) {
             /* {"message":"Не удалось найти запрошенный ресурс.","description":"Resource not found.","error":"DiskNotFoundError"} */
@@ -1527,10 +1526,9 @@ public class DiskYandexNet extends PluginForHost {
         final HashSet<String> blacklistedCookies = new HashSet<String>();
         blacklistedCookies.add(COOKIE_KEY_PASSWORD_TOKEN);
         /**
-         * Explanation for blacklisted cookie values: </br>
-         * passToken: Token which authorizes user to access password protected folder. While providing it via cookie login will technically
-         * work, the information which folder it is for, is not given. Setting it may cause disruption in folder crawler handling thus we
-         * ignore it here.
+         * Explanation for blacklisted cookie values: </br> passToken: Token which authorizes user to access password protected folder.
+         * While providing it via cookie login will technically work, the information which folder it is for, is not given. Setting it may
+         * cause disruption in folder crawler handling thus we ignore it here.
          */
         for (final Cookie cookie : cookies.getCookies()) {
             if (cookie.getValue() == null) {

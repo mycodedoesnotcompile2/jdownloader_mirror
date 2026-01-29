@@ -17,10 +17,6 @@ package jd.plugins.hoster;
 
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -35,7 +31,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48106 $", interfaceVersion = 3, names = { "huaban.com" }, urls = { "https?://(?:www\\.)?huaban\\.com/pins/(\\d+)" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "huaban.com" }, urls = { "https?://(?:www\\.)?huaban\\.com/pins/(\\d+)" })
 public class HuabanCom extends PluginForHost {
     public HuabanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,7 +153,7 @@ public class HuabanCom extends PluginForHost {
         if (dllink != null) {
             URLConnectionAdapter con = null;
             try {
-                final Browser br2 = new Browser();
+                final Browser br2 = createNewBrowserInstance();
                 br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {

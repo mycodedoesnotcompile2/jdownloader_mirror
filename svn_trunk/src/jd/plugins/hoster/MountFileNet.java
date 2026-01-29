@@ -21,13 +21,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -48,7 +41,14 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 2, names = { "mountfile.net" }, urls = { "https?://(?:www\\.)?mountfile\\.net/(?!d/)[A-Za-z0-9]+" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "mountfile.net" }, urls = { "https?://(?:www\\.)?mountfile\\.net/(?!d/)[A-Za-z0-9]+" })
 public class MountFileNet extends antiDDoSForHost {
     /* For reconnect special handling */
     private static Object            CTRLLOCK                      = new Object();
@@ -232,7 +232,7 @@ public class MountFileNet extends antiDDoSForHost {
                     if (this.br.containsHTML("account/logout/")) {
                         return;
                     }
-                    this.br = new Browser();
+                    this.br = createNewBrowserInstance();
                 }
                 br.setFollowRedirects(true);
                 getPage("https://" + this.getHost() + "/account/login/");

@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DiskYandexNet;
 
-@DecrypterPlugin(revision = "$Revision: 50244 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52198 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNetFolder extends PluginForDecrypt {
     public DiskYandexNetFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +123,6 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final Account account, final boolean allowPagination) throws Exception {
-        br.setFollowRedirects(true);
         String contenturl = param.getCryptedUrl();
         /* Do some URL corrections */
         final Regex docviewer = new Regex(contenturl, type_docviewer);
@@ -141,6 +140,7 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
         if (account != null) {
             hosterplugin.login(account, false);
         }
+        hosterplugin.prepBR(br);
         /**
          * 2021-02-09: New: Prefer website if we don't know whether we got a file or a folder! API will fail in case it is a single file &&
          * is currently quota-limited!

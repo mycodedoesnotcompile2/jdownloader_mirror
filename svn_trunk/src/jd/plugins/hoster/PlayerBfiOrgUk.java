@@ -19,7 +19,6 @@ package jd.plugins.hoster;
 import java.io.IOException;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -33,7 +32,7 @@ import jd.plugins.components.PluginJSonUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 
-@HostPlugin(revision = "$Revision: 36028 $", interfaceVersion = 3, names = { "player.bfi.org.uk" }, urls = { "https?://(?:www\\.)?player\\.bfi\\.org\\.uk/film/[a-z0-9\\-]+" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "player.bfi.org.uk" }, urls = { "https?://(?:www\\.)?player\\.bfi\\.org\\.uk/film/[a-z0-9\\-]+" })
 public class PlayerBfiOrgUk extends PluginForHost {
 
     public PlayerBfiOrgUk(PluginWrapper wrapper) {
@@ -76,7 +75,7 @@ public class PlayerBfiOrgUk extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Paid content - you need to pay for this before you can download it!");
         }
         /* Dump session information - not necessarily needed! */
-        this.br = new Browser();
+        this.br = createNewBrowserInstance();
 
         this.br.getPage("http://player.ooyala.com/player.js?embedCode=" + Encoding.urlEncode(videoid));
         String mobile_player_url = this.br.getRegex("mobile_player_url=\"(http[^<>\"]*?\\&device=)\"").getMatch(0);

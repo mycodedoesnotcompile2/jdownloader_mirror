@@ -39,7 +39,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 51438 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52199 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornboxCom.class })
 public class PornboxComCrawler extends PluginForDecrypt {
     public PornboxComCrawler(PluginWrapper wrapper) {
@@ -132,15 +132,24 @@ public class PornboxComCrawler extends PluginForDecrypt {
             ret.add(image_screenshot);
         }
         /* Add main video in all resolutions */
+        String trailerMediaID = null;
         for (final Map<String, Object> media : medias) {
             final String type = media.get("type").toString();
-            if (userIsPremium && type.equalsIgnoreCase("free")) {
+            final boolean isFreeContent = type.equalsIgnoreCase("free");
+            if (userIsPremium && isFreeContent) {
                 /* Skip free content like previews and trailers if user owns a premium account */
                 logger.info("Skipping media_id free content as user is premium " + media.get("media_id"));
                 continue;
+            } else if (isFreeContent) {
+                /*
+                 * Skip such items anyways as we cannot officially download trailers the same way as clips can be downloaded via account. We
+                 * need to download the streams!
+                 */
+                trailerMediaID = media.get("media_id").toString();
+                continue;
             }
             final List<Map<String, Object>> transcodings = (List<Map<String, Object>>) media.get("transcodings");
-            if (transcodings == null) {
+            if (transcodings == null || transcodings.isEmpty()) {
                 /* Most likely a premium only item. It will have list-field "offers" available instead of "transcodings". */
                 logger.info("Skipping media_id as it has no transcodings " + media.get("media_id"));
                 continue;
@@ -166,6 +175,39 @@ public class PornboxComCrawler extends PluginForDecrypt {
         for (final DownloadLink result : ret) {
             result.setAvailable(true);
             result._setFilePackage(fp);
+        }
+        crawlTrailer: if (!userIsPremium && trailerMediaID != null) {
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+            /*
+             * Return previously collected items already just in case something goes wrong in this handling and also to provide feedback to
+             * the user.
+             */
+            distribute(ret);
+            int maxBitrate = -1;
+            String maxQualityLabel = null;
+            String maxQualityDownloadlink = null;
+            br.getPage("/media/" + trailerMediaID + "/stream?label_id=29&_=" + System.currentTimeMillis());
+            final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> fallback = (Map<String, Object>) entries2.get("fallback");
+            for (final Object streamingtypesO : fallback.values()) {
+                /* Each streamingtype can have multiple qualities */
+                final List<Map<String, Object>> streamingtypes = (List<Map<String, Object>>) streamingtypesO;
+                for (final Map<String, Object> quality : streamingtypes) {
+                    final int bitrate = ((Number) quality.get("bitrate")).intValue();
+                    if (bitrate > maxBitrate || maxQualityDownloadlink == null) {
+                        maxBitrate = bitrate;
+                        maxQualityLabel = quality.get("quality").toString();
+                        maxQualityDownloadlink = quality.get("src").toString();
+                    }
+                }
+            }
+            final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(maxQualityDownloadlink));
+            video.setFinalFileName(title + "_trailer_" + maxQualityLabel + "_bitrate_" + maxBitrate + ".mp4");
+            video.setAvailable(true);
+            video._setFilePackage(fp);
+            ret.add(video);
         }
         return ret;
     }

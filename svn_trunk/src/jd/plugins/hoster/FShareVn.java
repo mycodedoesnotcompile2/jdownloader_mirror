@@ -68,7 +68,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
+@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
 public class FShareVn extends PluginForHost {
     private final String         SERVERERROR                            = "Tài nguyên bạn yêu cầu không tìm thấy";
     private final String         IPBLOCKED                              = "<li>Tài khoản của bạn thuộc GUEST nên chỉ tải xuống";
@@ -701,7 +701,7 @@ public class FShareVn extends PluginForHost {
                  * 2021-08-03: Fresh browser instance with fresh headers for each loop else we may get error 400 (seemingly because of the
                  * "Referer" header).
                  */
-                final Browser brc = prepBrowserAPI(new Browser());
+                final Browser brc = prepBrowserAPI(createNewBrowserInstance());
                 final String token = getAPITokenAndSetCookies(account, brc);
                 final Map<String, Object> postdata = new HashMap<String, Object>();
                 postdata.put("token", token);
