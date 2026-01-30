@@ -72,7 +72,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 52056 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52217 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -284,7 +284,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 52056 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 52217 $"));
     }
 
     /**
@@ -788,9 +788,11 @@ public abstract class K2SApi extends PluginForHost {
             final boolean isFree = !this.isPremium(account);
             if (isFree && "premium".equalsIgnoreCase(link.getStringProperty(PROPERTY_ACCESS))) {
                 // download not possible
-                premiumDownloadRestriction(getErrorMessageForUser(3));
+                throw new AccountRequiredException(getErrorMessageForUser(3));
             } else if (isFree && "private".equalsIgnoreCase(link.getStringProperty(PROPERTY_ACCESS))) {
                 privateDownloadRestriction(getErrorMessageForUser(8));
+                /* This code should never be reached (exception should happen before). */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             String currentIP = null;
             if (isFree && PluginJsonConfig.get(this.getConfigInterface()).isEnableReconnectWorkaround()) {
@@ -1387,7 +1389,7 @@ public abstract class K2SApi extends PluginForHost {
         try {
             /* Check text errors first */
             if (StringUtils.equalsIgnoreCase(serversideErrormessage, "File not available")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msgForUser);
             }
             switch (errorcode) {
             case 1:
@@ -1401,13 +1403,13 @@ public abstract class K2SApi extends PluginForHost {
                 // assume all types
                 ipBlockedOrAccountLimit(link, account, msgForUser, FREE_RECONNECTWAIT_MILLIS);
                 /* This code should never be reached (exception should happen before). */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
             case 3:
             case 7:
                 // DOWNLOAD_FILE_SIZE_EXCEEDED = 3; "Free user can't download large files. Upgrade to PREMIUM and forget about limits."
                 // PREMIUM_ONLY = 7; "This download available only for premium users"
                 // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":7}]}
-                premiumDownloadRestriction(msgForUser);
+                throw new AccountRequiredException(msgForUser);
             case 4:
                 // DOWNLOAD_NO_ACCESS = 4; "You no can access to this file"
                 // not sure about this...
@@ -1426,12 +1428,12 @@ public abstract class K2SApi extends PluginForHost {
                 }
                 ipBlockedOrAccountLimit(link, account, msgForUser, waitMillis);
                 /* This code should never be reached (exception should happen before). */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
             case 6:
                 // DOWNLOAD_FREE_THREAD_COUNT_TO_MANY = 6; "Free account does not allow to download more than one file at the same time"
                 ipBlockedOrAccountLimit(link, account, msgForUser, 15 * 60 * 1000l);
                 /* This code should never be reached (exception should happen before). */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
             case 9:
                 /*
                  * {"status":"error","code":406,"message":"Download is not available","errorCode":21,"errors":[{"code":9,
@@ -1441,6 +1443,8 @@ public abstract class K2SApi extends PluginForHost {
             case 8:
                 // PRIVATE_ONLY = 8; //'This is private file',
                 privateDownloadRestriction(msgForUser);
+                /* This code should never be reached (exception should happen before). */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             case 10:
                 // Bad/invalid token? {"message":"You are not authorized for this action","status":"error","code":403,"errorCode":10}
                 dumpAuthToken(account);
@@ -1462,7 +1466,7 @@ public abstract class K2SApi extends PluginForHost {
                 // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":6}]}
                 // {"message":"Download not available","status":"error","code":406,"errorCode":42,"errors":[{"code":7}]}
                 // sub error, pass it back into itself.
-                throw new AccountRequiredException();
+                throw new AccountRequiredException(msgForUser);
             case 75:
                 // ERROR_YOU_ARE_NEED_AUTHORIZED = 10;
                 // ERROR_AUTHORIZATION_EXPIRED = 11;
@@ -1499,7 +1503,7 @@ public abstract class K2SApi extends PluginForHost {
                     dumpAuthToken(account);
                     throw new AccountUnavailableException(msgForUser, 1 * 60 * 1000l);
                 }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
             case 31:
                 // ERROR_CAPTCHA_INVALID = 31;
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, msgForUser);
@@ -1543,7 +1547,7 @@ public abstract class K2SApi extends PluginForHost {
                 logger.warning("Unknown errorcode: " + errorcode);
                 /* No known errors in json -> Check for response code errors */
                 checkResponseCodeErrors(account, link, br);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msgForUser);
             }
         } catch (final PluginException p) {
             logger.warning(getRevisionInfo());
@@ -1802,16 +1806,6 @@ public abstract class K2SApi extends PluginForHost {
             }
         }
         return msg;
-    }
-
-    /**
-     * When premium only download restriction (eg. filesize), throws exception with given message
-     *
-     * @param msg
-     * @throws PluginException
-     */
-    public void premiumDownloadRestriction(final String msg) throws PluginException {
-        throw new AccountRequiredException(msg);
     }
 
     /**

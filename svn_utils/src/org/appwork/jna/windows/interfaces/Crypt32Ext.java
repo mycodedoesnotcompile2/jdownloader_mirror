@@ -36,7 +36,9 @@ package org.appwork.jna.windows.interfaces;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.WString;
 import com.sun.jna.platform.win32.WinCrypt.HCRYPTMSG;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.W32APIOptions;
 
@@ -55,7 +57,43 @@ public interface Crypt32Ext extends com.sun.jna.platform.win32.Crypt32 {
     void CryptMsgClose(HCRYPTMSG hCryptMsg);
 
     // BOOL CryptDecodeObject(DWORD dwCertEncodingType, LPCSTR lpszStructType,
-    //                        const BYTE *pbEncoded, DWORD cbEncoded, DWORD dwFlags,
-    //                        void *pvStructInfo, DWORD *pcbStructInfo);
+    // const BYTE *pbEncoded, DWORD cbEncoded, DWORD dwFlags,
+    // void *pvStructInfo, DWORD *pcbStructInfo);
     boolean CryptDecodeObject(int dwCertEncodingType, Pointer lpszStructType, Pointer pbEncoded, int cbEncoded, int dwFlags, Pointer pvStructInfo, IntByReference pcbStructInfo);
+
+    // int CERT_STORE_PROV_SYSTEM = 10;
+    // int CERT_SYSTEM_STORE_CURRENT_USER = 0x00010000;
+    // int CERT_SYSTEM_STORE_LOCAL_MACHINE = 0x00020000;
+    // int CERT_STORE_OPEN_EXISTING_FLAG = 0x00004000;
+    // int X509_ASN_ENCODING = 0x00000001;
+    // int PKCS_7_ASN_ENCODING = 0x00010000;
+    int CERT_STORE_ADD_REPLACE_EXISTING = 3;
+    // Thumbprint (SHA-1 hash) property id
+    int CERT_SHA1_HASH_PROP_ID          = 3;
+
+    HANDLE CertOpenStore(int lpszStoreProvider, int dwMsgAndCertEncodingType, Pointer hCryptProv, int dwFlags, WString pvPara);
+
+    boolean CertCloseStore(HANDLE hCertStore, int dwFlags);
+
+    boolean CertAddEncodedCertificateToStore(HANDLE hCertStore, int dwCertEncodingType, byte[] pbCertEncoded, int cbCertEncoded, int dwAddDisposition, Pointer ppCertContext // optional
+                                                                                                                                                                             // out;
+                                                                                                                                                                             // can
+                                                                                                                                                                             // be
+                                                                                                                                                                             // NULL
+    );
+
+    Pointer CertDuplicateCertificateContext(Pointer pCertContext);
+
+    int CERT_NAME_SIMPLE_DISPLAY_TYPE = 4;
+    int CERT_NAME_ISSUER_FLAG         = 0x00000001;
+
+    int CertGetNameStringW(Pointer pCertContext, int dwType, int dwFlags, Pointer pvTypePara, char[] pszNameString, int cchNameString);
+
+    Pointer CertEnumCertificatesInStore(HANDLE hCertStore, Pointer pPrevCertContext);
+
+    boolean CertGetCertificateContextProperty(Pointer pCertContext, int dwPropId, byte[] pvData, IntByReference pcbData);
+
+    boolean CertDeleteCertificateFromStore(Pointer pCertContext);
+
+    boolean CertFreeCertificateContext(Pointer pCertContext);
 }

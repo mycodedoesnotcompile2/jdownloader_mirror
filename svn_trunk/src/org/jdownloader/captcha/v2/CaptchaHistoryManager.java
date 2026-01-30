@@ -191,7 +191,12 @@ public class CaptchaHistoryManager {
         long currentTime = System.currentTimeMillis();
         for (Iterator<CaptchaHistoryEntry> iterator = entries.iterator(); iterator.hasNext();) {
             CaptchaHistoryEntry entry = iterator.next();
-            if (entry.getTimestamp() + ONE_YEAR_IN_MILLIS < currentTime || StringUtils.isEmpty(entry.getDomain())) {
+            if (entry.getCaptcha_type() == null || StringUtils.isEmpty(entry.getDomain())) {
+                /* Remove broken items */
+                iterator.remove();
+                hasChanges = true;
+            } else if (entry.getTimestamp() + ONE_YEAR_IN_MILLIS < currentTime) {
+                /* Remove old items */
                 iterator.remove();
                 hasChanges = true;
             }

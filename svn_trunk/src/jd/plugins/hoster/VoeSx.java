@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52219 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -339,6 +339,35 @@ public class VoeSx extends XFileSharingProBasic {
         } else if (br.containsHTML(">\\s*Access to this file has been temporarily restricted")) {
             /* 2023-11-29 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Access to this file has been temporarily restricted");
+        }
+        final String encodingError1 = br.getRegex(">\\s*(File is in the encoding queue\\. Current position: #\\d+)<").getMatch(0);
+        if (encodingError1 != null) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, encodingError1, 10 * 60 * 1000);
+        }
+        if (br.containsHTML(">\\s*Encoding in progress, please wait") || br.containsHTML("class=\"progress-bar encoding-process\"")) {
+            String encodingError2 = "Encoding in progress, please wait";
+            long waitMillis = 5 * 60 * 1000;
+            try {
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("/engine/status?fileCode=" + this.getFUIDFromURL(link));
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                final int waitSeconds = ((Number) entries.get("encodingWaitingSeconds")).intValue();
+                if (waitSeconds > 0) {
+                    waitMillis = waitSeconds * 1000;
+                }
+                final String state = entries.get("state").toString();
+                if (!StringUtils.isEmpty(state)) {
+                    /*
+                     * e.g. Das Video wird jetzt verarbeitet. Live-Codierungsstatus: <b>74 / 100%</b> - geschätzte Wartezeit: <b>3 Minuten
+                     * 40 Sekunden</b>
+                     */
+                    encodingError2 = state;
+                }
+            } catch (final Throwable e) {
+                logger.log(e);
+                logger.info("Failed to find detailed encoding in progress status info");
+            }
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, encodingError2, waitMillis);
         }
     }
 

@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52187 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52211 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class VidmolyTo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidmoly.biz", "vidmoly.me", "vidmoly.to", "vidmoly.net" });
+        ret.add(new String[] { "vidmoly.me", "vidmoly.biz", "vidmoly.to", "vidmoly.net" });
         return ret;
     }
 
@@ -63,6 +63,7 @@ public class VidmolyTo extends XFileSharingProBasic {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("vidmoly.to");
+        deadDomains.add("vidmoly.biz");
         return deadDomains;
     }
 
@@ -70,6 +71,10 @@ public class VidmolyTo extends XFileSharingProBasic {
     public String rewriteHost(final String host) {
         /* 2025-09-19: Changed main domain from vidmoly.to to vidmoly.net */
         /* 2026-01-27: Changed main domain from vidmoly.net to vidmoly.biz */
+        /*
+         * 2026-01-29: Changed main domain from vidmoly.biz to vidmoly.me as .biz domain displays this atm:
+         * {"name":"embed-service","version":"1.0.0","status":"running"}
+         */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

@@ -1145,6 +1145,7 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     @AboutConfig
     @ValidatorFactory(DefaultSimpleDateValidator.class)
     @RequiresRestart("Restart is Required")
+    @DescriptionForConfigEntry("Applies for column in Linkgrabber- and Downloadlist")
     String getDateTimeFormatDownloadListAddedDateColumn();
 
     void setDateTimeFormatDownloadListAddedDateColumn(String df);
@@ -1152,6 +1153,7 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     @AboutConfig
     @ValidatorFactory(DefaultSimpleDateValidator.class)
     @RequiresRestart("Restart is Required")
+    @DescriptionForConfigEntry("Applies for column in Linkgrabber- and Downloadlist")
     String getDateTimeFormatDownloadListModifiedDateColumn();
 
     void setDateTimeFormatDownloadListModifiedDateColumn(String df);

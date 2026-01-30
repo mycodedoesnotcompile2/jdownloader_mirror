@@ -19,6 +19,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
@@ -27,18 +28,17 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
 import jd.plugins.Plugin;
-import jd.plugins.PluginDependencies;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.FilemoonSx;
+import jd.plugins.hoster.BysejikuarCom;
 
-@DecrypterPlugin(revision = "$Revision: 52124 $", interfaceVersion = 3, names = {}, urls = {})
-@PluginDependencies(dependencies = { FilemoonSxCrawler.class })
+@DecrypterPlugin(revision = "$Revision: 52214 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,8 +46,23 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "filemoon.sx", "filemoon.to", "filemoon.eu", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com" });
+        ret.add(new String[] { "filemoon.sx", "bysejikuar.com", "byse.sx", "byseraguci.com", "bysezejataos.com", "filemoon.to", "filemoon.eu", "filemooon.link", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("filemoon.eu");
+        deadDomains.add("morgan0928-6v7c14vs.fun");
+        deadDomains.add("bf0skv.org");
+        deadDomains.add("ghajini-emtftw1o.lol");
+        deadDomains.add("f51rm.com");
+        /**
+         * 2026-01-29: <br>
+         * Domains that redirect only to a 403 error page are not offline for example: <br>
+         * filemooon.link, byseraguci.com, bysezejataos.com
+         */
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -76,7 +91,12 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final FilemoonSx hosterPlugin = (FilemoonSx) this.getNewPluginForHostInstance(this.getHost());
+        /*
+         * 2026-01-29: Hardcoded disabled subtitle crawler for now as website underwent major changes and I didn't find items with subtitles
+         * yet.
+         */
+        final boolean allowSubtitleCrawling = false;
+        final BysejikuarCom hosterPlugin = (BysejikuarCom) this.getNewPluginForHostInstance(this.getHost());
         /**
          * 2025-11-26: Do some replacements to ensure that links are compatible with the default XFS supported plugin patterns. <br>
          */
@@ -86,10 +106,14 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
         if (!new Regex(path0, "(d|e)").patternFind()) {
             contenturl = contenturl.replace("/" + path0 + "/", "/e/");
         }
+        final String addedLinkDomain = Browser.getHost(contenturl, true);
+        if (getDeadDomains().contains(addedLinkDomain)) {
+            contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), this.getHost());
+        }
         final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), contenturl, true);
         final XFSConfigVideoFilemoonSx cfg = PluginJsonConfig.get(XFSConfigVideoFilemoonSx.class);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        if (!cfg.isCrawlSubtitle()) {
+        if (!cfg.isCrawlSubtitle() || !allowSubtitleCrawling) {
             ret.add(link);
             return ret;
         }

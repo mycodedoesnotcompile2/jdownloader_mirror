@@ -35,10 +35,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 52191 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52214 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class BysejikuarCom extends PluginForHost {
     public BysejikuarCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,10 +60,13 @@ public class BysejikuarCom extends PluginForHost {
     }
 
     private static List<String[]> getPluginDomains() {
-        final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bysejikuar.com", "byse.sx" });
-        return ret;
+        return FilemoonSxCrawler.getPluginDomains();
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-01-29: Website had multiple domain changes so we need this. */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -75,7 +81,7 @@ public class BysejikuarCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:d|download)/([A-Za-z0-9]{12})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:d|e|download)/([A-Za-z0-9]{12})");
         }
         return ret.toArray(new String[0]);
     }
@@ -109,7 +115,9 @@ public class BysejikuarCom extends PluginForHost {
     }
 
     private String getApiBase() {
-        return "https://" + getHost() + "/api";
+        // return "https://" + getHost() + "/api";
+        /* 2026-01-29: Hardcoded domain */
+        return "https://bysejikuar.com/api";
     }
 
     private Map<String, Object> dldata         = null;
@@ -171,7 +179,7 @@ public class BysejikuarCom extends PluginForHost {
         requestFileInformation(link);
         if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             // TODO: Fix download and remove this check
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Download support for new Filemoon/BYSE website is still under development");
         }
         /* 2026-01-27: Typically 30 seconds */
         final int countdown_seconds = ((Number) this.dldata.get("countdown_seconds")).intValue();

@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 49515 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52214 $", interfaceVersion = 2, names = {}, urls = {})
 public class BsTo extends PluginForDecrypt {
     public BsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,6 @@ public class BsTo extends PluginForDecrypt {
         deadDomains.add("burningseries.nz");
         deadDomains.add("burningseries.se");
         deadDomains.add("burningseries.tw");
-        deadDomains.add("");
         return deadDomains;
     }
 

@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51626 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
+@HostPlugin(revision = "$Revision: 52214 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
 public class KrakenfilesCom extends PluginForHost {
     public KrakenfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -206,7 +206,7 @@ public class KrakenfilesCom extends PluginForHost {
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
                 logger.info("Attempting cookie login");
-                this.br.setCookies(this.getHost(), cookies);
+                br.setCookies(cookies);
                 if (!force) {
                     /* Don't validate cookies */
                     return false;
