@@ -6,12 +6,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.StringUtils;
+import java.util.concurrent.TimeUnit;
 
 import jd.controlling.captcha.CaptchaSettings;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
 
 /**
  * Singleton Manager for managing CaptchaHistoryEntry objects.
@@ -20,16 +21,22 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
  * to query the last timestamp per CAPTCHA_TYPE - Thread-safe operations using CopyOnWriteArrayList
  */
 public class CaptchaHistoryManager {
-    private static final CaptchaHistoryManager INSTANCE           = new CaptchaHistoryManager();
-    private static final int                   MAX_ENTRIES        = 500;
-    private static final long                  ONE_YEAR_IN_MILLIS = 365L * 24L * 60L * 60L * 1000L;
-    protected final static CaptchaSettings     CAPTCHA_SETTINGS   = JsonConfig.create(CaptchaSettings.class);
-    private final Object                       lock               = new Object();
+    private static final CaptchaHistoryManager              INSTANCE           = new CaptchaHistoryManager();
+    private static final int                                MAX_ENTRIES        = 500;
+    private static final long                               ONE_YEAR_IN_MILLIS = TimeUnit.DAYS.toMillis(365);
+    protected final static CaptchaSettings                  CAPTCHA_SETTINGS   = JsonConfig.create(CaptchaSettings.class);
+    private final CopyOnWriteArrayList<CaptchaHistoryEntry> entries;
 
     /**
      * Private constructor for singleton pattern.
      */
     private CaptchaHistoryManager() {
+        CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
+        if (entries == null) {
+            entries = new CopyOnWriteArrayList<CaptchaHistoryEntry>();
+            CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
+        }
+        this.entries = entries;
     }
 
     /**
@@ -55,9 +62,9 @@ public class CaptchaHistoryManager {
         if (challenge == null) {
             throw new IllegalArgumentException("challenge cannot be null");
         }
-        String host = challenge.getHost();
-        CAPTCHA_TYPE captchaType = CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
-        boolean isLoginCaptcha = challenge.isAccountLogin();
+        final String host = challenge.getHost();
+        final CAPTCHA_TYPE captchaType = CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
+        final boolean isLoginCaptcha = challenge.isAccountLogin();
         return new CaptchaHistoryEntry(host, captchaType, isLoginCaptcha);
     }
 
@@ -73,17 +80,8 @@ public class CaptchaHistoryManager {
         if (entry == null) {
             throw new IllegalArgumentException("entry cannot be null");
         }
-        synchronized (lock) {
-            CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
-            if (entries == null) {
-                entries = new CopyOnWriteArrayList<CaptchaHistoryEntry>();
-                CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
-            }
-            entries.add(entry);
-            if (cleanupEntries(entries)) {
-                CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
-            }
-        }
+        entries.add(entry);
+        cleanupEntries();
     }
 
     /**
@@ -99,7 +97,7 @@ public class CaptchaHistoryManager {
         if (challenge == null) {
             throw new IllegalArgumentException("challenge cannot be null");
         }
-        CaptchaHistoryEntry entry = new CaptchaHistoryEntry(challenge);
+        final CaptchaHistoryEntry entry = new CaptchaHistoryEntry(challenge);
         addEntry(entry);
     }
 
@@ -116,7 +114,7 @@ public class CaptchaHistoryManager {
         if (type == null) {
             throw new IllegalArgumentException("type cannot be null");
         }
-        CaptchaHistoryEntryFilter filter = new CaptchaHistoryEntryFilter().withCaptchaType(type);
+        final CaptchaHistoryEntryFilter filter = new CaptchaHistoryEntryFilter().withCaptchaType(type);
         return getFilteredEntries(filter);
     }
 
@@ -133,7 +131,7 @@ public class CaptchaHistoryManager {
         if (type == null) {
             throw new IllegalArgumentException("type cannot be null");
         }
-        CaptchaHistoryEntryFilter filter = new CaptchaHistoryEntryFilter().withCaptchaType(type);
+        final CaptchaHistoryEntryFilter filter = new CaptchaHistoryEntryFilter().withCaptchaType(type);
         return getLastEntryMatching(filter);
     }
 
@@ -143,25 +141,14 @@ public class CaptchaHistoryManager {
      * @return Copy of the history list
      */
     public List<CaptchaHistoryEntry> getAllEntries() {
-        synchronized (lock) {
-            CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
-            if (entries == null) {
-                return new ArrayList<CaptchaHistoryEntry>();
-            }
-            if (cleanupEntries(entries)) {
-                CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
-            }
-            return new ArrayList<CaptchaHistoryEntry>(entries);
-        }
+        return new ArrayList<CaptchaHistoryEntry>(cleanupEntries());
     }
 
     /**
      * Clears all entries from the history.
      */
     public void clear() {
-        synchronized (lock) {
-            CAPTCHA_SETTINGS.setCaptchaHistoryEntries(new CopyOnWriteArrayList<CaptchaHistoryEntry>());
-        }
+        entries.clear();
     }
 
     /**
@@ -174,41 +161,37 @@ public class CaptchaHistoryManager {
      *            The list to clean up
      * @return true if any entries were removed, false if no changes were made
      */
-    private boolean cleanupEntries(CopyOnWriteArrayList<CaptchaHistoryEntry> entries) {
-        if (entries == null || entries.size() == 0) {
-            return false;
+    private CopyOnWriteArrayList<CaptchaHistoryEntry> cleanupEntries() {
+        final CopyOnWriteArrayList<CaptchaHistoryEntry> entries = this.entries;
+        if (entries.size() == 0) {
+            return entries;
         }
-        boolean hasChanges = false;
-        // Remove null entries
+        final long currentTime = System.currentTimeMillis();
         for (Iterator<CaptchaHistoryEntry> iterator = entries.iterator(); iterator.hasNext();) {
-            CaptchaHistoryEntry entry = iterator.next();
+            final CaptchaHistoryEntry entry = iterator.next();
             if (entry == null) {
-                iterator.remove();
-                hasChanges = true;
-            }
-        }
-        // Remove entries older than 1 year or with empty domain
-        long currentTime = System.currentTimeMillis();
-        for (Iterator<CaptchaHistoryEntry> iterator = entries.iterator(); iterator.hasNext();) {
-            CaptchaHistoryEntry entry = iterator.next();
-            if (entry.getCaptcha_type() == null || StringUtils.isEmpty(entry.getDomain())) {
+                // Remove null entries
+                entries.remove(null);
+            } else if (entry.getCaptcha_type() == null || StringUtils.isEmpty(entry.getDomain())) {
                 /* Remove broken items */
-                iterator.remove();
-                hasChanges = true;
+                entries.remove(entry);
             } else if (entry.getTimestamp() + ONE_YEAR_IN_MILLIS < currentTime) {
                 /* Remove old items */
-                iterator.remove();
-                hasChanges = true;
+                // Remove entries older than 1 year or with empty domain
+                entries.remove(entry);
             }
         }
         // If we exceed MAX_ENTRIES, remove the oldest ones
         while (entries.size() > MAX_ENTRIES) {
             if (entries.size() > 0) {
-                entries.remove(0);
-                hasChanges = true;
+                try {
+                    entries.remove(0);
+                } catch (IndexOutOfBoundsException ignoreAsyncPurge) {
+                    break;
+                }
             }
         }
-        return hasChanges;
+        return entries;
     }
 
     /**
@@ -217,33 +200,18 @@ public class CaptchaHistoryManager {
      * @return Map with CAPTCHA_TYPE name() as key and entry count as value
      */
     public Map<String, Integer> getStatistics() {
-        synchronized (lock) {
-            CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
-            if (entries == null || entries.size() == 0) {
-                return new HashMap<String, Integer>();
-            }
-            Map<String, Integer> stats = new HashMap<String, Integer>();
-            for (int i = 0; i < entries.size(); i++) {
-                CaptchaHistoryEntry entry = entries.get(i);
-                if (entry == null) {
-                    continue;
-                }
-                CAPTCHA_TYPE type = entry.getCaptcha_type();
-                if (type == null) {
-                    continue;
-                }
-                String typeId = type.name();
-                Integer count = stats.get(typeId);
-                if (count == null) {
-                    count = Integer.valueOf(0);
-                }
-                stats.put(typeId, Integer.valueOf(count.intValue() + 1));
-            }
-            if (cleanupEntries(entries)) {
-                CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
-            }
-            return stats;
+        final List<CaptchaHistoryEntry> entries = cleanupEntries();
+        final Map<String, Integer> stats = new HashMap<String, Integer>();
+        final Iterator<CaptchaHistoryEntry> it = entries.iterator();
+        while (it.hasNext()) {
+            final CaptchaHistoryEntry entry = it.next();
+            final CAPTCHA_TYPE type = entry.getCaptcha_type();
+            final String typeId = type.name();
+            final Integer count = stats.get(typeId);
+            final int countValue = count != null ? count.intValue() + 1 : 1;
+            stats.put(typeId, countValue);
         }
+        return stats;
     }
 
     /**
@@ -256,37 +224,29 @@ public class CaptchaHistoryManager {
      * @throws IllegalArgumentException
      *             if filter is null
      */
-    public List<CaptchaHistoryEntry> getFilteredEntries(CaptchaHistoryEntryFilter filter) {
+    public List<CaptchaHistoryEntry> getFilteredEntries(final CaptchaHistoryEntryFilter filter) {
         if (filter == null) {
             throw new IllegalArgumentException("filter cannot be null");
         }
-        synchronized (lock) {
-            CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
-            if (entries == null || entries.size() == 0) {
-                return new ArrayList<CaptchaHistoryEntry>();
+        List<CaptchaHistoryEntry> result = new ArrayList<CaptchaHistoryEntry>();
+        final Iterator<CaptchaHistoryEntry> it = cleanupEntries().iterator();
+        while (it.hasNext()) {
+            final CaptchaHistoryEntry entry = it.next();
+            if (filter.matches(entry)) {
+                // Apply filters
+                result.add(entry);
             }
-            List<CaptchaHistoryEntry> result = new ArrayList<CaptchaHistoryEntry>();
-            // Apply filters
-            for (int i = 0; i < entries.size(); i++) {
-                CaptchaHistoryEntry entry = entries.get(i);
-                if (entry != null && filter.matches(entry)) {
-                    result.add(entry);
-                }
-            }
-            // Apply limit if specified
-            Integer limit = filter.getLimit();
-            if (limit != null && limit.intValue() > 0) {
-                int resultSize = result.size();
-                if (resultSize > limit.intValue()) {
-                    // Keep only the last 'limit' entries (most recent)
-                    result = result.subList(resultSize - limit.intValue(), resultSize);
-                }
-            }
-            if (cleanupEntries(entries)) {
-                CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
-            }
-            return result;
         }
+        final Integer limit = filter.getLimit();
+        if (limit != null && limit.intValue() > 0) {
+            // Apply limit if specified
+            final int resultSize = result.size();
+            if (resultSize > limit.intValue()) {
+                // Keep only the last 'limit' entries (most recent)
+                result = result.subList(resultSize - limit.intValue(), resultSize);
+            }
+        }
+        return result;
     }
 
     /**
@@ -302,8 +262,8 @@ public class CaptchaHistoryManager {
         if (filter == null) {
             throw new IllegalArgumentException("filter cannot be null");
         }
-        List<CaptchaHistoryEntry> entries = getFilteredEntries(filter);
-        if (entries == null || entries.size() == 0) {
+        final List<CaptchaHistoryEntry> entries = getFilteredEntries(filter);
+        if (entries.size() == 0) {
             return null;
         }
         return entries.get(entries.size() - 1);

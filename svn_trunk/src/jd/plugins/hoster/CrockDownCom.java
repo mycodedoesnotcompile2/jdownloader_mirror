@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 42477 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52227 $", interfaceVersion = 3, names = {}, urls = {})
 public class CrockDownCom extends XFileSharingProBasic {
     public CrockDownCom(final PluginWrapper wrapper) {
         super(wrapper);

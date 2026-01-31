@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 51951 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52223 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -686,7 +686,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
          */
         getPageAutoLogin(account, loggedIN, galleryID, param, br, param.getCryptedUrl(), null, null);
         final List<Map<String, Object>> postsFromWebsite = new ArrayList<Map<String, Object>>(0);
-        try {
+        findGalleryJsonSource: try {
             final String json = websiteGetJson();
             Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             List<Map<String, Object>> resource_data_list = null;
@@ -701,7 +701,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                             for (final Map<String, Object> postitem : postitems) {
                                 postsFromWebsite.add(postitem);
                             }
-                            break;
+                            break findGalleryJsonSource;
                         }
                     }
                 }
@@ -724,6 +724,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     postsFromWebsite.addAll(items);
+                    break findGalleryJsonSource;
                 }
             }
         } catch (final Throwable e) {
@@ -1043,7 +1044,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 nextid = (String) get(user, "media/page_info/end_cursor");
             }
             int numberofCrawledPosts = 0;
-            do {
+            pagination: do {
                 if (page > 1) {
                     final Browser br = this.br.cloneBrowser();
                     prepBrAjax(br, qdb);
@@ -1093,20 +1094,21 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 logger.info("Crawled page: " + page + " | Crawled posts: " + numberofCrawledPosts + "/" + numberofPosts + " | Collected DownloadLink items so far: " + ret.size());
                 if (maxItemsLimit > 0 && ret.size() >= maxItemsLimit) {
                     logger.info("Stopping because: User defined max items limit has been reached");
-                    break;
+                    break pagination;
                 } else if (numberofCrawledPosts >= numberofPosts) {
                     logger.info("Stopping because: Crawled all posts");
-                    break;
+                    break pagination;
                 } else if (ret.size() == decryptedLinksLastSize) {
                     logger.info("Stopping because: Failed to find any new items on current page");
-                    break;
+                    break pagination;
                 } else if (StringUtils.isEmpty(nextid)) {
                     logger.info("Stopping because: nextid is missing/empty");
-                    break;
+                    break pagination;
                 } else if (this.isAbort()) {
                     logger.info("Stopping because: Aborted by user");
-                    break;
+                    break pagination;
                 }
+                /* Continue to next page */
                 page++;
             } while (true);
             if (!isAbort()) {
@@ -1172,7 +1174,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         int numberofCrawledPosts = 0;
         final int maxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getProfileCrawlerMaxItemsLimit();
         final String profilePostsFeedBaseURL = InstaGramCom.ALT_API_BASE + "/feed/user/" + userID + "/";
-        do {
+        pagination: do {
             if (page == 1) {
                 InstaGramCom.getPageAltAPI(account, this.br, profilePostsFeedBaseURL);
             } else {
@@ -1219,16 +1221,16 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             logger.info("Crawled page: " + page + " | Crawled posts so far: " + numberofCrawledPosts + " | Total number of media items: " + total_media_items);
             if (!more_available) {
                 logger.info("Stopping because: more_available == false");
-                break;
+                break pagination;
             } else if (StringUtils.isEmpty(nextid)) {
                 logger.info("Stopping because: no nextid available");
-                break;
+                break pagination;
             } else if (maxItemsLimit > 0 && numberofCrawledPosts >= maxItemsLimit) {
                 logger.info("Stopping because: reached user defined max items limit of " + maxItemsLimit);
-                break;
-            } else {
-                page++;
+                break pagination;
             }
+            /* Continue to next page */
+            page++;
         } while (!this.isAbort());
         return ret;
     }
@@ -1442,13 +1444,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     @SuppressWarnings({ "unchecked" })
-    private ArrayList<DownloadLink> crawlPost(final CryptedLink param, InstagramMetadata metadata, Map<String, Object> post) throws Exception {
-        long date = JavaScriptEngineFactory.toLong(post.get("date"), 0);
-        if (date == 0) {
-            date = JavaScriptEngineFactory.toLong(post.get("taken_at_timestamp"), 0);
-            if (date == 0) {
+    private ArrayList<DownloadLink> crawlPost(final CryptedLink param, InstagramMetadata metadata, final Map<String, Object> post) throws Exception {
+        long date_timestamp = JavaScriptEngineFactory.toLong(post.get("date"), 0);
+        if (date_timestamp == 0) {
+            date_timestamp = JavaScriptEngineFactory.toLong(post.get("taken_at_timestamp"), 0);
+            if (date_timestamp == 0) {
                 // api
-                date = JavaScriptEngineFactory.toLong(post.get("taken_at"), 0);
+                date_timestamp = JavaScriptEngineFactory.toLong(post.get("taken_at"), 0);
             }
         }
         final InstagramConfig cfg = PluginJsonConfig.get(InstagramConfig.class);
@@ -1474,20 +1476,24 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             metadata = new InstagramMetadata();
         }
         metadata.setMainContentID(mainContentID);
-        metadata.setDate(new Date(date * 1000));
+        metadata.setDate(new Date(date_timestamp * 1000));
         /* Find username if it is not pre-given. */
+        String username = null;
         try {
-            Map<String, Object> ownerInfo = (Map<String, Object>) post.get("owner");
-            if (ownerInfo == null) {
-                // api
-                ownerInfo = (Map<String, Object>) post.get("user");
-            }
+            final Map<String, Object> ownerInfo = (Map<String, Object>) post.get("owner");
+            final Map<String, Object> user = (Map<String, Object>) post.get("user");
             String userID = StringUtils.valueOfOrNull(ownerInfo.get("id"));
-            if (userID == null) {
-                // api
-                userID = StringUtils.valueOfOrNull(ownerInfo.get("pk"));
+            if (userID == null && user != null) {
+                userID = user.get("pk").toString();
+            }
+            username = (String) ownerInfo.get("username");
+            if (username == null && user != null) {
+                username = user.get("username").toString();
             }
             if (userID == null) {
+                /* Should always be given! */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else if (username == null) {
                 /* Should always be given! */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -1495,29 +1501,10 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             if (ownerHasPrivateProfileO != null) {
                 ownerHasPrivateProfile = ownerHasPrivateProfileO.booleanValue();
             }
-            /* Check if username is in json */
-            String username = (String) ownerInfo.get("username");
-            if (username != null) {
-                /* Cache information for later usage just in case it isn't present in json the next time. */
-                addCachedUserID(userID, username);
+            /* Cache information for later usage just in case it isn't present in json the next time. */
+            addCachedUserID(userID, username);
+            if (metadata.getUsername() == null) {
                 metadata.setUsername(username);
-            } else {
-                /* Find username "the hard way" */
-                /* TODO: Not sure if this is still needed */
-                /* Check if we got this username cached */
-                synchronized (ID_TO_USERNAME) {
-                    username = this.getCachedUserName(userID);
-                    if (username == null) {
-                        /* HTTP request needed to find username! */
-                        username = this.getUsernameFromUserIDAltAPI(br, userID);
-                        if (username == null) {
-                            logger.warning("WTF failed to find username for userID: " + userID);
-                        }
-                    }
-                }
-                if (username != null) {
-                    metadata.setUsername(username);
-                }
             }
         } catch (final Throwable ignore) {
             logger.log(ignore);
@@ -1736,8 +1723,15 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> results = new ArrayList<DownloadLink>();
         final Map<String, Object> user = (Map<String, Object>) item.get("user");
-        final String username = user.get("username").toString();
         final String userID = user.get("id").toString();
+        /*
+         * First try to get username from provided metadata. This is important because a post can also be a repost from someone elses post
+         * thus posted by another user than the profile we might be crawling at this moment.
+         */
+        String username = metadata.getUsername();
+        if (username == null) {
+            username = user.get("username").toString();
+        }
         /* Now that we already have this data, we can also cache it which will save requests later on. */
         this.addCachedUserID(userID, username);
         final Object reel_typeO = item.get("reel_type");

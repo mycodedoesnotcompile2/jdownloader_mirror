@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -57,7 +58,7 @@ import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCap
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52226 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -560,7 +561,7 @@ public class FilerNet extends PluginForHost {
     }
 
     private Object checkErrorsAPI(final Account account) throws Exception {
-        Map<String, Object> entries = null;
+        final Map<String, Object> entries;
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
@@ -575,59 +576,105 @@ public class FilerNet extends PluginForHost {
             }
         }
         // TODO: Merge code- and "status" handling: error codes should be all we need here
-        final Object code = entries.get("code");
-        final String statusMessage = (String) entries.get("status");
-        if (code != null) {
-            if ("hour download limit reached".equals(code)) {
+        final Object codeObject = entries.get("code");
+        final String statusObject = (String) entries.get("status");
+
+        final Number code;
+        if (codeObject == null) {
+            code = null;
+        } else if (codeObject instanceof Number) {
+            code = (Number) codeObject;
+        } else if (codeObject.toString().matches("\\d+")) {
+            code = Integer.parseInt(codeObject.toString());
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+
+        final String status;
+        if (codeObject != null && !codeObject.toString().matches("\\d+") && !StringUtils.isNotEmpty(codeObject.toString())) {
+            // still required? or can be removed?
+            status = codeObject.toString();
+        } else {
+            status = statusObject;
+        }
+        if (status != null) {
+            if ("hour download limit reached".equals(status)) {
                 final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-                int wait = 300;
-                if (data != null) {
-                    wait = ((Number) data.get("wait")).intValue();
+                final Number wait;
+                if (data != null && data.get("wait") instanceof Number) {
+                    wait = ((Number) data.get("wait"));
+                } else {
+                    wait = 300;
                 }
                 // Waittime too small->Don't reconnect
-                if (wait < 61) {
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads...", wait * 1000l);
+                if (wait.intValue() < 61) {
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads...", wait.intValue() * 1000l);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait * 1000l);
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait.intValue() * 1000l);
                 }
-            } else if ("user download slots filled".equals(code)) {
+            } else if ("user download slots filled".equals(status)) {
                 errorNoFreeSlotsAvailable();
-            } else if ("file captcha input needed".equals(code)) {
-                // statusCode = 202;
-            } else if ("file wait needed".equals(code)) {
-                // statusCode = 203;
-            }
-        }
-        if (code != null && (code instanceof Number || code.toString().matches("\\d+"))) {
-            final int statusCode = Integer.parseInt(code.toString());
-            if (statusCode >= 200 && statusCode < 300) {
+            } else if ("file captcha input needed".equals(status)) {
                 /* No error */
                 /* 202 = file captcha input needed */
+                return entries;
+            } else if ("file wait needed".equals(status)) {
+                /* No error */
                 /* 203 = file wait needed */
                 return entries;
-            }
-            if (statusCode == STATUSCODE_APIDISABLED) {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_APIDISABLEDTEXT, 2 * 60 * 60 * 1000l);
-            } else if (statusCode == STATUSCODE_DOWNLOADTEMPORARILYDISABLED) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_DOWNLOADTEMPORARILYDISABLEDTEXT, 2 * 60 * 60 * 1000l);
-            } else if (statusCode == 504) {
-                if (account == null || AccountType.FREE.equals(account.getType())) {
-                    throw new AccountRequiredException(statusMessage);
+            } else if ("account suspended".equals(status)) {
+                // {"code":403,"status":"account suspended","data":{}}
+                if (account != null) {
+                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
                 } else {
-                    if (StringUtils.isEmpty(statusMessage)) {
-                        throw new AccountUnavailableException("Traffic limit reached", 60 * 60 * 1000l);
-                    } else {
-                        throw new AccountUnavailableException(statusMessage, 60 * 60 * 1000l);
-                    }
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
                 }
-            } else if (statusCode == 505) {
+            } else if ("file not found".equals(status)) {
                 /* {"code":"505","status":"file not found","data":[]} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (statusCode == STATUSCODE_UNKNOWNERROR) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMESSAGE_UNKNOWNERRORTEXT);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + statusCode);
             }
+        }
+
+        if (code != null) {
+            final int statusCode = code.intValue();
+            switch (statusCode) {
+            case 403:
+                if (account != null) {
+                    /* e.g. {"code":403,"status":"account suspended","data":{}} */
+                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+                }
+            case STATUSCODE_APIDISABLED:
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_APIDISABLEDTEXT, 2 * 60 * 60 * 1000l);
+            case 505:
+                /* {"code":"505","status":"file not found","data":[]} */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            case STATUSCODE_DOWNLOADTEMPORARILYDISABLED:
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_DOWNLOADTEMPORARILYDISABLEDTEXT, 2 * 60 * 60 * 1000l);
+            case 504:
+                if (account == null || AccountType.FREE.equals(account.getType())) {
+                    throw new AccountRequiredException(status);
+                } else {
+                    if (StringUtils.isEmpty(status)) {
+                        throw new AccountUnavailableException("Traffic limit reached", 60 * 60 * 1000l);
+                    } else {
+                        throw new AccountUnavailableException(status, 60 * 60 * 1000l);
+                    }
+                }
+            case STATUSCODE_UNKNOWNERROR:
+                throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMESSAGE_UNKNOWNERRORTEXT);
+            default:
+                if (statusCode >= 200 && statusCode < 300) {
+                    /* No error */
+                    /* 202 = file captcha input needed */
+                    /* 203 = file wait needed */
+                    return entries;
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error code " + entries);
+                }
+            }
+
         }
         final Object errorO = entries.get("error");
         final String message = (String) entries.get("message");
@@ -636,27 +683,29 @@ public class FilerNet extends PluginForHost {
              * Error codes and messages can be extracted from here: https://filer.net/assets/ErrorPage-Br2HzfRN-1765742941422.js
              */
             final int error = ((Number) errorO).intValue();
-            if (error == 404) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, getErrorMessage(message, message));
-            } else if (error == 500) {
+            switch (error) {
+            case 404:
+                throw new PluginException(LinkStatus.ERROR_FATAL, getErrorMessage(null, message));
+            case 500:
                 /* SERVICE_TEMPORARILY_UNAVAILABLE */
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, getErrorMessage(message, message));
-            } else if (error == 501) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, getErrorMessage(null, message));
+            case 501:
                 /* SERVICE_BUSY */
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, getErrorMessage(message, message));
-            } else if (error == 502) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, getErrorMessage(null, message));
+            case 502:
                 /* {"error":502,"message":"CONCURRENT_DOWNLOAD_LIMIT"} */
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 3 * 60 * 1000);
-            } else if (error == 503) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(null, message), TimeUnit.MINUTES.toMillis(3));
+            case 503:
                 /* HOURLY_DOWNLOAD_LIMIT */
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 1 * 60 * 60 * 1000);
-            } else if (error == 504) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(null, message), TimeUnit.HOURS.toMillis(1));
+            case 504:
                 /* BANDWIDTH_QUOTA_EXCEEDED */
-            } else if (error == 505) {
+                break;
+            case 505:
                 /* PREMIUM_REQUIRED */
-                throw new AccountRequiredException(getErrorMessage(message, message));
-            } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error code " + error + " | " + message);
+                throw new AccountRequiredException(getErrorMessage(null, message));
+            default:
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error code " + entries);
             }
         } else if (errorO instanceof String) {
             /* e.g. {"error":"Action mismatch: expected 'download', got ''"} */
@@ -679,9 +728,9 @@ public class FilerNet extends PluginForHost {
                 // Along with http response 400
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, error);
             } else if (error.equalsIgnoreCase("HOURLY_DOWNLOAD_LIMIT")) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(message, message), 1 * 60 * 60 * 1000);
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessage(error, message), TimeUnit.HOURS.toMillis(1));
             }
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + error);
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error code " + entries);
         }
         return entries;
     }
@@ -700,7 +749,7 @@ public class FilerNet extends PluginForHost {
         if (errorKey == null || StringUtils.isEmpty(errorKey)) {
             return defaultMessage;
         }
-        String message = ERROR_MESSAGES.get(errorKey);
+        final String message = ERROR_MESSAGES.get(errorKey);
         return message != null ? message : defaultMessage;
     }
 

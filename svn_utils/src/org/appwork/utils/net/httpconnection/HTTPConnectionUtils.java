@@ -141,6 +141,9 @@ public class HTTPConnectionUtils {
                                 case 2:// dNSName
                                     subjects.add(subjectAlternativeName.get(1).toString());
                                     break;
+                                case 7: // iPAddress
+                                    subjects.add(subjectAlternativeName.get(1).toString());
+                                    break;
                                 }
                             }
                         }

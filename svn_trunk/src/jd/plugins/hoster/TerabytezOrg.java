@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52221 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,7 @@ public class TerabytezOrg extends XFileSharingProBasic {
     }
 
     /** Pattern of their old YetiShare links. */
-    final Pattern PATTERN_OLD = Pattern.compile("(?i)https?://[^/]+/([a-f0-9]{16})(/([^/]+))?");
+    final Pattern PATTERN_OLD = Pattern.compile("https?://[^/]+/([a-f0-9]{16})(/([^/]+))?", Pattern.CASE_INSENSITIVE);
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {

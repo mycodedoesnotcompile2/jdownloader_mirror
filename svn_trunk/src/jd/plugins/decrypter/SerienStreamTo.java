@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
@@ -51,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52218 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52221 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -63,11 +62,12 @@ public class SerienStreamTo extends PluginForDecrypt {
      * Marked as old: aniworld urls, formerly also used for serienstream <br>
      * Marked as new: serienstream urls new 2026-01-29
      */
-    private static final Pattern SERIES_REGEX             = Pattern.compile("([\\w-]+)(/staffel-(\\d+)(/episode-(\\d+))?)?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_SINGLE_STREAM_OLD   = Pattern.compile("/anime/stream/" + SERIES_REGEX.pattern(), Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_SINGLE_STREAM_NEW   = Pattern.compile("/serie/" + SERIES_REGEX.pattern(), Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_SINGLE_REDIRECT_OLD = Pattern.compile("/redirect/(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_SINGLE_REDIRECT_NEW = Pattern.compile("/r\\?t=(ey[a-zA-Z0-9_/\\+\\=\\-%]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SERIES_REGEX                                 = Pattern.compile("([\\w-]+)(/staffel-(\\d+)(/episode-(\\d+))?)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SERIES_OLD                              = Pattern.compile("/anime/stream/" + SERIES_REGEX.pattern(), Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SERIES_NEW                              = Pattern.compile("/serie/" + SERIES_REGEX.pattern(), Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SINGLE_REDIRECT_OLD                     = Pattern.compile("/redirect/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SINGLE_REDIRECT_NEW                     = Pattern.compile("/r\\?t=(ey[a-zA-Z0-9_/\\+\\=\\-%]+)", Pattern.CASE_INSENSITIVE);
+    private static final String  PROPERTY_IS_PART_OF_COMPLETE_SEASON_CRAWLING = "is_part_of_complete_season_crawling";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -92,15 +92,10 @@ public class SerienStreamTo extends PluginForDecrypt {
         for (final String[] domains : getPluginDomains()) {
             if (i == 0) {
                 /* serienstream domains */
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !true) {
-                    // TODO: Finish implementation of "crawl all episodes of season", then remove this IDE-only check
-                    ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_SINGLE_STREAM_NEW.pattern() + "|" + TYPE_SINGLE_REDIRECT_NEW.pattern() + ")");
-                } else {
-                    ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_SINGLE_STREAM_NEW.pattern() + "|[\\w-]+/staffel-\\d+/episode-\\d+)");
-                }
+                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_SERIES_NEW.pattern() + "|" + TYPE_SINGLE_REDIRECT_NEW.pattern() + ")");
             } else {
                 /* aniworld domains */
-                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_SINGLE_STREAM_OLD.pattern() + "|" + TYPE_SINGLE_REDIRECT_OLD.pattern() + ")");
+                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_SERIES_OLD.pattern() + "|" + TYPE_SINGLE_REDIRECT_OLD.pattern() + ")");
             }
             i++;
         }
@@ -115,7 +110,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             ret.add(this.crawlSingleRedirect(contenturl));
             return ret;
         } else {
-            return this.crawlMirrors(contenturl);
+            return this.crawlMirrors(param, contenturl);
         }
     }
 
@@ -158,72 +153,70 @@ public class SerienStreamTo extends PluginForDecrypt {
         return createDownloadlink(finallink);
     }
 
-    private ArrayList<DownloadLink> crawlMirrors(final String contenturl) throws PluginException, InterruptedException, DecrypterException, IOException {
+    private ArrayList<DownloadLink> crawlMirrors(final CryptedLink param, final String contenturl) throws PluginException, InterruptedException, DecrypterException, IOException {
         br.setFollowRedirects(true);
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Set<String> dupes = new HashSet<String>();
+        final boolean isNewWebsite = new Regex(contenturl, TYPE_SERIES_NEW).patternFind();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String titleOfEpisodeOrMovie = br.getRegex("class=\"episodeGermanTitle\"[^>]*>([^<]+)</span>").getMatch(0);
-        if (titleOfEpisodeOrMovie != null) {
-            titleOfEpisodeOrMovie = Encoding.htmlDecode(titleOfEpisodeOrMovie).trim();
+        String seriesTitle = null;
+        String episodeTitle = null;
+        if (isNewWebsite) {
+            seriesTitle = br.getRegex("id=\"seasonsEpisodesModalLabel\">([^<]+)</h5>").getMatch(0);
+            episodeTitle = br.getRegex("<h2 class=\"h4 mb-1\"[^>]*>([^<]+)</h2>").getMatch(0);
+        } else {
+            seriesTitle = br.getRegex("class=\"hostSeriesTitle\"[^>]*>\\s*<strong>([^<]+)</strong>").getMatch(0);
         }
-        String seriesTitle = br.getRegex("<meta property=\"og:title\" content=\"(?:Episode\\s*\\d+\\s|Staffel\\s*\\d+\\s|Filme?\\s*\\d*\\s|von\\s)+([^\"]+)\"/>").getMatch(0);
+        if (episodeTitle != null) {
+            episodeTitle = Encoding.htmlDecode(episodeTitle).trim();
+        }
         final Regex urlinfo_series = new Regex(br._getURL().getPath(), SERIES_REGEX.pattern() + "$");
-        final Regex urlinfo_movies = new Regex(br.getURL(), "https?://[^/]+/([^/]+)/([^/]+)/([^/]+)/filme(/film-(\\d+))?");
-        final boolean isSeriesMoviesLink = urlinfo_movies.patternFind();
+        if (!urlinfo_series.patternFind()) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final String seriesTitleSlug = urlinfo_series.getMatch(0);
-        String seriesSeasonNumberStr = urlinfo_series.getMatch(2);
-        if (seriesSeasonNumberStr == null) {
+        String seasonNumberStr = urlinfo_series.getMatch(2);
+        if (seasonNumberStr == null) {
             /*
              * No season slug given -> Use season 1 as default to get same results as website which displays episodes of season 1 if no
              * season is given in URL.
              */
-            seriesSeasonNumberStr = "1";
+            seasonNumberStr = "1";
         }
-        final String filmNumberStr = urlinfo_movies.getMatch(4);
-        final String seriesSeasonEpisodeNumberStr = urlinfo_series.getMatch(4);
-        if (seriesTitle == null && seriesTitleSlug != null) {
-            logger.warning("Failed to find title -> Using fallback: " + seriesTitleSlug);
+        final String episodeNumberStr = urlinfo_series.getMatch(4);
+        if (seriesTitle == null) {
+            logger.warning("Failed to find seriesTitle -> Using fallback: " + seriesTitleSlug);
             seriesTitle = seriesTitleSlug.replace("-", " ").trim();
         }
-        if (seriesTitle != null) {
-            seriesTitle = Encoding.htmlDecode(seriesTitle).trim();
-        }
-        /* Videos are on external sites (not in embeds), so harvest those if we can get our hands on them. */
-        final String[] episodeMirrorsHTMLs = br.getRegex("<li class=\"[^\"]*episodeLink\\d+\"(.*?)</a>").getColumn(0);
-        if (filmNumberStr == null && urlinfo_movies.patternFind()) {
-            /* Find all films of a series */
-            // TODO: Check if such film links still exist
-            final String[][] filmLinks = br.getRegex("href=\"([^\"]+" + Pattern.quote(seriesTitleSlug) + "/filme/film-\\d+)\"").getMatches();
-            if (filmLinks == null || filmLinks.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            for (final String[] filmLink : filmLinks) {
-                final String url = br.getURL(Encoding.htmlDecode(filmLink[0])).toExternalForm();
-                if (dupes.add(url)) {
-                    ret.add(createDownloadlink(url));
-                }
-            }
-            logger.info("Found " + ret.size() + " films of series: " + seriesTitleSlug);
-            /* Early return */
-            return ret;
-        }
-        crawlEpisodesOfSeason: if (seriesSeasonEpisodeNumberStr == null && filmNumberStr == null) {
+        seriesTitle = Encoding.htmlDecode(seriesTitle).trim();
+        /* 2026-01-30: Movies are listed as season 0 and then have "normal" episode numbers starting from 1. */
+        // final boolean isMovie = seriesSeasonNumberStr.equals("0");
+        final Set<String> dupes = new HashSet<String>();
+        crawlEpisodesOfSeason: if (episodeNumberStr == null) {
             /* No specific episode/film -> Crawl all episodes of a series */
-            final String[][] itemLinks = br.getRegex("href=\"([^\"]+" + Pattern.quote(seriesTitleSlug) + "/staffel-" + seriesSeasonNumberStr + "/[^\"]+)\"").getMatches();
-            if (itemLinks == null || itemLinks.length == 0) {
+            final String[] urls = br.getRegex(Pattern.quote(seriesTitleSlug) + "/staffel-" + seasonNumberStr + "/episode-\\d+").getColumn(-1);
+            if (urls == null || urls.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            for (final String[] itemLink : itemLinks) {
-                final String url = br.getURL(Encoding.htmlDecode(itemLink[0])).toExternalForm();
-                if (dupes.add(url)) {
-                    ret.add(createDownloadlink(url));
+            for (String url : urls) {
+                if (isNewWebsite) {
+                    url = "/serie/" + url;
+                } else {
+                    url = "/anime/stream/" + url;
                 }
+                url = br.getURL(url).toExternalForm();
+                if (!dupes.add(url)) {
+                    continue;
+                }
+                final DownloadLink link = createDownloadlink(url);
+                link.setProperty(PROPERTY_IS_PART_OF_COMPLETE_SEASON_CRAWLING, true);
+                ret.add(link);
             }
-            logger.info("Found " + ret.size() + " episodes of season: " + seriesSeasonNumberStr);
+            logger.info("Found " + ret.size() + " episodes of season: " + seasonNumberStr);
+            logger.info("Crawled season " + seasonNumberStr + " | Found episodes: " + ret.size());
             return ret;
         }
         /* Assume we got a single episode or film -> Crawl all mirrors */
@@ -233,11 +226,13 @@ public class SerienStreamTo extends PluginForDecrypt {
         String[] newsite_language_ids = null;
         final Map<String, List<String>> redirectURLsByHoster = new HashMap<String, List<String>>();
         final Map<String, List<String>> redirectURLsByLanguageID = new HashMap<String, List<String>>();
+        final String[] episodeMirrorsHTMLs = br.getRegex("<li class=\"[^\"]*episodeLink\\d+\"(.*?)</a>").getColumn(0);
         if (episodeMirrorsHTMLs != null && episodeMirrorsHTMLs.length != 0) {
+            /* Old website (aniworld) */
             for (final String episodeHTML : episodeMirrorsHTMLs) {
-                final String redirectURL = new Regex(episodeHTML, "(?i)href=\"([^\"]+redirect[^\"]+)\" target=\"_blank\"").getMatch(0);
-                final String languageID = new Regex(episodeHTML, "(?i)data-lang-key=\"(\\d+)\"").getMatch(0);
-                final String hoster = new Regex(episodeHTML, "(?i)title=\"Hoster ([^\"]+)\"").getMatch(0).toLowerCase(Locale.ENGLISH);
+                final String redirectURL = new Regex(episodeHTML, "href=\"([^\"]+redirect[^\"]+)\" target=\"_blank\"").getMatch(0);
+                final String languageID = new Regex(episodeHTML, "data-lang-key=\"(\\d+)\"").getMatch(0);
+                final String hoster = new Regex(episodeHTML, "title=\"Hoster ([^\"]+)\"").getMatch(0).toLowerCase(Locale.ROOT);
                 if (redirectURL == null || languageID == null || hoster == null) {
                     logger.warning("Something is null: redirectURL =" + redirectURL + " | languageKey = " + languageID + " | hoster = " + hoster);
                     /* Skip invalid items */
@@ -282,7 +277,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             for (int i = 0; i < len; i++) {
                 final String redirectURL = newsite_redirect_urls[i];
                 final String languageID = newsite_language_ids[i];
-                final String hoster = newsite_hosters[i];
+                String hoster = newsite_hosters[i];
                 if (redirectURL == null || languageID == null || hoster == null) {
                     logger.warning("Something is null: redirectURL =" + redirectURL + " | languageKey = " + languageID + " | hoster = " + hoster);
                     /* Skip invalid items */
@@ -292,6 +287,7 @@ public class SerienStreamTo extends PluginForDecrypt {
                     /* Skip duplicates */
                     continue;
                 }
+                hoster = hoster.toLowerCase(Locale.ROOT);
                 /* Update language-packages */
                 if (redirectURLsByLanguageID.containsKey(languageID)) {
                     redirectURLsByLanguageID.get(languageID).add(redirectURL);
@@ -320,18 +316,18 @@ public class SerienStreamTo extends PluginForDecrypt {
         final Set<String> userHosterPrioList = new LinkedHashSet<String>();
         /* Collect language name -> ID mapping if needed */
         final String userLanguagePrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getLanguagePriorityString();
-        findUserPreferredLanguages: if (userLanguagePrioListStr != null) {
+        final Map<String, String> languageIdTitleMap = new HashMap<String, String>();
+        findUserPreferredAndExistingLanguages: if (userLanguagePrioListStr != null) {
             /* Find existing languages and their internal IDs */
             final List<String> userAllowedLanguageTitles = new ArrayList<String>();
             userAllowedLanguageTitles.addAll(Arrays.asList(userLanguagePrioListStr.split(",")));
             final String languageFlagsHTML = br.getRegex("<div class=\"changeLanguage\">(.*?)</div>").getMatch(0);
-            final Map<String, String> languageIdTitleMap = new HashMap<String, String>();
             if (languageFlagsHTML != null) {
                 /* Old website */
                 final String[][] languageTitleIDMappings = new Regex(languageFlagsHTML, "<img[^>]*data-lang-key=\"(\\d+)\" title=\"([^\"]+)\"").getMatches();
                 if (languageTitleIDMappings == null || languageTitleIDMappings.length == 0) {
                     logger.warning("Failed to find any languageTitleIDMappings");
-                    break findUserPreferredLanguages;
+                    break findUserPreferredAndExistingLanguages;
                 }
                 /* Put languageTitleIDMappings into HashMap */
                 for (final String[] mapping : languageTitleIDMappings) {
@@ -343,10 +339,10 @@ public class SerienStreamTo extends PluginForDecrypt {
                 final String[] language_ids = br.getRegex("data-language-id=\"(\\d+)").getColumn(0);
                 if (languages == null || languages.length == 0 || language_ids == null || language_ids.length == 0) {
                     logger.warning("Failed to find available languages #0");
-                    break findUserPreferredLanguages;
+                    break findUserPreferredAndExistingLanguages;
                 } else if (languages.length != language_ids.length) {
                     logger.warning("Failed to find available languages #1");
-                    break findUserPreferredLanguages;
+                    break findUserPreferredAndExistingLanguages;
                 }
                 for (int i = 0; i < languages.length; i++) {
                     languageIdTitleMap.put(language_ids[i], languages[i]);
@@ -354,7 +350,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             }
             if (languageIdTitleMap.isEmpty()) {
                 logger.warning("Failed to find available languages");
-                break findUserPreferredLanguages;
+                break findUserPreferredAndExistingLanguages;
             }
             /* List of languageIDs created by weaker checks -> To be used as fallback */
             final Set<String> userLanguageIDsPrioListGreedy = new LinkedHashSet<String>();
@@ -398,45 +394,52 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
         String userHosterPrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getHosterPriorityString();
         if (!StringUtils.isEmpty(userHosterPrioListStr)) {
-            userHosterPrioListStr = userHosterPrioListStr.replace(" ", "").toLowerCase(Locale.ENGLISH);
+            userHosterPrioListStr = userHosterPrioListStr.replace(" ", "").toLowerCase(Locale.ROOT);
             userHosterPrioList.addAll(Arrays.asList(userHosterPrioListStr.split(",")));
         }
         /* Now check which URLs/mirrors our user prefers --> If configured properly, user will need to enter less captchas this way */
-        List<String> urlsToProcess = null;
+        List<String> urlsToProcess = new ArrayList<String>();
         if (userHosterPrioList.size() > 0) {
             /* Get user preferred mirrors by host (+ language if desired) */
-            // TODO: Refactor this to make it easier to understand
-            for (final String userAllowedHoster : userHosterPrioList) {
-                if (urlsToProcess != null && urlsToProcess.size() > 0) {
-                    /* Stop early if preferred hoster was found */
-                    break;
-                }
-                final List<String> preferredMirrorsByHost = redirectURLsByHoster.get(userAllowedHoster);
-                if (preferredMirrorsByHost == null || preferredMirrorsByHost.size() == 0) {
+            final List<String> mirrorsByHost = new ArrayList<String>();
+            final List<String> mirrorsByHostAndLanguage = new ArrayList<String>();
+            String chosenPrioHoster = null;
+            String chosenPrioLanguage = null;
+            findMirrorMatchingPrioHosterAndLanguage: for (final String allowedHoster : userHosterPrioList) {
+                final List<String> thisMirrorsByHost = redirectURLsByHoster.get(allowedHoster);
+                if (thisMirrorsByHost == null || thisMirrorsByHost.size() == 0) {
                     continue;
                 }
-                logger.info("Found user priorized mirrors by host:" + userAllowedHoster);
+                if (mirrorsByHost.isEmpty()) {
+                    mirrorsByHost.addAll(thisMirrorsByHost);
+                    chosenPrioHoster = allowedHoster;
+                }
                 /* Combine this with users' language priority if given -> */
-                for (final String languageKey : userLanguageIDsPrioList) {
-                    final List<String> preferredMirrorsByLanguage = redirectURLsByLanguageID.get(languageKey);
-                    if (preferredMirrorsByLanguage != null) {
-                        /* Collect all links from preferred hoster && preferred language */
-                        logger.info("Found perfect match by host + language:" + userAllowedHoster + "|" + languageKey);
-                        urlsToProcess = new ArrayList<String>();
-                        for (final String preferredMirrorByHost : preferredMirrorsByHost) {
-                            if (preferredMirrorsByLanguage.contains(preferredMirrorByHost)) {
-                                urlsToProcess.add(preferredMirrorByHost);
-                            }
-                        }
-                        break;
-                    } else {
-                        /* Set fallback value (preference by mirror only, not by language). */
-                        urlsToProcess = preferredMirrorsByHost;
+                for (final String allowedLanguageID : userLanguageIDsPrioList) {
+                    final List<String> preferredMirrorsByLanguage = redirectURLsByLanguageID.get(allowedLanguageID);
+                    if (preferredMirrorsByLanguage == null) {
+                        continue;
                     }
+                    /* Collect all links from preferred hoster && preferred language */
+                    for (final String preferredMirrorByHost : thisMirrorsByHost) {
+                        if (preferredMirrorsByLanguage.contains(preferredMirrorByHost)) {
+                            mirrorsByHostAndLanguage.add(preferredMirrorByHost);
+                        }
+                    }
+                    chosenPrioHoster = allowedHoster;
+                    chosenPrioLanguage = languageIdTitleMap.get(allowedLanguageID);
+                    /* Early return */
+                    break findMirrorMatchingPrioHosterAndLanguage;
                 }
             }
-            if (urlsToProcess == null) {
-                logger.info("Failed to find user priorized mirrors by host: " + userHosterPrioList);
+            if (mirrorsByHostAndLanguage.size() > 0) {
+                logger.info("Found " + mirrorsByHostAndLanguage.size() + " user priorized mirrors by host " + chosenPrioHoster + " and language " + chosenPrioLanguage);
+                urlsToProcess.addAll(mirrorsByHostAndLanguage);
+            } else if (mirrorsByHost.size() > 0) {
+                logger.info("Found " + mirrorsByHost.size() + " user priorized mirrors by host " + chosenPrioHoster);
+                urlsToProcess.addAll(mirrorsByHost);
+            } else {
+                logger.info("Failed to find user priorized mirrors by host prio: " + userHosterPrioList + " | language prio: " + userLanguageIDsPrioList);
             }
         } else if (!userLanguageIDsPrioList.isEmpty()) {
             /* Get user preferred mirrors by language only (ALL mirrors for preferred language) */
@@ -445,43 +448,33 @@ public class SerienStreamTo extends PluginForDecrypt {
                     urlsToProcess = redirectURLsByLanguageID.get(languageKey);
                 }
             }
-            if (urlsToProcess != null) {
-                logger.info("Found user priorized mirrors by language");
+            if (urlsToProcess.size() > 0) {
+                logger.info("Found " + urlsToProcess.size() + " user priorized mirrors by language");
             } else {
-                logger.info("Failed to find user priorized mirrors by language");
+                logger.info("Failed to find user priorized mirrors by language prio: " + userLanguageIDsPrioList);
             }
         }
         /* Check if user wished mirrors were found */
-        if (urlsToProcess != null) {
+        if (urlsToProcess.size() > 0) {
             logger.info("Crawling " + urlsToProcess.size() + "/" + allRedirectURLs.size() + " URLs");
         } else {
             /* Fallback: Users' settings would have filtered all items -> Return all items instead */
             logger.info("Crawling ALL URLs: " + allRedirectURLs.size());
             urlsToProcess = allRedirectURLs;
         }
-        final FilePackage fp;
-        if (seriesTitle != null) {
-            fp = FilePackage.getInstance();
-            if (isSeriesMoviesLink) {
-                /* We are crawling a single- or all "movie episodes" of a series -> Set name of movie as package name if possible */
-                if (filmNumberStr != null && titleOfEpisodeOrMovie != null) {
-                    fp.setName(seriesTitle + " - " + titleOfEpisodeOrMovie);
-                    fp.setPackageKey(getHost() + "/series/" + seriesTitleSlug + "/film/" + filmNumberStr);
-                } else {
-                    /* Fallback or all films of a series */
-                    fp.setName(seriesTitle + " S0");
-                    fp.setPackageKey(getHost() + "/series/" + seriesTitleSlug + "/films");
-                }
-            } else {
-                /* Single series episode or all episodes of a series */
-                fp.setName(seriesTitle + " S" + seriesSeasonNumberStr);
-                fp.setPackageKey(getHost() + "/series/" + seriesTitleSlug + "/season/" + seriesSeasonNumberStr);
-            }
-            fp.setAllowMerge(true);
-            fp.setAllowInheritance(true);
+        final DownloadLink parent = param.getDownloadLink();
+        final FilePackage fp = FilePackage.getInstance();
+        if (parent != null && parent.hasProperty(PROPERTY_IS_PART_OF_COMPLETE_SEASON_CRAWLING)) {
+            fp.setName(seriesTitle + " S" + seasonNumberStr);
+        } else if (episodeTitle != null) {
+            fp.setName(seriesTitle + " " + episodeTitle);
         } else {
-            fp = null;
+            /* Fallback: Set series title only */
+            fp.setName(seriesTitle + " E" + episodeNumberStr);
         }
+        fp.setPackageKey(getHost() + "/series/" + seriesTitleSlug + "/season/" + seasonNumberStr);
+        fp.setAllowMerge(true);
+        fp.setAllowInheritance(true);
         int index = -1;
         for (String redirectURL : urlsToProcess) {
             index++;
@@ -514,9 +507,7 @@ public class SerienStreamTo extends PluginForDecrypt {
                 redirectURL = br2.getURL();
             }
             final DownloadLink link = createDownloadlink(redirectURL);
-            if (fp != null) {
-                fp.add(link);
-            }
+            link._setFilePackage(fp);
             ret.add(link);
             distribute(link);
             if (this.isAbort()) {

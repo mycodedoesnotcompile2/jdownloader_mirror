@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52211 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52221 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2FapnadoXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -39,7 +39,7 @@ public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
     /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "fapnado.xxx" });
+        ret.add(new String[] { "fapnado.xxx", "fapnado.com" });
         return ret;
     }
 
@@ -48,7 +48,7 @@ public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
         final Map<Integer, String> qualityMap = new HashMap<Integer, String>();
         String superDllink = super.getDllink(link, br);
         if (superDllink != null) {
-            superDllink = decrypt_url(superDllink);
+            superDllink = decrypt_url(br, superDllink);
             final String qualityHeightStr = new Regex(superDllink, "_(\\d+)p\\.mp4").getMatch(0);
             int qualityHeight = 360;
             if (qualityHeightStr != null) {
@@ -58,7 +58,7 @@ public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
         }
         String dllinkHD = br.getRegex("unfurl\\(\"(https://[^\"]+)\"\\)\\);o\\.setAttribute\\(\"type\",\"video/mp4\"\\);o.setAttribute\\('title',\"HD").getMatch(0);
         if (dllinkHD != null) {
-            dllinkHD = decrypt_url(dllinkHD);
+            dllinkHD = decrypt_url(br, dllinkHD);
             if (superDllink == null || !dllinkHD.equals(superDllink)) {
                 qualityMap.put(720, dllinkHD);
             }
@@ -84,8 +84,28 @@ public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
     }
 
-    private static String decrypt_url(String url) {
-        final String DIGIT_STRING = "59230349905716806800799377149365";
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        final String videoidFromURL = new Regex(br.getURL(), "/videos?/(\\d+)").getMatch(0);
+        if (videoidFromURL != null && !br.containsHTML("/embed/" + videoidFromURL)) {
+            /* Invalid link without error message e.g. /videos/6707/rachel-starr-gets- */
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
+    }
+
+    private static String decrypt_url(final Browser br, String url) {
+        String magic = br.getRegex("var a = '(\\d+)'").getMatch(0);
+        if (magic == null) {
+            /* Use static fallback */
+            if (br.getHost().equals("fapnado.xxx")) {
+                magic = "59230349905716806800799377149365";
+            } else {
+                /* fapnado.com */
+                magic = "57498501723701598260159359313752";
+            }
+        }
         Pattern pattern = Pattern.compile("/[0-9]+/([^/]+)/");
         Matcher matcher = pattern.matcher(url);
         if (!matcher.find()) {
@@ -97,7 +117,7 @@ public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
         for (int c = chars.length - 1; c >= 0; c--) {
             int b = c;
             for (int d = c; d < 32; d++) {
-                int digit = Character.getNumericValue(DIGIT_STRING.charAt(d));
+                int digit = Character.getNumericValue(magic.charAt(d));
                 b += digit;
             }
             while (b >= chars.length) {

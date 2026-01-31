@@ -35,22 +35,21 @@ package org.appwork.utils.net.httpserver;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 
 /**
  * @author daniel
  *
  */
 public class HttpServerController {
-
-    private final java.util.List<HttpServer> servers = new ArrayList<HttpServer>();
+    private final List<HttpServer> servers = new ArrayList<HttpServer>();
 
     public HttpServerController() {
     }
 
-    public synchronized HttpServerInterface getServer(final int port) {
+    public synchronized HttpServer getServer(final int port) {
         for (final HttpServer s : servers) {
             if ((port == 0 && s.getWishedPort() == port) || s.getPort() == port) {
                 return s;
