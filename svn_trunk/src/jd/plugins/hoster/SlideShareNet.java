@@ -15,19 +15,19 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.JDHash;
@@ -36,6 +36,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -44,30 +45,36 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52237 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "" })
 public class SlideShareNet extends PluginForHost {
     public SlideShareNet(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/business/premium/plans?cmp_src=main_nav");
     }
 
-    private static final String APIKEY       = "ZXdvclNoQm0=";
-    private static final String SHAREDSECRET = "UjZIRW9VVEQ=";
-
     @Override
-    public String getAGBLink() {
-        return "https://www." + getHost() + "/terms";
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(new int[] { 410, 500 });
+        return br;
     }
 
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
+    }
+
+    private static final String APIKEY          = "ZXdvclNoQm0=";
+    private static final String SHAREDSECRET    = "UjZIRW9VVEQ=";
     private static final String NOTDOWNLOADABLE = "class=\"sprite iconNoDownload j\\-tooltip\"";
     private String              dllink          = null;
     private boolean             isVideo         = false;
     private boolean             server_issues   = false;
 
-    public static Browser prepBR(final Browser br) {
-        br.setFollowRedirects(true);
-        br.setAllowedResponseCodes(new int[] { 410, 500 });
-        return br;
+    @Override
+    public String getAGBLink() {
+        return "https://www." + getHost() + "/terms";
     }
 
     public static boolean isOffline(final Browser br) {
@@ -94,7 +101,6 @@ public class SlideShareNet extends PluginForHost {
         isVideo = false;
         server_issues = false;
         this.setBrowserExclusive();
-        prepBR(this.br);
         br.getPage(link.getPluginPatternMatcher());
         br.followConnection();
         if (isOffline(br)) {
@@ -225,69 +231,34 @@ public class SlideShareNet extends PluginForHost {
         }
     }
 
-    private static final String MAINPAGE = "http://slideshare.net";
-
-    @SuppressWarnings("unchecked")
     public void login(final Browser br, final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            // Load cookies
-            br.setCookiesExclusive(true);
-            final Object ret = account.getProperty("cookies", null);
-            boolean acmatch = Encoding.urlEncode(account.getUser()).equals(account.getStringProperty("name", Encoding.urlEncode(account.getUser())));
-            if (acmatch) {
-                acmatch = Encoding.urlEncode(account.getPass()).equals(account.getStringProperty("pass", Encoding.urlEncode(account.getPass())));
+            /**
+             * 2026-02-01: Supports only cookie login because: <br>
+             * - it's easier <br>
+             * - they have a lot of different social login types
+             */
+            final Cookies userCookies = account.loadUserCookies();
+            logger.info("Attempting cookie login");
+            br.setCookies(userCookies);
+            if (!force) {
+                /* Don't validate cookies */
+                return;
             }
-            if (acmatch && ret != null && ret instanceof Map<?, ?> && !force) {
-                final Map<String, String> cookies = (Map<String, String>) ret;
-                if (account.isValid()) {
-                    for (final Map.Entry<String, String> cookieEntry : cookies.entrySet()) {
-                        final String key = cookieEntry.getKey();
-                        final String value = cookieEntry.getValue();
-                        br.setCookie(MAINPAGE, key, value);
-                    }
-                    return;
-                }
-            }
-            br.setFollowRedirects(false);
-            br.getHeaders().put("Accept-Language", "en-us;q=0.7,en;q=0.3");
-            br.getPage("https://www.slideshare.net/login");
-            final String token = br.getRegex("name=\"authenticity_token\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-            final String lang = System.getProperty("user.language");
-            if (token == null) {
-                if ("de".equalsIgnoreCase(lang)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlugin defekt, bitte den JDownloader Support kontaktieren!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            br.getPage("https://www.slideshare.net/");
+            if (!this.isLoggedin(br)) {
+                /* Dead end */
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlugin broken, please contact the JDownloader Support!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             }
-            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            br.postPage("https://www.slideshare.net/login", "login_source=login.page&remember=1&source_from=&utf8=%E2%9C%93&authenticity_token=" + Encoding.urlEncode(token) + "&user_login=" + Encoding.urlEncode(account.getUser()) + "&user_password=" + Encoding.urlEncode(account.getPass()));
-            if (!br.containsHTML("\"success\":true") || br.getCookie(MAINPAGE, "logged_in") == null) {
-                if ("de".equalsIgnoreCase(lang)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-            }
-            final String is_pro = br.getCookie(MAINPAGE, "is_pro");
-            if (is_pro != null && !is_pro.equals("false")) {
-                /* Do not accept unsupported accounts! */
-                logger.info("Premium accounts are not (yet) supported, please contact us in our supportforum!");
-                final AccountInfo ai = new AccountInfo();
-                ai.setStatus("Premium accounts are not (yet) supported, please contact us in our supportforum!");
-                account.setAccountInfo(ai);
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-            // Save cookies
-            final HashMap<String, String> cookies = new HashMap<String, String>();
-            final Cookies add = br.getCookies(MAINPAGE);
-            for (final Cookie c : add.getCookies()) {
-                cookies.put(c.getKey(), c.getValue());
-            }
-            account.setProperty("name", Encoding.urlEncode(account.getUser()));
-            account.setProperty("pass", Encoding.urlEncode(account.getPass()));
-            account.setProperty("cookies", cookies);
         }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("/logout\"");
     }
 
     @Override
@@ -306,7 +277,6 @@ public class SlideShareNet extends PluginForHost {
         handleErrors();
         if (!this.isVideo) {
             login(this.br, account, false);
-            br.setFollowRedirects(false);
             final boolean useAPI = false;
             if (useAPI) {
                 // NOTE: This can also be used without username and password to check links but we always have to access the normal link
@@ -329,7 +299,6 @@ public class SlideShareNet extends PluginForHost {
                 if (br.containsHTML(NOTDOWNLOADABLE)) {
                     throw new PluginException(LinkStatus.ERROR_FATAL, "This document is not downloadable");
                 }
-                br.setFollowRedirects(true);
                 br.getPage(link.getDownloadURL() + "/download");
                 if (br.containsHTML("You have exhausted your daily limit")) {
                     /*
@@ -411,15 +380,7 @@ public class SlideShareNet extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

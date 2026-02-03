@@ -284,10 +284,6 @@ public class AccountInfo extends Property implements AccountTrafficView {
         this.account_usedSpace = Math.max(0, size);
     }
 
-    public void setUsedSpace(final String string) {
-        this.setUsedSpace(SizeFormatter.getSize(string, true, true));
-    }
-
     /**
      * Wrapper, will use standard httpd Date pattern.
      *

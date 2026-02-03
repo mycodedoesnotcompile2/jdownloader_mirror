@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52077 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -811,7 +811,7 @@ public class FileFactory extends PluginForHost {
                 space = br.getRegex("<div\\s*class\\s*=\\s*\"number\"\\s*>\\s*([0-9\\.]+ ?(KB|MB|GB|TB))\\s*</div>\\s*<[^>]*>\\s*Used Space").getMatch(0);
             }
             if (space != null) {
-                ai.setUsedSpace(space);
+                ai.setUsedSpace(SizeFormatter.getSize(space));
             }
         }
         if (AccountType.PREMIUM.equals(accountType)) {

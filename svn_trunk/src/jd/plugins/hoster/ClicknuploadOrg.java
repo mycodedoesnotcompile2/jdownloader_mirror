@@ -18,8 +18,10 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
-import jd.config.SubConfiguration;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -30,10 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 51136 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 3, names = {}, urls = {})
 public class ClicknuploadOrg extends XFileSharingProBasic {
     public ClicknuploadOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -215,16 +214,8 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
         if (filename != null) {
             logger.info("Successfully found filename via report_file: " + filename);
             return filename;
-        } else {
-            logger.info("Failed to find filename via report_file");
-            final boolean fnameViaAbuseUnsupported = br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500 || !br.getURL().contains("report_file") || br.getRequest().getHtmlCode().trim().equalsIgnoreCase("No such file");
-            if (fnameViaAbuseUnsupported) {
-                logger.info("Seems like report_file availablecheck seems not to be supported by this host");
-                final SubConfiguration config = this.getPluginConfig();
-                config.setProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, System.currentTimeMillis());
-                config.setProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION, getPluginVersionHash());
-            }
-            return null;
         }
+        logger.info("Failed to find filename via report_file");
+        return null;
     }
 }

@@ -21,22 +21,35 @@ import org.appwork.utils.StringUtils;
  * to query the last timestamp per CAPTCHA_TYPE - Thread-safe operations using CopyOnWriteArrayList
  */
 public class CaptchaHistoryManager {
-    private static final CaptchaHistoryManager              INSTANCE           = new CaptchaHistoryManager();
-    private static final int                                MAX_ENTRIES        = 500;
-    private static final long                               ONE_YEAR_IN_MILLIS = TimeUnit.DAYS.toMillis(365);
-    protected final static CaptchaSettings                  CAPTCHA_SETTINGS   = JsonConfig.create(CaptchaSettings.class);
-    private final CopyOnWriteArrayList<CaptchaHistoryEntry> entries;
+    private static final CaptchaHistoryManager                 INSTANCE           = new CaptchaHistoryManager();
+    private static final int                                   MAX_ENTRIES        = 500;
+    private static final long                                  ONE_YEAR_IN_MILLIS = TimeUnit.DAYS.toMillis(365);
+    protected static final CaptchaSettings                     CAPTCHA_SETTINGS   = JsonConfig.create(CaptchaSettings.class);
+    private volatile CopyOnWriteArrayList<CaptchaHistoryEntry> entries            = null;
 
     /**
      * Private constructor for singleton pattern.
      */
     private CaptchaHistoryManager() {
-        CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
-        if (entries == null) {
-            entries = new CopyOnWriteArrayList<CaptchaHistoryEntry>();
-            CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
+    }
+
+    protected CopyOnWriteArrayList<CaptchaHistoryEntry> getEntries() {
+        CopyOnWriteArrayList<CaptchaHistoryEntry> entries = this.entries;
+        loadEntries: if (entries == null) {
+            synchronized (this) {
+                entries = this.entries;
+                if (entries != null) {
+                    break loadEntries;
+                }
+                entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
+                if (entries == null) {
+                    entries = new CopyOnWriteArrayList<CaptchaHistoryEntry>();
+                    CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
+                }
+                this.entries = entries;
+            }
         }
-        this.entries = entries;
+        return entries;
     }
 
     /**
@@ -80,7 +93,7 @@ public class CaptchaHistoryManager {
         if (entry == null) {
             throw new IllegalArgumentException("entry cannot be null");
         }
-        entries.add(entry);
+        getEntries().add(entry);
         cleanupEntries();
     }
 
@@ -148,7 +161,7 @@ public class CaptchaHistoryManager {
      * Clears all entries from the history.
      */
     public void clear() {
-        entries.clear();
+        getEntries().clear();
     }
 
     /**
@@ -162,7 +175,7 @@ public class CaptchaHistoryManager {
      * @return true if any entries were removed, false if no changes were made
      */
     private CopyOnWriteArrayList<CaptchaHistoryEntry> cleanupEntries() {
-        final CopyOnWriteArrayList<CaptchaHistoryEntry> entries = this.entries;
+        final CopyOnWriteArrayList<CaptchaHistoryEntry> entries = this.getEntries();
         if (entries.size() == 0) {
             return entries;
         }

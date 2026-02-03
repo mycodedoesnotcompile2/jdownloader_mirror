@@ -34,14 +34,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:\\w+)\\.)?slideshare\\.net/(slideshow/[a-z0-9\\-]+/\\d+|[a-z0-9\\-_]+/[a-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 52238 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:\\w+)\\.)?slideshare\\.net/(slideshow/[a-z0-9\\-]+/\\d+|[a-z0-9\\-_]+/[a-z0-9\\-_]+)" })
 public class SlideShareNetDecrypter extends PluginForDecrypt {
     public SlideShareNetDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        jd.plugins.hoster.SlideShareNet.prepBR(br);
         final String contenturl = param.getCryptedUrl().replaceAll("https?://(?:[a-z0-9]+\\.)?slideshare\\.net/", "https://www.slideshare.net/");
         final PluginForHost hostplugin = this.getNewPluginForHostInstance(this.getHost());
         final DownloadLink mainlink = createDownloadlink(contenturl);
@@ -95,10 +94,19 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
         final String[] htmls = br.getRegex("data-testid=\"vertical-slide-image\"([^<]+)").getColumn(0);
         if (htmls != null && htmls.length > 0) {
             for (final String html : htmls) {
+                final String url;
                 final String[] qualities = new Regex(html, "\\d+w, (https?://[^ ]+)").getColumn(0);
-                /* Best quality version of each document page. */
-                final String bestQualityImageURL = qualities[qualities.length - 1];
-                final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(bestQualityImageURL));
+                if (qualities != null && qualities.length > 0) {
+                    /* Multiple qualities -> Choose best quality version of each document page. */
+                    final String bestQualityImageURL = qualities[qualities.length - 1];
+                    url = bestQualityImageURL;
+                } else {
+                    url = new Regex(html, "src=\"(http[^\"]+)").getMatch(0);
+                    if (url == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                }
+                final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
                 dl.setAvailable(true);
                 dl._setFilePackage(fp);
                 ret.add(dl);
@@ -125,8 +133,6 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
             aa.setValid(false);
             return false;
         }
-        // Account is valid, let's just add it
-        AccountController.getInstance().addAccount(hostPlugin, aa);
         return true;
     }
 

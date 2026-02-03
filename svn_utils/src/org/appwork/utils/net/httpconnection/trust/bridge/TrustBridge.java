@@ -1,0 +1,155 @@
+/**
+ *
+ * ====================================================================================================================================================
+ *         "AppWork Utilities" License
+ *         The "AppWork Utilities" will be called [The Product] from now on.
+ * ====================================================================================================================================================
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
+ *         Germany
+ * === Preamble ===
+ *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
+ *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
+ *
+ * === 3rd Party Licences ===
+ *     Some parts of the [The Product] use or reference 3rd party libraries and classes. These parts may have different licensing conditions. Please check the *.license and *.info files of included libraries
+ *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header.
+ *
+ * === Definition: Commercial Usage ===
+ *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
+ * === Dual Licensing ===
+ * === Commercial Usage ===
+ *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
+ *     Contact AppWork for further details: e-mail@appwork.org
+ * === Non-Commercial Usage ===
+ *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
+ *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
+ *
+ *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
+ * ====================================================================================================================================================
+ * ==================================================================================================================================================== */
+package org.appwork.utils.net.httpconnection.trust.bridge;
+
+import java.net.Socket;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.X509ExtendedTrustManager;
+
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+
+/**
+ * @author thomas
+ * @date 29.01.2026
+ *
+ */
+public class TrustBridge extends X509ExtendedTrustManager {
+    /**
+     *
+     */
+    protected final TrustProviderInterface provider;
+    /**
+     *
+     */
+    protected final TrustCallback          trustCallback;
+
+    /**
+     * @param provider
+     * @param trustCallback
+     */
+    public TrustBridge(TrustProviderInterface provider, TrustCallback trustCallback) {
+        this.provider = provider;
+        this.trustCallback = trustCallback;
+    }
+
+    @Override
+    public X509Certificate[] getAcceptedIssuers() {
+        if (provider == null) {
+            return new X509Certificate[0];
+        }
+        return provider.getAcceptedIssuers();
+    }
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+        if (provider == null) {
+            throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
+        }
+        TrustResult trust = provider.checkServerTrusted(chain, authType, null);
+        trustCallback.onTrustResult(provider, chain, authType, trust);
+        if (!trust.isTrusted()) {
+            throw new RejectedByTrustProviderException(trust);
+        }
+    }
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+        if (provider == null) {
+            throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
+        } // not tested yet
+        DebugMode.debugger();
+        TrustResult trust = provider.checkClientTrusted(chain, authType, null);
+        trustCallback.onTrustResult(provider, chain, authType, trust);
+        if (!trust.isTrusted()) {
+            throw new RejectedByTrustProviderException(trust);
+        }
+    }
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
+        if (provider == null) {
+            throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
+        }
+        TrustResult trust = provider.checkServerTrusted(chain, authType, engine);
+        trustCallback.onTrustResult(provider, chain, authType, trust);
+        if (!trust.isTrusted()) {
+            throw new RejectedByTrustProviderException(trust);
+        }
+    }
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+        if (provider == null) {
+            throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
+        }
+        TrustResult trust = provider.checkServerTrusted(chain, authType, socket);
+        trustCallback.onTrustResult(provider, chain, authType, trust);
+        if (!trust.isTrusted()) {
+            throw new RejectedByTrustProviderException(trust);
+        }
+    }
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
+        if (provider == null) {
+            throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
+        } // not tested yet
+        DebugMode.debugger();
+        TrustResult trust = provider.checkClientTrusted(chain, authType, engine);
+        trustCallback.onTrustResult(provider, chain, authType, trust);
+        if (!trust.isTrusted()) {
+            throw new RejectedByTrustProviderException(trust);
+        }
+    }
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+        if (provider == null) {
+            throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
+        } // not tested yet
+        DebugMode.debugger();
+        TrustResult trust = provider.checkClientTrusted(chain, authType, socket);
+        trustCallback.onTrustResult(provider, chain, authType, trust);
+        if (!trust.isTrusted()) {
+            throw new RejectedByTrustProviderException(trust);
+        }
+    }
+}

@@ -164,24 +164,6 @@ public class RemoteAPI implements HttpRequestHandler {
         }
     }
 
-    /**
-     * @param request
-     * @param response
-     * @param originHeader
-     */
-    protected void setCorsHeaders(final HttpRequest request, final HttpResponse response) {
-        HTTPHeader originHeader = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ORIGIN);
-        HTTPHeader requestedHeaders = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_CONTROL_HEADERS);
-
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, originHeader.getValue()));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, "30"));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, GET, POST"));
-        if (requestedHeaders != null) {
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS, requestedHeaders.getValue()));
-        }
-
-    }
-
     protected HttpServerInterface getHTTPBridge(final RemoteAPIRequest request, final RemoteAPIResponse response) {
         if (request != null) {
             final HttpRequest httpRequest = request.getHttpRequest();
@@ -353,7 +335,6 @@ public class RemoteAPI implements HttpRequestHandler {
     public RemoteAPIRequest createRemoteAPIRequestObject(final HttpRequest request) throws BasicRemoteAPIException {
         Object preData = prepareRawRequest(request);
         // Origin validation is handled by the server instance in HttpConnection.
-
         this.validateRequest(request);
         final RemoteAPIMethod remoteAPIMethod = this.getRemoteAPIMethod(request);
         if (remoteAPIMethod == null) {
@@ -424,12 +405,9 @@ public class RemoteAPI implements HttpRequestHandler {
                     throw (BasicRemoteAPIException) e.getCause();
                 }
                 if (e instanceof RequestSizeLimitExceededException) {
-
                     throw new BasicRemoteAPIException(e, e.getMessage(), ResponseCode.REQUEST_ENTITY_TOO_LARGE, null);
-
                 }
                 throw new BasicRemoteAPIException(e, "Bad Request", ResponseCode.ERROR_BAD_REQUEST, null);
-
             }
         }
         return new ParsedParameters(parameters, jqueryCallback);
@@ -495,7 +473,6 @@ public class RemoteAPI implements HttpRequestHandler {
 
     protected String getRequestPathWithoutNamespace(final HttpRequest request) {
         final String requestPath = request.getRequestedPath();
-
         final int index = requestPath.lastIndexOf("/", requestPath.lastIndexOf("/") - 1);
         if (index > 0) {
             for (final String nameSpace : interfaces.keySet()) {
@@ -782,7 +759,6 @@ public class RemoteAPI implements HttpRequestHandler {
      * @throws BasicRemoteAPIException
      *             Throws BasicRemoteAPIException with ERROR_FORBIDDEN if Origin header is present and not allowed
      */
-
     /**
      * @param request
      */

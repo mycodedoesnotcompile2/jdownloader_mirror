@@ -487,9 +487,15 @@ public class ChallengeResponseController {
         }
         final AccountFilter af = new AccountFilter().setFeature(FEATURE.CAPTCHA_SOLVER);
         final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
+        /* Map to collect solver accounts by domain */
+        final Map<String, Account> bestAccountsByDomain = new HashMap<String, Account>();
         /* Collect unavailable solver domains for logging purposes only */
         final HashSet<String> unavailableSolverDomains = new HashSet<String>();
         for (final Account solverAccount : solverAccounts) {
+            if (solverAccount.getAccountInfo() == null) {
+                /* Skip accounts without AccountInfo. */
+                continue;
+            }
             boolean success = false;
             try {
                 final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
@@ -499,7 +505,7 @@ public class ChallengeResponseController {
                     continue;
                 }
                 final SolverService service = solver.getService();
-                if (service != null && !service.isEnabled()) {
+                if (!service.isEnabled()) {
                     // TODO: Move this into getChallengeVetoReason
                     vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
                     continue;
@@ -509,7 +515,13 @@ public class ChallengeResponseController {
                     vetoReasons.add(veto);
                     continue;
                 }
-                ret.add(solver);
+                /* Collect account by domain, keeping only the one with lowest balance */
+                final String domain = solverAccount.getHoster();
+                final double currentBalance = solverAccount.getAccountInfo().getAccountBalance();
+                final Account existingAccount = bestAccountsByDomain.get(domain);
+                if (existingAccount == null || currentBalance < existingAccount.getAccountInfo().getAccountBalance()) {
+                    bestAccountsByDomain.put(domain, solverAccount);
+                }
                 success = true;
             } catch (final Throwable e) {
                 logger.log(e);
@@ -520,6 +532,18 @@ public class ChallengeResponseController {
                 } else {
                     unavailableSolverDomains.add(solverAccount.getHoster());
                 }
+            }
+        }
+        /* Add solvers from best accounts to ret list -> Onkly one account per solver, only the account with the lowest balance. */
+        for (final Account bestAccount : bestAccountsByDomain.values()) {
+            try {
+                final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) bestAccount.getPlugin();
+                final ChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, bestAccount);
+                if (solver != null) {
+                    ret.add(solver);
+                }
+            } catch (final Throwable e) {
+                logger.log(e);
             }
         }
         logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);

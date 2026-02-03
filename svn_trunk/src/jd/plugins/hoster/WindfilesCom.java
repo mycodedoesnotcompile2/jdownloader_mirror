@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51803 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 3, names = {}, urls = {})
 public class WindfilesCom extends PluginForHost {
     public WindfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -322,7 +322,7 @@ public class WindfilesCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         final String space = br.getRegex("Space Used (\\d[^<]+)</div>").getMatch(0);
         if (space != null) {
-            ai.setUsedSpace(space.trim());
+            ai.setUsedSpace(SizeFormatter.getSize(space.trim()));
         } else {
             logger.info("Failed to find used account storage space");
         }

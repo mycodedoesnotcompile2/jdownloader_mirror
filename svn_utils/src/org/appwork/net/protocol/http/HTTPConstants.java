@@ -332,6 +332,7 @@ public class HTTPConstants {
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS  = "Access-Control-Allow-Methods";
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS  = "Access-Control-Allow-Headers";
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE        = "Access-Control-Max-Age";
+    public static final String           HEADER_REQUEST_ACCESS_CONTROL_REQUEST_METHOD  = "Access-Control-Request-Method";
     /**
      * The CSP header allows you to define a whitelist of approved sources of content for your site. By restricting the assets that a
      * browser can load for your site, like js and css, CSP can act as an effective countermeasure to XSS attacks. I have covered CSP in a
@@ -354,46 +355,49 @@ public class HTTPConstants {
      * This header is used to configure the built in reflective XSS protection found in Internet Explorer, Chrome and Safari (Webkit). Valid
      * settings for the header are 0, which disables the protection, 1 which enables the protection and 1; mode=block which tells the
      * browser to block the response if it detects an attack rather than sanitising the script.
-     * 
-     * <p><b>⚠️ DEPRECATED - DO NOT USE</b></p>
+     *
      * <p>
-     * This header is deprecated and should no longer be used in modern applications. It has been removed from major browsers
-     * (Chrome 78+, Safari 2023+, Edge) and can introduce security vulnerabilities rather than prevent them.
+     * <b>⚠️ DEPRECATED - DO NOT USE</b>
      * </p>
-     * 
+     * <p>
+     * This header is deprecated and should no longer be used in modern applications. It has been removed from major browsers (Chrome 78+,
+     * Safari 2023+, Edge) and can introduce security vulnerabilities rather than prevent them.
+     * </p>
+     *
      * <h3>Why This Header Should Not Be Used</h3>
      * <ul>
-     *   <li><b>Ineffective and Bypassable:</b> The XSS filters enabled by this header can be easily bypassed using encoded characters,
-     *       unbalanced quotes, or script attributes, providing only a false sense of security.</li>
-     *   <li><b>Security Vulnerabilities:</b> Rather than protecting sites, X-XSS-Protection can actually introduce XSS vulnerabilities
-     *       in otherwise safe websites. It also creates cross-site leak (XS-Leak) side-channel vulnerabilities that attackers can exploit
-     *       to extract sensitive data.</li>
-     *   <li><b>Inconsistent Browser Support:</b> Different browsers implemented it inconsistently—some blocked entire pages while others
-     *       attempted sanitization. Firefox never supported it, and major browsers have removed support. Only Internet Explorer still
-     *       honors it (and IE is deprecated).</li>
-     *   <li><b>False Positives:</b> Legitimate content containing certain keywords or characters would get blocked unexpectedly.</li>
+     * <li><b>Ineffective and Bypassable:</b> The XSS filters enabled by this header can be easily bypassed using encoded characters,
+     * unbalanced quotes, or script attributes, providing only a false sense of security.</li>
+     * <li><b>Security Vulnerabilities:</b> Rather than protecting sites, X-XSS-Protection can actually introduce XSS vulnerabilities in
+     * otherwise safe websites. It also creates cross-site leak (XS-Leak) side-channel vulnerabilities that attackers can exploit to extract
+     * sensitive data.</li>
+     * <li><b>Inconsistent Browser Support:</b> Different browsers implemented it inconsistently—some blocked entire pages while others
+     * attempted sanitization. Firefox never supported it, and major browsers have removed support. Only Internet Explorer still honors it
+     * (and IE is deprecated).</li>
+     * <li><b>False Positives:</b> Legitimate content containing certain keywords or characters would get blocked unexpectedly.</li>
      * </ul>
-     * 
+     *
      * <h3>What to Use Instead</h3>
      * <p>
-     * Use <b>Content-Security-Policy (CSP)</b> instead, which is the modern, standardized replacement that actually prevents XSS attacks
-     * by telling browsers what resources are allowed to run on a page. Unlike X-XSS-Protection's reactive filtering, CSP is proactive
-     * and configurable. CSP can prevent both reflected and stored XSS attacks, has full modern browser support, and works with nonces
-     * for additional security.
+     * Use <b>Content-Security-Policy (CSP)</b> instead, which is the modern, standardized replacement that actually prevents XSS attacks by
+     * telling browsers what resources are allowed to run on a page. Unlike X-XSS-Protection's reactive filtering, CSP is proactive and
+     * configurable. CSP can prevent both reflected and stored XSS attacks, has full modern browser support, and works with nonces for
+     * additional security.
      * </p>
      * <p>
      * For older browsers that may still honor this header, explicitly disable it by setting <code>X-XSS-Protection: 0</code>, then
      * implement a strong CSP combined with proper input validation and output encoding.
      * </p>
-     * 
+     *
      * <h3>References</h3>
      * <ul>
-     *   <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection">MDN: X-XSS-Protection (deprecated)</a></li>
-     *   <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP">MDN: Content Security Policy (CSP)</a></li>
-     *   <li><a href="https://www.nexgismo.com/blog/why-browsers-gave-up-on-x-xss-protection">Why Browsers Gave Up on X-XSS-Protection</a></li>
-     *   <li><a href="https://owasp.org/www-community/OWASP_Content_Security_Policy_Cheat_Sheet">OWASP CSP Cheat Sheet</a></li>
+     * <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection">MDN: X-XSS-Protection (deprecated)</a></li>
+     * <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP">MDN: Content Security Policy (CSP)</a></li>
+     * <li><a href="https://www.nexgismo.com/blog/why-browsers-gave-up-on-x-xss-protection">Why Browsers Gave Up on
+     * X-XSS-Protection</a></li>
+     * <li><a href="https://owasp.org/www-community/OWASP_Content_Security_Policy_Cheat_Sheet">OWASP CSP Cheat Sheet</a></li>
      * </ul>
-     * 
+     *
      * @deprecated This header is deprecated and should not be used. Use Content-Security-Policy (CSP) instead for modern XSS protection.
      *             For older browsers, explicitly disable this header by setting it to "0".
      * @see #HEADER_RESPONSE_CONTENT_SECURITY_POLICY
@@ -434,13 +438,12 @@ public class HTTPConstants {
     public static final String           HEADER_VALUE_ENCODING_DEFLATE                 = "deflate";
     public static final String           HEADER_RESPONSE_LAST_MODFIED                  = "Last-Modified";
     public static final String           HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS      = "Upgrade-Insecure-Requests";
-
     /**
      *
      */
     public static final String           X_APPWORK                                     = "x-appwork";
     public static final String           HEADER_REQUEST_CONTENT_LENGTH                 = "Content-Length";
-    public static final String ACCESS_CONTROL_ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";
-    public static final String ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK = "Access-Control-Request-Private-Network";
-    public static final String ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK = "Access-Control-Allow-Private-Network";
+    public static final String           ACCESS_CONTROL_ALLOW_CREDENTIALS              = "Access-Control-Allow-Credentials";
+    public static final String           ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK        = "Access-Control-Request-Private-Network";
+    public static final String           ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK          = "Access-Control-Allow-Private-Network";
 }

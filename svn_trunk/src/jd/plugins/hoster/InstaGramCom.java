@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 52000 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52230 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -150,7 +150,7 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_internal_media_id                  = "internal_media_id";
     public static final String   PROPERTY_orderid                            = "orderid";
     public static final String   PROPERTY_orderid_raw                        = "orderid_raw";
-    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                    // number of items
+    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                   // number of items
     // inside
     // post/story
     public static final String   PROPERTY_shortcode                          = "shortcode";
@@ -160,14 +160,14 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_type                               = "type";
     public static final String   PROPERTY_date                               = "date";
     public static final String   PROPERTY_hashtag                            = "hashtag";
-    public static final String   PROPERTY_coauthor_producers_comma_separated = "coauthor_producers_comma_separated"; // if a post has
-    // multiple authors
+    /* If one post has multiple authors */
+    public static final String   PROPERTY_coauthor_producers_comma_separated = "coauthor_producers_comma_separated";
     public static final String   PROPERTY_json_usertags                      = "json_usertags";
     @Deprecated
-    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                  // used until crawler
+    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                 // used until crawler
     // rev
     // 45795
-    public static final String   PROPERTY_main_content_id                    = "main_content_id";                    // e.g.
+    public static final String   PROPERTY_main_content_id                    = "main_content_id";                   // e.g.
     // instagram.com/p/<main_content_id>/
     public static final String   PROPERTY_forced_packagename                 = "forced_packagename";
     public static final String   PROPERTY_is_private                         = "is_private";

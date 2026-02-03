@@ -78,6 +78,7 @@ import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Joiner;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.net.LineParsingOutputStream;
 import org.appwork.utils.net.NoClosingInputStream;
@@ -95,7 +96,6 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @date 16.12.2021
      *
      */
-
     static {
         if (System.getProperty("java.net.preferIPv6Addresses") == null) {
             // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/net/doc-files/net-properties.html
@@ -776,6 +776,49 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         if (obj == null) {
             throw new Exception("Object is null");
         }
+    }
+
+    public static void assertNotNull(final Object obj, String explain) throws Exception {
+        if (obj == null) {
+            throw new Exception("Object is null:" + explain);
+        }
+    }
+
+    public static void assertNotEmpty(final String obj) throws Exception {
+        if (StringUtils.isEmpty(obj)) {
+            throw new Exception("String is null or empty");
+        }
+    }
+
+    /**
+     * Generates a random string of the specified length.
+     *
+     * @param length
+     *            The desired length of the string
+     * @return A random string containing ASCII printable characters
+     */
+    public static String generateRandomString(final int length) {
+        final StringBuilder sb = new StringBuilder(length);
+        final java.util.Random random = new java.util.Random();
+        // Use ASCII printable characters (32-126)
+        for (int i = 0; i < length; i++) {
+            sb.append((char) (32 + random.nextInt(95)));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Generates a random byte array of the specified length.
+     *
+     * @param length
+     *            The desired length of the byte array
+     * @return A random byte array
+     */
+    public static byte[] generateRandomBytes(final int length) {
+        final byte[] bytes = new byte[length];
+        final java.util.Random random = new java.util.Random();
+        random.nextBytes(bytes);
+        return bytes;
     }
 
     public static void asswertCachedLogsRecordMatches(final String pattern) throws Exception {

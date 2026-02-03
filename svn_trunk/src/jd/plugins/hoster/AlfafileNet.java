@@ -20,13 +20,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
-import jd.config.Property;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -37,6 +40,7 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -44,13 +48,20 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlfafileNet extends PluginForHost {
     public AlfafileNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://alfafile.net/premium");
+        this.enablePremium("https://" + getHost() + "/premium");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setCookie(this.getHost(), "lang", "en");
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -83,7 +94,7 @@ public class AlfafileNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://alfafile.net/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -101,53 +112,51 @@ public class AlfafileNet extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME                  = false;
-    private static final int     FREE_MAXCHUNKS               = 1;
-    private static final int     FREE_MAXDOWNLOADS            = 1;
-    private static final boolean ACCOUNT_FREE_RESUME          = false;
-    private static final int     ACCOUNT_FREE_MAXCHUNKS       = 1;
-    private static final int     ACCOUNT_FREE_MAXDOWNLOADS    = 1;
-    private static final boolean ACCOUNT_PREMIUM_RESUME       = true;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS    = -5;
-    private static final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME               = false;
+    private static final int     FREE_MAXCHUNKS            = 1;
+    private static final boolean ACCOUNT_FREE_RESUME       = false;
+    private static final int     ACCOUNT_FREE_MAXCHUNKS    = 1;
+    private static final boolean ACCOUNT_PREMIUM_RESUME    = true;
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = -5;
     /* don't touch the following! */
-    private boolean              isDirecturl                  = false;
+    private boolean              isDirecturl               = false;
     /*
      * TODO: Use API for linkchecking whenever an account is added to JD. This will ensure that the plugin will always work, at least for
      * premium users. Status 2015-08-03: Filecheck API does not seem to work --> Disabled it - reported API issues to jiaz.
      */
-    private static final boolean prefer_api_linkcheck         = false;
+    private static final boolean prefer_api_linkcheck      = false;
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
 
     @SuppressWarnings("deprecation")
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         isDirecturl = false;
         this.setBrowserExclusive();
-        prepBR(br);
         String filename = null;
         String filesize = null;
         String md5 = null;
-        boolean api_works = false;
-        Account aa = AccountController.getInstance().getValidAccount(this.getHost());
         String api_token = null;
-        if (aa != null) {
-            api_token = getLoginToken(aa);
-        }
-        if (api_token != null && prefer_api_linkcheck) {
-            this.br.getPage(API_BASE + "/file/info?file_id=" + getFileID(link) + "&token=" + api_token);
-            final String status = PluginJSonUtils.getJsonValue(br, "status");
-            if (!"401".equals(status)) {
-                api_works = true;
+        Map<String, Object> api_resp = null;
+        Number filesize_bytes = null;
+        if (prefer_api_linkcheck) {
+            final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+            if (account != null) {
+                api_token = getLoginToken(account);
+            }
+            if (api_token != null) {
+                br.getPage(API_BASE + "/file/info?file_id=" + getFileID(link) + "&token=" + api_token);
+                api_resp = this.handleAPIErrors(link, account);
             }
         }
-        if (api_works) {
-            final String status = PluginJSonUtils.getJsonValue(br, "status");
-            if (!"200".equals(status)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            filename = PluginJSonUtils.getJsonValue(br, "name");
-            filesize = PluginJSonUtils.getJsonValue(br, "size");
-            md5 = PluginJSonUtils.getJsonValue(br, "hash");
+        if (api_resp != null) {
+            Map<String, Object> fileinfo = (Map<String, Object>) api_resp.get("file");
+            filename = fileinfo.get("name").toString();
+            filesize_bytes = (Number) fileinfo.get("size");
+            md5 = (String) fileinfo.get("hash");
         } else {
             URLConnectionAdapter con = null;
             try {
@@ -177,7 +186,9 @@ public class AlfafileNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         link.setFinalFileName(Encoding.htmlDecode(filename).trim());
-        if (StringUtils.isNotEmpty(filesize)) {
+        if (filesize_bytes != null) {
+            link.setVerifiedFileSize(filesize_bytes.longValue());
+        } else if (StringUtils.isNotEmpty(filesize)) {
             link.setDownloadSize(SizeFormatter.getSize(filesize.contains(".") && filesize.contains(",") ? filesize.replace(",", "") : filesize));
         }
         if (md5 != null) {
@@ -206,8 +217,12 @@ public class AlfafileNet extends PluginForHost {
                 br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
                 br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
                 br.getPage("/download/start_timer/" + fid);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                /* Small hack: Extract html code from json, then set it as request-html code. */
+                final String html = entries.get("html").toString();
+                br.getRequest().setHtmlCode(html);
                 final String reconnect_wait = br.getRegex("Try again in (\\d+) minutes").getMatch(0);
-                if (br.containsHTML(">This file can be downloaded by premium users only|>You can download files up to")) {
+                if (br.containsHTML(">\\s*This file can be downloaded by premium users only|>You can download files up to")) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
                 } else if (reconnect_wait != null) {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(reconnect_wait) * 60 * 1001l);
@@ -216,45 +231,39 @@ public class AlfafileNet extends PluginForHost {
                 } else if (br.containsHTML("You have reached your daily downloads limit. Please try again later\\.")) {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You have reached your daily download limit.", 3 * 60 * 60 * 1000l);
                 }
-                int wait = 45;
-                String wait_str = br.getRegex(">(\\d+) <span>s<").getMatch(0);
-                if (wait_str != null) {
-                    wait = Integer.parseInt(wait_str);
+                final String wait_str = br.getRegex(">(\\d+)\\s*<span>\\s*s").getMatch(0);
+                final String redirect_url = entries.get("redirect_url").toString();
+                if (wait_str == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (redirect_url == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                String redirect_url = PluginJSonUtils.getJsonValue(br, "redirect_url");
-                if (redirect_url == null) {
-                    redirect_url = "/file/" + fid + "/captcha";
-                }
+                final int wait = (int) ReflectionUtils.cast(entries.get("timer"), Integer.class);
                 this.sleep(wait * 1001l, link);
                 br.getPage(redirect_url);
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
                 }
-                this.br.setFollowRedirects(true);
-                boolean success = false;
-                for (int i = 0; i <= 3; i++) {
-                    if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
-                        logger.info("Detected captcha method \"reCaptchaV2\" for this host");
-                        Form dlForm = br.getFormBySubmitvalue("send");
-                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, this.br).getToken();
-                        dlForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                        br.submitForm(dlForm);
-                        logger.info("Submitted DLForm");
-                        if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
-                            continue;
-                        }
-                        success = true;
-                        break;
-                    } else {
-                        /* No captcha? */
-                        success = true;
-                        break;
-                    }
+                final Form dlform = br.getFormBySubmitvalue("send");
+                if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
+                    logger.info("Detected captcha method \"reCaptchaV2\" for this host");
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, this.br).getToken();
+                    dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                    br.submitForm(dlform);
+                    logger.info("Submitted DLForm");
+                } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+                    final String captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+                    dlform.put("cf-turnstile-response", Encoding.urlEncode(captchaResponse));
+                } else {
+                    /* No captcha? */
+                    logger.info("No captcha required?");
                 }
-                if (!success) {
+                br.submitForm(dlform);
+                if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br) || AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+                    /* This should be a rare case */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
-                dllink = br.getRegex("href=\"(https://[^<>\"]*?)\" class=\"big_button\"><span>Download</span>").getMatch(0);
+                dllink = br.getRegex("href=\"(https://[^<>\"]*?)\" class=\"big_button\"><span>\\s*Download</span>").getMatch(0);
                 if (dllink == null) {
                     dllink = br.getRegex("\"(https?://[a-z0-9\\-]+\\.alfafile\\.net/dl/[^<>\"]*?)\"").getMatch(0);
                 }
@@ -288,7 +297,6 @@ public class AlfafileNet extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     if (con.getCompleteContentLength() > 0) {
@@ -310,94 +318,83 @@ public class AlfafileNet extends PluginForHost {
         return null;
     }
 
-    private void prepBR(final Browser br) {
-        br.setCookie(this.getHost(), "lang", "en");
-        br.setFollowRedirects(true);
-    }
-
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 1;
     }
 
     /** https://alfafile.net/api/doc */
     private static final String API_BASE = "https://alfafile.net/api/v1";
 
-    private void login(final Account account, final boolean validateLoginToken) throws Exception {
+    private Map<String, Object> login(final Account account, final boolean validateLoginToken) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                prepBR(br);
-                br.setFollowRedirects(true);
-                final Cookies cookies = account.loadCookies("");
-                String token = getLoginToken(account);
-                if (cookies != null && token != null) {
-                    /* We do not really need the cookies but we need the timstamp! */
-                    br.setCookies(this.getHost(), cookies);
-                    if (!validateLoginToken) {
-                        logger.info("Trust token without check");
-                        return;
-                    }
-                    logger.info("Checking token");
-                    br.postPage(API_BASE + "/user/info", "token=" + Encoding.urlEncode(token));
-                    if (this.isLoggedIN(br)) {
-                        logger.info("Token login successful");
-                        return;
-                    } else {
-                        logger.info("Token login failed");
-                    }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            String token = getLoginToken(account);
+            if (cookies != null && token != null) {
+                /* We do not really need the cookies but we need the timstamp! */
+                br.setCookies(cookies);
+                if (!validateLoginToken) {
+                    return null;
                 }
-                logger.info("Performing full login");
-                /*
-                 * Using the same API as rapidgator.net (alfafile uses "/v1" in baseURL, rapidgator uses "v2" but responses are the same.)
-                 */
-                br.getPage(API_BASE + "/user/login?login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
-                token = PluginJSonUtils.getJsonValue(br, "token");
-                if (token == null || !isLoggedIN(br)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                logger.info("Checking token");
+                br.postPage(API_BASE + "/user/info", "token=" + Encoding.urlEncode(token));
+                try {
+                    final Map<String, Object> entries = this.handleAPIErrors(null, account);
+                    logger.info("Token login successful");
+                    return entries;
+                } catch (final Exception e) {
+                    logger.log(e);
+                    logger.info("Token login failed");
                 }
-                account.saveCookies(br.getCookies(br.getURL()), "");
-                account.setProperty("token", token);
-            } catch (final PluginException e) {
-                account.setProperty("cookies", Property.NULL);
-                throw e;
             }
+            logger.info("Performing full login");
+            /*
+             * Using the same API as rapidgator.net (alfafile uses "/v1" in baseURL, rapidgator uses "v2" but responses are the same.)
+             */
+            br.getPage(API_BASE + "/user/login?login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
+            final Map<String, Object> entries = this.handleAPIErrors(null, account);
+            token = entries.get("token").toString();
+            if (StringUtils.isEmpty(token)) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            account.saveCookies(br.getCookies(br.getURL()), "");
+            account.setProperty("token", token);
+            return entries;
         }
     }
 
-    private boolean isLoggedIN(final Browser br) {
-        if ("200".equals(PluginJSonUtils.getJsonValue(br, "status"))) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @SuppressWarnings({ "unchecked" })
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(account, true);
-        final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
-        final long traffic_total = JavaScriptEngineFactory.toLong(JavaScriptEngineFactory.walkJson(entries, "response/user/traffic/total"), -1);
-        final long traffic_left = JavaScriptEngineFactory.toLong(JavaScriptEngineFactory.walkJson(entries, "response/user/traffic/left"), -1);
-        final String ispremium = PluginJSonUtils.getJsonValue(br, "is_premium");
-        if ("true".equals(ispremium)) {
-            final String expire = PluginJSonUtils.getJsonValue(br, "premium_end_time");
+        final Map<String, Object> entries = login(account, true);
+        final Map<String, Object> user = (Map<String, Object>) entries.get("user");
+        final Map<String, Object> traffic = (Map<String, Object>) user.get("traffic");
+        final Map<String, Object> storage = (Map<String, Object>) user.get("storage");
+        final long traffic_total = ((Number) traffic.get("total")).longValue();
+        final long traffic_left = ((Number) traffic.get("left")).longValue();
+        if (Boolean.TRUE.equals(user.get("is_premium"))) {
+            final String expire = user.get("premium_end_time").toString();
             ai.setValidUntil(Long.parseLong(expire) * 1000);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
             account.setType(AccountType.PREMIUM);
             account.setConcurrentUsePossible(true);
-            ai.setStatus("Premium account");
         } else {
             account.setType(AccountType.FREE);
-            /* free accounts can still have captcha */
-            account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(false);
-            ai.setStatus("Registered (free) user");
         }
         ai.setTrafficLeft(traffic_left);
         ai.setTrafficMax(traffic_total);
+        try {
+            final long storage_total = ((Number) storage.get("total")).longValue();
+            final long storage_left = ((Number) storage.get("left")).longValue();
+            ai.setUsedSpace(storage_total - storage_left);
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.info("Failed to parse storage information");
+        }
         return ai;
     }
 
@@ -406,7 +403,6 @@ public class AlfafileNet extends PluginForHost {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link);
         login(account, false);
-        br.setFollowRedirects(false);
         if (account.getType() == AccountType.FREE) {
             /*
              * No API --> We're actually not downloading via free account but it doesnt matter as there are no known free account advantages
@@ -419,8 +415,8 @@ public class AlfafileNet extends PluginForHost {
             if (dllink == null) {
                 final String fid = getFileID(link);
                 this.br.getPage(API_BASE + "/file/download?file_id=" + fid + "&token=" + getLoginToken(account));
-                handleErrorsGeneral(account);
-                dllink = PluginJSonUtils.getJsonValue(br, "download_url");
+                Map<String, Object> entries = handleAPIErrors(link, account);
+                dllink = entries.get("download_url").toString();
                 if (dllink == null) {
                     logger.warning("Final downloadlink (String is \"dllink\") regex didn't match!");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -442,49 +438,74 @@ public class AlfafileNet extends PluginForHost {
         }
     }
 
-    private void handleErrorsGeneral(final Account account) throws PluginException {
-        final String errorcode = PluginJSonUtils.getJsonValue(br, "status");
-        String errormessage = PluginJSonUtils.getJsonValue(br, "details");
-        if ("409".equals(errorcode) && StringUtils.containsIgnoreCase(errormessage, "File temporarily unavailable")) {
+    private Map<String, Object> handleAPIErrors(final DownloadLink link, final Account account) throws PluginException {
+        Map<String, Object> entries = null;
+        try {
+            /* 2024-11-21: Hotfix for API returning invalid json: "1{"val" (string starts with "1" and not with "{". */
+            final String json = br.getRegex("(\\{.+)").getMatch(0);
+            entries = restoreFromString(json, TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long wait = 1 * 60 * 1000;
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait);
+            } else {
+                throw new AccountUnavailableException(msg, wait);
+            }
+        }
+        final int status = ((Number) entries.get("status")).intValue();
+        String errormessage = (String) entries.get("details");
+        if (status == 200) {
+            /* No error */
+            Map<String, Object> response = (Map<String, Object>) entries.get("response");
+            return response;
+        }
+        if (status == 409 && StringUtils.containsIgnoreCase(errormessage, "File temporarily unavailable")) {
             /*
              * {"response":null,"status":409,"details":"Conflict. File temporarily unavailable."}
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormessage, 30 * 60 * 1000l);
         }
-        if (errorcode != null) {
-            if (errorcode.equals("401")) {
-                /* This can sometimes happen in premium mode */
-                /* {"response":null,"status":401,"details":"Unauthorized. Token doesn't exist"} */
-                if (account == null) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormessage, 5 * 60 * 1000l);
-                } else {
-                    throw new AccountUnavailableException(errormessage, 5 * 60 * 1000l);
+        if (status == 401) {
+            /* This can sometimes happen in premium mode */
+            /* {"response":null,"status":401,"details":"Unauthorized. Token doesn't exist"} */
+            if (account != null) {
+                throw new AccountInvalidException(errormessage);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormessage, 5 * 60 * 1000l);
+            }
+        } else if (status == 404) {
+            /*
+             * E.g. detailed errormessages: "details":"File with file_id: '1234567' doesn't exist"
+             */
+            if (errormessage == null) {
+                errormessage = "File does not exist according to API";
+            }
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (status == 409) {
+            /*
+             * E.g. detailed errormessages:
+             *
+             * Conflict. Delay between downloads must be not less than 60 minutes. Try again in 51 minutes.
+             *
+             * Conflict. DOWNLOAD::ERROR::You can't download not more than 1 file at a time in free mode.
+             */
+            String minutes_regexed = null;
+            int minutes = 60;
+            if (errormessage != null) {
+                minutes_regexed = new Regex(errormessage, "again in (\\d+) minutes?").getMatch(0);
+                if (minutes_regexed != null) {
+                    minutes = Integer.parseInt(minutes_regexed);
                 }
-            } else if (errorcode.equals("404")) {
-                /*
-                 * E.g. detailed errormessages: "details":"File with file_id: '1234567' doesn't exist"
-                 */
-                if (errormessage == null) {
-                    errormessage = "File does not exist according to API";
-                }
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (errorcode.equals("409")) {
-                /*
-                 * E.g. detailed errormessages:
-                 *
-                 * Conflict. Delay between downloads must be not less than 60 minutes. Try again in 51 minutes.
-                 *
-                 * Conflict. DOWNLOAD::ERROR::You can't download not more than 1 file at a time in free mode.
-                 */
-                String minutes_regexed = null;
-                int minutes = 60;
-                if (errormessage != null) {
-                    minutes_regexed = new Regex(errormessage, "again in (\\d+) minutes?").getMatch(0);
-                    if (minutes_regexed != null) {
-                        minutes = Integer.parseInt(minutes_regexed);
-                    }
-                }
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, minutes * 60 * 1001l);
+            }
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, minutes * 60 * 1001l);
+        } else {
+            final String msg = "Error " + status + " | " + errormessage;
+            if (link == null) {
+                throw new AccountUnavailableException(msg, 3 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, msg);
             }
         }
     }
@@ -500,14 +521,15 @@ public class AlfafileNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public boolean hasCaptcha(DownloadLink link, Account acc) {
+        if (acc != null && AccountType.PREMIUM.equals(acc.getType())) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }

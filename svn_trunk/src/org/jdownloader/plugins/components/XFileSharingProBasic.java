@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52223 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -166,20 +166,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /* Used variables */
-    protected WeakHashMap<Request, String[]>  correctedBrowserRequestMap                                        = new WeakHashMap<Request, String[]>();
+    protected WeakHashMap<Request, String[]>  correctedBrowserRequestMap                                  = new WeakHashMap<Request, String[]>();
     /* Don't touch the following! */
-    private static Map<String, AtomicInteger> freeRunning                                                       = new HashMap<String, AtomicInteger>();
-    protected static final String             PROPERTY_ACCOUNT_apikey                                           = "apikey";
-    private static final String               PROPERTY_PLUGIN_api_domain_with_protocol                          = "apidomain";
-    protected static final String             PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP = "REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
-    protected static final String             PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION   = "REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION";
-    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP         = "ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
-    private static final String               PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_VERSION           = "ALT_AVAILABLECHECK_LAST_FAILURE_VERSION";
-    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING                   = "ALT_AVAILABLECHECK_LAST_WORKING";
-    public static final String                PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL                          = "last_working_payment_url";
-    protected static final String             PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE       = "allow_api_download_attempt_in_website_mode";
-    private String                            videoStreamDownloadurl                                            = null;
-    private boolean                           hasCheckedEmbedHandling                                           = false;
+    private static Map<String, AtomicInteger> freeRunning                                                 = new HashMap<String, AtomicInteger>();
+    protected static final String             PROPERTY_ACCOUNT_apikey                                     = "apikey";
+    private static final String               PROPERTY_PLUGIN_api_domain_with_protocol                    = "apidomain";
+    private long                              timestampAbuseAvailablecheckLastFailure                     = -1;
+    private int                               numberofContinuousFailuresAbuseAvailablecheckLastFailure    = 0;
+    private long                              timestampAltAvailablecheckLastFailure                       = -1;
+    private int                               numberofContinuousFailuresAltAvailablecheckLastFailure      = 0;
+    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING             = "ALT_AVAILABLECHECK_LAST_WORKING";
+    public static final String                PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL                    = "last_working_payment_url";
+    protected static final String             PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE = "allow_api_download_attempt_in_website_mode";
+    private String                            videoStreamDownloadurl                                      = null;
+    private boolean                           hasCheckedEmbedHandling                                     = false;
 
     public static enum URL_TYPE {
         EMBED_VIDEO,
@@ -2026,10 +2026,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } finally {
             if (linkcheckerSuccess) {
                 cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING, checkTypeCurrent);
+                timestampAltAvailablecheckLastFailure = -1;
+                numberofContinuousFailuresAltAvailablecheckLastFailure = 0;
             } else {
                 logger.info("Seems like checkfiles availablecheck is not supported by this host");
-                cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, System.currentTimeMillis());
-                cfg.setProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_VERSION, getPluginVersionHash());
+                timestampAltAvailablecheckLastFailure = System.currentTimeMillis();
+                numberofContinuousFailuresAltAvailablecheckLastFailure += 1;
             }
         }
         return linkcheckerSuccess;
@@ -2095,23 +2097,31 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * 2019-07-10: ONLY "No such file" as response might always be wrong and should be treated as a failure! Example: xvideosharing.com
          */
         if (br.containsHTML(">\\s*No such file\\s*<")) {
+            /* Success */
+            timestampAbuseAvailablecheckLastFailure = -1;
+            numberofContinuousFailuresAbuseAvailablecheckLastFailure = 0;
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String filename = regexFilenameAbuse(br);
         if (filename != null) {
+            /* Success */
             logger.info("Successfully found filename via report_file: " + filename);
+            timestampAbuseAvailablecheckLastFailure = -1;
+            numberofContinuousFailuresAbuseAvailablecheckLastFailure = 0;
             return filename;
-        } else {
-            logger.info("Failed to find filename via report_file");
-            final boolean fnameViaAbuseUnsupported = br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500 || !StringUtils.containsIgnoreCase(br.getURL(), "report_file") || br.getRequest().getHtmlCode().trim().equalsIgnoreCase("No such file");
-            if (fnameViaAbuseUnsupported) {
-                logger.info("Seems like report_file availablecheck seems not to be supported by this host");
-                final SubConfiguration config = this.getPluginConfig();
-                config.setProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, System.currentTimeMillis());
-                config.setProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION, getPluginVersionHash());
-            }
-            return null;
         }
+        logger.info("Failed to find filename via report_file");
+        final boolean fnameViaAbuseUnsupported = br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500 || !StringUtils.containsIgnoreCase(br.getURL(), "report_file");
+        if (fnameViaAbuseUnsupported) {
+            logger.info("Seems like report_file availablecheck seems not to be supported by this host");
+            timestampAbuseAvailablecheckLastFailure = System.currentTimeMillis();
+            numberofContinuousFailuresAbuseAvailablecheckLastFailure += 1;
+        } else {
+            logger.warning("Unknown state");
+            timestampAbuseAvailablecheckLastFailure = -1;
+            numberofContinuousFailuresAbuseAvailablecheckLastFailure = 0;
+        }
+        return null;
     }
 
     /** Part of {@link #getFnameViaAbuseLink() getFnameViaAbuseLink} */
@@ -4314,10 +4324,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String space[] = new Regex(getCorrectBR(br), ">\\s*Used space:\\s*</td>.*?<td.*?b>([0-9\\.]+) ?(KB|MB|GB|TB)?</b>").getRow(0);
         if ((space != null && space.length != 0) && (space[0] != null && space[1] != null)) {
             /* free users it's provided by default */
-            ai.setUsedSpace(space[0] + " " + space[1]);
+            ai.setUsedSpace(SizeFormatter.getSize(space[0] + " " + space[1]));
         } else if ((space != null && space.length != 0) && space[0] != null) {
             /* premium users the Mb value isn't provided for some reason... */
-            ai.setUsedSpace(space[0] + "Mb");
+            ai.setUsedSpace(SizeFormatter.getSize(space[0] + "Mb"));
         }
     }
 
@@ -6246,27 +6256,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected final boolean internal_supports_availablecheck_filename_abuse() {
         final boolean supportedByIndicatingHtmlCode = new Regex(getCorrectBR(br), "op=report_file&(?:amp;)?id=" + this.getFUIDFromURL(this.getDownloadLink())).matches();
-        boolean allowedByAutoHandling = true;
-        final SubConfiguration config = this.getPluginConfig();
-        final long timestampLastFailure = config.getLongProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, 0);
-        final String last_version = config.getStringProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION, null);
-        if (timestampLastFailure > 0 && StringUtils.equalsIgnoreCase(getPluginVersionHash(), last_version)) {
-            final long timestampCooldown = timestampLastFailure + internal_waittime_on_alternative_availablecheck_failures();
+        if (timestampAbuseAvailablecheckLastFailure > 0 && numberofContinuousFailuresAbuseAvailablecheckLastFailure >= 50) {
+            final long timestampCooldown = timestampAbuseAvailablecheckLastFailure + internal_waittime_on_alternative_availablecheck_failures();
             if (timestampCooldown > System.currentTimeMillis()) {
-                logger.info("internal_supports_availablecheck_filename_abuse is still deactivated as it did not work on the last attempt");
-                logger.info("Time until retry: " + TimeFormatter.formatMilliSeconds(timestampCooldown - System.currentTimeMillis(), 0));
-                allowedByAutoHandling = false;
+                logger.info("internal_supports_availablecheck_filename_abuse is temp deactivated  | Time until retry: " + TimeFormatter.formatMilliSeconds(timestampCooldown - System.currentTimeMillis(), 0));
+                return false;
             }
         }
-        return (this.supports_availablecheck_filename_abuse() || supportedByIndicatingHtmlCode) && allowedByAutoHandling;
+        return this.supports_availablecheck_filename_abuse() || supportedByIndicatingHtmlCode;
     }
 
     protected final boolean internal_supports_availablecheck_alt() {
-        final SubConfiguration config = this.getPluginConfig();
-        final long timestampLastFailure = config.getLongProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, 0);
-        final String last_version = config.getStringProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_VERSION, null);
-        if (timestampLastFailure > 0 && StringUtils.equalsIgnoreCase(getPluginVersionHash(), last_version)) {
-            final long timestampCooldown = timestampLastFailure + internal_waittime_on_alternative_availablecheck_failures();
+        if (timestampAltAvailablecheckLastFailure > 0 && numberofContinuousFailuresAltAvailablecheckLastFailure >= 50) {
+            final long timestampCooldown = timestampAltAvailablecheckLastFailure + internal_waittime_on_alternative_availablecheck_failures();
             if (timestampCooldown > System.currentTimeMillis()) {
                 logger.info("internal_supports_availablecheck_alt is deactivated | Time until retry: " + TimeFormatter.formatMilliSeconds(timestampCooldown - System.currentTimeMillis(), 0));
                 return false;
@@ -6280,7 +6282,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Its purpose is to minimize unnecessary http requests.
      */
     protected long internal_waittime_on_alternative_availablecheck_failures() {
-        return 12 * 60 * 60 * 1000;
+        return 4 * 60 * 60 * 1000;
     }
 
     /**
@@ -6294,7 +6296,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         br.getPage(this.getAPIBase() + "/account/info");
         /* 2020-05-29: Answer we'd expect if API is available: {"msg":"Invalid key","server_time":"2020-05-29 17:16:36","status":400} */
         try {
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             /* No Exception -> json parsing was successful -> We got an API response. */
             return true;
             // final String msg = (String) entries.get("msg");
@@ -6312,10 +6314,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public Class<? extends XFSConfig> getConfigInterface() {
         return null;
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override
