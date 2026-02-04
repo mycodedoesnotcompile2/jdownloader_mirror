@@ -27,14 +27,15 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PremiumizeBrowseNode;
 import jd.plugins.hoster.PremiumizeMe;
-import jd.plugins.hoster.ZeveraCom;
 import jd.plugins.hoster.ZeveraCore;
 
-@DecrypterPlugin(revision = "$Revision: 50406 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52242 $", interfaceVersion = 2, names = {}, urls = {})
 public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
     public PremiumizeMeZeveraFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private ZeveraCore hosterPlugin = null;
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -73,7 +74,7 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
             throw new AccountRequiredException();
         }
         this.setBrowserExclusive();
-        final ZeveraCore hosterPlugin = (ZeveraCore) this.getNewPluginForHostInstance(this.getHost());
+        hosterPlugin = (ZeveraCore) this.getNewPluginForHostInstance(this.getHost());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final ArrayList<PremiumizeBrowseNode> nodes = getNodes(br, account, parameter.getCryptedUrl());
         final Map<String, Object> data = hosterPlugin.handleAPIErrors(this, br, null, account);
@@ -182,7 +183,7 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
         link.setLinkID(link.getHost() + "://" + node.getID());
     }
 
-    public static ArrayList<PremiumizeBrowseNode> getNodes(final Browser br, final Account account, final String url) throws IOException, AccountInvalidException {
+    private ArrayList<PremiumizeBrowseNode> getNodes(final Browser br, final Account account, final String url) throws IOException, AccountInvalidException {
         final String response = accessCloudItem(br, account, url);
         final Map<String, Object> responseMap = JSonStorage.restoreFromString(response, TypeRef.MAP);
         final String status = (String) responseMap.get("status");
@@ -216,15 +217,10 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
         return null;
     }
 
-    protected static String accessCloudItem(final Browser br, final Account account, final String url) throws IOException, AccountInvalidException {
+    private String accessCloudItem(final Browser br, final Account account, final String url) throws IOException, AccountInvalidException {
         final boolean pairingLogin = ZeveraCore.setAuthHeader(br, account);
         final String itemID = PremiumizeMe.getCloudID(url);
-        final String client_id;
-        if (account.getHoster().equals("premiumize.me")) {
-            client_id = PremiumizeMe.getClientIDExt();
-        } else {
-            client_id = ZeveraCom.getClientIDExt();
-        }
+        final String client_id = hosterPlugin.getClientID();
         final boolean isFolder;
         if (StringUtils.containsIgnoreCase(url, "folder_id")) {
             /* Crawl specific folder_id. */
@@ -241,7 +237,7 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
         }
         query.add("client_id", Encoding.urlEncode(client_id));
         if (!pairingLogin) {
-            query.add("apikey", Encoding.urlEncode(ZeveraCore.getAPIKey(account)));
+            query.add("apikey", Encoding.urlEncode(this.hosterPlugin.getAPIKey(account)));
         }
         if (isFolder) {
             /* Folder */

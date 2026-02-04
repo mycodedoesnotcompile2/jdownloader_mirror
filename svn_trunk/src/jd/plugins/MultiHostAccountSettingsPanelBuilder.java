@@ -406,6 +406,11 @@ public class MultiHostAccountSettingsPanelBuilder {
             public boolean isEnabled(final MultiHostHost mhost) {
                 return mhost.isEnabled();
             }
+
+            @Override
+            public boolean isDefaultVisible() {
+                return false;
+            }
         };
     }
 
@@ -748,7 +753,7 @@ public class MultiHostAccountSettingsPanelBuilder {
         return new ExtTextColumn<MultiHostHost>("Data age") {
             @Override
             public String getStringValue(final MultiHostHost mhost) {
-                final long timestamp = mhost.getCreatedTimestamp();
+                final long timestamp = mhost.getUpdateTimestamp();
                 if (timestamp <= 0) {
                     return "unknown";
                 }
@@ -759,7 +764,7 @@ public class MultiHostAccountSettingsPanelBuilder {
 
             @Override
             protected String getTooltipText(final MultiHostHost mhost) {
-                final long timestamp = mhost.getCreatedTimestamp();
+                final long timestamp = mhost.getUpdateTimestamp();
                 if (timestamp <= 0) {
                     return null;
                 }

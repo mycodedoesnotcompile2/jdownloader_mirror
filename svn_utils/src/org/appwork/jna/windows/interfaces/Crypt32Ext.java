@@ -40,6 +40,7 @@ import com.sun.jna.WString;
 import com.sun.jna.platform.win32.WinCrypt.HCRYPTMSG;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.W32APIOptions;
 
 /**
@@ -75,17 +76,16 @@ public interface Crypt32Ext extends com.sun.jna.platform.win32.Crypt32 {
 
     boolean CertCloseStore(HANDLE hCertStore, int dwFlags);
 
-    boolean CertAddEncodedCertificateToStore(HANDLE hCertStore, int dwCertEncodingType, byte[] pbCertEncoded, int cbCertEncoded, int dwAddDisposition, Pointer ppCertContext // optional
-                                                                                                                                                                             // out;
-                                                                                                                                                                             // can
-                                                                                                                                                                             // be
-                                                                                                                                                                             // NULL
-    );
+    boolean CertAddEncodedCertificateToStore(HANDLE hCertStore, int dwCertEncodingType, byte[] pbCertEncoded, int cbCertEncoded, int dwAddDisposition, PointerByReference pAdded);
+
+    boolean CertSetCertificateContextProperty(Pointer pCertContext, int dwPropId, int dwFlags, Pointer pvData);
 
     Pointer CertDuplicateCertificateContext(Pointer pCertContext);
 
-    int CERT_NAME_SIMPLE_DISPLAY_TYPE = 4;
-    int CERT_NAME_ISSUER_FLAG         = 0x00000001;
+    int                     CERT_NAME_SIMPLE_DISPLAY_TYPE = 4;
+    int                     CERT_NAME_ISSUER_FLAG         = 0x00000001;
+    int                     CERT_STORE_ADD_ALWAYS         = 4;
+    public static final int CERT_FRIENDLY_NAME_PROP_ID    = 11;
 
     int CertGetNameStringW(Pointer pCertContext, int dwType, int dwFlags, Pointer pvTypePara, char[] pszNameString, int cchNameString);
 

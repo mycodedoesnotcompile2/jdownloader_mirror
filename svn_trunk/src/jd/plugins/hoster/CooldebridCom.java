@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52159 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52244 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -166,7 +167,7 @@ public class CooldebridCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        if (!br.getURL().contains("/generate.html")) {
+        if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/generate.html")) {
             br.getPage("/generate.html");
         }
         final String accountType = br.getRegex("(Free User|Premium User)\\s*</span>").getMatch(0);
@@ -177,8 +178,9 @@ public class CooldebridCom extends PluginForHost {
         if (!usedTrafficRegex.patternFind()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        ai.setTrafficMax(SizeFormatter.getSize(usedTrafficRegex.getMatch(1)));
-        ai.setTrafficLeft(ai.getTrafficMax() - SizeFormatter.getSize(usedTrafficRegex.getMatch(0)));
+        final long trafficMax = SizeFormatter.getSize(usedTrafficRegex.getMatch(1));
+        ai.setTrafficMax(trafficMax);
+        ai.setTrafficLeft(trafficMax - SizeFormatter.getSize(usedTrafficRegex.getMatch(0)));
         final Regex usedLinksRegex = br.getRegex("id=\"used_links\">(\\d+)</span>\\s*/\\s*(\\d+)\\s*links");
         if (!usedLinksRegex.patternFind()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -204,42 +206,44 @@ public class CooldebridCom extends PluginForHost {
             }
         } else {
             /*
-             * 2022-02-22: Website claims to also support some hosts for free users but when this plugin was developed they did not have a
+             * 2022-02-22: Website claims to also support some hosts for free users but when this plugin was developed, they did not have a
              * single free host on their list.
              */
             account.setType(AccountType.FREE);
             ai.setExpired(true);
         }
-        // br.getPage("/host-status.html");
+        /* An alternative table overview of supported hosts can be found here: /host-status.html */
         final List<MultiHostHost> supportedHosts = new ArrayList<MultiHostHost>();
         final String[] htmls = br.getRegex("<tr>(.*?)</tr>").getColumn(0);
         if (htmls == null || htmls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
         }
+        final HashSet<String> skippedHTMLs = new HashSet<String>();
         for (final String html : htmls) {
             final String domain = new Regex(html, "favicons\\?domain=([^\"]+)").getMatch(0);
             if (domain == null) {
                 /* Skip invalid items */
+                skippedHTMLs.add(html);
                 continue;
             }
             final String[] columns = new Regex(html, "<td(.*?)</td>").getColumn(0);
             if (columns.length != 3) {
-                logger.warning("Skipping row because of column length mismatch --> @developer! Check plugin code!");
+                logger.warning("Skipping row because of column length mismatch --> @developer! Check plugin code! -> html: " + html);
+                skippedHTMLs.add(html);
                 continue;
             }
             /* Skip hosts that are marked as broken/offline by this multihost */
-            final String hostStatusColumn = columns[2].toLowerCase(Locale.ENGLISH);
+            final String hostStatusColumn = columns[2].toLowerCase(Locale.ROOT);
             final MultiHostHost mhost = new MultiHostHost(domain);
-            if (StringUtils.containsIgnoreCase(html, "Only Premium") && account.getType() != AccountType.PREMIUM) {
+            if (account.getType() != AccountType.PREMIUM && StringUtils.containsIgnoreCase(html, "Only Premium")) {
+                /* User owns free account but only premium users can download from this host. */
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+            } else if (hostStatusColumn.contains("online")) {
+                mhost.setStatus(MultihosterHostStatus.WORKING);
+            } else if (hostStatusColumn.contains("unstable")) {
+                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
             } else {
-                if (hostStatusColumn.contains("online")) {
-                    mhost.setStatus(MultihosterHostStatus.WORKING);
-                } else if (hostStatusColumn.contains("unstable")) {
-                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
-                } else {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                }
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             /*
              * Skip hosts if individual limits have been reached. Some have "unlimited" links or bandwidth -> Limit-RegEx will fail for them
@@ -248,21 +252,24 @@ public class CooldebridCom extends PluginForHost {
             final String hostLimitsHTML = columns[1];
             final Regex maxLinkLimitRegex = new Regex(hostLimitsHTML, "used_count=\"[^\"]+\">(\\d+)</span>\\s*/\\s*(\\d+)\\s*link\\s*</p>");
             if (maxLinkLimitRegex.patternFind()) {
-                final int linksUsed = Integer.parseInt(maxLinkLimitRegex.getMatch(0));
-                final int linksMax = Integer.parseInt(maxLinkLimitRegex.getMatch(1));
-                final int linksLeft = linksMax - linksUsed;
-                mhost.setLinksLeft(linksLeft);
-                mhost.setLinksMax(linksMax);
+                /* Host has individual "max links per day" limits */
+                final int mhostLinksUsed = Integer.parseInt(maxLinkLimitRegex.getMatch(0));
+                final int mhostLinksMax = Integer.parseInt(maxLinkLimitRegex.getMatch(1));
+                final int mhostLinksLeft = mhostLinksMax - mhostLinksUsed;
+                mhost.setLinksLeftAndMax(mhostLinksLeft, mhostLinksMax);
             }
             final Regex maxQuotaRegex = new Regex(hostLimitsHTML, "used_mb=\"[^\"]+\">(\\d+(?:\\.\\d{1,2})? [A-Za-z]{1,5})</span>\\s*/\\s*(\\d+(?:\\.\\d{1,2})? [A-Za-z]{1,5})\\s*<br>");
             if (maxQuotaRegex.patternFind()) {
-                final long trafficUsed = SizeFormatter.getSize(maxQuotaRegex.getMatch(0));
-                final long trafficMax = SizeFormatter.getSize(maxQuotaRegex.getMatch(1));
-                final long trafficLeft = trafficMax - trafficUsed;
-                mhost.setTrafficLeft(trafficLeft);
-                mhost.setTrafficMax(trafficMax);
+                /* Host has individual traffic limits */
+                final long mhostTrafficUsed = SizeFormatter.getSize(maxQuotaRegex.getMatch(0));
+                final long mhostTrafficMax = SizeFormatter.getSize(maxQuotaRegex.getMatch(1));
+                final long mhostTrafficLeft = mhostTrafficMax - mhostTrafficUsed;
+                mhost.setTrafficLeftAndMax(mhostTrafficLeft, mhostTrafficMax);
             }
             supportedHosts.add(mhost);
+        }
+        if (supportedHosts.isEmpty()) {
+            logger.info("Found " + skippedHTMLs.size() + " unparseable html snippets");
         }
         ai.setMultiHostSupportV2(this, supportedHosts);
         account.setConcurrentUsePossible(true);

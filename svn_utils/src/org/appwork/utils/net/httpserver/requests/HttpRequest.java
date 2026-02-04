@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
@@ -73,19 +74,25 @@ public abstract class HttpRequest implements HttpRequestInterface {
         }
     }
 
-    public boolean isHttps() {
-        return https;
+    public boolean isSSL() {
+        return connection.isSSL();
     }
 
-    public void setHttps(boolean https) {
-        this.https = https;
+    /**
+     * Returns the client certificate trust result from TLS handshake (mutual TLS). Use {@link TrustResult#getChain()} for the certificate
+     * chain, {@link TrustResult#isTrusted()}, etc.
+     *
+     * @return The trust result, or null if no client cert was presented
+     */
+    public TrustResult getTrustResult() {
+        return connection.getTrustResult();
     }
 
-    protected boolean                          https                  = false;
+    /** Client certificate trust result from TLS handshake (mutual TLS). Null if none. */
+    protected TrustResult                      trustResult            = null;
     protected List<KeyValuePair>               requestedURLParameters = null;
     private List<String>                       remoteAddress          = new ArrayList<String>();
     protected final RawHttpConnectionInterface connection;
-
     private HttpServerInterface                server;
     private final long                         id;
 
@@ -97,7 +104,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
 
     public HttpRequest(final RawHttpConnectionInterface connection) {
         this.connection = connection;
-        id = REQUEST_ID_COUNTER.incrementAndGet();
+        this.id = REQUEST_ID_COUNTER.incrementAndGet();
     }
 
     public long getId() {
@@ -221,64 +228,6 @@ public abstract class HttpRequest implements HttpRequestInterface {
     public void setServer(final HttpServerInterface server) {
         this.server = server;
     }
-
-    // @Deprecated
-    // public void setBridge(final HTTPBridge deprecatedBridge) {
-    // final HttpServerInterface previousServerInterface = getServer();
-    // setServer(new HttpServerInterface() {
-    // @Override
-    // public boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse) {
-    // return deprecatedBridge.canHandleChunkedEncoding(httpRequest, httpResponse);
-    // }
-    //
-    // @Override
-    // public String getResponseServerHeader() {
-    // return null;
-    // }
-    //
-    // @Override
-    // public ResponseSecurityHeaders getResponseSecurityHeaders() {
-    // return null;
-    // }
-    //
-    // @Override
-    // public RequestSizeLimits getRequestSizeLimits() {
-    // return null;
-    // }
-    //
-    // @Override
-    // public HeaderValidationRules getHeaderValidationRules() {
-    // return null;
-    // }
-    //
-    // @Override
-    // public List<HttpRequestHandler> getHandler() {
-    // return previousServerInterface.getHandler();
-    // }
-    //
-    // private final CorsHandler corsHandler = new CorsHandler() {
-    // @Override
-    // public boolean isAllowHeadersFromRequest() {
-    // return true;
-    // }
-    // };
-    //
-    // @Override
-    // public CorsHandler getCorsHandler() {
-    // return corsHandler;
-    // }
-    //
-    // @Override
-    // public ConnectionTimeouts getConnectionTimeouts() {
-    // return null;
-    // }
-    //
-    // @Override
-    // public Set<RequestMethod> getAllowedMethods() {
-    // return null;
-    // }
-    // });
-    // }
 
     /**
      * returns the server bridge. Exmaple: FCGI for the FCGI bridge

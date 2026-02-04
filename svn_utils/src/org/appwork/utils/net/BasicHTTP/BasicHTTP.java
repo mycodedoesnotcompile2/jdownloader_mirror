@@ -69,6 +69,8 @@ import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
 public class BasicHTTP implements Interruptible {
     protected final static Charset          UTF8           = Charset.forName("UTF-8");
@@ -78,6 +80,7 @@ public class BasicHTTP implements Interruptible {
     protected int                           connectTimeout = 15000;
     protected int                           readTimeout    = 30000;
     protected HTTPProxy                     proxy          = HTTPProxy.NONE;
+    protected TrustProviderInterface        trustProvider  = null;
     protected LogInterface                  logger         = null;
     protected final Object                  lock           = new Object();
 
@@ -211,6 +214,7 @@ public class BasicHTTP implements Interruptible {
     protected HTTPConnection createHTTPConnection(final URL url) {
         this.connection = null;
         final HTTPConnection connection = HTTPConnectionFactory.createHTTPConnection(url, getProxy());
+        connection.setTrustProvider(getTrustProvider());
         this.connection = connection;
         return connection;
     }
@@ -444,6 +448,14 @@ public class BasicHTTP implements Interruptible {
 
     public HTTPProxy getProxy() {
         return this.proxy;
+    }
+
+    public TrustProviderInterface getTrustProvider() {
+        TrustProviderInterface tp = trustProvider;
+        if (tp == null) {
+            return TrustUtils.getDefaultProvider();
+        }
+        return tp;
     }
 
     public int getReadTimeout() {
@@ -934,6 +946,10 @@ public class BasicHTTP implements Interruptible {
 
     public void setProxy(final HTTPProxy proxy) {
         this.proxy = proxy;
+    }
+
+    public void setTrustProvider(final TrustProviderInterface trustProvider) {
+        this.trustProvider = trustProvider;
     }
 
     public void setReadTimeout(final int readTimeout) {

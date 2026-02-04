@@ -35,7 +35,7 @@ import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 52242 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
 public class PremiumizeMe extends ZeveraCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("premiumize.me");
 
@@ -46,10 +46,6 @@ public class PremiumizeMe extends ZeveraCore {
 
     @Override
     public String getClientID() {
-        return getClientIDExt();
-    }
-
-    public static String getClientIDExt() {
         return "616325511";
     }
 

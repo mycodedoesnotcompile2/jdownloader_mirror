@@ -34,12 +34,15 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.os;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.appwork.jna.windows.interfaces.Crypt32Ext;
 import org.appwork.loggingv3.LogV3;
@@ -175,20 +178,228 @@ public class WindowsCertUtils {
      * @throws Exception
      *             if Windows store open/add fails.
      */
-    public static void installCertificate(final X509Certificate certificate, final WindowsCertUtils.KeyStore target) throws Exception {
+    public static void installCertificate(final X509Certificate certificate, final WindowsCertUtils.KeyStore target, final String friendlyName) throws Exception {
         if (certificate == null) {
             return;
         }
         final byte[] der = certificate.getEncoded();
         final HANDLE store = WindowsCertUtils.openStore(target, false);
+        final com.sun.jna.ptr.PointerByReference pAdded = new com.sun.jna.ptr.PointerByReference();
+        Pointer addedCtx = null;
         try {
-            final boolean ok = Crypt32Ext.INSTANCE.CertAddEncodedCertificateToStore(store, WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, der, der.length, Crypt32Ext.CERT_STORE_ADD_REPLACE_EXISTING, null);
+            final boolean ok = Crypt32Ext.INSTANCE.CertAddEncodedCertificateToStore(store, WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, der, der.length, Crypt32Ext.CERT_STORE_ADD_ALWAYS, pAdded);
             if (!ok) {
                 throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            addedCtx = pAdded.getValue();
+            if (addedCtx == null || Pointer.nativeValue(addedCtx) == 0) {
+                throw new IllegalStateException("Null PCCERT_CONTEXT from CertAddEncodedCertificateToStore");
+            }
+            if (friendlyName != null && !friendlyName.isEmpty()) {
+                try {
+                    // CERT_FRIENDLY_NAME_PROP_ID expects pvData to point to a CRYPT_DATA_BLOB (cbData + pbData), not raw string
+                    final byte[] utf16le = (friendlyName + "\0").getBytes(StandardCharsets.UTF_16LE);
+                    final WinCrypt.DATA_BLOB blob = new WinCrypt.DATA_BLOB(utf16le);
+                    blob.write();
+                    final boolean okProp = Crypt32Ext.INSTANCE.CertSetCertificateContextProperty(addedCtx, Crypt32Ext.CERT_FRIENDLY_NAME_PROP_ID, 0, blob.getPointer());
+                    if (!okProp) {
+                        LogV3.warning("Failed to set friendly name: " + Kernel32.INSTANCE.GetLastError());
+                    }
+                } catch (Throwable e) {
+                    LogV3.log(e);
+                }
+            }
+        } finally {
+            // CertAdd... returned a context we must free
+            if (addedCtx != null && Pointer.nativeValue(addedCtx) != 0) {
+                Crypt32Ext.INSTANCE.CertFreeCertificateContext(addedCtx);
+            }
+            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+        }
+    }
+
+    static String getName(final Pointer certContext, final boolean issuer) {
+        final int flags = issuer ? Crypt32Ext.CERT_NAME_ISSUER_FLAG : 0;
+        final int type = Crypt32Ext.CERT_NAME_SIMPLE_DISPLAY_TYPE; // "CN ..." style
+        final int len = Crypt32Ext.INSTANCE.CertGetNameStringW(certContext, type, flags, null, null, 0);
+        if (len <= 1) {
+            return "";
+        }
+        final char[] buf = new char[len];
+        Crypt32Ext.INSTANCE.CertGetNameStringW(certContext, type, flags, null, buf, buf.length);
+        final String s = new String(buf);
+        final int nul = s.indexOf('\0');
+        return (nul >= 0) ? s.substring(0, nul) : s;
+    }
+
+    public static int removeCertificatesByIssuedToOrBy(final KeyStore target, final String issuedToContains, final String issuedByContains) {
+        final HANDLE store = openStore(target, false);
+        Pointer ctx = null;
+        int removed = 0;
+        try {
+            while (true) {
+                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                if (ctx == null || Pointer.nativeValue(ctx) == 0) {
+                    break;
+                }
+                final Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                try {
+                    final String subject = getName(dup, false); // issued to
+                    final String issuer = getName(dup, true); // issued by
+                    final boolean matchSubject = issuedToContains != null && !issuedToContains.isEmpty() && subject.toLowerCase().contains(issuedToContains.toLowerCase());
+                    final boolean matchIssuer = issuedByContains != null && !issuedByContains.isEmpty() && issuer.toLowerCase().contains(issuedByContains.toLowerCase());
+                    if (matchSubject || matchIssuer) {
+                        // NOTE: CertDeleteCertificateFromStore frees the context on success.
+                        final boolean ok = Crypt32Ext.INSTANCE.CertDeleteCertificateFromStore(ctx);
+                        ctx = null; // prevent use-after-free
+                        if (!ok) {
+                            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                        }
+                        removed++;
+                    }
+                } finally {
+                    if (dup != null && Pointer.nativeValue(dup) != 0) {
+                        Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                    }
+                }
             }
         } finally {
             Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
         }
+        return removed;
+    }
+
+    // Reads FriendlyName (CERT_FRIENDLY_NAME_PROP_ID) from a cert context. Returns "" if not set.
+    static String getFriendlyName(final Pointer certContext) {
+        final IntByReference cb = new IntByReference(0);
+        // Query size (includes terminating NUL, UTF-16LE)
+        final boolean okSize = Crypt32Ext.INSTANCE.CertGetCertificateContextProperty(certContext, Crypt32Ext.CERT_FRIENDLY_NAME_PROP_ID, null, cb);
+        if (!okSize || cb.getValue() <= 2) {
+            return "";
+        }
+        final byte[] buf = new byte[cb.getValue()];
+        final boolean okData = Crypt32Ext.INSTANCE.CertGetCertificateContextProperty(certContext, Crypt32Ext.CERT_FRIENDLY_NAME_PROP_ID, buf, cb);
+        if (!okData) {
+            return "";
+        }
+        try {
+            // Decode UTF-16LE, trim at first NUL
+            final String s = new String(buf, 0, cb.getValue(), "UTF-16LE");
+            final int nul = s.indexOf('\0');
+            return (nul >= 0) ? s.substring(0, nul) : s;
+        } catch (final Exception e) {
+            return "";
+        }
+    }
+
+    // Case-insensitive "contains" helper; empty needle => false.
+    static boolean containsIgnoreCase(final String haystack, final String needle) {
+        if (needle == null || needle.isEmpty()) {
+            return false;
+        }
+        if (haystack == null || haystack.isEmpty()) {
+            return false;
+        }
+        return haystack.toLowerCase().contains(needle.toLowerCase());
+    }
+
+    // Returns true if ANY provided filter matches. If no filters provided => false (safe default).
+    static boolean matchesAny(final String subject, final String issuer, final String friendly, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
+        final boolean hasAnyFilter = (issuedToContains != null && !issuedToContains.isEmpty()) || (issuedByContains != null && !issuedByContains.isEmpty()) || (friendlyNameContains != null && !friendlyNameContains.isEmpty());
+        if (!hasAnyFilter) {
+            return false;
+        }
+        return containsIgnoreCase(subject, issuedToContains) || containsIgnoreCase(issuer, issuedByContains) || containsIgnoreCase(friendly, friendlyNameContains);
+    }
+
+    public static class CertListEntry {
+        public final String subject;      // Issued to
+        public final String issuer;       // Issued by
+        public final String friendlyName; // Windows "Friendly Name"
+        public final String thumbprint;   // SHA-1 hex
+
+        public CertListEntry(final String subject, final String issuer, final String friendlyName, final String thumbprint) {
+            this.subject = subject;
+            this.issuer = issuer;
+            this.friendlyName = friendlyName;
+            this.thumbprint = thumbprint;
+        }
+    }
+
+    // LIST: returns matching certificates (safe: returns empty if no filters provided)
+    public static List<CertListEntry> listCertificates(final KeyStore target, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
+        final List<CertListEntry> ret = new ArrayList<CertListEntry>();
+        final HANDLE store = openStore(target, true);
+        Pointer ctx = null;
+        try {
+            while (true) {
+                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                if (ctx == null || Pointer.nativeValue(ctx) == 0) {
+                    break;
+                }
+                final Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                try {
+                    final String subject = getName(dup, false);
+                    final String issuer = getName(dup, true);
+                    final String friendly = getFriendlyName(dup);
+                    if (matchesAny(subject, issuer, friendly, issuedToContains, issuedByContains, friendlyNameContains)) {
+                        final byte[] sha1 = getCertSha1Thumbprint(dup);
+                        final String sha1Hex = (sha1 != null) ? HexFormatter.byteArrayToHex(sha1) : null;
+                        ret.add(new CertListEntry(subject, issuer, friendly, sha1Hex));
+                    }
+                } finally {
+                    if (dup != null && Pointer.nativeValue(dup) != 0) {
+                        Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                    }
+                }
+            }
+        } finally {
+            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+        }
+        return ret;
+    }
+
+    // REMOVE: deletes matching certificates; returns count removed (safe: removes 0 if no filters provided)
+    public static int removeCertificates(final KeyStore target, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
+        final HANDLE store = openStore(target, false);
+        Pointer ctx = null;
+        int removed = 0;
+        try {
+            while (true) {
+                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                if (ctx == null || Pointer.nativeValue(ctx) == 0) {
+                    break;
+                }
+                // Duplicate to read properties safely before deletion
+                final Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                boolean doDelete = false;
+                try {
+                    final String subject = getName(dup, false);
+                    final String issuer = getName(dup, true);
+                    final String friendly = getFriendlyName(dup);
+                    doDelete = matchesAny(subject, issuer, friendly, issuedToContains, issuedByContains, friendlyNameContains);
+                    if (doDelete) {
+                        LogV3.info("Deleting cert: subject=" + subject + " | issuer=" + issuer + " | friendly=" + friendly);
+                    }
+                } finally {
+                    if (dup != null && Pointer.nativeValue(dup) != 0) {
+                        Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                    }
+                }
+                if (doDelete) {
+                    // CertDeleteCertificateFromStore frees ctx on success
+                    final boolean ok = Crypt32Ext.INSTANCE.CertDeleteCertificateFromStore(ctx);
+                    ctx = null; // prevent use-after-free
+                    if (!ok) {
+                        throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                    }
+                    removed++;
+                }
+            }
+        } finally {
+            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+        }
+        return removed;
     }
 
     static String getCertDisplayName(final Pointer certContext) {

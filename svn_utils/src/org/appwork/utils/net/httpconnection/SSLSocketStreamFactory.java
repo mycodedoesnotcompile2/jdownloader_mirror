@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -35,17 +35,33 @@ package org.appwork.utils.net.httpconnection;
 
 import java.io.IOException;
 
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLSocketFactory;
+
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 
 /**
  * @author daniel
  *
  */
 public interface SSLSocketStreamFactory {
-    public SSLSocketStreamInterface create(SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, SSLSocketStreamOptions options) throws IOException;
+    /**
+     * @param trustProvider
+     *            Trust provider for server cert validation (must not be null for create)
+     * @param keyManagers
+     *            Optional client cert key managers for mutual TLS, or null
+     */
+    public SSLSocketStreamInterface create(SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, SSLSocketStreamOptions options, TrustProviderInterface trustProvider, KeyManager[] keyManagers) throws IOException;
 
     public String retry(SSLSocketStreamOptions options, Exception e);
 
-    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName) throws IOException;
-
+    /**
+     * @param trustProvider
+     *            Trust provider for server cert validation; null uses default
+     * @param keyManagers
+     *            Optional client cert key managers, or null
+     * @param trustCallback
+     */
+    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, KeyManager[] keyManagers, TrustCallback trustCallback) throws IOException;
 }

@@ -36,16 +36,20 @@ package org.appwork.utils.net.httpserver.tests;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.serializer.Deser;
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.ReadableBytes;
 import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.RequestSizeLimitExceededException;
 import org.appwork.utils.net.httpserver.RequestSizeLimits;
 import org.appwork.utils.net.throttledconnection.ThrottledInputStream;
 import org.appwork.utils.os.CrossSystem;
@@ -63,12 +67,28 @@ import org.appwork.utils.os.CrossSystem;
  * <li>Draining can be disabled</li>
  * <li>Draining works with GZIP-compressed data</li>
  * <li>Draining behavior with chunked transfer encoding</li>
+ * <li>Header size limit exceeded (draining not possible because request is unknown)</li>
  * </ul>
+ *
+ * <p>
+ * <b>Important OS-dependent behavior when draining is disabled:</b>
+ * </p>
+ * <ul>
+ * <li><b>Windows:</b> Throws exception (connection closed) only when LARGE amounts of POST data are sent (e.g., 5MB+). This happens because
+ * the TCP buffer overflows when the server closes the connection without draining. With SMALL POST data (few KB), Windows typically returns
+ * a valid response code (413) instead of throwing an exception.</li>
+ * <li><b>Linux:</b> May return a valid response code (413) even without draining, especially for smaller POST data amounts.</li>
+ * </ul>
+ *
+ * <p>
+ * The difference between large and small POST data behavior demonstrates that Windows exceptions are caused by TCP buffer overflow, not
+ * just by the absence of draining. Small POST data fits in the TCP buffer, allowing the server to send a response before closing the
+ * connection.
+ * </p>
  *
  * @author AppWork
  */
 public class HttpServerDrainingTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -76,7 +96,6 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
     @Override
     public void runTest() throws Exception {
         try {
-
             this.setupServer();
             this.testPostSizeLimitExceededWithinDrainLimit();
             this.testPostSizeLimitExceededExceedsDrainLimit();
@@ -87,6 +106,9 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
             this.testPostSizeLimitExceededWithChunkedDrainTimeout();
             this.testPostSizeLimitExceededWithChunkedExceedsDrainLimit();
             this.testPostSizeLimitExceededWithChunkedAndGzipDraining();
+            this.testPostSizeLimitExceededNoDrainingSmallData();
+            this.testHeaderSizeLimitExceededWithPost();
+            this.testHeaderSizeLimitExceededWithGet();
         } finally {
             this.teardownServer();
         }
@@ -100,12 +122,12 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - Within Drain Limit");
         // Setup server with custom limits: 2MB POST limit, 10MB drain limit
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(Long.valueOf(16 * 1024L), // 16KB header
-                Long.valueOf(2 * 1024 * 1024L), // 2MB POST limit
-                Long.valueOf(10 * 1024 * 1024L), // 10MB processed
-                Long.valueOf(10 * 1024 * 1024L), // 10MB drain limit
-                Long.valueOf(30000L)); // 30s drain timeout (30000 ms)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(Long.valueOf(ReadableBytes.Unit.KB.toKibiBytes(16)), // 16KB header
+                Long.valueOf(ReadableBytes.Unit.MB.toKibiBytes(2)), // 2MB POST limit
+                Long.valueOf(ReadableBytes.Unit.MB.toKibiBytes(10)), // 10MB processed
+                Long.valueOf(ReadableBytes.Unit.MB.toKibiBytes(10)), // 10MB drain limit
+                Long.valueOf(TimeUnit.SECONDS.toMillis(30))); // 30s drain timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         httpServer.setVerboseLog(true);
         httpClient.setVerboseLog(true);
@@ -113,15 +135,12 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create POST data that exceeds POST limit but is within drain limit (5MB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 5 * 1024 * 1024; i++) {
-                    postData.append("X");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(5));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -142,8 +161,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     throw new Exception("POST Size Limit test failed after " + elapsed + "ms: Expected 413 but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -165,8 +184,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
             httpClient.setVerboseLog(true);
             this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
             this.httpClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");
-            this.httpClient.setConnectTimeout(50000);
-            this.httpClient.setReadTimeout(100000);
+            this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+            this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
             final RequestContext context = this.httpClient.post(urlString, postData);
             final int responseCode = context.getCode();
             final long elapsed = System.currentTimeMillis() - startTime;
@@ -177,8 +196,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
             throw new Exception("HttpClient test failed after " + elapsed + "ms: Expected 413 but got HttpClientException: " + e.getMessage(), e);
         } finally {
             this.httpClient.clearRequestHeader();
-            this.httpClient.setConnectTimeout(5000);
-            this.httpClient.setReadTimeout(30000);
+            this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+            this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
         }
     }
 
@@ -190,26 +209,23 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - Exceeds Drain Limit");
         // Setup server with custom limits: 2MB POST limit, 5MB drain limit
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                5 * 1024 * 1024L, // 5MB drain limit (smaller than POST data)
-                30000L); // 30s drain timeout (30000 ms)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(5), // 5MB drain limit (smaller than POST data)
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create POST data that exceeds both POST limit and drain limit (15MB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 15 * 1024 * 1024; i++) {
-                    postData.append("Y");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(15));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -230,8 +246,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     LogV3.info("POST Size Limit (exceeds drain limit) test successful - Connection closed when drain limit exceeded in " + elapsed + "ms: " + e.getMessage());
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -243,33 +259,46 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
     }
 
     /**
-     * Test: POST exceeding limit with draining DISABLED - should close connection without draining POST data: 5MB, POST limit: 2MB, Drain
-     * limit: 0 (disabled) -> No draining, connection closed immediately
+     * Test: POST exceeding limit with draining DISABLED - behavior depends on OS and POST data size.
+     *
+     * <p>
+     * <b>Important OS-dependent behavior:</b>
+     * </p>
+     * <ul>
+     * <li><b>Windows:</b> Throws exception only when LARGE amounts of POST data are sent (e.g., 5MB+). This happens because the TCP buffer
+     * overflows when the server closes the connection without draining. With small POST data (few KB), Windows may successfully return a
+     * response code instead of throwing an exception.</li>
+     * <li><b>Linux:</b> May return a valid response code (413) even without draining, especially for smaller POST data amounts.</li>
+     * </ul>
+     *
+     * <p>
+     * This test uses 5MB POST data to trigger the Windows exception behavior. For small POST data tests, see
+     * {@link #testPostSizeLimitExceededNoDrainingSmallData()}.
+     * </p>
+     *
+     * POST data: 5MB, POST limit: 2MB, Drain limit: 0 (disabled) -> No draining, behavior OS-dependent
      */
     private void testPostSizeLimitExceededNoDraining() throws Exception {
         LogV3.info("Test: POST Size Limit Exceeded - No Draining");
         // Setup server with draining disabled (null drain limit and null timeout)
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024l, // 16KB header
-                2 * 1024 * 1024l, // 2MB POST limit
-                10 * 1024 * 1024l, // 10MB processed
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
                 -1, // Draining disabled (null)
                 -1); // No timeout
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create POST data that exceeds POST limit (5MB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 5 * 1024 * 1024; i++) {
-                    postData.append("Z");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(5));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -308,12 +337,94 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     }
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
                 // We expect either an exception OR a successful response (OS-dependent behavior)
                 // The key difference is that the server should NOT drain (visible in logs)
-                LogV3.info("POST Size Limit (no draining) test completed - Behavior is OS-dependent (Windows: Exception, Linux: may return response)");
+                // IMPORTANT: Under Windows, exceptions only occur with LARGE POST data (5MB+) when TCP buffer overflows.
+                // With small POST data, Windows may also return a response code instead of throwing an exception.
+                LogV3.info("POST Size Limit (no draining, large data) test completed - Behavior is OS-dependent (Windows: Exception with large data, Linux: may return response)");
+            } finally {
+                this.restoreHttpMethods(previousMethods);
+            }
+        } finally {
+            this.teardownServer();
+            this.setupServer();
+        }
+    }
+
+    /**
+     * Test: POST exceeding limit with draining DISABLED and SMALL POST data - should return response code (no exception).
+     *
+     * <p>
+     * <b>Important OS-dependent behavior:</b>
+     * </p>
+     * <ul>
+     * <li><b>Windows:</b> With SMALL POST data (few KB), Windows typically returns a valid response code (413) instead of throwing an
+     * exception. Exceptions only occur with LARGE POST data (5MB+) when the TCP buffer overflows after the server closes the connection
+     * without draining.</li>
+     * <li><b>Linux:</b> Returns a valid response code (413) even without draining.</li>
+     * </ul>
+     *
+     * <p>
+     * This test verifies that small POST data exceeding the limit returns a response code even when draining is disabled, demonstrating
+     * that the Windows exception behavior only occurs with large amounts of data that overflow the TCP buffer.
+     * </p>
+     *
+     * POST data: 10KB, POST limit: 2KB, Drain limit: 0 (disabled) -> Should return 413 response code (no exception)
+     */
+    private void testPostSizeLimitExceededNoDrainingSmallData() throws Exception {
+        LogV3.info("Test: POST Size Limit Exceeded - No Draining (Small Data)");
+        // Setup server with draining disabled and small POST limit
+        this.teardownServer();
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.KB.toKibiBytes(2), // 2KB POST limit (small!)
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                -1, // Draining disabled
+                -1); // No timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.KB.toKibiBytes(2)); // 2KB POST limit
+        this.httpServer.setRequestSizeLimits(limits);
+        try {
+            final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
+            try {
+                // Create POST data that exceeds POST limit but is SMALL (10KB) - should NOT trigger Windows exception
+                // Windows exceptions only occur with LARGE data (5MB+) that overflow TCP buffer
+                final String postData = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(10));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
+                final String url = "http://localhost:" + this.serverPort + "/test/postData";
+                this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
+                final long startTime = System.currentTimeMillis();
+                lastServerException = null;
+                try {
+                    final RequestContext context = this.httpClient.post(url, jsonData);
+                    final int responseCode = context.getCode();
+                    final long elapsed = System.currentTimeMillis() - startTime;
+                    // With SMALL POST data, even Windows should return a response code (no exception)
+                    // Exceptions only occur with LARGE data (5MB+) when TCP buffer overflows
+                    assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "POST without draining (small data) should return 413, was: " + responseCode);
+                    assertTrue(this.lastServerException != null, "Server-side: Exception expected for oversized POST body when draining is disabled");
+                    // Timing validation: 10KB POST without draining (fast response)
+                    // - Should be fast since no draining overhead
+                    // - Max allowed: 100ms (should be fast when draining is disabled)
+                    assertTrue(elapsed < 100, "Request without draining (small data) should complete within 100ms, took: " + elapsed + "ms");
+                    assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
+                    LogV3.info("POST Size Limit (no draining, small data) test successful - Got response code: " + responseCode + " in " + elapsed + "ms (no exception even on Windows)");
+                } catch (final HttpClientException e) {
+                    final long elapsed = System.currentTimeMillis() - startTime;
+                    // Exception should NOT occur with small POST data, even on Windows
+                    // Windows exceptions only occur with LARGE data (5MB+) that overflow TCP buffer
+                    throw new Exception("POST Size Limit (no draining, small data) test failed: Expected 413 response code but got HttpClientException. This suggests TCP buffer overflow even with small data, which is unexpected. Exception: " + e.getMessage(), e);
+                } finally {
+                    this.httpClient.clearRequestHeader();
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
+                }
+                // Key point: With SMALL POST data, even Windows returns a response code instead of throwing an exception.
+                // This demonstrates that Windows exceptions only occur with LARGE data that overflow the TCP buffer.
+                LogV3.info("POST Size Limit (no draining, small data) test completed - Small data returns response code even on Windows (exceptions only with large data 5MB+)");
             } finally {
                 this.restoreHttpMethods(previousMethods);
             }
@@ -332,33 +443,29 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         // Setup server with short drain timeout: 2MB POST limit, 100MB drain limit, 2s timeout
         // Use large drain limit but short timeout to ensure timeout is triggered
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                100 * 1024 * 1024L, // 100MB drain limit (much higher than POST data to allow timeout to trigger)
-                2000L); // 2s drain timeout (2000 ms) (SHORT!)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(100), // 100MB drain limit (much higher than POST data to allow timeout to trigger)
+                TimeUnit.SECONDS.toMillis(2)); // 2s drain timeout (SHORT!)
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create very large POST data (50MB) - large enough that draining will take longer than 2s timeout
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 50 * 1024 * 1024; i++) {
-                    postData.append("T");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(50));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
                     byte[] bytes;
                     ThrottledInputStream in = new ThrottledInputStream(new ByteArrayInputStream(bytes = jsonData.getBytes("UTF-8")));
-                    in.setLimit((int) org.appwork.utils.ReadableBytes.Unit.MB.toKibiBytes(10));
-
+                    in.setLimit((int) ReadableBytes.Unit.MB.toKibiBytes(10));
                     final RequestContext context = httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(in).setPostDataLength(bytes.length));
                     final int responseCode = context.getCode();
                     final long elapsed = System.currentTimeMillis() - startTime;
@@ -378,8 +485,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     LogV3.info("POST Size Limit (drain timeout) test - Drain stopped after timeout in " + elapsed + "ms: " + e.getMessage());
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
                 // Key point: Server should stop draining after 2 seconds (visible in logs)
                 LogV3.info("POST Size Limit (drain timeout) test completed - Check logs for 'Drain input stream stopped due to timeout'");
@@ -400,12 +507,12 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - With GZIP Draining");
         // Setup server with custom limits: 2MB POST limit, 10MB drain limit
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                10 * 1024 * 1024L, // 10MB drain limit
-                30000L); // 30s drain timeout (30000 ms)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB drain limit
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
@@ -413,19 +520,14 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 // Create uncompressed data that will exceed POST limit when compressed
                 // Use less compressible data (random-like) to ensure compressed size exceeds 2MB
                 // We need ~10MB uncompressed to get ~3MB compressed (typical GZIP ratio for random data)
-                final StringBuilder uncompressedData = new StringBuilder();
-                for (int i = 0; i < 1024 * 1024; i++) {
-                    // Use pattern that doesn't compress as well as single character
-                    uncompressedData.append((char) ('A' + (Math.random() * 26)));
-                }
-                final String jsonData = "{\"data\":\"" + uncompressedData.toString() + "\"}";
-
+                final String uncompressedData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(1));
+                final String jsonData = "{\"data\":" + Deser.toString(uncompressedData) + "}";
                 // Compress the data with GZIP
                 final ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 GZIPOutputStream gzipOut = null;
                 try {
                     gzipOut = new GZIPOutputStream(baos);
-                    while (baos.size() < 2 * 1024 * 1024) {
+                    while (baos.size() < ReadableBytes.Unit.MB.toKibiBytes(2)) {
                         gzipOut.write(jsonData.getBytes("UTF-8"));
                     }
                     gzipOut.flush();
@@ -438,17 +540,15 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     }
                 }
                 final byte[] compressedData = baos.toByteArray();
-
                 // Verify compressed data exceeds POST limit but is within drain limit
-                assertTrue(compressedData.length > 2 * 1024 * 1024, "Compressed data should exceed POST limit (2MB), was: " + compressedData.length);
-                assertTrue(compressedData.length < 10 * 1024 * 1024, "Compressed data should be within drain limit (10MB), was: " + compressedData.length);
+                assertTrue(compressedData.length > ReadableBytes.Unit.MB.toKibiBytes(2), "Compressed data should exceed POST limit (2MB), was: " + compressedData.length);
+                assertTrue(compressedData.length < ReadableBytes.Unit.MB.toKibiBytes(10), "Compressed data should be within drain limit (10MB), was: " + compressedData.length);
                 LogV3.info("Test data: Compressed=" + compressedData.length + " bytes (exceeds 2MB POST limit, within 10MB drain limit)");
-
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_ENCODING, "gzip");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -474,8 +574,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     throw new Exception("GZIP POST within drain limit test failed after " + elapsed + "ms: Expected 413 but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -494,34 +594,29 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - With Chunked Transfer-Encoding");
         // Setup server with custom limits: 2MB POST limit, 10MB drain limit
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                10 * 1024 * 1024L, // 10MB drain limit
-                30000L); // 30s drain timeout (30000 ms)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB drain limit
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create POST data that exceeds POST limit (5MB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 5 * 1024 * 1024; i++) {
-                    postData.append("Y");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(5));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final byte[] postBytes = jsonData.getBytes("UTF-8");
-
                 // Use HttpClient with chunked transfer encoding
                 // Create InputStream wrapper (not ByteArrayInputStream to avoid auto-detection of length)
                 final java.io.InputStream postDataStream = new CountingInputStream(new java.io.ByteArrayInputStream(postBytes));
-
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 // Set Transfer-Encoding: chunked header
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -543,8 +638,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     throw new Exception("POST Size Limit (chunked) test failed after " + elapsed + "ms: Expected 413 but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -563,34 +658,29 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - With Chunked Transfer-Encoding and Drain Timeout");
         // Setup server with short drain timeout: 2MB POST limit, 100MB drain limit, 2s timeout
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                100 * 1024 * 1024L, // 100MB drain limit (much higher than POST data to allow timeout to trigger)
-                2000L); // 2s drain timeout (2000 ms) (SHORT!)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(100), // 100MB drain limit (much higher than POST data to allow timeout to trigger)
+                TimeUnit.SECONDS.toMillis(2)); // 2s drain timeout (SHORT!)
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create very large POST data (50MB) - large enough that draining will take longer than 2s timeout
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 50 * 1024 * 1024; i++) {
-                    postData.append("T");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(50));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final byte[] postBytes = jsonData.getBytes("UTF-8");
-
                 // Use ThrottledInputStream to slow down data transfer so drain timeout can trigger
                 // Wrap in FilterInputStream to prevent auto-detection of length for chunked encoding
                 final ThrottledInputStream postDataStream = new ThrottledInputStream(new ByteArrayInputStream(postBytes));
-                postDataStream.setLimit((int) org.appwork.utils.ReadableBytes.Unit.MB.toKibiBytes(10)); // 10 MB/s limit
-
+                postDataStream.setLimit((int) ReadableBytes.Unit.MB.toKibiBytes(10)); // 10 MB/s limit
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -614,8 +704,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     LogV3.info("POST Size Limit (chunked drain timeout) test - Drain stopped after timeout in " + elapsed + "ms: " + e.getMessage());
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
                 // Key point: Server should stop draining after 2 seconds (visible in logs)
                 LogV3.info("POST Size Limit (chunked drain timeout) test completed - Check logs for 'Drain chunked stopped due to timeout'");
@@ -636,33 +726,28 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - With Chunked Transfer-Encoding Exceeding Drain Limit");
         // Setup server with custom limits: 2MB POST limit, 5MB drain limit
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                5 * 1024 * 1024L, // 5MB drain limit (smaller than POST data)
-                30000L); // 30s drain timeout (30000 ms)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(5), // 5MB drain limit (smaller than POST data)
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
             try {
                 // Create POST data that exceeds both POST limit and drain limit (15MB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 15 * 1024 * 1024; i++) {
-                    postData.append("Y");
-                }
-                final String jsonData = "{\"data\":\"" + postData.toString() + "\"}";
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(15));
+                final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
                 final byte[] postBytes = jsonData.getBytes("UTF-8");
-
                 // Use HttpClient with chunked transfer encoding
                 // Create InputStream wrapper (not ByteArrayInputStream to avoid auto-detection of length)
                 final java.io.InputStream postDataStream = new CountingInputStream(new java.io.ByteArrayInputStream(postBytes));
-
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -684,8 +769,8 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     LogV3.info("POST Size Limit (chunked exceeds drain limit) test successful - Connection closed when drain limit exceeded in " + elapsed + "ms: " + e.getMessage());
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -704,12 +789,12 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - With Chunked Transfer-Encoding and GZIP Compression");
         // Setup server with custom limits: 2MB POST limit, 10MB drain limit
         this.teardownServer();
-        final RequestSizeLimits limits = new RequestSizeLimits(16 * 1024L, // 16KB header
-                2 * 1024 * 1024L, // 2MB POST limit
-                10 * 1024 * 1024L, // 10MB processed
-                10 * 1024 * 1024L, // 10MB drain limit
-                30000L); // 30s drain timeout (30000 ms)
-        this.setupServerWithLimits(-1, 2 * 1024 * 1024); // 2MB POST limit
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(16), // 16KB header
+                ReadableBytes.Unit.MB.toKibiBytes(2), // 2MB POST limit
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB drain limit
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(2)); // 2MB POST limit
         this.httpServer.setRequestSizeLimits(limits);
         try {
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
@@ -717,19 +802,14 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 // Create uncompressed data that will exceed POST limit when compressed
                 // Use less compressible data (random-like) to ensure compressed size exceeds 2MB
                 // We need ~10MB uncompressed to get ~3MB compressed (typical GZIP ratio for random data)
-                final StringBuilder uncompressedData = new StringBuilder();
-                for (int i = 0; i < 1024 * 1024; i++) {
-                    // Use pattern that doesn't compress as well as single character
-                    uncompressedData.append((char) ('A' + (Math.random() * 26)));
-                }
-                final String jsonData = "{\"data\":\"" + uncompressedData.toString() + "\"}";
-
+                final String uncompressedData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(1));
+                final String jsonData = "{\"data\":" + Deser.toString(uncompressedData) + "}";
                 // Compress the data with GZIP
                 final ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 GZIPOutputStream gzipOut = null;
                 try {
                     gzipOut = new GZIPOutputStream(baos);
-                    while (baos.size() < 2 * 1024 * 1024) {
+                    while (baos.size() < ReadableBytes.Unit.MB.toKibiBytes(2)) {
                         gzipOut.write(jsonData.getBytes("UTF-8"));
                     }
                     gzipOut.flush();
@@ -742,24 +822,21 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     }
                 }
                 final byte[] compressedData = baos.toByteArray();
-
                 // Verify compressed data exceeds POST limit but is within drain limit
-                assertTrue(compressedData.length > 2 * 1024 * 1024, "Compressed data should exceed POST limit (2MB), was: " + compressedData.length);
-                assertTrue(compressedData.length < 10 * 1024 * 1024, "Compressed data should be within drain limit (10MB), was: " + compressedData.length);
+                assertTrue(compressedData.length > ReadableBytes.Unit.MB.toKibiBytes(2), "Compressed data should exceed POST limit (2MB), was: " + compressedData.length);
+                assertTrue(compressedData.length < ReadableBytes.Unit.MB.toKibiBytes(10), "Compressed data should be within drain limit (10MB), was: " + compressedData.length);
                 LogV3.info("Test data: Compressed=" + compressedData.length + " bytes (exceeds 2MB POST limit, within 10MB drain limit)");
-
                 // Use HttpClient with chunked transfer encoding AND GZIP compression
                 // Create InputStream wrapper (not ByteArrayInputStream to avoid auto-detection of length)
                 final java.io.InputStream postDataStream = new CountingInputStream(new java.io.ByteArrayInputStream(compressedData));
-
                 httpClient.setVerboseLog(true);
                 httpServer.setVerboseLog(true);
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_ENCODING, "gzip");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 final long startTime = System.currentTimeMillis();
                 lastServerException = null;
                 try {
@@ -784,8 +861,150 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     throw new Exception("Chunked+GZIP POST within drain limit test failed after " + elapsed + "ms: Expected 413 but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
+                }
+            } finally {
+                this.restoreHttpMethods(previousMethods);
+            }
+        } finally {
+            this.teardownServer();
+            this.setupServer();
+        }
+    }
+
+    /**
+     * Test: POST request with header size limit exceeded - draining not possible because request is unknown Header size: 20KB, Header
+     * limit: 1KB -> Should fail during header parsing
+     */
+    private void testHeaderSizeLimitExceededWithPost() throws Exception {
+        LogV3.info("Test: Header Size Limit Exceeded - POST Request");
+        // Setup server with small header size limit: 1KB
+        this.teardownServer();
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(1), // 1KB header limit (small!)
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB POST limit (large enough to not interfere)
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB drain limit
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits((int) ReadableBytes.Unit.KB.toKibiBytes(1), ReadableBytes.Unit.MB.toKibiBytes(10)); // 1KB header limit
+        this.httpServer.setRequestSizeLimits(limits);
+        try {
+            final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
+            try {
+                final String largeHeaderValue = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(10));
+                final String url = "http://localhost:" + this.serverPort + "/test/postData";
+                // Set oversized header
+                this.httpClient.putRequestHeader("X-Large-Header", largeHeaderValue);
+                this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
+                httpServer.setVerboseLog(true);
+                final long startTime = System.currentTimeMillis();
+                lastServerException = null;
+                try {
+                    // POST with same amount of data as other POST tests (5MB)
+                    final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(5));
+                    final String jsonData = "{\"data\":" + Deser.toString(postData) + "}";
+                    final RequestContext context = this.httpClient.post(url, jsonData);
+                    final int responseCode = context.getCode();
+                    final long elapsed = System.currentTimeMillis() - startTime;
+                    // On Linux, may return response code (413) instead of closing connection
+                    if (this.expectValidResponseWhenDrainingFails()) {
+                        // Valid response code expected (Linux behavior)
+                        assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "POST with oversized header should return 413, was: " + responseCode);
+                        assertTrue(this.lastServerException instanceof RequestSizeLimitExceededException, "Server-side: Exception expected for oversized header");
+                        assertTrue(elapsed < 100, "Request with oversized header should complete within 100ms, took: " + elapsed + "ms");
+                        assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
+                        LogV3.info("POST Header Size Limit test successful - Got response code: " + responseCode + " in " + elapsed + "ms");
+                    } else {
+                        // Exception expected (Windows behavior) - but got response code, which is unexpected
+                        throw new Exception("POST Header Size Limit test failed: Expected HttpClientException (connection closed) but got response code: " + responseCode);
+                    }
+                } catch (final HttpClientException e) {
+                    final long elapsed = System.currentTimeMillis() - startTime;
+                    if (this.expectExceptionWhenDrainingFails()) {
+                        // Exception expected (Windows behavior) - draining not possible because request is unknown
+                        assertTrue(this.lastServerException != null, "Server-side: Exception expected for oversized header");
+                        assertTrue(elapsed < 200, "Request with oversized header should complete within 200ms, took: " + elapsed + "ms");
+                        assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
+                        LogV3.info("POST Header Size Limit test successful - Connection closed (draining not possible) in " + elapsed + "ms: " + e.getMessage());
+                    } else {
+                        // Valid response expected (Linux behavior) - but got exception, which is unexpected
+                        throw new Exception("POST Header Size Limit test failed: Expected valid response code but got HttpClientException: " + e.getMessage(), e);
+                    }
+                } finally {
+                    this.httpClient.clearRequestHeader();
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
+                }
+            } finally {
+                this.restoreHttpMethods(previousMethods);
+            }
+        } finally {
+            this.teardownServer();
+            this.setupServer();
+        }
+    }
+
+    /**
+     * Test: GET request with header size limit exceeded - draining not possible because request is unknown Header size: 20KB, Header limit:
+     * 1KB -> Should fail during header parsing
+     */
+    private void testHeaderSizeLimitExceededWithGet() throws Exception {
+        LogV3.info("Test: Header Size Limit Exceeded - GET Request");
+        // Setup server with small header size limit: 1KB
+        this.teardownServer();
+        final RequestSizeLimits limits = new RequestSizeLimits(ReadableBytes.Unit.KB.toKibiBytes(1), // 1KB header limit (small!)
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB POST limit (not relevant for GET)
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB processed
+                ReadableBytes.Unit.MB.toKibiBytes(10), // 10MB drain limit
+                TimeUnit.SECONDS.toMillis(30)); // 30s drain timeout
+        this.setupServerWithLimits((int) ReadableBytes.Unit.KB.toKibiBytes(1), ReadableBytes.Unit.MB.toKibiBytes(10)); // 1KB header limit
+        this.httpServer.setRequestSizeLimits(limits);
+        try {
+            final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
+            try {
+                // Create oversized header value (20KB) - exceeds 1KB header limit
+                final String largeHeaderValue = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(8));
+                final String url = "http://localhost:" + this.serverPort + "/test/getData";
+                // Set oversized header
+                this.httpClient.putRequestHeader("X-Large-Header", largeHeaderValue.toString());
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
+                final long startTime = System.currentTimeMillis();
+                lastServerException = null;
+                try {
+                    final RequestContext context = this.httpClient.get(url);
+                    final int responseCode = context.getCode();
+                    final long elapsed = System.currentTimeMillis() - startTime;
+                    // On Linux, may return response code (413) instead of closing connection
+                    if (this.expectValidResponseWhenDrainingFails()) {
+                        // Valid response code expected (Linux behavior)
+                        assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "GET with oversized header should return 413, was: " + responseCode);
+                        assertTrue(this.lastServerException != null, "Server-side: Exception expected for oversized header");
+                        assertTrue(elapsed < 100, "Request with oversized header should complete within 100ms, took: " + elapsed + "ms");
+                        assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
+                        LogV3.info("GET Header Size Limit test successful - Got response code: " + responseCode + " in " + elapsed + "ms");
+                    } else {
+                        // Exception expected (Windows behavior) - but got response code, which is unexpected
+                        throw new Exception("GET Header Size Limit test failed: Expected HttpClientException (connection closed) but got response code: " + responseCode);
+                    }
+                } catch (final HttpClientException e) {
+                    final long elapsed = System.currentTimeMillis() - startTime;
+                    if (this.expectExceptionWhenDrainingFails()) {
+                        // Exception expected (Windows behavior) - draining not possible because request is unknown
+                        assertTrue(this.lastServerException != null, "Server-side: Exception expected for oversized header");
+                        assertTrue(elapsed < 500, "Request with oversized header should complete within 100ms, took: " + elapsed + "ms");
+                        assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
+                        LogV3.info("GET Header Size Limit test successful - Connection closed (draining not possible) in " + elapsed + "ms: " + e.getMessage());
+                    } else {
+                        // Valid response expected (Linux behavior) - but got exception, which is unexpected
+                        throw new Exception("GET Header Size Limit test failed: Expected valid response code but got HttpClientException: " + e.getMessage(), e);
+                    }
+                } finally {
+                    this.httpClient.clearRequestHeader();
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);

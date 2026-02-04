@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52094 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52245 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZapuploadTop extends PluginForHost {
     public ZapuploadTop(PluginWrapper wrapper) {
         super(wrapper);
@@ -172,15 +172,19 @@ public class ZapuploadTop extends PluginForHost {
             }
             final Map<String, Object> dlconfig = JSonStorage.restoreFromString(downloadConfigJson, TypeRef.MAP);
             final Number dlconfig_captcha = (Number) dlconfig.get("captcha");
-            if (dlconfig_captcha != null && dlconfig_captcha.intValue() == 1) {
+            final String captcha_type = dlconfig.get("captcha_type").toString();
+            if (dlconfig_captcha != null && dlconfig_captcha.intValue() == 1 && !StringUtils.equalsIgnoreCase(captcha_type, "minigame")) {
                 if (br.containsHTML("class=\"h-captcha\"")) {
                     /* 2025-01-07: uploadzap.com */
                     final String hcaptchaResponse = new CaptchaHelperHostPluginHCaptcha(this, br).getToken();
                     dlform2.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
                     dlform2.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
-                } else {
+                } else if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
                     final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
                     dlform2.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                } else {
+                    /* This should never happen */
+                    logger.info("Website says captcha is required but there is no captcha -> Trying download without captcha");
                 }
             }
             br.submitForm(dlform2);

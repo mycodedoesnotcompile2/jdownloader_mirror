@@ -323,8 +323,8 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static void assertNull(final Object b) throws Exception {
-        assertEquals(null, b);
+    public static void assertNull(final Object b, String... string) throws Exception {
+        assertEquals(null, b, string);
     }
 
     public static void assertEquals(final Object a, final Object b, String... comments) throws Exception {

@@ -66,17 +66,18 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  * @author AppWork GmbH
  */
 public abstract class AbstractServerBasics implements HttpServerInterface {
-
+    /**
+     * 
+     */
+    public static final String FORBIDDEN_ORIGIN = "Forbidden Origin!";
     // Security and CORS configuration
     protected ResponseSecurityHeaders responseSecurityHeaders;
     protected CorsHandler             corsHandler;
-
     // HttpServerInterface configuration
     protected Set<RequestMethod>      allowedMethods;
     protected HeaderValidationRules   headerValidationRules;
     protected RequestSizeLimits       requestSizeLimits;
     protected ConnectionTimeouts      connectionTimeouts;
-
     // Server header configuration
     protected String                  responseServerHeaderValue;
 
@@ -87,10 +88,8 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      */
     protected AbstractServerBasics(String name) {
         setResponseServerHeaderValue(name);
-
         // Set default size limits
         this.requestSizeLimits = new RequestSizeLimits();
-
         // Set default header validation rules
         this.headerValidationRules = new HeaderValidationRules();
         // Set default allowed methods (only GET allowed by default)
@@ -100,13 +99,10 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
         // Set default connection timeouts config
         this.connectionTimeouts = new ConnectionTimeouts();
         this.corsHandler = new CorsHandler();
-        //
-        System.setProperty("TESTTTT", "hj213");
     }
 
     public void setAllowedMethods(RequestMethod... methods) {
         this.setAllowedMethods(new HashSet<RequestMethod>(Arrays.asList(methods)));
-
     }
     // HttpServerInterface implementation
 
@@ -198,13 +194,15 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      * Sets the CORS handler.
      *
      * @param corsHandler
-     *            The CORS handler instance, or null to disable CORS
+     *            The CORS handler instance. Must not be null. To disable CORS, use a CorsHandler with allowedOrigins=null.
+     * @throws IllegalArgumentException
+     *             if corsHandler is null
      */
     public void setCorsHandler(final CorsHandler corsHandler) {
-        if (corsHandler != null) {
-            // Validate CORS configuration, including conflicts with security headers if configured
-            corsHandler.validate();
+        if (corsHandler == null) {
+            throw new IllegalArgumentException("CorsHandler must not be null. To disable CORS, use a CorsHandler with allowedOrigins=null.");
         }
+        corsHandler.validate();
         this.corsHandler = corsHandler;
     }
 
@@ -222,7 +220,6 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
     public void setResponseServerHeaderValue(final String responseServerHeader) {
         this.responseServerHeaderValue = responseServerHeader;
     }
-
     // Abstract methods that must be implemented by subclasses
 
     /**
@@ -272,43 +269,25 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.fine("validateRequest: Starting validation for " + request.getRequestMethod() + " " + request.getRequestedURL());
         }
         final HeaderCollection requestHeaders = request.getRequestHeaders();
-
         // Header validation
         final HeaderValidationRules headerRules = this.getHeaderValidationRules();
         if (headerRules != null && headerRules.isEnabled()) {
             if (!headerRules.isRequestAllowed(requestHeaders)) {
                 final String errorMessage = headerRules.getValidationError(requestHeaders);
-
                 LogV3.warning("Security: Header validation failed | Error: " + errorMessage);
                 throw new ForbiddenHeaderException(errorMessage);
             }
         }
-
         // Method validation
         final Set<RequestMethod> allowedMethods = this.getAllowedMethods();
         RequestMethod requestMethod = request.getRequestMethod();
         if (allowedMethods != null) {
-
             if (requestMethod == RequestMethod.UNKNOWN || !allowedMethods.contains(requestMethod)) {
                 throw new HttpMethodNotAllowedException("Illegal Method");
             }
         }
-
-        // Origin validation (CORS)
-        final HTTPHeader originHeader = requestHeaders.get(HTTPConstants.HEADER_REQUEST_ORIGIN);
-        if (originHeader != null) {
-            final String origin = originHeader.getValue();
-            if (StringUtils.isEmpty(origin)) {
-                throw new ForbiddenOriginException("Empty Origin header rejected");
-            }
-            final CorsHandler corsHandler = this.getCorsHandler();
-            // Only validate if CORS handler is configured (null means CORS validation is disabled)
-            if (corsHandler != null) {
-                if (!corsHandler.isOriginAllowed(requestHeaders)) {
-                    throw new ForbiddenOriginException("Cross-Origin request rejected");
-                }
-            }
-            // If corsHandler is null, skip validation (CORS disabled)
+        if (!this.getCorsHandler().isRequestAllowed(request)) {
+            throw new ForbiddenOriginException("Cross-Origin request rejected");
         }
         RequestSizeLimits limits = getRequestSizeLimits();
         // Early Content-Length check: Reject requests with Content-Length exceeding POST body limit BEFORE reading any body data
@@ -337,9 +316,7 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
         if (this.isVerboseLogEnabled()) {
             LogV3.fine("validateRequest: Validation completed in " + validateElapsed + "ms");
         }
-
     }
-
     // /**
     // * Helper method to extract the request method from a request object. Works with both HttpRequest and HTTPServerRequest.
     // *
@@ -387,7 +364,6 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
     // }
     // return "unknown";
     // }
-
     // /**
     // * Helper method to extract the remote address from a request object. Works with both HttpRequest and HTTPServerRequest.
     // *
@@ -462,12 +438,10 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      *             if an I/O error occurs while handling the exception
      */
     public boolean onException(final Throwable e, final HttpRequest request, HttpResponse response) throws IOException {
-
         if (Exceptions.containsInstanceOf(e, SocketException.class, ClosedChannelException.class)) {
             // socket already closed (likely due to timeout or security limit)
             // Don't log as error - this is expected when timeouts trigger or security limits are exceeded
             return true;
-
         } else if (e instanceof HttpMethodNotAllowedException) {
             final String remoteAddress = request != null ? StringUtils.join(request.getRemoteAddress(), ", ") : "unknown";
             final String requestUrl = request != null ? request.getRequestedURL() : "unknown";
@@ -475,7 +449,6 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.warning("Security: HTTP method not allowed | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Method: " + method + " | Message: " + e.getMessage());
             response.setResponseCode(ResponseCode.METHOD_NOT_ALLOWED);
             // Apply default headers (security, CORS, server) before setting content
-
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
             try {
                 final String message = e.getMessage() != null ? e.getMessage() : "HTTP method not allowed";
@@ -487,11 +460,9 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
                 // Ignore
             }
             return true;
-
         } else if (request instanceof OptionsRequest) {
             response.setResponseCode(HTTPConstants.ResponseCode.ERROR_FORBIDDEN);
             // Apply default headers (security, CORS, server) before setting content
-
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
             response.getOutputStream(true).flush();
             return true;
@@ -501,7 +472,6 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.warning("Security: Request size limit exceeded | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Message: " + e.getMessage());
             response.setResponseCode(ResponseCode.REQUEST_ENTITY_TOO_LARGE);
             // Apply default headers (security, CORS, server) before setting content
-
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
             try {
                 final String message = "Request size limit exceeded!";
@@ -513,17 +483,15 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
                 // Ignore
             }
             return true;
-
         } else if (e instanceof ForbiddenOriginException) {
             final String remoteAddress = request != null ? StringUtils.join(request.getRemoteAddress(), ", ") : "unknown";
             final String requestUrl = request != null ? request.getRequestedURL() : "unknown";
             LogV3.warning("Security: Forbidden origin detected | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Message: " + e.getMessage());
             response.setResponseCode(ResponseCode.ERROR_FORBIDDEN);
             // Apply default headers (security, CORS, server) before setting content
-
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
             try {
-                final String message = "Forbidden Origin!";
+                final String message = FORBIDDEN_ORIGIN;
                 final byte[] bytes = message.getBytes("UTF-8");
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
                 response.getOutputStream(true).write(bytes);
@@ -538,7 +506,6 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.warning("Security: Forbidden header detected | Remote: " + remoteAddress + " | URL: " + requestUrl + " | Message: " + e.getMessage());
             response.setResponseCode(ResponseCode.ERROR_BAD_REQUEST);
             // Apply default headers (security, CORS, server) before setting content
-
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
             try {
                 final String message = "Forbidden Headers!";
@@ -552,12 +519,10 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             return true;
         } else if (e instanceof HttpConnectionExceptionHandler) {
             return ((HttpConnectionExceptionHandler) e).handle(request, response);
-
         } else if (request != null) {
             response.setResponseCode(ResponseCode.SERVERERROR_INTERNAL);
             LogV3.log(e);
             // Apply default headers (security, CORS, server) before setting content
-
             // do not return stacktraces!
             final byte[] bytes = "Unexpected Exception".getBytes("UTF-8");
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text; charset=UTF-8"));
@@ -574,15 +539,14 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
 
     /**
      * Checks if verbose logging is enabled for this server.
-     * 
+     *
      * <p>
      * This method checks if the server is an instance of {@link HttpServer} and if verbose logging is enabled.
      * </p>
-     * 
+     *
      * @return {@code true} if verbose logging is enabled, {@code false} otherwise
      */
     public boolean isVerboseLogEnabled() {
         return this instanceof HttpServer && ((HttpServer) this).isVerboseLog();
     }
-
 }

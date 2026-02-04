@@ -227,7 +227,7 @@ public class RemoteAPIRequest implements HttpRequestInterface {
      *
      */
     public boolean isHttps() {
-        return request.isHttps();
+        return request.isSSL();
     }
 
     /*

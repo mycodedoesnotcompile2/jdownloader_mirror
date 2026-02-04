@@ -171,7 +171,7 @@ public class HTTPConnectionUtils {
                         }
                     }
                     if (!result) {
-                        throw new IOException("HTTPS hostname wrong:  should be <" + host + "> != " + subjects);
+                        throw new IllegalSSLHostnameException(host, subjects);
                     } else {
                         return true;
                     }

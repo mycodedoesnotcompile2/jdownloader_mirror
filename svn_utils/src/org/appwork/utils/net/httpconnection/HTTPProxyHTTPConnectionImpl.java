@@ -193,11 +193,11 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                 proxySocket = connectionSocket;
                 if (HTTPProxy.TYPE.HTTPS.equals(proxy.getType())) {
                     if (sslSocketStreamProxyOptions == null) {
-                        sslSocketStreamProxyOptions = getSSLSocketStreamOptions(proxy.getHost(), proxy.getPort(), isSSLTrustALL());
+                        sslSocketStreamProxyOptions = getSSLSocketStreamOptions(proxy.getHost(), proxy.getPort());
                     }
                     factory = getSSLSocketStreamFactory(sslSocketStreamProxyOptions);
                     state = SSL_STATE.PROXY;
-                    this.connectionSocket = factory.create(connectionSocket, proxy.getHost(), proxy.getPort(), true, sslSocketStreamProxyOptions);
+                    this.connectionSocket = factory.create(connectionSocket, proxy.getHost(), proxy.getPort(), true, sslSocketStreamProxyOptions, getTrustProvider(), getKeyManagers());
                     proxySocket = connectionSocket;
                 }
                 this.connectTime = Time.systemIndependentCurrentJVMTimeMillis() - startTime;
@@ -289,11 +289,12 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                     if (this.httpURL.getProtocol().startsWith("https")) {
                         final String hostName = getHostname();
                         if (sslSocketStreamEndPointOptions == null) {
-                            sslSocketStreamEndPointOptions = getSSLSocketStreamOptions(hostName, getPort(), isSSLTrustALL());
+                            sslSocketStreamEndPointOptions = getSSLSocketStreamOptions(hostName, getPort());
                         }
                         factory = getSSLSocketStreamFactory(sslSocketStreamEndPointOptions);
                         state = SSL_STATE.ENDPOINT;
-                        this.connectionSocket = factory.create(connectionSocket, hostName, getPort(), true, sslSocketStreamEndPointOptions);
+                        this.connectionSocket = factory.create(connectionSocket, hostName, getPort(), true, sslSocketStreamEndPointOptions, getTrustProvider(), getKeyManagers());
+                        this.trustResult = ((TrustResultProvider) connectionSocket).getTrustResult();
                     }
                     /*
                      * httpPath needs to be like normal http request, eg /index.html
@@ -311,7 +312,8 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                 /* now send Request */
                 this.sendRequest();
                 return;
-            } catch (final IOException e) {
+            } catch (IOException e) {
+                e = mapExceptions(e);
                 String retrySSL = null;
                 try {
                     if (SSL_STATE.ENDPOINT.equals(state) && sslSocketStreamEndPointOptions != null) {

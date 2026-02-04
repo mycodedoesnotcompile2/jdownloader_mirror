@@ -1,5 +1,7 @@
 package jd.plugins.components;
 
+import org.appwork.exceptions.WTFException;
+
 import jd.config.Property;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
@@ -8,8 +10,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
-
-import org.appwork.exceptions.WTFException;
 
 /**
  * Instead of duplication we create a class
@@ -54,6 +54,7 @@ public class MultiHosterManagement {
                 break setLimitOnAccount;
             }
             mhost.setErrorStatus(reason, timeout);
+            mhost.setUpdateTimestamp(System.currentTimeMillis());
             ai.updateMultihostSupportedHost(mhost);
         }
         throw new PluginException(LinkStatus.ERROR_RETRY, reason);
@@ -113,5 +114,4 @@ public class MultiHosterManagement {
             this.putError(account, downloadLink, errorWait, errorPrefix + error);
         }
     }
-
 }

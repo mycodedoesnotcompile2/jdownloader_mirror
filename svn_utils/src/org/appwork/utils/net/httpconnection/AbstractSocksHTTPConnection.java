@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -51,7 +51,6 @@ import org.appwork.utils.net.socketconnection.SocksSocketConnection.DESTTYPE;
  *
  */
 public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
-
     protected SocketStreamInterface sockssocket  = null;
     protected StringBuffer          proxyRequest = null;
     protected final DESTTYPE        destType;
@@ -115,10 +114,11 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
                     try {
                         final String hostName = getHostname();
                         if (sslSocketStreamOptions == null) {
-                            sslSocketStreamOptions = getSSLSocketStreamOptions(hostName, port, isSSLTrustALL());
+                            sslSocketStreamOptions = getSSLSocketStreamOptions(hostName, port);
                         }
                         factory = getSSLSocketStreamFactory(sslSocketStreamOptions);
-                        this.connectionSocket = factory.create(sockssocket, hostName, port, true, sslSocketStreamOptions);
+                        this.connectionSocket = factory.create(sockssocket, hostName, port, true, sslSocketStreamOptions, getTrustProvider(), getKeyManagers());
+                        setTrustResult(((TrustResultProvider) connectionSocket).getTrustResult());
                     } catch (final IOException e) {
                         final String retrySSL;
                         try {
@@ -146,7 +146,8 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
                 /* now send Request */
                 this.sendRequest();
                 return;
-            } catch (final IOException e) {
+            } catch (IOException e) {
+                e = mapExceptions(e);
                 final String retrySSL;
                 try {
                     retrySSL = sslSocketStreamOptions != null ? (sslSocketStreamOptions = sslSocketStreamOptions.clone()).retry(factory, e) : null;

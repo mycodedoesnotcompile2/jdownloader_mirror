@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -42,6 +42,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
+import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -51,6 +52,10 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 import org.appwork.utils.net.socketconnection.SocketConnection;
 
 public abstract class SimpleUseNet {
@@ -85,6 +90,7 @@ public abstract class SimpleUseNet {
         },
         STAT,
         QUIT;
+
         public boolean isMultiLineResponse(int code) {
             return false;
         };
@@ -153,7 +159,16 @@ public abstract class SimpleUseNet {
     }
 
     protected SSLSocketFactory getSSLSocketFactory(final String sniHostName) throws IOException {
-        return JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, sniHostName);
+        return JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, sniHostName, null, new TrustCallback() {
+            @Override
+            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return TrustUtils.getDefaultProvider();
+            }
+        });
     }
 
     protected boolean useSNIWorkaround() {
@@ -287,11 +302,11 @@ public abstract class SimpleUseNet {
     }
 
     private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream() {
-                                                       @Override
-                                                       public synchronized byte[] toByteArray() {
-                                                           return buf;
-                                                       };
-                                                   };
+        @Override
+        public synchronized byte[] toByteArray() {
+            return buf;
+        };
+    };
 
     protected synchronized String readLine() throws IOException {
         return readLine(lineBuffer);

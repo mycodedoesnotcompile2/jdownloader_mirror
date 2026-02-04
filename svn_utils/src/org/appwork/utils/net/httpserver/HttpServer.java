@@ -587,6 +587,29 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
     private int lastPort = -1;
 
     /**
+     * Creates a new ServerSocket for the given socket address.
+     * 
+     * <p>
+     * This method can be overridden by subclasses to create specialized server sockets (e.g., SSLServerSocket).
+     * The default implementation creates a standard ServerSocket.
+     * </p>
+     * 
+     * <p>
+     * Note: The socket address parameter is provided for subclasses that may need it, but the default implementation
+     * creates an unbound ServerSocket. The socket will be bound later using {@link ServerSocket#bind(SocketAddress)}.
+     * </p>
+     * 
+     * @return A new ServerSocket instance
+     * @throws IOException
+     *             if the server socket cannot be created
+     */
+    protected ServerSocket createServerSocket() throws IOException {
+        final ServerSocket serverSocket = new ServerSocket();
+        serverSocket.setReuseAddress(true);
+        return serverSocket;
+    }
+
+    /**
      *
      */
 
@@ -606,9 +629,8 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                 int localPort = port;
                 for (final InetAddress inetAddress : localhost) {
                     final SocketAddress socketAddress = new InetSocketAddress(inetAddress, localPort);
-                    final ServerSocket controlSocket = new ServerSocket();
+                    final ServerSocket controlSocket = this.createServerSocket();
                     try {
-                        controlSocket.setReuseAddress(true);
                         LogV3.info("Try to bind Server to " + socketAddress);
                         controlSocket.bind(socketAddress);
                         serverSockets.add(controlSocket);
@@ -626,10 +648,10 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                     lastPort = serverSockets.get(0).getLocalPort();
                 }
             } else {
-                final ServerSocket controlSocket = new ServerSocket(port);
+                final ServerSocket controlSocket = this.createServerSocket();
+                controlSocket.bind(new InetSocketAddress(port));
                 lastPort = controlSocket.getLocalPort();
                 serverSockets.add(controlSocket);
-                controlSocket.setReuseAddress(true);
             }
             shutDownControlSockets(null);
             if (controlSockets.compareAndSet(null, serverSockets)) {

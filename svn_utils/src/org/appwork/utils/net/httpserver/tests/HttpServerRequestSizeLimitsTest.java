@@ -34,17 +34,23 @@
 package org.appwork.utils.net.httpserver.tests;
 
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.serializer.Deser;
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.ReadableBytes;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.CorsHandler;
+import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.RequestSizeLimitExceededException;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
 
@@ -64,7 +70,6 @@ import org.appwork.utils.net.httpserver.XContentTypeOptions;
  * @author AppWork
  */
 public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -87,23 +92,16 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
     }
 
     /**
-     * Test: Request size limit - request within limit should succeed Uses default limits (16KB header) - tests with 10KB request
+     * Test: Request size limit - request within limit should succeed Uses default limits (4KB header) - tests with 3KB request
      */
     private void testRequestSizeLimitWithinLimit() throws Exception {
         LogV3.info("Test: Request Size Limit - Within Limit");
-        // Server already has default limits (16KB header, 10MB POST)
-
-        // Reset server-side tracking
         this.lastServerException = null;
         this.lastRequest = null;
         this.lastResponse = null;
-
-        // Create a request that is within the limit (10KB)
-        final StringBuilder param = new StringBuilder();
-        for (int i = 0; i < 10000; i++) {
-            param.append("A");
-        }
-        final String encodedParam = URLEncoder.encode(param.toString(), "UTF-8");
+        final String param = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(3));
+        final String encodedParam = URLEncoder.encode(param, "UTF-8");
+        httpServer.getRequestSizeLimits().setMaxHeaderSize(encodedParam.getBytes("UTF-8").length + 1000);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + encodedParam;
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
@@ -115,27 +113,21 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
     }
 
     /**
-     * Test: Request size limit - request exceeding limit should fail Uses default limits (16KB header) - tests with 20KB request
+     * Test: Request size limit - request exceeding limit should fail Uses default limits (4KB header) - tests with 20KB request
      */
     private void testRequestSizeLimitExceeded() throws Exception {
         LogV3.info("Test: Request Size Limit - Exceeded");
-        // Server already has default limits (16KB header, 10MB POST)
-
+        // Server already has default limits (4KB header, 1MB POST body, 2MB POST processed)
         // Reset server-side tracking
         this.lastServerException = null;
         this.lastRequest = null;
         this.lastResponse = null;
-
-        // Create a request that exceeds the limit (20KB > 16KB default)
-        final StringBuilder param = new StringBuilder();
-        for (int i = 0; i < 20000; i++) {
-            param.append("A");
-        }
-        final String encodedParam = URLEncoder.encode(param.toString(), "UTF-8");
+        // Create a request that exceeds the limit (20KB > 4KB default)
+        final String param = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(20));
+        final String encodedParam = URLEncoder.encode(param, "UTF-8");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + encodedParam;
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
-
         assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "Request exceeding limit should return " + ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode() + " error, was: " + responseCode);
         // Server-side: RequestSizeLimitExceededException should occur
         assertTrue(this.lastServerException != null, "Server-side: Exception expected for request exceeding limit");
@@ -149,31 +141,22 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
      */
     private void testRequestSizeLimitExceededHasSecurityHeaders() throws Exception {
         LogV3.info("Test: Request Size Limit Exceeded - Security Headers Present");
-
-        // Create a request that exceeds the limit (20KB > 16KB default)
-        final StringBuilder param = new StringBuilder();
-        for (int i = 0; i < 20000; i++) {
-            param.append("A");
-        }
-        final String encodedParam = URLEncoder.encode(param.toString(), "UTF-8");
+        // Create a request that exceeds the limit (20KB > 4KB default)
+        final String param = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(20));
+        final String encodedParam = URLEncoder.encode(param, "UTF-8");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + encodedParam;
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
-
         assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "Request exceeding limit should return 413 error, was: " + responseCode);
-
         // Verify Security Headers are present even in error response
         final String xContentTypeOptions = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS);
         assertTrue(xContentTypeOptions != null, "X-Content-Type-Options header should be present in error response\r\n" + context);
         assertTrue(XContentTypeOptions.NOSNIFF.getValue().equalsIgnoreCase(xContentTypeOptions), "X-Content-Type-Options should be \"" + XContentTypeOptions.NOSNIFF.getValue() + "\" in error response");
-
         final String csp = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
         assertTrue(csp != null, "Content-Security-Policy header should be present in error response");
         assertTrue(csp.contains("default-src"), "CSP should contain default-src directive in error response");
-
         final String referrerPolicy = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
         assertTrue(referrerPolicy != null, "Referrer-Policy header should be present in error response");
-
         LogV3.info("Request Size Limit (exceeded) has Security Headers test passed");
     }
 
@@ -182,7 +165,6 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
      */
     private void testRequestSizeLimitExceededHasServerHeader() throws Exception {
         LogV3.info("Test: Request Size Limit Exceeded - Server Header Present");
-
         // Create a request that exceeds the limit
         final StringBuilder param = new StringBuilder();
         for (int i = 0; i < 20000; i++) {
@@ -192,13 +174,10 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + encodedParam;
         final RequestContext context = this.httpClient.get(url);
         final int responseCode = context.getCode();
-
         assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "Request exceeding limit should return 413 error");
-
         // Verify Server Header is present even in error response
         final String serverHeader = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_SERVER);
         assertTrue(serverHeader != null, "Server header should be present in error response");
-
         LogV3.info("Request Size Limit (exceeded) has Server Header test passed: " + serverHeader);
     }
 
@@ -212,38 +191,31 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
      */
     private void testRequestSizeLimitExceededHasCorsHeaders() throws Exception {
         LogV3.info("Test: Request Size Limit Exceeded - CORS Headers NOT Present (Most Restrictive)");
-
         // Setup CORS handler
         final CorsHandler previousCors = this.httpServer.getCorsHandler();
         try {
             final CorsHandler corsHandler = new CorsHandler();
             final Set<String> allowedOrigins = new HashSet<String>();
             allowedOrigins.add("https://example.com");
-            corsHandler.setAllowedOrigins(allowedOrigins);
+            final List<OriginRule> rules = new ArrayList<OriginRule>();
+            rules.add(new OriginRule("https://example.com"));
+            corsHandler.setAllowedOrigins(rules);
             this.httpServer.setCorsHandler(corsHandler);
-
             // Create a request that exceeds the limit WITH Origin header
             // The Origin header is part of the request, but since the request line + headers exceed the limit,
             // the Origin header cannot be read before the exception is thrown
-            final StringBuilder param = new StringBuilder();
-            for (int i = 0; i < 20000; i++) {
-                param.append("A");
-            }
-            final String encodedParam = URLEncoder.encode(param.toString(), "UTF-8");
+            final String param = generateRandomString(20000);
+            final String encodedParam = URLEncoder.encode(param, "UTF-8");
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + encodedParam;
-
             this.httpClient.putRequestHeader("Origin", "https://example.com");
             try {
                 final RequestContext context = this.httpClient.get(url);
                 final int responseCode = context.getCode();
-
                 assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "Request exceeding limit should return 413 error");
-
                 // Verify that NO CORS Headers are set - this is the most restrictive (and correct) behavior
                 // when the request cannot be fully read
                 final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
                 assertTrue(allowOrigin == null, "Access-Control-Allow-Origin header should NOT be present when request headers cannot be read (most restrictive CORS policy)");
-
                 LogV3.info("Request Size Limit (exceeded) has correct CORS behavior: No CORS headers (most restrictive)");
             } finally {
                 this.httpClient.clearRequestHeader();
@@ -256,28 +228,21 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
     }
 
     /**
-     * Test: POST size limit - POST within limit should succeed Uses default limits (10MB POST) - tests with 5MB POST
+     * Test: POST size limit - POST within limit should succeed Uses default limits (1MB POST body) - tests with 500KB POST
      */
     private void testPostSizeLimitWithinLimit() throws Exception {
         LogV3.info("Test: POST Size Limit - Within Limit");
         // Allow POST method for this test
         final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
-
         try {
-            // Server already has default limits (16KB header, 2MB POST body, 10MB POST processed)
-
+            // Server already has default limits (4KB header, 1MB POST body, 2MB POST processed)
             // Reset server-side tracking
             this.lastServerException = null;
             this.lastRequest = null;
             this.lastResponse = null;
-
-            // Create POST data that is within the limit (1MB < 2MB default)
-            final StringBuilder postData = new StringBuilder();
-            for (int i = 0; i < 1 * 1024 * 1024; i++) {
-                postData.append("X");
-            }
-            final String jsonData = "{\"params\":[\"" + postData.toString() + "\"]}";
-
+            // Create POST data that is within the limit (500KB < 1MB default)
+            final String postData = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(500));
+            final String jsonData = "{\"params\":[" + Deser.toString(postData) + "]}";
             final String url = "http://localhost:" + this.serverPort + "/test/postData";
             this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
             try {
@@ -305,29 +270,22 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit - Exceeded");
         // Setup server with smaller POST size limit (100KB) to test limit enforcement
         this.teardownServer();
-        this.setupServerWithLimits(-1, 100 * 1024); // No header limit, 100KB POST limit
-
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.KB.toKibiBytes(100)); // No header limit, 100KB POST limit
         try {
             // Allow POST method for this test
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
-
             try {
                 // Reset server-side tracking
                 this.lastServerException = null;
                 this.lastRequest = null;
                 this.lastResponse = null;
-
                 // Create POST data that exceeds the limit (200KB > 100KB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 200 * 1024; i++) {
-                    postData.append("Y");
-                }
-                final String jsonData = "{\"params\":[\"" + postData.toString() + "\"]}";
-
+                final String postData = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(200));
+                final String jsonData = "{\"params\":[" + Deser.toString(postData) + "]}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 try {
                     final RequestContext context = this.httpClient.post(url, jsonData);
                     final int responseCode = context.getCode();
@@ -342,8 +300,8 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
                     throw new Exception("POST Size Limit test failed: Expected 413 response code but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -362,47 +320,36 @@ public class HttpServerRequestSizeLimitsTest extends HttpServerTestBase {
         LogV3.info("Test: POST Size Limit Exceeded - Security Headers Present");
         // Setup server with smaller POST size limit (100KB) to test limit enforcement
         this.teardownServer();
-        this.setupServerWithLimits(-1, 100 * 1024); // No header limit, 100KB POST limit
-
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.KB.toKibiBytes(100)); // No header limit, 100KB POST limit
         try {
             // Allow POST method for this test
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
-
             try {
                 // Create POST data that exceeds the limit (200KB > 100KB)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 200 * 1024; i++) {
-                    postData.append("Y");
-                }
-                final String jsonData = "{\"params\":[\"" + postData.toString() + "\"]}";
-
+                final String postData = generateRandomString((int) ReadableBytes.Unit.KB.toKibiBytes(200));
+                final String jsonData = "{\"params\":[" + Deser.toString(postData) + "]}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 try {
                     final RequestContext context = this.httpClient.post(url, jsonData);
                     final int responseCode = context.getCode();
-
                     assertTrue(responseCode == ResponseCode.REQUEST_ENTITY_TOO_LARGE.getCode(), "POST exceeding limit must return 413 error");
-
                     // Verify Security Headers are present even in error response
                     final String xContentTypeOptions = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS);
                     assertTrue(xContentTypeOptions != null, "X-Content-Type-Options header should be present in POST size limit error response");
-
                     final String csp = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_SECURITY_POLICY);
                     assertTrue(csp != null, "Content-Security-Policy header should be present in POST size limit error response");
-
                     final String serverHeader = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_SERVER);
                     assertTrue(serverHeader != null, "Server header should be present in POST size limit error response");
-
                     LogV3.info("POST Size Limit (exceeded) has Security Headers test passed");
                 } catch (final HttpClientException e) {
                     throw new Exception("POST Size Limit Security Headers test failed: Expected 413 response with headers but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);

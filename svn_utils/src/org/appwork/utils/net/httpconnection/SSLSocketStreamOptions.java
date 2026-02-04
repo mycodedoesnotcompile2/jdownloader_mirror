@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -57,7 +57,6 @@ import org.appwork.utils.os.CrossSystem.ARCHFamily;
  *
  */
 public class SSLSocketStreamOptions implements Cloneable {
-    protected final boolean trustAllFlag;
 
     public List<String> getRetryReasons() {
         return retryReasons;
@@ -102,16 +101,14 @@ public class SSLSocketStreamOptions implements Cloneable {
         return id;
     }
 
-    public SSLSocketStreamOptions(final String id, final boolean trustFlag) {
+    public SSLSocketStreamOptions(final String id) {
         this.id = id;
-        this.trustAllFlag = trustFlag;
         this.sslSocketStreamFactory = null;
         initCipherSuitesLists();
     }
 
     public SSLSocketStreamOptions(SSLSocketStreamOptions importFrom) {
         id = importFrom.getId();
-        trustAllFlag = importFrom.isTrustAll();
         sniEnabled.set(importFrom.isSNIEnabled());
         valid.set(importFrom.isValid());
         preferredCipherSuites.addAll(importFrom.getPreferredCipherSuites());
@@ -182,10 +179,6 @@ public class SSLSocketStreamOptions implements Cloneable {
         return disabledCipherSuites;
     }
 
-    public boolean isTrustAll() {
-        return trustAllFlag;
-    }
-
     @Override
     public SSLSocketStreamOptions clone() {
         return new SSLSocketStreamOptions(this);
@@ -231,6 +224,12 @@ public class SSLSocketStreamOptions implements Cloneable {
                 if (sniEnabled.compareAndSet(true, false)) {
                     return addRetryReason("disable SNI");
                 }
+            }
+            if (e instanceof TrustValidationFailedException) {
+                return null;
+            }
+            if (e instanceof IllegalSSLHostnameException) {
+                return null;
             }
             final String factoryRetry = factory != null ? factory.retry(this, e) : null;
             if (factoryRetry != null) {

@@ -21,10 +21,9 @@ import java.util.List;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigFilefoxCc;
 
 import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.ConfigEntry;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -39,12 +38,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52243 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilefoxCc extends XFileSharingProBasic {
     public FilefoxCc(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
-        this.setConfigElements();
     }
 
     @Override
@@ -159,7 +157,7 @@ public class FilefoxCc extends XFileSharingProBasic {
 
     @Override
     protected AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
-        final AccountInfo accInfo = super.fetchAccountInfoWebsite(account);
+        final AccountInfo ai = super.fetchAccountInfoWebsite(account);
         if (account.getType() == AccountType.FREE) {
             /* 2020-08-17: Special */
             final Regex expireRegex = new Regex(getCorrectBR(br), "Premium Account expires in (\\d+) days?, (\\d+) hours?");
@@ -169,10 +167,10 @@ public class FilefoxCc extends XFileSharingProBasic {
                 account.setType(AccountType.PREMIUM);
                 final long days = Long.parseLong(daysStr) * 24 * 60 * 60 * 1000;
                 final long hours = Long.parseLong(hoursStr) * 60 * 60 * 1000;
-                accInfo.setValidUntil(System.currentTimeMillis() + days + hours);
+                ai.setValidUntil(System.currentTimeMillis() + days + hours);
             }
         }
-        return accInfo;
+        return ai;
     }
 
     @Override
@@ -277,30 +275,34 @@ public class FilefoxCc extends XFileSharingProBasic {
     }
 
     private void handleSecurityVerification() throws Exception {
-        if (br.getURL() != null && br.getURL().contains("op=captcha&id=")) {
-            /*
-             * 2019-01-23: Special - this may also happen in premium mode! This will only happen when accessing downloadurl. It gets e.g.
-             * triggered when accessing a lot of different downloadurls in a small timeframe.
-             */
-            /* Tags: XFS_IP_CHECK /ip_check/ */
-            Form securityVerification = br.getFormbyProperty("name", "F1");
-            if (securityVerification == null) {
-                securityVerification = br.getFormbyProperty("id", "f1");
-            }
-            if (securityVerification != null && securityVerification.containsHTML("data-sitekey")) {
-                logger.info("Handling securityVerification");
-                final boolean redirectSetting = br.isFollowingRedirects();
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                securityVerification.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                br.setFollowRedirects(true);
-                super.submitForm(securityVerification);
-                br.setFollowRedirects(redirectSetting);
-            }
+        if (br.getURL() == null) {
+            return;
+        } else if (!StringUtils.containsIgnoreCase(br.getURL(), "op=captcha&id=")) {
+            /* No security verification required */
+            return;
+        }
+        /*
+         * 2019-01-23: Special - this may also happen in premium mode! This will only happen when accessing downloadurl. It gets e.g.
+         * triggered when accessing a lot of different downloadurls in a small timeframe.
+         */
+        /* Tags: XFS_IP_CHECK /ip_check/ */
+        Form securityVerification = br.getFormbyProperty("name", "F1");
+        if (securityVerification == null) {
+            securityVerification = br.getFormbyProperty("id", "f1");
+        }
+        if (securityVerification != null && securityVerification.containsHTML("data-sitekey")) {
+            logger.info("Handling securityVerification");
+            final boolean redirectSetting = br.isFollowingRedirects();
+            final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+            securityVerification.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            br.setFollowRedirects(true);
+            super.submitForm(securityVerification);
+            br.setFollowRedirects(redirectSetting);
         }
     }
 
-    private void setConfigElements() {
-        /* 2019-08-20: This host maybe grants (free-)users with special Referer values better downloadspeeds. */
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, this.getPluginConfig(), "CUSTOM_REFERER", "Set custom Referer here").setDefaultValue(null));
+    @Override
+    public Class<? extends XFSConfigFilefoxCc> getConfigInterface() {
+        return XFSConfigFilefoxCc.class;
     }
 }

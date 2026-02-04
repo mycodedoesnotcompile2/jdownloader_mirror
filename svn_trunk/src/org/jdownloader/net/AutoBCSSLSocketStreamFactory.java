@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLSocketFactory;
 
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
@@ -13,6 +14,9 @@ import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamInterface;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 
 public class AutoBCSSLSocketStreamFactory implements SSLSocketStreamFactory {
     private final static String              BC_FACTORY = "BC_Factory";
@@ -37,13 +41,14 @@ public class AutoBCSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, final SSLSocketStreamOptions options) throws IOException {
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, final SSLSocketStreamOptions options, TrustProviderInterface trustProvider, KeyManager[] keyManagers) throws IOException {
         final SSLSocketStreamInterface ret;
         if (preferBC(options)) {
-            ret = bc.create(socketStream, host, port, autoclose, options);
+            ret = bc.create(socketStream, host, port, autoclose, options, trustProvider, keyManagers);
         } else {
-            ret = jsse.create(socketStream, host, port, autoclose, options);
+            ret = jsse.create(socketStream, host, port, autoclose, options, trustProvider, keyManagers);
         }
+        final SSLSocketStreamInterface inner = ret;
         return new AutoSwitchSSLSocketStreamInterface() {
             @Override
             public Socket getSocket() {
@@ -87,12 +92,17 @@ public class AutoBCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
             @Override
             public SSLSocketStreamInterface getInternalSSLSocketStreamInterface() {
-                return ret;
+                return inner;
             }
 
             @Override
             public SSLSocketStreamFactory getSSLSocketStreamFactory() {
                 return AutoBCSSLSocketStreamFactory.this;
+            }
+
+            @Override
+            public TrustResult getTrustResult() {
+                return inner.getTrustResult();
             }
         };
     }
@@ -118,11 +128,11 @@ public class AutoBCSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketFactory getSSLSocketFactory(SSLSocketStreamOptions options, String sniHostName) throws IOException {
+    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, KeyManager[] keyManagers, TrustCallback trustCallback) throws IOException {
         if (preferBC(options)) {
-            return bc.getSSLSocketFactory(options, sniHostName);
+            return bc.getSSLSocketFactory(options, sniHostName, keyManagers, trustCallback);
         } else {
-            return jsse.getSSLSocketFactory(options, sniHostName);
+            return jsse.getSSLSocketFactory(options, sniHostName, keyManagers, trustCallback);
         }
     }
 }

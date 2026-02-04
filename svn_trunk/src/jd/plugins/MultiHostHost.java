@@ -83,7 +83,7 @@ public class MultiHostHost implements DownloadControllerListener {
     private static final long       MAX_UNAVAILABLE_TIME            = 5 * 60 * 1000;
     protected AccountInfo           accountInfo                     = null;
     protected final AtomicBoolean   propertyListenerEnabled         = new AtomicBoolean(false);
-    protected long                  createdTimestamp                = System.currentTimeMillis();
+    protected long                  updateTimestamp                = System.currentTimeMillis();
 
     public AccountInfo getAccountInfo() {
         return accountInfo;
@@ -417,12 +417,12 @@ public class MultiHostHost implements DownloadControllerListener {
         this.maxDownloads = maxDownloads;
     }
 
-    public long getCreatedTimestamp() {
-        return createdTimestamp;
+    public long getUpdateTimestamp() {
+        return updateTimestamp;
     }
 
-    public void setCreatedTimestamp(long createdTimestamp) {
-        this.createdTimestamp = createdTimestamp;
+    public void setUpdateTimestamp(long ts) {
+        this.updateTimestamp = ts;
     }
 
     protected DomainInfo domainInfo = null;

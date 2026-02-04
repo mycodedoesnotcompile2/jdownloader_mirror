@@ -65,7 +65,7 @@ public class HttpConnectionThread extends Thread {
         this.serverThreadID = serverThreadID;
     }
 
-    public HttpServerConnection getCurrentConnection() {
+    public RawHttpConnectionInterface getCurrentConnection() {
         return this.currentConnection;
     }
 
@@ -86,7 +86,7 @@ public class HttpConnectionThread extends Thread {
     @Override
     public void interrupt() {
         try {
-            final HttpServerConnection lcurrentConnection = this.getCurrentConnection();
+            final RawHttpConnectionInterface lcurrentConnection = this.getCurrentConnection();
             if (lcurrentConnection != null) {
                 lcurrentConnection.closeConnection();
                 lcurrentConnection.close();

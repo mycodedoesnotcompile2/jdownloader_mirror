@@ -33,7 +33,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.ChunkedOutputStream;
 import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.AbstractServerBasics;
 import org.appwork.utils.net.httpserver.ContentSecurityPolicy;
@@ -239,10 +238,10 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
             }
 
             @Override
-            protected String findAllowedOrigin(String requestOrigin, HeaderCollection requestHeaders, HeaderCollection responseHeaders) {
-                if (requestOrigin != null) {
-                    return requestOrigin;
-                } else if (StringUtils.containsIgnoreCase(requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_HOST), "my.jdownloader.org")) {
+            protected String getOriginForResponse(String origin, HttpRequest request) {
+                if (origin != null) {
+                    return origin;
+                } else if (StringUtils.containsIgnoreCase(request.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_HOST), "my.jdownloader.org")) {
                     return "https://my.jdownloader.org";
                 } else {
                     return "*";

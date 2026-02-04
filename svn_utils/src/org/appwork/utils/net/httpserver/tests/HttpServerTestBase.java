@@ -38,6 +38,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -86,7 +87,6 @@ public abstract class HttpServerTestBase extends AWTest {
         }
 
         public boolean onException(Throwable e, org.appwork.utils.net.httpserver.requests.HttpRequest request, org.appwork.utils.net.httpserver.responses.HttpResponse response) throws IOException {
-
             HttpServerTestBase.this.lastServerException = e;
             HttpServerTestBase.this.lastRequest = request;
             HttpServerTestBase.this.lastResponse = response;
@@ -106,36 +106,32 @@ public abstract class HttpServerTestBase extends AWTest {
      * Server Setup: Creates and starts an HTTP Server with Dummy API
      */
     protected void setupServer() throws IOException, ParseException {
-
         LogV3.info("re-warm IPv6 (isGlobalIPv6Available) availability check to cache result and avoid delays during tests...");
-        // Pre-warm IPv6 availability check to cache result and avoid delays during tests
-        HTTPConnectionUtils.isGlobalIPv6Available(5000, 5000, -1);
+        if (!"system".equals(System.getProperty("java.net.preferIPv6Addresses"))) {
+            // Pre-warm IPv6 availability check to cache result and avoid delays during tests
+            HTTPConnectionUtils.isGlobalIPv6Available(5000, 5000, -1);
+        }
         LogV3.info("Starting HTTP Server Setup...");
         // Create RemoteAPI and register Dummy API
         this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
-
         // Create HttpServer on a free port (0 = automatic)
         this.httpServer = new TestHttpServer(0);
-
         this.httpServer.setLocalhostOnly(true);
-
         // Register RemoteAPI as request handler
         this.httpServer.registerRequestHandler(this.remoteAPI);
-
+        // Register dummy handler for CORS test paths
+        this.httpServer.registerRequestHandler(new DummyCorsTestPathHandler());
         // Start server
         this.httpServer.start();
         this.serverPort = this.httpServer.getActualPort();
-
         // Note: Input stream draining is enabled by default via RequestSizeLimits.DEFAULT_MAX_DRAIN_INPUT_STREAM_BYTES
-
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
-        this.httpClient.setConnectTimeout(5000);
-        this.httpClient.setReadTimeout(30000);
+        this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+        this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
         // Set default mandatory header for all requests
         this.httpClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");
-
         LogV3.info("HTTP Server started on port: " + this.serverPort);
     }
 
@@ -240,7 +236,6 @@ public abstract class HttpServerTestBase extends AWTest {
             errorMsg.append("  Method: " + (context.getMethod() != null ? context.getMethod() : "null") + "\n");
             final String responseBody = context.getResponseString();
             if (responseBody != null) {
-
                 if (responseBody.length() > 500) {
                     errorMsg.append("  Response Body (first 500 chars): " + responseBody.substring(0, 500) + "...\n");
                 } else {
@@ -279,34 +274,26 @@ public abstract class HttpServerTestBase extends AWTest {
      */
     protected void setupServerWithLimits(final int maxHeaderSize, final long maxPostBodySize, final long maxPostProcessedSize) throws IOException, ParseException {
         LogV3.info("Starting HTTP Server Setup with Limits (maxHeaderSize=" + maxHeaderSize + ", maxPostBodySize=" + maxPostBodySize + ", maxPostProcessedSize=" + maxPostProcessedSize + ")...");
-
         // Create RemoteAPI and register Dummy API
         this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
-
         // Create HttpServer on a free port (0 = automatic) with exception tracking
         this.httpServer = new TestHttpServer(0);
-
         this.httpServer.setLocalhostOnly(true);
-
         // Set request size limits BEFORE registering handlers and starting
         final RequestSizeLimits limits = new RequestSizeLimits(maxHeaderSize, maxPostBodySize, maxPostProcessedSize);
         this.httpServer.setRequestSizeLimits(limits);
-
         // Register RemoteAPI as request handler
         this.httpServer.registerRequestHandler(this.remoteAPI);
-
         // Start server
         this.httpServer.start();
         this.serverPort = this.httpServer.getActualPort();
-
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
-        this.httpClient.setConnectTimeout(5000);
-        this.httpClient.setReadTimeout(30000);
+        this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+        this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
         // Set default mandatory header for all requests
         this.httpClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");
-
         LogV3.info("HTTP Server started on port: " + this.serverPort + " with size limits");
     }
 
@@ -316,40 +303,31 @@ public abstract class HttpServerTestBase extends AWTest {
      */
     protected void setupServerWithBrowserHeaders() throws IOException, ParseException {
         LogV3.info("Starting HTTP Server Setup with Browser Header Rules...");
-
         // Create RemoteAPI and register Dummy API
         this.remoteAPI = new RemoteAPI();
         this.remoteAPI.register(new DummyTestAPIImpl());
-
         // Create HttpServer on a free port (0 = automatic) with exception tracking
         this.httpServer = new TestHttpServer(0);
-
         this.httpServer.setLocalhostOnly(true);
-
         // Set header validation rules that allow direct browser requests BEFORE starting
         // - No mandatory headers (allow direct browser navigation)
         // - No forbidden headers (allow sec-fetch-* headers)
         final Map<String, String> mandatoryHeaders = new HashMap<String, String>();
         final Map<String, String> forbiddenHeaders = new HashMap<String, String>();
-
         mandatoryHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, SecFetchSite.NONE.getValue());
         mandatoryHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, SecFetchMode.NAVIGATE.getValue());
         mandatoryHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, SecFetchDest.DOCUMENT.getValue());
         final HeaderValidationRules rules = new HeaderValidationRules(mandatoryHeaders, forbiddenHeaders);
         this.httpServer.setHeaderValidationRules(rules);
-
         // Register RemoteAPI as request handler
         this.httpServer.registerRequestHandler(this.remoteAPI);
-
         // Start server
         this.httpServer.start();
         this.serverPort = this.httpServer.getActualPort();
-
         // Create HttpClient instance for tests
         this.httpClient = new HttpClient();
-        this.httpClient.setConnectTimeout(5000);
-        this.httpClient.setReadTimeout(30000);
-
+        this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+        this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
         LogV3.info("HTTP Server started on port: " + this.serverPort + " with browser header rules");
     }
 

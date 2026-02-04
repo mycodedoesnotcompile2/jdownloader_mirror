@@ -1,8 +1,10 @@
 package org.jdownloader.api.cnl2;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -12,6 +14,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
+import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
@@ -70,9 +73,9 @@ public class ExternInterface {
     private static void configureServerForExternInterface(HttpServer server) {
         // CORS configuration for ExternInterface: Allow all origins for browser extensions and websites
         CorsHandler corsHandler = new CorsHandler();
-        // Java 1.6 compatible: Explicit HashSet creation instead of Collections.singleton()
-        Set<String> allowedOrigins = new HashSet<String>();
-        allowedOrigins.add("*");
+        // Java 1.6 compatible: Explicit ArrayList creation
+        List<OriginRule> allowedOrigins = new ArrayList<OriginRule>();
+        allowedOrigins.add(new OriginRule("*"));
         // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "*"));
         // (manually set in onBeforeSendHeaders() hook)
         // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization

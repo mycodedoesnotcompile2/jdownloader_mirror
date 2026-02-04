@@ -23,6 +23,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -45,24 +59,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 //IMPORTANT: this class must stay in jd.plugins.hoster because it extends another plugin (UseNet) which is only available through PluginClassLoader
 abstract public class ZeveraCore extends UseNet {
     /* Connection limits */
-    private final String API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
+    private final String        API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
+    private static final String PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
 
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -90,7 +91,7 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     /** Must override!! */
-    abstract String getClientID();
+    public abstract String getClientID();
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -263,7 +264,7 @@ abstract public class ZeveraCore extends UseNet {
             super.handleMultiHost(link, account);
             return;
         } else {
-            login(this.br, account, false, getClientID());
+            login(this.br, account, false);
             final String directlinkproperty = account.getHoster() + "directlink";
             final String storedDirecturl = link.getStringProperty(directlinkproperty);
             String dllink = null;
@@ -439,11 +440,7 @@ abstract public class ZeveraCore extends UseNet {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        return fetchAccountInfoAPI(this.br, getClientID(), account);
-    }
-
-    public AccountInfo fetchAccountInfoAPI(final Browser br, final String client_id, final Account account) throws Exception {
-        login(br, account, true, client_id);
+        login(br, account, true);
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> userinfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String customerID = userinfo.get("customer_id").toString();
@@ -679,7 +676,7 @@ abstract public class ZeveraCore extends UseNet {
         return thread;
     }
 
-    public void login(final Browser br, final Account account, final boolean force, final String clientID) throws Exception {
+    public void login(final Browser br, final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final boolean useWorkaround = true;
@@ -690,6 +687,7 @@ abstract public class ZeveraCore extends UseNet {
                 /*
                  * 2019-06-26: New: TODO: We need a way to get the usenet logindata without exposing the original account logindata/apikey!
                  */
+                final String clientID = this.getClientID();
                 try {
                     boolean hasTriedOldToken = false;
                     final long tokenValidUntil = account.getLongProperty("token_valid_until", 0);
@@ -729,7 +727,7 @@ abstract public class ZeveraCore extends UseNet {
                             Thread.sleep(interval_seconds * 1001l);
                             br.postPage("https://www." + account.getHoster() + "/token", "grant_type=device_code&client_id=" + clientID + "&code=" + device_code);
                             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                            access_token = (String) entries.get("access_token");
+                            access_token = (String) entries.get(PROPERTY_ACCOUNT_AUTH_TOKEN);
                             if (!StringUtils.isEmpty(access_token)) {
                                 success = true;
                                 break;
@@ -758,7 +756,7 @@ abstract public class ZeveraCore extends UseNet {
                         /* This should never happen! */
                         throw new AccountInvalidException("Unsupported token_type");
                     }
-                    account.setProperty("access_token", access_token);
+                    account.setProperty(PROPERTY_ACCOUNT_AUTH_TOKEN, access_token);
                     account.setProperty("token_valid_until", System.currentTimeMillis() + ((Number) entries.get("expires_in")).longValue());
                     setAuthHeader(br, account);
                     callAPI(br, account, "/api/account/info");
@@ -811,7 +809,7 @@ abstract public class ZeveraCore extends UseNet {
     protected String getUseNetUsername(final Account account) {
         if (usePairingLogin(account)) {
             /* Login via access_token:access_token */
-            return account.getStringProperty("access_token");
+            return account.getStringProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
         } else {
             /* Login via APIKEY:APIKEY */
             return account.getPass();
@@ -822,7 +820,7 @@ abstract public class ZeveraCore extends UseNet {
     protected String getUseNetPassword(final Account account) {
         if (usePairingLogin(account)) {
             /* Login via access_token:access_token */
-            return account.getStringProperty("access_token");
+            return account.getStringProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
         } else {
             /* Login via APIKEY:APIKEY */
             return account.getPass();
@@ -830,11 +828,11 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     /**
-     * @return true: Account has 'access_token' property so pairing login was used. </br> false: Account does not have 'access_token'
-     *         property so API Key login was used.
+     * @return true: Account has 'access_token' property so pairing login was used. </br>
+     *         false: Account does not have 'access_token' property so API Key login was used.
      */
     public static boolean setAuthHeader(final Browser br, final Account account) {
-        final String access_token = account.getStringProperty("access_token");
+        final String access_token = account.getStringProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
         if (access_token != null) {
             br.getHeaders().put("Authorization", "Bearer " + access_token);
             return true;
@@ -890,7 +888,8 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     /**
-     * Indicates whether downloads via free accounts are possible or not. </br> 2023-11-08: That feature has been removed serverside.
+     * Indicates whether downloads via free accounts are possible or not. </br>
+     * 2023-11-08: That feature has been removed serverside.
      */
     @Deprecated
     private final boolean supportsFreeAccountDownloadMode(final Account account) {
@@ -898,8 +897,10 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     /**
-     * Indicates whether or not to display free account download dialogs which tell the user to activate free mode via website. </br> Some
-     * users find this annoying and will deactivate it. </br> default = true </br> 2023-11-08: That feature has been removed serverside.
+     * Indicates whether or not to display free account download dialogs which tell the user to activate free mode via website. </br>
+     * Some users find this annoying and will deactivate it. </br>
+     * default = true </br>
+     * 2023-11-08: That feature has been removed serverside.
      */
     @Deprecated
     private final boolean displayFreeAccountDownloadDialogs(final Account account) {
@@ -915,18 +916,19 @@ abstract public class ZeveraCore extends UseNet {
 
     /**
      * 2019-08-21: Premiumize.me has so called 'booster points' which basically means that users with booster points can download more than
-     * normal users can with their fair use limit: https://www.premiumize.me/booster </br> Premiumize has not yet integrated this in their
-     * API which means accounts with booster points will run into the fair-use-limit in JDownloader and will not be able to download any
-     * more files then. </br> This workaround can set accounts to unlimited traffic so that users will still be able to download.</br>
+     * normal users can with their fair use limit: https://www.premiumize.me/booster </br>
+     * Premiumize has not yet integrated this in their API which means accounts with booster points will run into the fair-use-limit in
+     * JDownloader and will not be able to download any more files then. </br>
+     * This workaround can set accounts to unlimited traffic so that users will still be able to download.</br>
      * Remove this workaround once Premiumize has integrated their booster points into their API.
      */
     public boolean isBoosterPointsUnlimitedTrafficWorkaroundActive(final Account account) {
         return false;
     }
 
-    public static String getAPIKey(final Account account) throws AccountInvalidException {
+    public String getAPIKey(final Account account) throws AccountInvalidException {
         final String str = account.getPass();
-        if (looksLikeValidAPIKey_STATIC(str)) {
+        if (this.looksLikeValidAPIKey(str)) {
             return str;
         } else {
             throw new AccountInvalidException("Invalid API key format");
@@ -1068,14 +1070,13 @@ abstract public class ZeveraCore extends UseNet {
     public static String getCloudID(final String url) throws MalformedURLException {
         if (url == null) {
             return null;
+        }
+        final UrlQuery query = UrlQuery.parse(url);
+        final String folder_id = query.get("folder_id");
+        if (folder_id != null) {
+            return folder_id;
         } else {
-            final UrlQuery query = UrlQuery.parse(url);
-            final String folder_id = query.get("folder_id");
-            if (folder_id != null) {
-                return folder_id;
-            } else {
-                return query.get("id");
-            }
+            return query.get("id");
         }
     }
 
@@ -1086,16 +1087,6 @@ abstract public class ZeveraCore extends UseNet {
 
     @Override
     protected boolean looksLikeValidAPIKey(final String str) {
-        if (str == null) {
-            return false;
-        } else if (looksLikeValidAPIKey_STATIC(str)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    protected static boolean looksLikeValidAPIKey_STATIC(final String str) {
         if (str == null) {
             return false;
         } else if (str.matches("[a-z0-9]{16}")) {

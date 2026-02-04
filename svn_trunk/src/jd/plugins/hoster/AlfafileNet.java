@@ -20,15 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -49,7 +40,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
+@HostPlugin(revision = "$Revision: 52251 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlfafileNet extends PluginForHost {
     public AlfafileNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,19 +112,14 @@ public class AlfafileNet extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME               = false;
-    private static final int     FREE_MAXCHUNKS            = 1;
-    private static final boolean ACCOUNT_FREE_RESUME       = false;
-    private static final int     ACCOUNT_FREE_MAXCHUNKS    = 1;
-    private static final boolean ACCOUNT_PREMIUM_RESUME    = true;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = -5;
-    /* don't touch the following! */
-    private boolean              isDirecturl               = false;
-    /*
-     * TODO: Use API for linkchecking whenever an account is added to JD. This will ensure that the plugin will always work, at least for
-     * premium users. Status 2015-08-03: Filecheck API does not seem to work --> Disabled it - reported API issues to jiaz.
-     */
-    private static final boolean prefer_api_linkcheck      = false;
+    private static final boolean FREE_RESUME                 = false;
+    private static final int     FREE_MAXCHUNKS              = 1;
+    private static final boolean ACCOUNT_FREE_RESUME         = false;
+    private static final int     ACCOUNT_FREE_MAXCHUNKS      = 1;
+    private static final boolean ACCOUNT_PREMIUM_RESUME      = true;
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS   = -5;
+    private boolean              isDirecturl                 = true;
+    private static final boolean allow_use_api_for_linkcheck = true;
 
     @Override
     protected String getDefaultFileName(DownloadLink link) {
@@ -140,19 +135,18 @@ public class AlfafileNet extends PluginForHost {
         String filesize = null;
         String md5 = null;
         String api_token = null;
-        Map<String, Object> api_resp = null;
         Number filesize_bytes = null;
-        if (prefer_api_linkcheck) {
-            final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        Account account = null;
+        if (allow_use_api_for_linkcheck) {
+            account = AccountController.getInstance().getValidAccount(this.getHost());
             if (account != null) {
                 api_token = getLoginToken(account);
             }
-            if (api_token != null) {
-                br.getPage(API_BASE + "/file/info?file_id=" + getFileID(link) + "&token=" + api_token);
-                api_resp = this.handleAPIErrors(link, account);
-            }
         }
-        if (api_resp != null) {
+        if (api_token != null) {
+            /* API docs: https://alfafile.net/api/doc/file#info */
+            br.getPage(API_BASE + "/file/info?file_id=" + getFileID(link) + "&token=" + api_token);
+            Map<String, Object> api_resp = this.handleAPIErrors(link, account);
             Map<String, Object> fileinfo = (Map<String, Object>) api_resp.get("file");
             filename = fileinfo.get("name").toString();
             filesize_bytes = (Number) fileinfo.get("size");
@@ -182,10 +176,9 @@ public class AlfafileNet extends PluginForHost {
             filename = br.getRegex("id=\"st_file_name\" title=\"([^<>\"]*?)\"").getMatch(0);
             filesize = br.getRegex("<span class=\"size\">([^<>\"]*?)</span>").getMatch(0);
         }
-        if (filename == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (filename != null) {
+            link.setFinalFileName(Encoding.htmlDecode(filename).trim());
         }
-        link.setFinalFileName(Encoding.htmlDecode(filename).trim());
         if (filesize_bytes != null) {
             link.setVerifiedFileSize(filesize_bytes.longValue());
         } else if (StringUtils.isNotEmpty(filesize)) {
@@ -238,7 +231,7 @@ public class AlfafileNet extends PluginForHost {
                 } else if (redirect_url == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final int wait = (int) ReflectionUtils.cast(entries.get("timer"), Integer.class);
+                final int wait = ((Integer) ReflectionUtils.cast(entries.get("timer"), Integer.class)).intValue();
                 this.sleep(wait * 1001l, link);
                 br.getPage(redirect_url);
                 if (br.getHttpConnection().getResponseCode() == 404) {

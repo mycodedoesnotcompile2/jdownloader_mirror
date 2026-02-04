@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -39,6 +39,8 @@ import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+
+import javax.net.ssl.KeyManager;
 
 public interface HTTPConnection {
     @Deprecated
@@ -200,9 +202,24 @@ public interface HTTPConnection {
 
     void setRequestProperty(String key, String string);
 
-    void setSSLTrustALL(boolean trustALL);
+    void setTrustProvider(org.appwork.utils.net.httpconnection.trust.TrustProviderInterface trustProvider);
 
-    boolean isSSLTrustALL();
+    org.appwork.utils.net.httpconnection.trust.TrustProviderInterface getTrustProvider();
+
+    /**
+     * Set key managers for client certificate (mutual TLS) authentication.
+     *
+     * @param keyManagers
+     *            KeyManager array or null to disable client cert
+     */
+    void setKeyManagers(KeyManager[] keyManagers);
+
+    /**
+     * @return Key managers for client cert, or null
+     */
+    KeyManager[] getKeyManagers();
+
+    TrustResult getTrustResult();
 
     /**
      * @param profiler

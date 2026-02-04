@@ -369,7 +369,7 @@ public abstract class SimpleFTP {
         case EXPLICIT_REQUIRED_CC_DC:
             try {
                 // TODO: add SSLSocketStream options support, caching + retry + trustAll
-                return getSSLSocketStreamFactory().create(ret, address.getAddress().getHostAddress(), address.getPort(), true, null);
+                return getSSLSocketStreamFactory().create(ret, address.getAddress().getHostAddress(), address.getPort(), true, null, null, null);
             } catch (IOException e) {
                 socket.close();
                 throw e;
@@ -841,7 +841,7 @@ public abstract class SimpleFTP {
         final String response = readLines(new int[] { RESPONSE_CODE.OK_234.code(), RESPONSE_CODE.FAILED_500.code(), RESPONSE_CODE.FAILED_502.code(), RESPONSE_CODE.FAILED_504.code(), RESPONSE_CODE.FAILED_530.code(), RESPONSE_CODE.FAILED_534.code() }, "AUTH_TLS FAILED");
         if (StringUtils.startsWithCaseInsensitive(response, "234")) {
             // TODO: add SSLSocketStream options support, caching + retry + trustAll
-            socket = getSSLSocketStreamFactory().create(getControlSocket(), "", getPort(), true, null);
+            socket = getSSLSocketStreamFactory().create(getControlSocket(), "", getPort(), true, null, null, null);
             return true;
         } else {
             return false;

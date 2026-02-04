@@ -41,8 +41,8 @@ import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.net.protocol.http.ResponseCodeInterface;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.HttpServerConnection.ConnectionHook;
+import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
  * @author daniel
@@ -54,15 +54,15 @@ public class HttpResponse implements HttpResponseInterface {
     public static final byte[]     HTTP11        = "HTTP/1.1 ".getBytes();
     public static final byte[]     _0            = "0".getBytes();
     private ResponseCodeInterface  responseCode  = ResponseCode.SUCCESS_NO_CONTENT;
-    protected final HttpServerConnection connection;
+    protected final RawHttpConnectionInterface connection;
     protected OutputStream         outputStream  = null;
     protected boolean              asyncResponse = false;
 
-    public HttpServerConnection getConnection() {
+    public RawHttpConnectionInterface getConnection() {
         return connection;
     }
 
-    public HttpResponse(final HttpServerConnection connection) {
+    public HttpResponse(final RawHttpConnectionInterface connection) {
         this.connection = connection;
         this.responseHeaders = new HeaderCollection();
 

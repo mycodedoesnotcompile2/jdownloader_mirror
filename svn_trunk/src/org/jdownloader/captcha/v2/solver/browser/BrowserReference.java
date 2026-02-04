@@ -3,9 +3,11 @@ package org.jdownloader.captcha.v2.solver.browser;
 import java.awt.Rectangle;
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,6 +32,7 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
+import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
@@ -525,15 +528,15 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     private void configureServerForBrowserReference(HttpServer server) {
         // CORS configuration for BrowserReference: Allow local server address
         CorsHandler corsHandler = new CorsHandler();
-        // Java 1.6 compatible: Explicit HashSet creation
-        Set<String> allowedOrigins = new HashSet<String>();
+        // Java 1.6 compatible: Explicit ArrayList creation
+        List<OriginRule> allowedOrigins = new ArrayList<OriginRule>();
         // Allow the local server address (e.g., "http://127.0.0.1:12345")
         // Use server.getServerAddress() directly to get the actual server address
         String serverAddress = server.getServerAddress();
         if (serverAddress == null) {
             serverAddress = "127.0.0.1:" + server.getActualPort();
         }
-        allowedOrigins.add("http://" + serverAddress);
+        allowedOrigins.add(new OriginRule("http://" + serverAddress));
         // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
         //      (manually set in onBeforeSendHeaders() hook with dynamic server address)
         // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization

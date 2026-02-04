@@ -62,6 +62,7 @@ import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.LimitedInputStreamInterface;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
 import org.appwork.utils.net.httpserver.handler.HttpProxyHandler;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
@@ -174,23 +175,44 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
 
     protected final AbstractServerBasics server;
     protected final Socket               clientSocket;
+    /** True if this connection is over SSL/TLS. */
+    protected final boolean              ssl;
+    /** Client certificate trust result (chain + provider + exception); null if no client cert. */
+    protected final TrustResult          trustResult;
     protected boolean                    outputStreamInUse = false;
     protected HttpResponse               response          = null;
     protected InputStream                is;
     protected final OutputStream         os;
     protected HttpRequest                request;
     private volatile boolean             isActive;
-
     // Thread currently processing this connection (set in beforeExecute, cleared in afterExecute)
-    private static final Pattern         METHOD            = Pattern.compile("(" + new Joiner("|").join(RequestMethod.values()) + ")");
+    private static final Pattern         METHOD            = Pattern.compile("(" + new Joiner("|") {
+                                                               protected String elementToString(Object s) {
+                                                                   if (!(s instanceof RequestMethod)) {
+                                                                       return super.elementToString(s);
+                                                                   }
+                                                                   return Pattern.quote(((RequestMethod) s).getHeaderValue());
+                                                               };
+                                                           }.join(RequestMethod.values()) + ")");
     private static final Pattern         REQUESTLINE       = Pattern.compile("\\s+(.+)\\s+HTTP/");
     public static final Pattern          REQUESTURL        = Pattern.compile("^(/.*?)($|\\?)");
     public static final Pattern          REQUESTPARAM      = Pattern.compile("^/.*?\\?(.+)");
 
     protected HttpServerConnection(final AbstractServerBasics server, final Socket clientSocket, final InputStream is, final OutputStream os) throws IOException {
+        this(server, clientSocket, is, os, false, (TrustResult) null);
+    }
+
+    /**
+     * @param ssl
+     *            true if this connection is over SSL/TLS
+     * @param clientCertTrustResult
+     *            Trust result from client cert validation (chain + provider + exception), or null if no client cert
+     */
+    protected HttpServerConnection(final AbstractServerBasics server, final Socket clientSocket, final InputStream is, final OutputStream os, final boolean ssl, final TrustResult clientCertTrustResult) throws IOException {
         this.server = server;
         this.clientSocket = clientSocket;
-
+        this.ssl = ssl;
+        this.trustResult = clientCertTrustResult;
         if (is == null && clientSocket != null) {
             this.is = clientSocket.getInputStream();
         } else {
@@ -201,7 +223,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         } else {
             this.os = os;
         }
-
         this.isActive = true;
         // Set socket timeout from server configuration
         final ConnectionTimeouts timeouts = getServer().getConnectionTimeouts();
@@ -211,11 +232,29 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             // Fallback to default if not configured
             this.clientSocket.setSoTimeout(ConnectionTimeouts.DEFAULT_SOCKET_TIMEOUT_MS);
         }
-
     }
 
     public Socket getClientSocket() {
         return clientSocket;
+    }
+
+    /**
+     * @return true if this connection is over SSL/TLS
+     */
+    @Override
+    public boolean isSSL() {
+        return this.ssl;
+    }
+
+    /**
+     * Returns the client certificate trust result (chain, provider, exception). Use {@link TrustResult#getChain()} for the certificate
+     * chain.
+     *
+     * @return The client cert trust result, or null if none
+     */
+    @Override
+    public TrustResult getTrustResult() {
+        return this.trustResult;
     }
 
     /**
@@ -241,6 +280,8 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
     protected HttpServerConnection(AbstractServerBasics server) {
         this.server = server;
         this.clientSocket = null;
+        this.ssl = false;
+        this.trustResult = null;
         this.is = null;
         this.os = null;
         this.isActive = false;
@@ -338,18 +379,15 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         if (isVerboseLogEnabled()) {
             LogV3.fine("HttpConnection.buildRequest: Starting request parsing");
         }
-
         RequestSizeLimits limits;
         InputStream headerStream = is;
         limits = getServer().getRequestSizeLimits();
         if (limits != null) {
-
             long headerLimit = limits.getMaxHeaderSize();
             if (headerLimit > 0) {
                 headerStream = new LimitedInputStreamWithException(headerStream, headerLimit);
             }
         }
-
         final long parseRequestLineStartTime = Time.systemIndependentCurrentJVMTimeMillis();
         final String requestLine = this.parseRequestLine(headerStream);
         final long parseRequestLineElapsed = Time.systemIndependentCurrentJVMTimeMillis() - parseRequestLineStartTime;
@@ -361,13 +399,11 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         }
         // TOTO: requestLine may be "" in some cases (chrome pre connection...?)
         final RequestMethod connectionType = this.parseConnectionType(requestLine);
-
         String requestedURL = new Regex(requestLine, HttpServerConnection.REQUESTLINE).getMatch(0);
         if (!StringUtils.startsWithCaseInsensitive(requestedURL, "/")) {
             requestedURL = "/" + StringUtils.valueOrEmpty(requestedURL);
         }
         String requestedPath = new Regex(requestedURL, HttpServerConnection.REQUESTURL).getMatch(0);
-
         final long parseRequestURLParamsStartTime = Time.systemIndependentCurrentJVMTimeMillis();
         final List<KeyValuePair> requestedURLParameters = this.parseRequestURLParams(requestedURL);
         final long parseRequestURLParamsElapsed = Time.systemIndependentCurrentJVMTimeMillis() - parseRequestURLParamsStartTime;
@@ -381,7 +417,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         if (isVerboseLogEnabled()) {
             LogV3.fine("HttpConnection.buildRequest: parseRequestHeaders() completed in " + parseRequestHeadersElapsed + "ms, header count: " + (requestHeaders != null ? requestHeaders.size() : 0));
         }
-
         // wrap for further post Reads
         if (!connectionType.mayHavePostBody) {
             // ensure that nobody tries to read any further...
@@ -390,7 +425,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                     return new RequestSizeLimitExceededException("This Method does not support POST data!");
                 };
             };
-
         } else {
             if (limits != null) {
                 long postLimits = limits.getMaxPostBodySize();
@@ -399,7 +433,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 }
             }
         }
-
         final HttpRequest request;
         switch (connectionType) {
         case CONNECT:
@@ -463,10 +496,10 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             request = this.buildUnsubscribeRequest();
             break;
         default:
-            throw new IOException("Unsupported " + requestLine);
+            throw new IOException("Unsupported type " + requestLine);
         }
         if (request == null) {
-            throw new IOException("Unsupported " + requestLine);
+            throw new IOException("Unsupported reuqest " + requestLine);
         }
         request.setServer(server);
         /* parse remoteClientAddresses */
@@ -479,8 +512,13 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         if (isVerboseLogEnabled()) {
             LogV3.fine("HttpConnection.buildRequest: buildRequest() completed in " + buildRequestElapsed + "ms");
         }
+        if (headerStream instanceof CountingInputStreamInterface) {
+            if (isVerboseLogEnabled()) {
+                long bytesRead = ((CountingInputStreamInterface) headerStream).transferedBytes();
+                LogV3.fine("HttpConnection.buildRequest: total Header Size: " + bytesRead);
+            }
+        }
         return request;
-
     }
 
     /**
@@ -493,13 +531,11 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             return (T) is;
         }
         while (is instanceof CountingInputStreamInterface) {
-
             InputStream newIs = ((CountingInputStreamInterface) is).getParentInputStream();
             if (newIs == is) {
                 DebugMode.debugger();
                 break;
             }
-
             is = newIs;
             if (class1.isAssignableFrom(is.getClass())) {
                 return (T) is;
@@ -513,7 +549,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
      */
     protected HttpResponse buildResponse() throws IOException {
         HttpResponse res = new HttpResponse(this);
-
         return res;
     }
 
@@ -523,30 +558,22 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
      */
     void configure(HttpRequest request, HttpResponse response) {
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CONNECTION, "close"));
-
         AbstractServerBasics server = getServer();
         {
             String serverHeader = server.getResponseServerHeader();
-
             if (!StringUtils.isEmpty(serverHeader)) {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_SERVER, serverHeader));
             }
         }
         {
             ResponseSecurityHeaders securityHeaders = server.getResponseSecurityHeaders();
-
             if (securityHeaders != null) {
                 securityHeaders.addSecurityHeaders(response.getResponseHeaders());
             }
         }
-        if (request != null) {
-            CorsHandler corsHandler = server.getCorsHandler();
-            // Only add CORS headers if CORS is enabled
-            if (corsHandler != null) {
-                corsHandler.addCorsHeaders(request.getRequestHeaders(), response.getResponseHeaders());
-            }
+        if (request != null && response != null) {
+            server.getCorsHandler().addCorsHeaders(request, response);
         }
-
     }
 
     public boolean closableStreams() {
@@ -561,7 +588,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
      */
     public void closeConnection() {
         this.isActive = false;
-
         if (this.clientSocket != null) {
             try {
                 this.clientSocket.shutdownOutput();
@@ -618,7 +644,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
      *            Number of bytes to read and discard
      */
     public void drainContentLength(long bytesToDrain) {
-
         if (bytesToDrain <= 0) {
             if (isVerboseLogEnabled()) {
                 LogV3.fine("Nothing to drain (bytesToDrain = " + bytesToDrain + "), skipping");
@@ -783,15 +808,12 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         if (this.clientSocket != null) {
             final InetAddress clientAddress = this.clientSocket.getInetAddress();
             remoteAddress.add(clientAddress.getHostAddress());
-
         }
         final HTTPHeader forwardedFor = requestHeaders.get("X-Forwarded-For");
         if (forwardedFor != null && !StringUtils.isEmpty(forwardedFor.getValue())) {
             final String addresses[] = forwardedFor.getValue().split(", ");
             for (final String ip : addresses) {
-
                 remoteAddress.add(ip.trim());
-
             }
         }
         return remoteAddress;
@@ -817,7 +839,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         final String method = new Regex(requestLine, HttpServerConnection.METHOD).getMatch(0);
         // TOTO: requestLine may be "" in some cases (chrome pre connection...?)
         try {
-            return RequestMethod.valueOf(method);
+            return RequestMethod.get(method);
         } catch (final Exception e) {
             return RequestMethod.UNKNOWN;
         }
@@ -967,7 +989,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             } finally {
                 request = this.request;
                 response = this.response;
-
                 final long configureStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                 configure(request, response);
                 final long configureElapsed = Time.systemIndependentCurrentJVMTimeMillis() - configureStartTime;
@@ -979,29 +1000,25 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             if (isVerboseLogEnabled()) {
                 LogV3.fine("HttpConnection.run: Request built in " + (beforeValidateTime - requestStartTime) + "ms, calling validateRequest");
             }
-
+            // throw exception on Cors validation error
             server.validateRequest(request);
             final long afterValidateTime = Time.systemIndependentCurrentJVMTimeMillis();
             if (isVerboseLogEnabled()) {
                 LogV3.fine("HttpConnection.run: validateRequest completed in " + (afterValidateTime - beforeValidateTime) + "ms");
             }
-
             if (this.deferRequest(request)) {
                 closeConnection = false;
             } else {
                 // Handle OPTIONS requests automatically if CORS is configured
                 if (request instanceof OptionsRequest) {
-                    final CorsHandler corsHandler = server.getCorsHandler();
-                    if (corsHandler != null && corsHandler.answerOptionsRequest((OptionsRequest) request, response)) {
+                    if (server.getCorsHandler().answerOptionsRequest((OptionsRequest) request, response)) {
                         // CORS is configured and origin is allowed - OPTIONS preflight request handled
                         // Response is already prepared by answerOptionsRequest()
                         response.getOutputStream(true).flush();
                         closeConnection = true;
                         return;
                     }
-                    // If no CORS handler is configured or origin is not allowed, fall through to normal handler processing
                 }
-
                 boolean handled = false;
                 final boolean isPostRequest = isPostRequest(request);
                 final boolean isGetRequest = isGetRequest(request);
@@ -1027,7 +1044,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                             } else {
                                 throw new HttpMethodNotAllowedException("This server is not a proxy!");
                             }
-
                         } else {
                             throw new HttpMethodNotAllowedException("Unsupported RequestType");
                         }
@@ -1062,7 +1078,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 LogV3.fine("HttpConnection.run: Exception caught after " + (exceptionTime - requestStartTime) + "ms: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             }
             try {
-
                 final AbstractServerBasics server = this.getServer();
                 this.response = createErrorResponse();
                 final long beforeOnExceptionTime = Time.systemIndependentCurrentJVMTimeMillis();
@@ -1071,9 +1086,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 if (isVerboseLogEnabled()) {
                     LogV3.fine("HttpConnection.run: onException completed in " + (afterOnExceptionTime - beforeOnExceptionTime) + "ms");
                 }
-
             } catch (final Throwable nothing) {
-
                 LogV3.warning("Error: Cannot Send HTTP Response!");
                 LogV3.log(Exceptions.addSuppressed(e, nothing));
             }
@@ -1083,7 +1096,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             if (isVerboseLogEnabled()) {
                 LogV3.fine("HttpConnection.run: Request processing completed in " + totalRequestTime + "ms, closeConnection=" + closeConnection);
             }
-
             if (closeConnection) {
                 final long beforeDrainingTime = Time.systemIndependentCurrentJVMTimeMillis();
                 if (isVerboseLogEnabled()) {
@@ -1094,9 +1106,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 if (isVerboseLogEnabled()) {
                     LogV3.fine("HttpConnection.run: handleDraining completed in " + (afterDrainingTime - beforeDrainingTime) + "ms");
                 }
-
                 this.closeConnection();
-
                 this.close();
             }
             final long totalTime = Time.systemIndependentCurrentJVMTimeMillis() - requestStartTime;
@@ -1125,38 +1135,30 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                     LogV3.fine("handleDraining: shutdownOutput() failed: " + ignore.getMessage());
                 }
             }
-
         }
-
         try {
-
-            InputStream inp = getInputStream();
-
-            // reset limits
-            if (inp instanceof LimitedInputStreamInterface) {
-                ((LimitedInputStreamInterface) inp).setLimit(-1);
-            }
-            while (inp instanceof CountingInputStreamInterface) {
-
-                InputStream newIs = ((CountingInputStreamInterface) inp).getParentInputStream();
-                if (newIs == inp) {
-                    DebugMode.debugger();
-                    break;
-                }
-
-                inp = newIs;
+            if (request instanceof AbstractPostRequest) {
+                InputStream inp = getInputStream();
+                // reset limits
                 if (inp instanceof LimitedInputStreamInterface) {
                     ((LimitedInputStreamInterface) inp).setLimit(-1);
                 }
-            }
-            if (request instanceof AbstractPostRequest) {
+                while (inp instanceof CountingInputStreamInterface) {
+                    InputStream newIs = ((CountingInputStreamInterface) inp).getParentInputStream();
+                    if (newIs == inp) {
+                        DebugMode.debugger();
+                        break;
+                    }
+                    inp = newIs;
+                    if (inp instanceof LimitedInputStreamInterface) {
+                        ((LimitedInputStreamInterface) inp).setLimit(-1);
+                    }
+                }
                 HTTPHeader header = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_CONTENT_LENGTH);
                 if (header != null) {
                     long cl = Long.parseLong(header.getValue());
                     CountingInputStream inputStream;
-
                     inputStream = getInputStreamByType(request.getConnection().getInputStream(), CountingInputStream.class);
-
                     if (inputStream != null) {
                         long remaining = cl - inputStream.transferedBytes();
                         if (isVerboseLogEnabled()) {
@@ -1194,7 +1196,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                             if (requestInputStream != null) {
                                 // Find ChunkedInputStream in the stream chain
                                 ChunkedInputStream chunkedStream = getInputStreamByType(requestInputStream, ChunkedInputStream.class);
-
                                 if (isVerboseLogEnabled()) {
                                     LogV3.fine("handleDraining: Found ChunkedInputStream, calling drainChunked()");
                                 }
@@ -1203,7 +1204,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                                 if (isVerboseLogEnabled()) {
                                     LogV3.fine("handleDraining: drainChunked completed, total handleDraining time: " + handleDrainingElapsed + "ms");
                                 }
-
                             } else {
                                 if (isVerboseLogEnabled()) {
                                     LogV3.fine("handleDraining: Request InputStream is null, cannot drain chunked");
@@ -1223,7 +1223,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 }
             } else {
                 if (isVerboseLogEnabled()) {
-                    LogV3.fine("handleDraining: Not a POST request, no draining needed");
+                    LogV3.fine("handleDraining: Not a POST request or no Request at all, no draining needed");
                 }
             }
         } catch (Exception e) {
@@ -1277,9 +1277,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         // if (accessAge != null) {
         // ret.getResponseHeaders().add(accessAge);
         // }
-
         configure(request, ret);
-
         ret.setResponseCode(HTTPConstants.ResponseCode.SERVERERROR_INTERNAL);
         return ret;
     }
@@ -1310,7 +1308,6 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         if (this.isOutputStreamInUse()) {
             throw new OutputStreamIsAlreadyInUseException("OutputStream is already in use!");
         } else if (this.response != null) {
-
             try {
                 final OutputStream out = this.getRawOutputStream();
                 final ConnectionHook lHook = hook;
@@ -1369,5 +1366,4 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             return "HttpConnectionThread: IS and OS";
         }
     }
-
 }

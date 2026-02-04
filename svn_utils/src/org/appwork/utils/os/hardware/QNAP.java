@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -37,6 +37,7 @@ import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.net.URL;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Pattern;
@@ -48,6 +49,10 @@ import javax.net.ssl.SSLSession;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -92,7 +97,16 @@ public abstract class QNAP implements HardwareTypeInterface {
                         final URL url = new URL(host + "/cgi-bin/authLogin.cgi");
                         final HttpURLConnection connection = (HttpURLConnection) url.openConnection(Proxy.NO_PROXY);
                         if (connection instanceof HttpsURLConnection) {
-                            ((HttpsURLConnection) connection).setSSLSocketFactory(JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, url.getHost()));
+                            ((HttpsURLConnection) connection).setSSLSocketFactory(JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, url.getHost(), null, new TrustCallback() {
+                                @Override
+                                public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                                }
+
+                                @Override
+                                public TrustProviderInterface getTrustProvider() {
+                                    return TrustAllProvider.getInstance();
+                                }
+                            }));
                             ((HttpsURLConnection) connection).setHostnameVerifier(new HostnameVerifier() {
                                 @Override
                                 public boolean verify(String hostname, SSLSession session) {

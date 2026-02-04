@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -41,7 +40,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.KeyManagementException;
-import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -50,16 +48,15 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 import org.appwork.utils.DebugMode;
@@ -67,6 +64,11 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
+import org.appwork.utils.net.httpconnection.trust.bridge.Java1_6TrustBridge;
+import org.appwork.utils.net.httpconnection.trust.bridge.TrustBridge;
 
 /**
  * @author daniel
@@ -75,15 +77,19 @@ import org.appwork.utils.StringUtils;
 public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     private static final JavaSSLSocketStreamFactory INSTANCE          = new JavaSSLSocketStreamFactory();
     private final static String                     TLS13_ENABLED     = "JSSE_TLS1.3_ENABLED";
+    private final static String                     SSL_ENABLED       = "JSSE_SSL_ENABLED";
     private final static String                     TLS10_11_DISABLED = "JSSE_TLS10_11_DISABLED";
 
     public static final JavaSSLSocketStreamFactory getInstance() {
         return INSTANCE;
     }
 
-    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName) throws IOException {
+    @Override
+    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, KeyManager[] keyManagers, TrustCallback trustCallback) throws IOException {
         final boolean sniEnabled = !StringUtils.isEmpty(sniHostName) && (options == null || options.isSNIEnabled());
-        return getSSLSocketFactory(getSSLContext(options), options, sniEnabled ? sniHostName : null);
+        final TrustManager trustBridge = generateTrustManagerDelegate(trustCallback);
+        final SSLContext sslContext = getSSLContext(options, trustBridge, keyManagers);
+        return getSSLSocketFactory(sslContext, options, sniEnabled ? sniHostName : null);
     }
 
     /*
@@ -95,7 +101,17 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
      */
     public void isCipherSuiteSupported(final String... cipherSuites) throws SSLException {
         try {
-            final SSLContext context = getSSLContext(null);
+            final SSLContext context = getSSLContext(null, generateTrustManagerDelegate(new TrustCallback() {
+                @Override
+                public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                    // ignore
+                }
+
+                @Override
+                public TrustProviderInterface getTrustProvider() {
+                    return TrustUtils.getDefaultProvider();
+                }
+            }), null);
             final SSLParameters parameters = context.getSupportedSSLParameters();
             final List<String> supportedCipherSuites = Arrays.asList(parameters.getCipherSuites());
             for (final String cipherSuite : cipherSuites) {
@@ -133,84 +149,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         }
     }
 
-    protected TrustManager[] getTrustCerts(final SSLSocketStreamOptions options) throws SSLException {
-        if (options == null || options.isTrustAll()) {
-            return new TrustManager[] { bridge(new X509TrustManagerBridge() {
-                @Override
-                public X509Certificate[] getAcceptedIssuers() {
-                    /*
-                     * returning null here can cause a NPE in some java versions!
-                     */
-                    return new java.security.cert.X509Certificate[0];
-                }
-
-                @Override
-                public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
-                }
-
-                @Override
-                public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
-                }
-
-                @Override
-                public X509TrustManager getTrustManager() {
-                    return null;
-                }
-            }) };
-        } else {
-            if (false && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                final TrustManager[] custom;
-                final TrustManager[] def;
-                try {
-                    // KeyStore dd = KeyStore.getInstance("Windows-ROOT");
-                    FileInputStream is = new FileInputStream("/home/daniel/jdk/jdk1.8.0_131/jre/lib/security/cacerts.all");
-                    KeyStore caKeyStore = KeyStore.getInstance("jks");
-                    caKeyStore.load(is, "changeit".toCharArray());
-                    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX");
-                    trustManagerFactory.init(caKeyStore);
-                    custom = trustManagerFactory.getTrustManagers();
-                    trustManagerFactory = TrustManagerFactory.getInstance("PKIX");
-                    trustManagerFactory.init((KeyStore) null);
-                    def = trustManagerFactory.getTrustManagers();
-                } catch (Exception e) {
-                    return null;
-                }
-                return new TrustManager[] { new X509TrustManager() {
-                    @Override
-                    public void checkClientTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
-                    }
-
-                    @Override
-                    public void checkServerTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
-                        try {
-                            ((X509TrustManager) def[0]).checkServerTrusted(chain, authType);
-                            return;
-                        } catch (CertificateException e) {
-                            e.printStackTrace();
-                        }
-                        try {
-                            ((X509TrustManager) custom[0]).checkServerTrusted(chain, authType);
-                            return;
-                        } catch (CertificateException e) {
-                            e.printStackTrace();
-                        }
-                        throw new CertificateException();
-                    }
-
-                    @Override
-                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                        /*
-                         * returning null here can cause a NPE in some java versions!
-                         */
-                        return new java.security.cert.X509Certificate[0];
-                    }
-                } };
-            }
-            return null;
-        }
-    }
-
-    protected SSLContext getSSLContext(final SSLSocketStreamOptions options) throws IOException {
+    protected SSLContext getSSLContext(final SSLSocketStreamOptions options, TrustManager trustBridge, KeyManager[] keyManagers) throws IOException {
         // https://bugs.openjdk.java.net/browse/JDK-8248721
         // https://stackoverflow.com/questions/29437596/tlsv1-3-is-it-available-now-in-java-8
         // https://java.com/en/jre-jdk-cryptoroadmap.html
@@ -224,31 +163,56 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
             protocols.add(TLS.TLS_1_2.id);
         }
         protocols.add("TLS");
-        protocols.add("SSL");
-        SSLContext sslContext = null;
+        if (options != null && options.getCustomFactorySettings().contains(SSL_ENABLED)) {
+            protocols.add("SSL");
+        }
+        SSLContext sslContext;
+        try {
+            sslContext = createContext(protocols);
+        } catch (NoSuchAlgorithmException e) {
+            throw new SSLException(e);
+        }
+        try {
+            sslContext.init(keyManagers, new TrustManager[] { trustBridge }, null);
+            return sslContext;
+        } catch (KeyManagementException e) {
+            throw new SSLException(e);
+        }
+    }
+
+    protected SSLContext createContext(List<String> protocols) throws NoSuchAlgorithmException {
         NoSuchAlgorithmException nsae = null;
         for (final String protocol : protocols) {
             try {
-                sslContext = SSLContext.getInstance(protocol);
-                break;
+                SSLContext context = SSLContext.getInstance(protocol);
+                // LogV3.info("Created SLLContext: " + protocol);
+                return context;
             } catch (NoSuchAlgorithmException e) {
                 nsae = Exceptions.addSuppressed(e, nsae);
             }
         }
-        if (sslContext != null) {
-            try {
-                sslContext.init(null, getTrustCerts(options), null);
-                return sslContext;
-            } catch (KeyManagementException e) {
-                throw new SSLException(e);
-            }
+        if (nsae == null) {
+            throw new NoSuchAlgorithmException("Should not happen: Could not create a SSLContext");
+        }
+        throw nsae;
+    }
+
+    /**
+     * @param trustCallback
+     * @return
+     */
+    public static TrustManager generateTrustManagerDelegate(TrustCallback trustCallback) {
+        final TrustProviderInterface provider = trustCallback != null ? trustCallback.getTrustProvider() : null;
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
+            return new TrustBridge(provider, trustCallback);
         } else {
-            throw new SSLException(nsae);
+            return new Java1_6TrustBridge(provider, trustCallback);
         }
     }
 
     protected String[] filterEnabledSupportedProtocols(final SSLSocketStreamOptions options, SSLContext sslContext, final String... onlyEnabledProtocols) {
-        final List<String> supportedProtocols = Arrays.asList(sslContext.getSupportedSSLParameters().getProtocols());
+        // getDefaultSSLParameters contains only protocols that can actually be used (and are not disabled)
+        final List<String> supportedProtocols = Arrays.asList(sslContext.getDefaultSSLParameters().getProtocols());
         final List<String> enabledProtocols;
         if (onlyEnabledProtocols.length == 0) {
             enabledProtocols = new ArrayList<String>(supportedProtocols);
@@ -265,6 +229,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                 enabledProtocols.remove(TLS.TLS_1_0.id);
             }
         }
+        // LogV3.info("Protocols: " + enabledProtocols);
         return enabledProtocols.toArray(new String[0]);
     }
 
@@ -273,7 +238,8 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         TLS_1_2("TLSv1.2"),
         TLS_1_1("TLSv1.1"),
         TLS_1_0("TLSv1");
-        protected final String id;
+
+        public final String id;
 
         private TLS(final String id) {
             this.id = id;
@@ -281,23 +247,30 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     protected SSLSocket modifyProtocols(final SSLSocket sslSocket, final SSLSocketFactory factory, final SSLContext sslContext, final SSLSocketStreamOptions options) {
-        if (sslContext != null) {
-            if (isTLSSupported(TLS.TLS_1_3, options, sslContext)) {
-                sslSocket.setEnabledProtocols(filterEnabledSupportedProtocols(options, sslContext, new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id, TLS.TLS_1_3.id }));
-            } else if (JVMVersion.isMinimum(JVMVersion.JAVA_1_8)) {
-                sslSocket.setEnabledProtocols(filterEnabledSupportedProtocols(options, sslContext, new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id }));
-            } else if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
-                sslSocket.setEnabledProtocols(filterEnabledSupportedProtocols(options, sslContext, new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id }));
-            } else if (JVMVersion.isMinimum(JVMVersion.JAVA_16 + 121000)) {
-                // https://www.oracle.com/java/technologies/javase/6-relnotes.html#R160_121
-                sslSocket.setEnabledProtocols(filterEnabledSupportedProtocols(options, sslContext, new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id }));
-            } else if (JVMVersion.isMinimum(JVMVersion.JAVA_16 + 111000)) {
-                // https://blogs.oracle.com/java-platform-group/diagnosing-tls,-ssl,-and-https
-                sslSocket.setEnabledProtocols(filterEnabledSupportedProtocols(options, sslContext, new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id }));
-            } else {
-                sslSocket.setEnabledProtocols(filterEnabledSupportedProtocols(options, sslContext, new String[] { TLS.TLS_1_0.id }));
-            }
+        if (sslContext == null) {
+            return sslSocket;
         }
+        // Decide the protocol preference list once
+        final String[] preferred;
+        if (isTLSSupported(TLS.TLS_1_3, options, sslContext)) {
+            preferred = new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id, TLS.TLS_1_3.id };
+        } else if (JVMVersion.isMinimum(JVMVersion.JAVA_1_8)) {
+            preferred = new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id };
+        } else if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
+            preferred = new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id };
+        } else if (JVMVersion.isMinimum(JVMVersion.JAVA_16 + 121000)) {
+            // https://www.oracle.com/java/technologies/javase/6-relnotes.html#R160_121
+            preferred = new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id, TLS.TLS_1_2.id };
+        } else if (JVMVersion.isMinimum(JVMVersion.JAVA_16 + 111000)) {
+            // https://blogs.oracle.com/java-platform-group/diagnosing-tls,-ssl,-and-https
+            preferred = new String[] { TLS.TLS_1_0.id, TLS.TLS_1_1.id };
+        } else {
+            preferred = new String[] { TLS.TLS_1_0.id };
+        }
+        // Filter once, set once
+        final String[] enabled = filterEnabledSupportedProtocols(options, sslContext, preferred);
+        // LogV3.info("Pref protocols: " + Arrays.toString(preferred) + " -Filtered: " + Arrays.toString(enabled));
+        sslSocket.setEnabledProtocols(enabled);
         return sslSocket;
     }
 
@@ -306,7 +279,18 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
             // https://github.com/wildfly-security/wildfly-openssl
             // https://github.com/openjsse/openjsse
             if (sslContext == null) {
-                sslContext = getSSLContext(options);
+                TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {
+                    @Override
+                    public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                        // ignore
+                    }
+
+                    @Override
+                    public TrustProviderInterface getTrustProvider() {
+                        return TrustUtils.getDefaultProvider();
+                    }
+                });
+                sslContext = getSSLContext(options, trustBridge, null);
             }
             return tls != null && Arrays.asList(sslContext.getSupportedSSLParameters().getProtocols()).contains(tls.id);
         } catch (Exception e) {
@@ -457,10 +441,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         };
     }
 
-    protected Boolean verifySSLHostname(HostnameVerifier hostNameVerifier, SSLSession session, String host) throws IOException {
-        return HTTPConnectionUtils.verifySSLHostname(hostNameVerifier, session, host);
-    }
-
     public interface JSSESSLSocketStreamInterface extends SSLSocketStreamInterface {
         public SSLContext getSSLContext();
 
@@ -470,13 +450,44 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoClose, final SSLSocketStreamOptions options) throws IOException {
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoClose, final SSLSocketStreamOptions options, TrustProviderInterface trustProvider, KeyManager[] keyManagers) throws IOException {
+        if (trustProvider == null) {
+            throw new NullPointerException("trustProvider");
+        }
         final boolean sniEnabled = !StringUtils.isEmpty(host) && (options == null || options.isSNIEnabled());
-        final SSLContext sslContext = getSSLContext(options);
+        final TrustResult[] resultStore = new TrustResult[] { null };
+        TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {
+            @Override
+            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                resultStore[0] = result;
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustProvider;
+            }
+        });
+        final SSLContext sslContext = getSSLContext(options, trustBridge, keyManagers);
         final SSLSocketFactory sslFactory = getSSLSocketFactory(sslContext, options, sniEnabled ? host : null);
         final SSLSocket sslSocket = (SSLSocket) sslFactory.createSocket(socketStream.getSocket(), sniEnabled ? host : "", port, autoClose);
-        if (options != null && !options.isTrustAll()) {
-            verifySSLHostname(null, sslSocket.getSession(), host);
+        try {
+            sslSocket.startHandshake();
+        } catch (final SSLHandshakeException e) {
+            throw new SSLHandshakeWithTrustResultException(e, resultStore[0], "SSL handshake failed: " + e.getMessage());
+        } catch (final IOException e) {
+            throw new IOWithTrustResultException(e, resultStore[0], "SSL handshake failed: " + e.getMessage());
+        }
+        try {
+            trustProvider.verifyHostname(sslSocket.getSession(), host, this);
+        } catch (IllegalSSLHostnameException e) {
+            e.setTrustResult(resultStore[0]);
+            e.getTrustResult().exception(e);
+            throw e;
+        } catch (RuntimeException e) {
+            IllegalSSLHostnameException thr = new IllegalSSLHostnameException(host, e);
+            thr.setTrustResult(resultStore[0]);
+            thr.getTrustResult().exception(e);
+            throw thr;
         }
         return new JSSESSLSocketStreamInterface() {
             @Override
@@ -534,11 +545,23 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
             public SSLSession getSSLSession() {
                 return sslSocket.getSession();
             }
+
+            @Override
+            public TrustResult getTrustResult() {
+                DebugMode.breakIf(resultStore[0] == null);
+                return resultStore[0];
+            }
         };
     }
 
     @Override
     public String retry(SSLSocketStreamOptions options, Exception e) {
+        if (e instanceof TrustValidationFailedException) {
+            return null;
+        }
+        if (e instanceof IllegalSSLHostnameException) {
+            return null;
+        }
         if (isTLSSupported(TLS.TLS_1_3, options, null) && options.isTLSConfigurationException(e)) {
             // https://www.bouncycastle.org/docs/tlsdocs1.5on/org/bouncycastle/tls/AlertDescription.html
             if (options.getCustomFactorySettings().add(TLS13_ENABLED)) {

@@ -6,12 +6,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.jdownloader.extensions.eventscripter.EnvironmentException;
+
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.requests.HeadRequest;
-
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.jdownloader.extensions.eventscripter.EnvironmentException;
 
 public class BrowserSandBox {
     private final Browser br;
@@ -93,10 +93,6 @@ public class BrowserSandBox {
 
     public String getContentType() {
         return br.getHttpConnection().getContentType();
-    }
-
-    public boolean isSSLTrustALL() {
-        return br.getHttpConnection().isSSLTrustALL();
     }
 
     public int getConnectTimeout() {

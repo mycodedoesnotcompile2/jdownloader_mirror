@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -68,10 +68,13 @@ import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import javax.net.ssl.KeyManager;
+
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.KeyValueStringEntry;
 import org.appwork.utils.Regex;
@@ -88,6 +91,8 @@ import org.appwork.utils.net.SocketFactory;
 import org.appwork.utils.net.StreamValidEOF;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.NetworkInterfaceException.ERROR;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.bridge.RejectedByTrustProviderException;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 
@@ -152,6 +157,16 @@ public class HTTPConnectionImpl implements HTTPConnection {
         }
     }
 
+    /**
+     * Clears the cached SSL socket stream options. For testing only; ensures fresh options (e.g. so client-cert tests use the default
+     * SSLSocketStreamFactory and not a cached one that might omit client cert).
+     */
+    public static void clearSSLSocketStreamOptionsCache() {
+        synchronized (SSL_SOCKETSTREAM_OPTIONS) {
+            SSL_SOCKETSTREAM_OPTIONS.clear();
+        }
+    }
+
     protected HTTPHeaderMap<String>          requestProperties = null;
     protected volatile long[]                ranges;
     protected String                         customcharset     = null;
@@ -207,7 +222,9 @@ public class HTTPConnectionImpl implements HTTPConnection {
     protected final CopyOnWriteArrayList<String> connectExceptions    = new CopyOnWriteArrayList<String>();
     protected volatile KEEPALIVE                 keepAlive            = KEEPALIVE.DISABLED;
     protected volatile InetAddress               remoteIPs[]          = null;
-    protected boolean                            sslTrustALL          = true;
+    protected TrustProviderInterface             sslTrustProvider     = null;
+    protected KeyManager[]                       sslKeyManagers       = null;
+    protected TrustResult                        trustResult          = null;
     protected InetAddress                        lastConnection       = null;
     protected int                                lastConnectionPort   = -1;
     protected String                             hostName;
@@ -597,6 +614,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         this.ranges = null;
         this.lastConnection = null;
         this.lastConnectionPort = -1;
+        setTrustResult(null);
     }
 
     protected InetAddress getBindInetAddress(InetAddress dest, HTTPProxy proxy) throws IOException {
@@ -835,12 +853,12 @@ public class HTTPConnectionImpl implements HTTPConnection {
         return false;
     }
 
-    protected SSLSocketStreamOptions getSSLSocketStreamOptions(String host, int port, boolean trustAllFlag) {
-        final String id = getSSLSocketStreamOptionsID(host, port, trustAllFlag);
+    protected SSLSocketStreamOptions getSSLSocketStreamOptions(String host, int port) {
+        final String id = getSSLSocketStreamOptionsID(host, port);
         synchronized (SSL_SOCKETSTREAM_OPTIONS) {
             SSLSocketStreamOptions options = SSL_SOCKETSTREAM_OPTIONS.get(id);
             if (options == null || !options.isValid()) {
-                options = getNewSSLSocketStreamOptionsInstance(host, port, trustAllFlag);
+                options = getNewSSLSocketStreamOptionsInstance(host, port);
                 SSL_SOCKETSTREAM_OPTIONS.put(id, options);
             }
             return getSSLSocketStreamOptions(options);
@@ -873,13 +891,13 @@ public class HTTPConnectionImpl implements HTTPConnection {
         return sslSocketStreamOptions;
     }
 
-    protected String getSSLSocketStreamOptionsID(final String host, final int port, final boolean trustAllFlag) {
-        return host + ":" + port + ":" + trustAllFlag;
+    protected String getSSLSocketStreamOptionsID(final String host, final int port) {
+        return host + ":" + port;
     }
 
-    protected SSLSocketStreamOptions getNewSSLSocketStreamOptionsInstance(String host, int port, boolean trustAllFlag) {
-        final String id = getSSLSocketStreamOptionsID(host, port, trustAllFlag);
-        final SSLSocketStreamOptions ret = new SSLSocketStreamOptions(id, trustAllFlag);
+    protected SSLSocketStreamOptions getNewSSLSocketStreamOptionsInstance(String host, int port) {
+        final String id = getSSLSocketStreamOptionsID(host, port);
+        final SSLSocketStreamOptions ret = new SSLSocketStreamOptions(id);
         return processSSLSocketStreamOptionsModifier(ret);
     }
 
@@ -1016,10 +1034,11 @@ public class HTTPConnectionImpl implements HTTPConnection {
                         if (this.httpURL.getProtocol().startsWith("https")) {
                             final String hostName = getHostname();
                             if (sslSocketStreamOptions == null) {
-                                sslSocketStreamOptions = getSSLSocketStreamOptions(hostName, port, isSSLTrustALL());
+                                sslSocketStreamOptions = getSSLSocketStreamOptions(hostName, port);
                             }
                             factory = getSSLSocketStreamFactory(sslSocketStreamOptions);
-                            this.connectionSocket = factory.create(connectionSocket, hostName, port, true, sslSocketStreamOptions);
+                            this.connectionSocket = factory.create(connectionSocket, hostName, port, true, sslSocketStreamOptions, getTrustProvider(), getKeyManagers());
+                            setTrustResult(((TrustResultProvider) connectionSocket).getTrustResult());
                         }
                         this.connectTime = Time.systemIndependentCurrentJVMTimeMillis() - startMS;
                         ee = null;
@@ -1043,7 +1062,8 @@ public class HTTPConnectionImpl implements HTTPConnection {
                         } else {
                             ee = cause;
                         }
-                    } catch (final IOException e) {
+                    } catch (IOException e) {
+                        e = mapExceptions(e);
                         final String retrySSL;
                         try {
                             retrySSL = sslSocketStreamOptions != null ? (sslSocketStreamOptions = sslSocketStreamOptions.clone()).retry(factory, e) : null;
@@ -1090,6 +1110,35 @@ public class HTTPConnectionImpl implements HTTPConnection {
                 }
             }
         }
+    }
+
+    /**
+     * @param e
+     * @return
+     */
+    protected IOException mapExceptions(IOException e) {
+        TrustResultProvider trp = Exceptions.getInstanceof(e, TrustResultProvider.class);
+        if (trp != null) {
+            TrustResult tr = trp.getTrustResult();
+            DebugMode.breakIf(getTrustResult() != null && getTrustResult() != tr);
+            setTrustResult(tr);
+        }
+        RejectedByTrustProviderException rejectedByTrust = Exceptions.getInstanceof(e, RejectedByTrustProviderException.class);
+        if (rejectedByTrust != null) {
+            e = new TrustValidationFailedException(rejectedByTrust);
+        }
+        IllegalSSLHostnameException rejectedByHostname = Exceptions.getInstanceof(e, IllegalSSLHostnameException.class);
+        if (rejectedByHostname != null) {
+            e = rejectedByHostname;
+        }
+        return e;
+    }
+
+    /**
+     * @param trustResult
+     */
+    protected void setTrustResult(TrustResult trustResult) {
+        this.trustResult = trustResult;
     }
 
     protected SSLSocketStreamFactory getSSLSocketStreamFactory(final SSLSocketStreamOptions sslSocketStreamOptions) {
@@ -1643,7 +1692,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         }
         sb.append("----------------Request-------------------------\r\n");
         if (getRawInputStream() != null) {
-            sb.append(this.httpMethod.toString()).append(' ').append(this.httpPath).append(" HTTP/1.1\r\n");
+            sb.append(this.httpMethod.getHeaderValue()).append(' ').append(this.httpPath).append(" HTTP/1.1\r\n");
             final Iterator<Entry<String, String>> it = this.getRequestProperties().entrySet().iterator();
             while (it.hasNext()) {
                 final Entry<String, String> next = it.next();
@@ -1825,7 +1874,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         }
         final SocketStreamInterface connectionSocket = getConnectionSocket();
         final StringBuilder sb = new StringBuilder();
-        sb.append(this.httpMethod.name()).append(' ').append(this.httpPath).append(" HTTP/1.1\r\n");
+        sb.append(this.httpMethod.getHeaderValue()).append(' ').append(this.httpPath).append(" HTTP/1.1\r\n");
         this.addHostHeader();
         this.putHostToTop(this.requestProperties);
         final Iterator<Entry<String, String>> it = this.requestProperties.entrySet().iterator();
@@ -1935,13 +1984,38 @@ public class HTTPConnectionImpl implements HTTPConnection {
     }
 
     @Override
-    public void setSSLTrustALL(boolean trustALL) {
-        this.sslTrustALL = trustALL;
+    public void setTrustProvider(TrustProviderInterface trustProvider) {
+        this.sslTrustProvider = trustProvider; // null is allowed - getter returns default then
     }
 
     @Override
-    public boolean isSSLTrustALL() {
-        return this.sslTrustALL;
+    public TrustProviderInterface getTrustProvider() {
+        if (this.sslTrustProvider == null) {
+            return org.appwork.utils.net.httpconnection.trust.TrustUtils.getDefaultProvider();
+        }
+        return this.sslTrustProvider;
+    }
+
+    @Override
+    public void setKeyManagers(final KeyManager[] keyManagers) {
+        this.sslKeyManagers = keyManagers;
+    }
+
+    @Override
+    public KeyManager[] getKeyManagers() {
+        return this.sslKeyManagers;
+    }
+
+    @Override
+    public TrustResult getTrustResult() {
+        SocketStreamInterface cs = connectionSocket;
+        if (cs instanceof TrustResultProvider) {
+            TrustResult c = ((TrustResultProvider) cs).getTrustResult();
+            if (c != null) {
+                return c;
+            }
+        }
+        return this.trustResult;
     }
 
     @Override

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -99,31 +99,31 @@ public class HTTPProxy {
     }
 
     public static final HTTPProxy NONE = new HTTPProxy(TYPE.NONE) {
-                                           @Override
-                                           public void setConnectMethodPrefered(final boolean value) {
-                                           }
+        @Override
+        public void setConnectMethodPrefered(final boolean value) {
+        }
 
-                                           @Override
-                                           public void setLocal(final String local) {
-                                           }
+        @Override
+        public void setLocal(final String local) {
+        }
 
-                                           @Override
-                                           public void setPass(final String pass) {
-                                           }
+        @Override
+        public void setPass(final String pass) {
+        }
 
-                                           @Override
-                                           public void setPort(final int port) {
-                                           }
+        @Override
+        public void setPort(final int port) {
+        }
 
-                                           @Override
-                                           public void setType(final TYPE type) {
-                                               super.setType(TYPE.NONE);
-                                           }
+        @Override
+        public void setType(final TYPE type) {
+            super.setType(TYPE.NONE);
+        }
 
-                                           @Override
-                                           public void setUser(final String user) {
-                                           }
-                                       };
+        @Override
+        public void setUser(final String user) {
+        }
+    };
 
     public static List<HTTPProxy> getFromSystemProperties() {
         final java.util.List<HTTPProxy> ret = new ArrayList<HTTPProxy>();
@@ -389,7 +389,6 @@ public class HTTPProxy {
     protected boolean preferNativeImplementation = false;
     protected boolean resolveHostname            = false;
     protected boolean keepAliveSupported         = false;
-
     protected boolean doNotStoreInstance         = false;
 
     public boolean isDoNotStoreInstance() {
@@ -671,9 +670,11 @@ public class HTTPProxy {
     /**
      * @param preferNativeImplementation
      *            the preferNativeImplementation to set
+     * @return
      */
-    public void setPreferNativeImplementation(final boolean preferNativeImplementation) {
+    public HTTPProxy setPreferNativeImplementation(final boolean preferNativeImplementation) {
         this.preferNativeImplementation = preferNativeImplementation;
+        return this;
     }
 
     public void setType(final TYPE type) {

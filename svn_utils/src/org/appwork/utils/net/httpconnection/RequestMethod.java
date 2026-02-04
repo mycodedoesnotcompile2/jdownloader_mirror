@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -34,6 +34,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
+import java.util.Locale;
+
 import org.appwork.utils.ByteArrayUtils;
 
 public enum RequestMethod {
@@ -44,7 +46,11 @@ public enum RequestMethod {
     /**
      * UPnP M-SEARCH method. Used to discover UPnP devices and services. No request body.
      */
-    MSEARCH("M-SEARCH", false), // UPnP
+    MSEARCH("M-SEARCH", false) {
+        public String getHeaderValue() {
+            return "M-SEARCH";
+        }
+    }, // UPnP
     /**
      * UPnP SUBSCRIBE method. Used to subscribe to event notifications. No request body (header-based).
      */
@@ -129,6 +135,10 @@ public enum RequestMethod {
         this(null, requiresOutputStream);
     }
 
+    public String getHeaderValue() {
+        return name();
+    }
+
     /**
      *
      */
@@ -189,5 +199,17 @@ public enum RequestMethod {
             }
         }
         return UNKNOWN;
+    }
+
+    /**
+     * @param requestedMethod
+     * @return
+     */
+    public static RequestMethod get(String requestedMethod) throws IllegalArgumentException {
+        // Handle special case: "M-SEARCH" maps to MSEARCH enum
+        if (RequestMethod.MSEARCH.getHeaderValue().equals(requestedMethod.toUpperCase(Locale.ROOT))) {
+            return RequestMethod.MSEARCH;
+        }
+        return valueOf(requestedMethod.toUpperCase(Locale.ROOT));
     }
 }

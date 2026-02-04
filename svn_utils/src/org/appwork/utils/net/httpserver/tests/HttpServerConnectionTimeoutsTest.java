@@ -38,6 +38,7 @@ import java.io.InputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -97,7 +98,7 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
      */
     private void testCustomSocketTimeout() throws Exception {
         LogV3.info("Test: Custom Socket Timeout");
-        final int customTimeout = 10 * 1000; // 10 seconds
+        final int customTimeout = (int) TimeUnit.SECONDS.toMillis(10); // 10 seconds
         final ConnectionTimeouts customTimeouts = new ConnectionTimeouts(customTimeout);
         httpServer.setConnectionTimeouts(customTimeouts);
 
@@ -122,7 +123,7 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
      */
     private void testSocketTimeoutEnforcement() throws Exception {
         LogV3.info("Test: Socket Timeout Enforcement");
-        final int shortTimeout = 2 * 1000; // 2 seconds
+        final int shortTimeout = (int) TimeUnit.SECONDS.toMillis(2); // 2 seconds
         final ConnectionTimeouts shortTimeouts = new ConnectionTimeouts(shortTimeout);
         httpServer.setConnectionTimeouts(shortTimeouts);
 

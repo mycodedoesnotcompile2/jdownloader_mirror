@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -40,6 +40,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 
+import javax.net.ssl.KeyManager;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -53,6 +55,8 @@ import org.appwork.utils.net.httpconnection.ProxyEndpointConnectException;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
 /**
  * @author daniel
@@ -65,14 +69,33 @@ public class HTTPProxySocketConnection extends SocketConnection {
         HTTPProxySocketConnection.defaultSSLSocketStreamFactory = defaultSSLSocketStreamFactory;
     }
 
-    protected boolean sslTrustALL = true;
+    protected TrustProviderInterface trustProvider = null;
+    protected KeyManager[]           keyManagers   = null;
 
-    public void setSSLTrustALL(boolean trustALL) {
-        this.sslTrustALL = trustALL;
+    public void setTrustProvider(TrustProviderInterface trustProvider) {
+        this.trustProvider = trustProvider;
     }
 
-    public boolean isSSLTrustALL() {
-        return this.sslTrustALL;
+    public TrustProviderInterface getTrustProvider() {
+        TrustProviderInterface tp = trustProvider;
+        if (tp == null) {
+            return TrustUtils.getDefaultProvider();
+        }
+        return tp;
+    }
+
+    /**
+     * Set KeyManagers for client certificate authentication (e.g. from KeyManagerFactory). Null to disable client cert.
+     */
+    public void setKeyManagers(final KeyManager[] keyManagers) {
+        this.keyManagers = keyManagers;
+    }
+
+    /**
+     * @return KeyManagers for client cert, or null
+     */
+    public KeyManager[] getKeyManagers() {
+        return this.keyManagers;
     }
 
     public HTTPProxySocketConnection(HTTPProxy proxy) {
@@ -114,8 +137,8 @@ public class HTTPProxySocketConnection extends SocketConnection {
             try {
                 final SSLSocketStreamFactory factory = getSSLSocketStreamFactory();
                 // TODO: add SSLSocketStreamOptions cache
-                final String id = proxy.getHost() + ":" + proxy.getPort() + ":" + isSSLTrustALL();
-                proxySocket = factory.create(proxySocket, "", proxy.getPort(), true, new SSLSocketStreamOptions(id, isSSLTrustALL()));
+                final String id = proxy.getHost() + ":" + proxy.getPort();
+                proxySocket = factory.create(proxySocket, "", proxy.getPort(), true, new SSLSocketStreamOptions(id), getTrustProvider(), getKeyManagers());
             } catch (final IOException e) {
                 // TODO: add SSLSocketStreamOptions.retry support
                 throw new ProxyConnectException(e, proxy);

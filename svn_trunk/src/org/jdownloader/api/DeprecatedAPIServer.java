@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
-import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -45,11 +44,13 @@ import org.appwork.utils.net.httpserver.ConnectionTimeouts;
 import org.appwork.utils.net.httpserver.ContentSecurityPolicy;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HeaderValidationRules;
-import org.appwork.utils.net.httpserver.HttpServerConnection;
-import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.HttpConnectionRunnable;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.HttpServer;
+import org.appwork.utils.net.httpserver.HttpServerConnection;
+import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
+import org.appwork.utils.net.httpserver.OriginRule;
+import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 import org.appwork.utils.net.httpserver.ReferrerPolicy;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
@@ -162,25 +163,25 @@ public class DeprecatedAPIServer extends HttpServer {
     }
 
     public static final class DeprecatedPostRequest extends PostRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedPostRequest(HttpServerConnection connection) {
+        public DeprecatedPostRequest(RawHttpConnectionInterface connection) {
             super(connection);
         }
     }
 
     public static final class DeprecatedOptionsRequest extends OptionsRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedOptionsRequest(HttpServerConnection connection) {
+        public DeprecatedOptionsRequest(RawHttpConnectionInterface connection) {
             super(connection);
         }
     }
 
     public static final class DeprecatedHeadRequest extends HeadRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedHeadRequest(HttpServerConnection connection) {
+        public DeprecatedHeadRequest(RawHttpConnectionInterface connection) {
             super(connection);
         }
     }
 
     public static final class DeprecatedGetRequest extends GetRequest implements DeprecatedAPIRequestInterface {
-        public DeprecatedGetRequest(HttpServerConnection connection) {
+        public DeprecatedGetRequest(RawHttpConnectionInterface connection) {
             super(connection);
         }
     }
@@ -191,23 +192,14 @@ public class DeprecatedAPIServer extends HttpServer {
         setAllowedMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.HEAD, RequestMethod.OPTIONS);
         CorsHandler cors = new CorsHandler() {
             @Override
-            public Set<String> getAllowedOrigins() {
-                HashSet<String> set = new HashSet<String>();
+            public List<OriginRule> getAllowedOrigins() {
+                List<OriginRule> set = new ArrayList<OriginRule>();
                 String allowed = cfg.getLocalAPIServerHeaderAccessControllAllowOrigin();
                 if (StringUtils.isNotEmpty(allowed)) {
-                    set.add(allowed);
+                    set.add(new OriginRule(allowed));
                 }
                 return set;
             }
-            // HTTPHeader originHeader = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ORIGIN);
-            // if (originHeader != null) {
-            // String origin = originHeader.getValue().replaceAll("^https?://", "");
-            // String value = JsonConfig.create(RemoteAPIConfig.class).getLocalAPIServerHeaderAccessControllAllowOrigin();
-            // if (StringUtils.isNotEmpty(origin) && !"*".equals(value)) {
-            // throw new org.appwork.remoteapi.exceptions.AuthException("Bad Origin");
-            // }
-            // // TODO Validate origin
-            // }
         };
         // NEVER!
         cors.addCredentialsRule(Pattern.compile(".*"), false);

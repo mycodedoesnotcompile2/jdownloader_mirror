@@ -8,7 +8,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import org.appwork.storage.Storable;
 
 public class MultiHostHostData implements Storable {
-    private Long                  createdTimestamp;
+    private Long                  updateTimestamp;
     private List<String>          domains;
     private boolean               enabled;
     private Long                  linksLeft;
@@ -31,12 +31,12 @@ public class MultiHostHostData implements Storable {
         this.domains = new ArrayList<String>();
     }
 
-    public Long getCreatedTimestamp() {
-        return createdTimestamp;
+    public Long getUpdateTimestamp() {
+        return updateTimestamp;
     }
 
-    public void setCreatedTimestamp(Long createdTimestamp) {
-        this.createdTimestamp = createdTimestamp;
+    public void setUpdateTimestamp(Long ts) {
+        this.updateTimestamp = ts;
     }
 
     public List<String> getDomains() {
@@ -188,7 +188,7 @@ public class MultiHostHostData implements Storable {
 
     public static MultiHostHostData createFromMultiHostHost(MultiHostHost source) {
         final MultiHostHostData hostData = new MultiHostHostData();
-        hostData.setCreatedTimestamp(source.getCreatedTimestamp());
+        hostData.setUpdateTimestamp(source.getUpdateTimestamp());
         hostData.setEnabled(source.isEnabled());
         hostData.setName(source.getName());
         hostData.setDomains(source.getDomains());
@@ -211,9 +211,9 @@ public class MultiHostHostData implements Storable {
 
     public MultiHostHost toMultiHostHost() {
         final MultiHostHost mhost = new MultiHostHost();
-        final Long createdTimestamp = getCreatedTimestamp();
-        if (createdTimestamp != null) {
-            mhost.setCreatedTimestamp(createdTimestamp);
+        final Long updateTimestamp = getUpdateTimestamp();
+        if (updateTimestamp != null) {
+            mhost.setUpdateTimestamp(updateTimestamp);
         }
         mhost.setEnabled(this.isEnabled());
         mhost.setName(this.getName());

@@ -55,6 +55,8 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import javax.net.ssl.KeyManager;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -80,6 +82,10 @@ import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
 public class HttpClient {
     // maybe add a factory System property someday
@@ -104,6 +110,13 @@ public class HttpClient {
         private volatile boolean        executed        = false;
         private int                     redirectCounter = 0;
         private HashMap<String, String> requestHeaders;
+
+        public TrustResult getTrustResult() {
+            if (connection == null) {
+                return null;
+            }
+            return connection.getTrustResult();
+        }
 
         public int getRedirectCounter() {
             return this.redirectCounter;
@@ -593,6 +606,8 @@ public class HttpClient {
     protected final HashMap<String, String> requestHeader;
     private final List<RequestContext>      requests             = new CopyOnWriteArrayList<RequestContext>();
     private boolean                         verboseLog           = false;
+    private TrustProviderInterface          trustProvider        = null;
+    private KeyManager[]                    keyManagers          = null;
 
     public HttpClient() {
         this.requestHeader = new HashMap<String, String>();
@@ -708,12 +723,26 @@ public class HttpClient {
     protected HTTPConnection createHTTPConnection(final RequestContext context) throws HttpClientException {
         HTTPConnection connection;
         try {
-            connection = HTTPConnectionFactory.createHTTPConnection(context.redirectTo != null ? context.redirectTo : new URL(context.getUrl()), this.getProxy());
+            if (context.redirectTo != null) {
+                LogV3.fine("HttpClient: Redirect " + context.getUrl() + "->" + context.redirectTo);
+            }
+            connection = createHTTPConnection(context.redirectTo != null ? context.redirectTo : new URL(context.getUrl()), this.getProxy());
         } catch (final MalformedURLException e) {
             throw new HttpClientException(null, e);
         }
+        connection.setTrustProvider(getTrustProvider());
+        if (this.keyManagers != null) {
+            connection.setKeyManagers(getKeyManagers());
+            LogV3.fine("HttpClient.createHTTPConnection: setKeyManagers on connection, length=" + getKeyManagers().length);
+        } else {
+            LogV3.fine("HttpClient.createHTTPConnection: keyManagers is null, not setting on connection");
+        }
         context.setConnection(connection);
         return connection;
+    }
+
+    protected HTTPConnection createHTTPConnection(final URL url, final HTTPProxy proxy) {
+        return HTTPConnectionFactory.createHTTPConnection(url, proxy);
     }
 
     /**
@@ -1010,9 +1039,7 @@ public class HttpClient {
         }
         boolean followRedirect = false;
         context.linkInterrupt();
-
         try {
-
             try {
                 final long prepareConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                 this.prepareConnection(context);
@@ -1032,7 +1059,6 @@ public class HttpClient {
                 if (this.isVerboseLog()) {
                     LogV3.fine("HttpClient.execute: context.onConnect() completed in " + onConnectElapsed + "ms");
                 }
-
                 if (context.getPostDataStream() != null) {
                     final long postStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     LogV3.fine("HttpClient.post: Starting POST data sending, postDataLength=" + context.getPostDataLength());
@@ -1046,7 +1072,6 @@ public class HttpClient {
                         LogV3.fine("HttpClient.post: connect() completed in " + connectElapsed + "ms, total time since postStart: " + (connectElapsed) + "ms");
                     }
                     final long wrapOutputStreamStartTime = Time.systemIndependentCurrentJVMTimeMillis();
-
                     final OutputStream outputStream = this.wrapPostOutputStream(connection, directHTTPConnectionOutputStream);
                     final long wrapOutputStreamElapsed = Time.systemIndependentCurrentJVMTimeMillis() - wrapOutputStreamStartTime;
                     if (this.isVerboseLog()) {
@@ -1062,7 +1087,6 @@ public class HttpClient {
                     // if (context.getPostDataLength() > 0) {
                     final long dataSendStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     LogV3.fine("HttpClient.post: Starting to send " + context.getPostDataLength() + " bytes of POST data");
-
                     final byte[] buffer = new byte[32767];
                     int len;
                     long totalSent = 0;
@@ -1079,7 +1103,6 @@ public class HttpClient {
                     input.close();
                     final long dataSendElapsed = Time.systemIndependentCurrentJVMTimeMillis() - dataSendStartTime;
                     LogV3.fine("HttpClient.post: Sent " + totalSent + " bytes of POST data in " + dataSendElapsed + "ms");
-
                     // } else {
                     // LogV3.fine("HttpClient.post: postDataLength <= 0, skipping data send");
                     // }
@@ -1121,9 +1144,7 @@ public class HttpClient {
                     /* contentLength is known */
                     context.onContentLength(connection.getCompleteContentLength());
                 }
-
                 followRedirect = this.followRedirect(context);
-
                 if (!followRedirect) {
                     // do not follow redirects if we had errors during post
                     this.checkResponseCode(context);
@@ -1133,7 +1154,6 @@ public class HttpClient {
                     }
                     this.readInputStream(context, (CountingInputStream) input);
                 }
-
             } catch (final ReadIOException e) {
                 throw this.handleInterrupt(new HttpClientException(context, e));
             } catch (final WriteIOException e) {
@@ -1258,6 +1278,35 @@ public class HttpClient {
         this.verboseLog = verboseLog;
     }
 
+    public TrustProviderInterface getTrustProvider() {
+        TrustProviderInterface tp = trustProvider;
+        if (tp == null) {
+            return TrustUtils.getDefaultProvider();
+        }
+        return tp;
+    }
+
+    public void setTrustProvider(TrustProviderInterface sslTrustProvider) {
+        this.trustProvider = sslTrustProvider;
+    }
+
+    /**
+     * Set key managers for client certificate (mutual TLS) authentication.
+     *
+     * @param keyManagers
+     *            KeyManager array (e.g. from KeyManagerFactory), or null to disable client cert
+     */
+    public void setKeyManagers(final KeyManager[] keyManagers) {
+        this.keyManagers = keyManagers;
+    }
+
+    /**
+     * @return Key managers for client cert, or null
+     */
+    public KeyManager[] getKeyManagers() {
+        return this.keyManagers;
+    }
+
     /*
      * (non-Javadoc)
      *
@@ -1273,5 +1322,27 @@ public class HttpClient {
             os = new ChunkedOutputStream(os);
         }
         return os;
+    }
+
+    /**
+     * @param instance
+     * @return
+     */
+    public HttpClient trust(TrustProviderInterface... provider) {
+        if (provider.length > 1) {
+            setTrustProvider(new CompositeTrustProvider(provider));
+        } else {
+            setTrustProvider(provider[0]);
+        }
+        return this;
+    }
+
+    /**
+     * @param proxy2
+     * @return
+     */
+    public HttpClient proxy(HTTPProxy proxy) {
+        this.setProxy(proxy);
+        return this;
     }
 }

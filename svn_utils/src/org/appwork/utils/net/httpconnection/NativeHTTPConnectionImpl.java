@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -50,6 +50,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -60,10 +61,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLSession;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
@@ -75,12 +78,55 @@ import org.appwork.utils.net.CountingInputStreamInterface;
 import org.appwork.utils.net.EmptyInputStream;
 import org.appwork.utils.net.NullOutputStream;
 import org.appwork.utils.net.StreamValidEOF;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
+import org.appwork.utils.net.httpconnection.trust.bridge.RejectedByTrustProviderException;
 
 /**
  * @author daniel
  *
  */
 public class NativeHTTPConnectionImpl implements HTTPConnection {
+    public IllegalSSLHostnameException illegalSSLHostnameException;
+
+    /**
+     * @author thomas
+     * @date 03.02.2026
+     *
+     */
+    public final class HostnameVerifiedDelegate implements HostnameVerifier {
+        /**
+         *
+         */
+        private final String             urlHost;
+        /**
+         *
+         */
+        private final HttpsURLConnection scon;
+
+        /**
+         * @param urlHost
+         * @param scon
+         */
+        private HostnameVerifiedDelegate(String urlHost, HttpsURLConnection scon) {
+            this.urlHost = urlHost;
+            this.scon = scon;
+        }
+
+        @Override
+        public boolean verify(String host, SSLSession sslSession) {
+            try {
+                getTrustProvider().verifyHostname(sslSession, urlHost, scon);
+                return true;
+            } catch (IllegalSSLHostnameException e) {
+                NativeHTTPConnectionImpl.this.illegalSSLHostnameException = e;
+                connectExceptions.add(getExceptionMessage(e));
+                return false;
+            }
+        }
+    }
+
     protected final static ProxySelector                         DEFAULT_PROXY_SELECTOR      = ProxySelector.getDefault();
     protected final URL                                          httpURL;
     protected final HTTPProxy                                    proxy;
@@ -105,7 +151,8 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     protected boolean                                            contentDecoded              = true;
     private boolean                                              connected                   = false;
     private boolean                                              wasConnected                = false;
-    private boolean                                              sslTrustALL                 = false;
+    private TrustProviderInterface                               trustProvider               = null;
+    private KeyManager[]                                         keyManagers                 = null;
     private boolean                                              legacyConnectFlag           = true;
     protected final CopyOnWriteArrayList<String>                 connectExceptions           = new CopyOnWriteArrayList<String>();
     private final static WeakHashMap<Thread, HTTPProxy>          CURRENT_THREAD_PROXY_AUTH   = new WeakHashMap<Thread, HTTPProxy>();
@@ -298,13 +345,13 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
     }
 
-    protected String getSSLSocketStreamOptionsID(final String host, final int port, final boolean trustAllFlag) {
-        return host + ":" + port + ":" + trustAllFlag;
+    protected String getSSLSocketStreamOptionsID(final String host, final int port) {
+        return host + ":" + port;
     }
 
-    protected SSLSocketStreamOptions getNewSSLSocketStreamOptionsInstance(String host, int port, boolean trustAllFlag) {
-        final String id = getSSLSocketStreamOptionsID(host, port, trustAllFlag);
-        final SSLSocketStreamOptions ret = new SSLSocketStreamOptions(id, trustAllFlag) {
+    protected SSLSocketStreamOptions getNewSSLSocketStreamOptionsInstance(String host, int port) {
+        final String id = getSSLSocketStreamOptionsID(host, port);
+        final SSLSocketStreamOptions ret = new SSLSocketStreamOptions(id) {
             @Override
             protected void initCipherSuitesLists() {
             }
@@ -318,12 +365,12 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
 
     protected void setRequestMethod(HttpURLConnection con, org.appwork.utils.net.httpconnection.RequestMethod requestMethod) throws ProtocolException {
         try {
-            con.setRequestMethod(requestMethod.name());
+            con.setRequestMethod(requestMethod.getHeaderValue());
         } catch (ProtocolException e) {
             try {
                 final Field field = ReflectionUtils.getField(HttpURLConnection.class, "method", con, String.class);
                 field.setAccessible(true);
-                field.set(con, requestMethod.name());
+                field.set(con, requestMethod.getHeaderValue());
             } catch (Throwable e2) {
                 throw Exceptions.addSuppressed(e, e2);
             }
@@ -341,7 +388,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         if (ret != null) {
             return ret;
         } else {
-            return NativeSSLSocketStreamFactory.getInstance();
+            return JavaSSLSocketStreamFactory.getInstance();
         }
     }
 
@@ -354,7 +401,8 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
     }
 
-    protected Proxy nativeProxy = null;
+    protected Proxy       nativeProxy = null;
+    protected TrustResult trustResult;
 
     @Override
     public void connect() throws IOException {
@@ -399,29 +447,24 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
             }
             if (this.con instanceof HttpsURLConnection) {
                 final HttpsURLConnection scon = (HttpsURLConnection) this.con;
-                final boolean trustAll = isSSLTrustALL();
                 final String urlHost = httpURL.getHost();
                 final int hostPort = httpURL.getPort() != -1 ? httpURL.getPort() : httpURL.getDefaultPort();
                 // TODO: add support for SSLSocketStreamOptions cache/retry
-                final SSLSocketStreamOptions options = getNewSSLSocketStreamOptionsInstance(urlHost, hostPort, trustAll);
+                final SSLSocketStreamOptions options = getNewSSLSocketStreamOptionsInstance(urlHost, hostPort);
                 final SSLSocketStreamFactory nativeSSLSocketStreamFactory = getSSLSocketStreamFactory(options);
-                scon.setSSLSocketFactory(nativeSSLSocketStreamFactory.getSSLSocketFactory(options, urlHost));
-                final HostnameVerifier hostNameVerifier = scon.getHostnameVerifier();
-                scon.setHostnameVerifier(new HostnameVerifier() {
+                trustResult = null;
+                scon.setSSLSocketFactory(nativeSSLSocketStreamFactory.getSSLSocketFactory(options, urlHost, getKeyManagers(), new TrustCallback() {
                     @Override
-                    public boolean verify(String host, SSLSession sslSession) {
-                        if (trustAll) {
-                            return true;
-                        } else {
-                            try {
-                                return Boolean.TRUE.equals(HTTPConnectionUtils.verifySSLHostname(hostNameVerifier, sslSession, host));
-                            } catch (IOException e) {
-                                connectExceptions.add(getExceptionMessage(e));
-                                return false;
-                            }
-                        }
+                    public TrustProviderInterface getTrustProvider() {
+                        return NativeHTTPConnectionImpl.this.getTrustProvider();
                     }
-                });
+
+                    @Override
+                    public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                        NativeHTTPConnectionImpl.this.trustResult = result;
+                    }
+                }));
+                scon.setHostnameVerifier(new HostnameVerifiedDelegate(urlHost, scon));
             }
             this.con.setConnectTimeout(this.connectTimeout);
             this.con.setReadTimeout(this.readTimeout);
@@ -449,6 +492,29 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
             try {
                 this.con.connect();
             } catch (IOException e) {
+                if (illegalSSLHostnameException != null) {
+                    // hava swallows the exception and replaces it with a generic IOException... lets fix this
+                    e = illegalSSLHostnameException;
+                }
+                TrustResultProvider trp = Exceptions.getInstanceof(e, TrustResultProvider.class);
+                if (trp != null) {
+                    TrustResult tr = trp.getTrustResult();
+                    if (tr != null) {
+                        DebugMode.breakIf(getTrustResult() != null && getTrustResult() != tr);
+                        trustResult = tr;
+                    }
+                }
+                RejectedByTrustProviderException rejectedByTrust = Exceptions.getInstanceof(e, RejectedByTrustProviderException.class);
+                if (rejectedByTrust != null) {
+                    e = new TrustValidationFailedException(rejectedByTrust);
+                }
+                IllegalSSLHostnameException rejectedByHostname = Exceptions.getInstanceof(e, IllegalSSLHostnameException.class);
+                if (rejectedByHostname != null) {
+                    if (trustResult != null) {
+                        trustResult.exception(rejectedByHostname);
+                    }
+                    e = rejectedByHostname;
+                }
                 if (StringUtils.contains(e.getMessage(), "Unable to tunnel through proxy")) {
                     // e.g. CONNECT method
                     final String proxyReturns = new Regex(e.getMessage(), "Proxy returns\\s*\"(.+)\"").getMatch(0);
@@ -993,13 +1059,32 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     }
 
     @Override
-    public void setSSLTrustALL(boolean trustALL) {
-        this.sslTrustALL = trustALL;
+    public void setTrustProvider(TrustProviderInterface trustProvider) {
+        this.trustProvider = trustProvider;
     }
 
     @Override
-    public boolean isSSLTrustALL() {
-        return this.sslTrustALL;
+    public TrustProviderInterface getTrustProvider() {
+        TrustProviderInterface tp = trustProvider;
+        if (tp == null) {
+            return TrustUtils.getDefaultProvider();
+        }
+        return tp;
+    }
+
+    @Override
+    public void setKeyManagers(final KeyManager[] keyManagers) {
+        this.keyManagers = keyManagers;
+    }
+
+    @Override
+    public KeyManager[] getKeyManagers() {
+        return this.keyManagers;
+    }
+
+    @Override
+    public TrustResult getTrustResult() {
+        return this.trustResult;
     }
 
     @Override
@@ -1026,5 +1111,4 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     public HTTPConnectionProfilerInterface getProfiler() {
         return null;
     }
-
 }

@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -232,8 +233,8 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/getAllRequestHeaders";
 
         final org.appwork.utils.net.httpclient.HttpClient testClient = new org.appwork.utils.net.httpclient.HttpClient();
-        testClient.setConnectTimeout(5000);
-        testClient.setReadTimeout(30000);
+        testClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+        testClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
         testClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");
         testClient.putRequestHeader("X-Custom-Header", "custom-value");
         testClient.putRequestHeader("X-Another-Header", "another-value");
@@ -286,8 +287,8 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/getAllRequestHeaders";
 
         final org.appwork.utils.net.httpclient.HttpClient testClient = new org.appwork.utils.net.httpclient.HttpClient();
-        testClient.setConnectTimeout(5000);
-        testClient.setReadTimeout(30000);
+        testClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+        testClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
         testClient.putRequestHeader("X-APPWORK", "1");
         testClient.putRequestHeader("X-Custom-Header", "test-value");
 

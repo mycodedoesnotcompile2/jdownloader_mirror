@@ -41,7 +41,6 @@ import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.X509ExtendedTrustManager;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.TrustCallback;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
@@ -94,8 +93,7 @@ public class TrustBridge extends X509ExtendedTrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
-        } // not tested yet
-        DebugMode.debugger();
+        }
         TrustResult trust = provider.checkClientTrusted(chain, authType, null);
         trustCallback.onTrustResult(provider, chain, authType, trust);
         if (!trust.isTrusted()) {
@@ -131,8 +129,7 @@ public class TrustBridge extends X509ExtendedTrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
-        } // not tested yet
-        DebugMode.debugger();
+        }
         TrustResult trust = provider.checkClientTrusted(chain, authType, engine);
         trustCallback.onTrustResult(provider, chain, authType, trust);
         if (!trust.isTrusted()) {
@@ -144,8 +141,7 @@ public class TrustBridge extends X509ExtendedTrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
-        } // not tested yet
-        DebugMode.debugger();
+        }
         TrustResult trust = provider.checkClientTrusted(chain, authType, socket);
         trustCallback.onTrustResult(provider, chain, authType, trust);
         if (!trust.isTrusted()) {

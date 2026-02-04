@@ -69,6 +69,7 @@ import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
@@ -91,7 +92,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52242 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1130,9 +1131,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * https://xfswebsite.tld/embed-[a-z0-9]{12}
      */
     public AvailableStatus requestFileInformationWebsiteXFSOld(final DownloadLink link, final Account account) throws Exception {
-        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(getPluginEnvironment());
-        final String contentURL = this.getContentURL(link);
-        if (probeDirectDownload(link, account, br, br.createGetRequest(this.getContentURL(link)), true)) {
+        final GetRequest req = br.createGetRequest(this.getContentURL(link));
+        final String referer = this.getReferer(link);
+        if (referer != null) {
+            req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
+        }
+        if (probeDirectDownload(link, account, br, req, true)) {
             return AvailableStatus.TRUE;
         }
         if (this.supportsShortURLs()) {
@@ -1165,9 +1169,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             url = this.getMainPage(br) + this.buildURLPath(link, fuid, URL_TYPE.NORMAL);
         }
-        if (!StringUtils.equals(url, contentURL)) {
+        if (!StringUtils.equals(url, this.getContentURL(link))) {
             /* Check for direct-download if we haven't already done this before. */
-            if (probeDirectDownload(link, account, br, br.createGetRequest(url), true)) {
+            final GetRequest req2 = br.createGetRequest(url);
+            if (referer != null) {
+                req2.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
+            }
+            if (probeDirectDownload(link, account, br, req2, true)) {
                 return AvailableStatus.TRUE;
             }
         }
@@ -1240,7 +1248,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1])) {
             link.setDownloadSize(SizeFormatter.getSize(fileInfo[1]));
-        } else if (!link.isSizeSet() && this.internal_isVideohosterEmbed(this.br) && supports_availablecheck_filesize_via_embedded_video() && !isDownload && urltype != URL_TYPE.EMBED_VIDEO) {
+        } else if (!link.isSizeSet() && this.internal_isVideohosterEmbed(this.br) && supports_availablecheck_filesize_via_embedded_video() && !PluginEnvironment.DOWNLOAD.equals(getPluginEnvironment()) && urltype != URL_TYPE.EMBED_VIDEO) {
             /*
              * Special case for some videohosts to determine the filesize: Last chance to find filesize - do NOT execute this when used has
              * started the download of our current DownloadLink as this could lead to "Too many connections" errors!
@@ -1275,6 +1283,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 url = this.getContentURL(link);
             } else {
                 url = this.getMainPage(br) + this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO);
+            }
+            final String referer = this.getReferer(link);
+            if (referer != null) {
+                br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
             }
             getPage(br, url);
         }
@@ -1370,7 +1382,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             url = this.getMainPage(br) + this.buildURLPath(link, fuid, URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD);
         }
-        if (probeDirectDownload(link, account, br, br.createGetRequest(url), true)) {
+        final GetRequest req = br.createGetRequest(url);
+        final String referer = this.getReferer(link);
+        if (referer != null) {
+            req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
+        }
+        if (probeDirectDownload(link, account, br, req, true)) {
             return AvailableStatus.TRUE;
         } else if (isOffline(link, this.br)) {
             if (!CompareUtils.equals(isRefererRequired, isRefererRequired(link))) {
@@ -1620,7 +1637,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* Short URLs -> We need to find the long FUID! */
             /* Check if the URL we want has already been accessed with given browser instance */
             if (br.getURL() == null || !br.getURL().equals(contentURL)) {
-                if (probeDirectDownload(link, account, br, br.createGetRequest(contentURL), true)) {
+                final GetRequest req = br.createGetRequest(contentURL);
+                final String referer = this.getReferer(link);
+                if (referer != null) {
+                    req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
+                }
+                if (probeDirectDownload(link, account, br, req, true)) {
                     return;
                 }
             }
@@ -3202,7 +3224,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final Class<? extends XFSConfig> cfg = this.getConfigInterface();
         if (cfg != null) {
             final String custom_referer_from_settings = PluginJsonConfig.get(cfg).getCustomReferer();
-            if (!StringUtils.isEmpty(custom_referer_from_settings) && !this.canHandle(custom_referer_from_settings) && verifyURLFormat(custom_referer_from_settings)) {
+            if (!StringUtils.isEmpty(custom_referer_from_settings) && verifyURLFormat(custom_referer_from_settings)) {
                 logger.info("Using custom config as referer: " + custom_referer_from_settings);
                 return custom_referer_from_settings;
             }

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpserver.HttpServerConnection.ConnectionHook;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 
@@ -61,5 +62,18 @@ public interface RawHttpConnectionInterface {
     public void setHook(ConnectionHook hook);
 
     public ConnectionHook getHook();
+
+    /**
+     * Returns the client certificate trust result (chain, provider, exception). Use {@link TrustResult#getChain()} for the certificate
+     * chain.
+     *
+     * @return The client cert trust result, or null if none
+     */
+    TrustResult getTrustResult();
+
+    /**
+     * @return true if this connection is over SSL/TLS
+     */
+    boolean isSSL();
 
 }

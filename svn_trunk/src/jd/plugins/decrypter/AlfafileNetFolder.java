@@ -35,7 +35,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.AlfafileNet;
 
-@DecrypterPlugin(revision = "$Revision: 48304 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52240 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AlfafileNet.class })
 public class AlfafileNetFolder extends PluginForDecrypt {
     public AlfafileNetFolder(PluginWrapper wrapper) {
@@ -69,26 +69,26 @@ public class AlfafileNetFolder extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String url = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         br.setFollowRedirects(true);
-        br.getPage(url);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
-        String fpName = br.getRegex("class=\"ico_folder\"></span>([^<]+)<em").getMatch(0);
-        final String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
-        for (final String singleLink : links) {
-            if (plg.canHandle(singleLink)) {
-                ret.add(createDownloadlink(singleLink));
+        String title = br.getRegex("class=\"ico_folder\"[^>]*>\\s*</span>([^<]+)<em").getMatch(0);
+        final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+        for (final String url : urls) {
+            if (plg.canHandle(url)) {
+                ret.add(createDownloadlink(url));
             }
         }
         if (ret.isEmpty()) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
-        if (fpName != null) {
+        if (title != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName).trim());
+            fp.setName(Encoding.htmlDecode(title).trim());
             fp.addLinks(ret);
         }
         return ret;

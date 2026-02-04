@@ -17,6 +17,11 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -39,14 +44,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52241 $", interfaceVersion = 3, names = {}, urls = {})
 public class MvpdjCom extends PluginForHost {
     public MvpdjCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/user/register");
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/about";
     }
 
     @Override
@@ -57,14 +64,31 @@ public class MvpdjCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mvpdj.com", "mvpdj.cn" });
+        ret.add(new String[] { "dj1234.com", "mvpdj.com", "mvpdj.cn" });
         return ret;
     }
 
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("mvpdj.cn");
+        deadDomains.add("mvpdj.com"); // 2026-02-03
         return deadDomains;
+    }
+
+    private String getContenturl(final DownloadLink link) {
+        // String url = link.getPluginPatternMatcher();
+        // for (final String deaddomain : this.getDeadDomains()) {
+        // url = url.replace(deaddomain, this.getHost());
+        // }
+        // return url;
+        /* Old url-formats are not supported anymore but old file-ids may still be online. */
+        return "https://www." + getHost() + "/music/info-" + this.getFID(link);
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-02-03: Main domain has changed from mvpdj.com to dj1234.com */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -76,10 +100,13 @@ public class MvpdjCom extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_SONG_OLD = Pattern.compile("/song/player/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SONG_NEW = Pattern.compile("/music/info-(\\d+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/song/player/(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SONG_OLD.pattern() + "|" + PATTERN_SONG_NEW.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -95,7 +122,12 @@ public class MvpdjCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_SONG_NEW).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_SONG_OLD).getMatch(0);
+        return fid;
     }
 
     @Override
@@ -108,11 +140,6 @@ public class MvpdjCom extends PluginForHost {
     private String dllink = null;
 
     @Override
-    public String getAGBLink() {
-        return "https://mvpdj.com/about";
-    }
-
-    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         dllink = null;
         final String extDefault = ".mp3";
@@ -120,9 +147,6 @@ public class MvpdjCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(fid + extDefault);
         }
-        /* 2017-08-03: Website randomly returns 500 with regular html content --> Allow response 500 */
-        br.setAllowedResponseCodes(new int[] { 500 });
-        this.setBrowserExclusive();
         boolean loggedIN = false;
         final Account aa = AccountController.getInstance().getValidAccount(this);
         if (aa != null) {
@@ -130,11 +154,12 @@ public class MvpdjCom extends PluginForHost {
             loggedIN = true;
         }
         String title = null;
+        String filesizeStr = null;
         if (loggedIN) {
             /* Download via download button --> Higher quality */
             br.postPage("https://www." + getHost() + "/song/download", "id=" + fid);
-            title = this.br.getRegex("class=\"dt_tc_big\"[^<>]*?>([^<>]+)<").getMatch(0);
-            if (this.br.containsHTML(">账户余额不足，请先充值")) {
+            title = br.getRegex("/info-" + fid + "\">([^<]+)</a>").getMatch(0);
+            if (br.containsHTML(">\\s*账户余额不足，请先充值")) {
                 /*
                  * Hmm something like "No traffic left" --> But let's not temp-disable the account - let's simply download the stream then!
                  */
@@ -142,7 +167,7 @@ public class MvpdjCom extends PluginForHost {
             } else {
                 /* Number at the end seems to be a server/mirror number. Possibilities: 1,2 */
                 logger.info("Track should be downloadable fine via account");
-                dllink = "https://www.mvpdj.com/song/purchase/" + fid + "/2";
+                dllink = "https://www." + getHost() + "/song/purchase/" + fid + "/2";
             }
             if (title != null) {
                 title = Encoding.htmlDecode(title).trim();
@@ -154,38 +179,41 @@ public class MvpdjCom extends PluginForHost {
             } else {
                 logger.info("Trying stream download");
             }
-            br.getPage(link.getPluginPatternMatcher());
+            br.getPage(getContenturl(link));
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (!br.containsHTML("data-id=\"" + fid)) {
                 /* E.g. https://www.mvpdj.com/song/player/111222333 */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            title = br.getRegex("<h1 class=\"audio-title[^>]*>([^<]+)</h1>").getMatch(0);
             if (title == null) {
-                title = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
+                title = br.getRegex("/info-" + fid + "\">([^<]+)</a>").getMatch(0);
+            }
+            if (filesizeStr == null) {
+                filesizeStr = br.getRegex("class=\"iconfont icon-file [^\"]+\"></i>([^<]+)</span>").getMatch(0);
             }
             dllink = PluginJSonUtils.getJsonValue(br, "url");
             if (StringUtils.isEmpty(dllink)) {
                 /* 2023-01-23 */
                 dllink = br.getRegex("<audio[^<]*src=\"([^\"]+)").getMatch(0);
             }
-            if (title != null) {
-                title = Encoding.htmlDecode(title).trim();
-                final String ext = Plugin.getFileNameExtensionFromURL(dllink, extDefault);
-                link.setFinalFileName(this.applyFilenameExtension(title, ext));
-            }
+        }
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            final String ext = Plugin.getFileNameExtensionFromURL(dllink, extDefault);
+            link.setFinalFileName(this.applyFilenameExtension(title, ext));
+        }
+        if (filesizeStr != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
         }
         if (dllink != null) {
             dllink = br.getURL(dllink).toExternalForm();
             if (this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD && !link.isSizeSet()) {
-                /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
-                final Browser br2 = createNewBrowserInstance();
-                // In case the link redirects to the finallink
+                /* Find file size */
                 URLConnectionAdapter con = null;
                 try {
-                    con = br2.openHeadConnection(dllink);
-                    handleConnectionErrors(br2, con);
+                    con = br.openHeadConnection(dllink);
+                    handleConnectionErrors(br, con);
                     /* Especially for official account-downloads, server-filenames might be crippled! */
                     final String filename_connection = getFileNameFromConnection(con);
                     if (filename_connection != null) {
@@ -219,10 +247,8 @@ public class MvpdjCom extends PluginForHost {
         if (StringUtils.isEmpty(this.dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
-        final Browser dlbrowser = createNewBrowserInstance();
-        dl = jd.plugins.BrowserAdapter.openDownload(dlbrowser, link, dllink, true, 0);
-        handleConnectionErrors(dlbrowser, dl.getConnection());
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
+        handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
@@ -247,11 +273,11 @@ public class MvpdjCom extends PluginForHost {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
-                this.br.setCookies(this.getHost(), cookies);
+                br.setCookies(this.getHost(), cookies);
                 br.getPage("https://www." + this.getHost() + "/user/useraccount");
-                if (!this.br.toString().equals("0")) {
+                if (!br.toString().equals("0")) {
                     logger.info("Cookie login successful");
-                    account.saveCookies(this.br.getCookies(br.getHost()), "");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
                 } else {
                     logger.info("Cookie login failed");
@@ -270,7 +296,7 @@ public class MvpdjCom extends PluginForHost {
             /* 2024-04-08: Captcha not needed anymore */
             // final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "https://" + this.getHost(), true);
             // final String code = this.getCaptchaCode("https://www.mvpdj.com/captcha/number2.php", dummyLink);
-            // this.br.postPage("/user/useraccount", "");
+            // br.postPage("/user/useraccount", "");
             br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             br.getHeaders().put("Referer", "https://www." + this.getHost() + "/");

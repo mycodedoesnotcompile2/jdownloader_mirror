@@ -35,13 +35,16 @@ package org.appwork.utils.net.httpserver.tests;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.serializer.Deser;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.ReadableBytes;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
 import org.appwork.utils.net.httpconnection.RequestMethod;
@@ -62,7 +65,6 @@ import org.appwork.utils.net.httpserver.RequestSizeLimitExceededException;
  * @author AppWork
  */
 public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -88,25 +90,20 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
         // Setup server with POST body limit (5MB) and larger processed limit (10MB)
         // This makes sense: Raw POST data is smaller, processed (decompressed) data could be larger
         this.teardownServer();
-        this.setupServerWithLimits(-1, 5 * 1024 * 1024, 10 * 1024 * 1024); // No header limit, 5MB POST limit, 10MB processed limit
-
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(5), ReadableBytes.Unit.MB.toKibiBytes(10)); // No header limit, 5MB
+                                                                                                                     // POST limit, 10MB
+                                                                                                                     // processed limit
         try {
             // Allow POST method for this test
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
-
             try {
                 // Reset server-side tracking
                 this.lastServerException = null;
                 this.lastRequest = null;
                 this.lastResponse = null;
-
                 // Create POST data that is within both limits (3MB < 5MB POST limit, and < 10MB processed limit)
-                final StringBuilder postData = new StringBuilder();
-                for (int i = 0; i < 3 * 1024 * 1024; i++) {
-                    postData.append("X");
-                }
-                final String jsonData = "{\"params\":[\"" + postData.toString() + "\"]}";
-
+                final String postData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(3));
+                final String jsonData = "{\"params\":[" + Deser.toString(postData) + "]}";
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 try {
@@ -139,25 +136,20 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
         // Setup server with POST body limit (5MB) and smaller processed limit (2MB)
         // This is realistic: Accept up to 5MB compressed data, but limit decompressed data to 2MB
         this.teardownServer();
-        this.setupServerWithLimits(-1, 5 * 1024 * 1024, 2 * 1024 * 1024); // No header limit, 5MB POST limit, 2MB processed limit
-
+        this.setupServerWithLimits(-1, ReadableBytes.Unit.MB.toKibiBytes(5), ReadableBytes.Unit.MB.toKibiBytes(2)); // No header limit, 5MB
+                                                                                                                    // POST limit, 2MB
+                                                                                                                    // processed limit
         try {
             // Allow POST method for this test
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
-
             try {
                 // Reset server-side tracking
                 this.lastServerException = null;
                 this.lastRequest = null;
                 this.lastResponse = null;
-
                 // Create uncompressed data that exceeds processed limit (3MB > 2MB processed limit)
-                final StringBuilder uncompressedData = new StringBuilder();
-                for (int i = 0; i < 3 * 1024 * 1024; i++) {
-                    uncompressedData.append("Y");
-                }
-                final String jsonData = "{\"params\":[\"" + uncompressedData.toString() + "\"]}";
-
+                final String uncompressedData = generateRandomString((int) ReadableBytes.Unit.MB.toKibiBytes(3));
+                final String jsonData = "{\"params\":[" + Deser.toString(uncompressedData) + "]}";
                 // Compress the data with GZIP
                 final ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 GZIPOutputStream gzipOut = null;
@@ -173,17 +165,15 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
                     }
                 }
                 final byte[] compressedData = baos.toByteArray();
-
                 // Verify compressed data is within POST limit but uncompressed exceeds processed limit
-                assertTrue(compressedData.length < 5 * 1024 * 1024, "Compressed data should be within POST limit (5MB)");
-                assertTrue(jsonData.getBytes("UTF-8").length > 2 * 1024 * 1024, "Uncompressed data should exceed processed limit (2MB)");
+                assertTrue(compressedData.length < ReadableBytes.Unit.MB.toKibiBytes(5), "Compressed data should be within POST limit (5MB)");
+                assertTrue(jsonData.getBytes("UTF-8").length > ReadableBytes.Unit.MB.toKibiBytes(2), "Uncompressed data should exceed processed limit (2MB)");
                 LogV3.info("Test data: Compressed=" + compressedData.length + " bytes, Uncompressed=" + jsonData.getBytes("UTF-8").length + " bytes");
-
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_ENCODING, "gzip");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 try {
                     final RequestContext context = this.httpClient.post(url, compressedData);
                     final int responseCode = context.getCode();
@@ -202,8 +192,8 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
                     throw new Exception("POST Processed Size Limit test failed: Expected error response but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
@@ -223,29 +213,24 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
         // Setup server with small POST limit (1MB) but allow slightly larger processed data (2MB)
         // This tests the case where tiny compressed data expands to large size
         this.teardownServer();
-        final int postLimit = 1 * 1024 * 1024; // 1MB POST limit
-        final int processLimit = 2 * 1024 * 1024; // 2MB processed limit
+        final int postLimit = (int) ReadableBytes.Unit.MB.toKibiBytes(1); // 1MB POST limit
+        final int processLimit = (int) ReadableBytes.Unit.MB.toKibiBytes(2); // 2MB processed limit
         this.setupServerWithLimits(-1, postLimit, processLimit); // No header limit, 1MB POST limit, 2MB processed limit
-
         try {
             // Allow POST method for this test
             final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
-
             try {
-                // Create uncompressed data that will exceed processed limit (3MB > 2MB processed limit)
-                // Use highly repetitive data for maximum compression ratio
-                final StringBuilder uncompressedData = new StringBuilder();
-                for (int i = 0; i < 3 * 1024 * 1024; i++) {
-                    uncompressedData.append("Y"); // Repetitive character compresses very well
-                }
-                final String jsonData = "{\"params\":[\"" + uncompressedData.toString() + "\"]}";
-
+                final byte[] uncompressedData = generateRandomBytes((int) ReadableBytes.Unit.KB.toKibiBytes(1));
                 // Compress the data with GZIP
                 final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                int rawcount = 0;
                 GZIPOutputStream gzipOut = null;
                 try {
                     gzipOut = new GZIPOutputStream(baos);
-                    gzipOut.write(jsonData.getBytes("UTF-8"));
+                    while (rawcount < processLimit) {
+                        rawcount += uncompressedData.length;
+                        gzipOut.write(uncompressedData);
+                    }
                 } finally {
                     if (gzipOut != null) {
                         try {
@@ -255,17 +240,13 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
                     }
                 }
                 final byte[] compressedData = baos.toByteArray();
-
                 // Verify compressed data is within POST limit (should be much smaller than 1MB due to high compression)
                 assertTrue(compressedData.length < postLimit, "Compressed data should be within POST limit (1MB)");
-                assertTrue(jsonData.getBytes("UTF-8").length > processLimit, "Uncompressed data should exceed processed limit (2MB)");
-                LogV3.info("Test data (high compression): Compressed=" + compressedData.length + " bytes, Uncompressed=" + jsonData.getBytes("UTF-8").length + " bytes, Ratio=" + (jsonData.getBytes("UTF-8").length / compressedData.length) + "x");
-
                 final String url = "http://localhost:" + this.serverPort + "/test/postData";
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_CONTENT_ENCODING, "gzip");
-                this.httpClient.setConnectTimeout(50000);
-                this.httpClient.setReadTimeout(100000);
+                this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(50));
+                this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(100));
                 try {
                     // Send compressed data
                     final RequestContext context = this.httpClient.post(url, compressedData);
@@ -280,8 +261,8 @@ public class HttpServerPostProcessedSizeLimitsTest extends HttpServerTestBase {
                     throw new Exception("POST Processed Size Limit (GZIP) test failed: Expected error response but got HttpClientException: " + e.getMessage(), e);
                 } finally {
                     this.httpClient.clearRequestHeader();
-                    this.httpClient.setConnectTimeout(5000);
-                    this.httpClient.setReadTimeout(30000);
+                    this.httpClient.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
+                    this.httpClient.setReadTimeout((int) TimeUnit.SECONDS.toMillis(30));
                 }
             } finally {
                 this.restoreHttpMethods(previousMethods);
