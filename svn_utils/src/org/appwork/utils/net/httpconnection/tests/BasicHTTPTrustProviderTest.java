@@ -33,6 +33,7 @@
 package org.appwork.utils.net.httpconnection.tests;
 
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.EnumSet;
 
 import org.appwork.loggingv3.LogV3;
@@ -41,6 +42,7 @@ import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.tests.DummyTestAPIImpl;
 import org.appwork.utils.net.BasicHTTP.BasicHTTP;
 import org.appwork.utils.net.BasicHTTP.BasicHTTPException;
+import org.appwork.utils.net.BasicHTTP.InvalidResponseCode;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.TrustResult;
@@ -62,6 +64,9 @@ public class BasicHTTPTrustProviderTest extends SSLTrustProviderTestBase {
         createTestCertificates();
         testTrustProviderGetterSetter();
         testBasicHTTPConnectionReceivesTrustProvider();
+        testBasicHTTPRealHttpRequest();
+        testBasicHTTPHTTPSFailsWithWrongTrustProvider();
+        testBasicHTTPInvalidResponseCode();
         cleanupTempFiles();
         LogV3.info("BasicHTTP TrustProvider tests completed successfully");
     }
@@ -118,6 +123,105 @@ public class BasicHTTPTrustProviderTest extends SSLTrustProviderTestBase {
                 assertTrue(trustResult.isTrusted(), "CustomTrustProvider(CA) should trust the server certificate");
             } catch (final BasicHTTPException e) {
                 throw new Exception("BasicHTTP getPage failed: " + e.getMessage(), e);
+            }
+        } finally {
+            server.stop();
+        }
+    }
+
+    /**
+     * Real HTTP request via BasicHTTP.getPage against a plain HTTP server (no SSL).
+     */
+    private void testBasicHTTPRealHttpRequest() throws Exception {
+        LogV3.info("Test: BasicHTTP real HTTP request (plain HTTP)");
+        final TestHTTPServer server = new TestHTTPServer(0, null);
+        server.setLocalhostOnly(true);
+        server.setAllowedMethods(EnumSet.of(RequestMethod.GET));
+        final RemoteAPI remoteAPI = new RemoteAPI();
+        remoteAPI.register(new DummyTestAPIImpl());
+        server.registerRequestHandler(remoteAPI);
+        server.start();
+        final int serverPort = server.getActualPort();
+        try {
+            final BasicHTTP basicHTTP = new BasicHTTP();
+            basicHTTP.setAllowedResponseCodes(200);
+            basicHTTP.getRequestHeader().put(HTTPConstants.X_APPWORK, "1");
+            basicHTTP.setConnectTimeout(10000);
+            basicHTTP.setReadTimeout(10000);
+            final String urlString = "http://localhost:" + serverPort + "/test/echo?message=" + URLEncoder.encode("BasicHTTPRealHttp", "UTF-8");
+            final String page = basicHTTP.getPage(new URL(urlString));
+            assertNotNull(page, "getPage over HTTP should return response body");
+            assertTrue(page.contains("BasicHTTPRealHttp") || page.contains("echo"), "Response should contain echo payload");
+        } finally {
+            server.stop();
+        }
+    }
+
+    /**
+     * Negative test: HTTPS with TrustProvider that does not trust the server certificate must fail.
+     */
+    private void testBasicHTTPHTTPSFailsWithWrongTrustProvider() throws Exception {
+        if (sslContext == null) {
+            logInfoAnyway("Skipping BasicHTTP HTTPS negative test - SSL context not available");
+            return;
+        }
+        LogV3.info("Test: BasicHTTP HTTPS fails with wrong TrustProvider");
+        final TestHTTPServer server = new TestHTTPServer(0, sslContext);
+        server.setAutoUpgrade(false);
+        server.setLocalhostOnly(true);
+        server.setAllowedMethods(EnumSet.of(RequestMethod.GET));
+        final RemoteAPI remoteAPI = new RemoteAPI();
+        remoteAPI.register(new DummyTestAPIImpl());
+        server.registerRequestHandler(remoteAPI);
+        server.start();
+        final int serverPort = server.getActualPort();
+        try {
+            final BasicHTTP basicHTTP = new BasicHTTP();
+            basicHTTP.setTrustProvider(TrustCurrentJREProvider.getInstance());
+            basicHTTP.setAllowedResponseCodes(200);
+            basicHTTP.getRequestHeader().put(HTTPConstants.X_APPWORK, "1");
+            basicHTTP.setConnectTimeout(5000);
+            basicHTTP.setReadTimeout(5000);
+            final String urlString = "https://localhost:" + serverPort + "/test/echo?message=shouldFail";
+            try {
+                basicHTTP.getPage(new URL(urlString));
+                assertTrue(false, "getPage over HTTPS with wrong TrustProvider should throw");
+            } catch (final BasicHTTPException e) {
+                assertNotNull(e.getCause(), "BasicHTTPException should have a cause (SSL/cert failure)");
+                LogV3.info("Expected failure with wrong TrustProvider: " + e.getCause().getMessage());
+            }
+        } finally {
+            server.stop();
+        }
+    }
+
+    /**
+     * Negative test: BasicHTTP must throw when response code is not in allowed list (e.g. 404).
+     */
+    private void testBasicHTTPInvalidResponseCode() throws Exception {
+        LogV3.info("Test: BasicHTTP InvalidResponseCode when response not allowed");
+        final TestHTTPServer server = new TestHTTPServer(0, null);
+        server.setLocalhostOnly(true);
+        server.setAllowedMethods(EnumSet.of(RequestMethod.GET));
+        final RemoteAPI remoteAPI = new RemoteAPI();
+        remoteAPI.register(new DummyTestAPIImpl());
+        server.registerRequestHandler(remoteAPI);
+        server.start();
+        final int serverPort = server.getActualPort();
+        try {
+            final BasicHTTP basicHTTP = new BasicHTTP();
+            basicHTTP.setAllowedResponseCodes(200);
+            basicHTTP.getRequestHeader().put(HTTPConstants.X_APPWORK, "1");
+            basicHTTP.setConnectTimeout(5000);
+            basicHTTP.setReadTimeout(5000);
+            final String urlString = "http://localhost:" + serverPort + "/test/nonexistent";
+            try {
+                basicHTTP.getPage(new URL(urlString));
+                assertTrue(false, "getPage with disallowed response code should throw");
+            } catch (final BasicHTTPException e) {
+                final Throwable cause = e.getCause();
+                assertTrue(cause instanceof InvalidResponseCode, "Cause should be InvalidResponseCode, got: " + (cause != null ? cause.getClass().getSimpleName() : "null"));
+                LogV3.info("Expected InvalidResponseCode: " + cause.getMessage());
             }
         } finally {
             server.stop();

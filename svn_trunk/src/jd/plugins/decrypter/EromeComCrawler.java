@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52253 $", interfaceVersion = 3, names = {}, urls = {})
 public class EromeComCrawler extends PluginForDecrypt {
     public EromeComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,21 +120,27 @@ public class EromeComCrawler extends PluginForDecrypt {
             // final String preloadImage = br.getRegex("<link rel=\"preload\" href=\"(https?://[^\"]+)\" as=\"image\"").getMatch(0);
             final String uploadername = br.getRegex("id=\"user_name\"[^>]*>([^<]+)<").getMatch(0);
             final String bottomAlbumDescription = br.getRegex("<p id=\"legend\"[^>]*>(.*?)</p>").getMatch(0);
-            final String[] mediagrouphtmls = br.getRegex("<div class=\"media-group\" id=\"\\d+\"[^>]*>(.*?)</div>\\s*</div>(.*?)").getColumn(0);
-            if (mediagrouphtmls == null || mediagrouphtmls.length == 0) {
+            String[] htmls = br.getRegex("<div class=\"media-group\" id=\"\\d+\"[^>]*>(.*?)</div>\\s*</div>").getColumn(0);
+            if (htmls == null || htmls.length == 0) {
+                /* 2026-02-04 */
+                htmls = br.getRegex("<div class=\"media-group\"[^>]*>(.*?)</div>\\s*</div>").getColumn(0);
+            }
+            if (htmls == null || htmls.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final EromeComConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
-            for (final String mediagrouphtml : mediagrouphtmls) {
-                final String directurlImage = new Regex(mediagrouphtml, "class=\"img\" data-src=\"(https?://[^\"]+)\"").getMatch(0);
-                final String directurlVideo = new Regex(mediagrouphtml, "<source src=\"(https?://[^\"]+)\" type='video/mp4'").getMatch(0);
+            for (final String html : htmls) {
+                final String directurlImage = new Regex(html, "class=\"img\" data-src=\"(https?://[^\"]+)\"").getMatch(0);
+                final String directurlVideo = new Regex(html, "<source src=\"(https?://[^\"]+)\" type='video/mp4'").getMatch(0);
                 if (directurlImage == null && directurlVideo == null) {
+                    logger.info("Skipping invalid item: " + html);
                     continue;
-                } else if (directurlImage != null) {
+                }
+                if (directurlImage != null) {
                     ret.add(this.createDownloadlink(directurlImage));
                 } else {
                     ret.add(this.createDownloadlink(directurlVideo));
-                    final String videoThumbnail = new Regex(mediagrouphtml, "poster=\"(https?://[^\"]+)\"").getMatch(0);
+                    final String videoThumbnail = new Regex(html, "poster=\"(https?://[^\"]+)\"").getMatch(0);
                     /* Add video thumbnail if user wants that. */
                     if (videoThumbnail != null && cfg.isAddThumbnail()) {
                         ret.add(this.createDownloadlink(videoThumbnail));

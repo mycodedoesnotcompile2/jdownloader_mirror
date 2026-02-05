@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -120,17 +121,27 @@ public class HTTPConnectionUtils {
 
     public static Boolean verifySSLHostname(HostnameVerifier hostNameVerifier, final SSLSession sslSession, final String host) throws IOException {
         try {
+            if (host == null) {
+                return null;
+            }
             if (hostNameVerifier == null) {
                 hostNameVerifier = HttpsURLConnection.getDefaultHostnameVerifier();
             }
-            final Boolean hostNameVerifierResult = hostNameVerifier != null ? hostNameVerifier.verify(host, sslSession) : null;
+            Boolean hostNameVerifierResult = hostNameVerifier != null ? hostNameVerifier.verify(host, sslSession) : null;
             if (sslSession != null && sslSession.getPeerCertificates().length > 0) {
                 final Certificate certificate = sslSession.getPeerCertificates()[0];
                 if (certificate instanceof X509Certificate) {
-                    final String hostname = host.toLowerCase(Locale.ENGLISH);
-                    final HashSet<String> subjects = new HashSet<String>();
+                    final Set<String> hostVariants = new HashSet<String>();
+                    hostVariants.add(host.toLowerCase(Locale.ROOT));
+                    if (host.startsWith("[")) {
+                        try {
+                            hostVariants.add(InetAddress.getByName(host).getHostAddress());
+                        } catch (UnknownHostException e) {
+                        }
+                    }
+                    final HashSet<String> subjectAndAlternativeNames = new HashSet<String>();
                     final X509Certificate x509 = (X509Certificate) certificate;
-                    subjects.add(new Regex(x509.getSubjectX500Principal().getName(), "CN\\s*=\\s*(.*?)(,| |$)").getMatch(0));
+                    subjectAndAlternativeNames.add(new Regex(x509.getSubjectX500Principal().getName(), "CN\\s*=\\s*(.*?)(,| |$)").getMatch(0));
                     try {
                         final Collection<List<?>> subjectAlternativeNames = x509.getSubjectAlternativeNames();
                         if (subjectAlternativeNames != null) {
@@ -139,10 +150,21 @@ public class HTTPConnectionUtils {
                                 switch (generalNameType) {
                                 case 1:// rfc822Name
                                 case 2:// dNSName
-                                    subjects.add(subjectAlternativeName.get(1).toString());
+                                {
+                                    subjectAndAlternativeNames.add(subjectAlternativeName.get(1).toString().toLowerCase(Locale.ROOT));
                                     break;
+                                }
                                 case 7: // iPAddress
-                                    subjects.add(subjectAlternativeName.get(1).toString());
+                                {
+                                    final String ip = subjectAlternativeName.get(1).toString();
+                                    subjectAndAlternativeNames.add(ip);
+                                    try {
+                                        subjectAndAlternativeNames.add(InetAddress.getByName(ip).getHostAddress());
+                                    } catch (UnknownHostException e) {
+                                    }
+                                    break;
+                                }
+                                default:
                                     break;
                                 }
                             }
@@ -150,19 +172,27 @@ public class HTTPConnectionUtils {
                     } catch (CertificateParsingException e) {
                         e.printStackTrace();
                     }
-                    subjects.remove(null);
+                    subjectAndAlternativeNames.remove(null);
                     boolean result = false;
-                    for (String subject : subjects) {
-                        subject = subject.toLowerCase(Locale.ENGLISH);
-                        if (StringUtils.equals(subject, hostname)) {
+                    for (final String hostVariant : hostVariants) {
+                        if (subjectAndAlternativeNames.contains(hostVariant)) {
                             result = true;
                             break;
-                        } else if (subject.startsWith("*.") && hostname.length() > subject.length() - 1 && hostname.endsWith(subject.substring(1)) && hostname.substring(0, hostname.length() - subject.length() + 1).indexOf('.') < 0) {
-                            /**
-                             * http://en.wikipedia.org/wiki/ Wildcard_certificate
-                             */
-                            result = true;
-                            break;
+                        }
+                    }
+                    if (result == false) {
+                        for (final String hostVariant : hostVariants) {
+                            for (final String subjectAndAlternativeName : subjectAndAlternativeNames) {
+                                if (!subjectAndAlternativeName.startsWith("*.")) {
+                                    continue;
+                                } else if (hostVariant.length() > subjectAndAlternativeName.length() - 1 && hostVariant.endsWith(subjectAndAlternativeName.substring(1)) && hostVariant.substring(0, hostVariant.length() - subjectAndAlternativeName.length() + 1).indexOf('.') < 0) {
+                                    /**
+                                     * http://en.wikipedia.org/wiki/ Wildcard_certificate
+                                     */
+                                    result = true;
+                                    break;
+                                }
+                            }
                         }
                     }
                     if (hostNameVerifierResult != null) {
@@ -171,7 +201,7 @@ public class HTTPConnectionUtils {
                         }
                     }
                     if (!result) {
-                        throw new IllegalSSLHostnameException(host, subjects);
+                        throw new IllegalSSLHostnameException(host, subjectAndAlternativeNames);
                     } else {
                         return true;
                     }

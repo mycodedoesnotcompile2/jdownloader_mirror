@@ -1289,10 +1289,11 @@ public enum VariantBase {
         this.converter = converter;
     }
 
-    public void convert(DownloadLink downloadLink, PluginForHost plugin) throws Exception {
-        if (converter != null) {
-            converter.run(downloadLink, plugin);
+    public boolean convert(DownloadLink downloadLink, PluginForHost plugin) throws Exception {
+        if (converter == null) {
+            return false;
         }
+        return converter.run(downloadLink, plugin);
     }
 
     public FileContainer getContainer() {

@@ -37,7 +37,7 @@ public class YoutubeConverterMP4ToM4AAudio extends AbstractDemuxToAudioConverter
     }
 
     @Override
-    public void run(DownloadLink downloadLink, PluginForHost plugin) throws Exception {
+    public boolean run(DownloadLink downloadLink, PluginForHost plugin) throws Exception {
         final FFMpegProgress set = new FFMpegProgress();
         try {
             downloadLink.addPluginProgress(set);
@@ -56,6 +56,7 @@ public class YoutubeConverterMP4ToM4AAudio extends AbstractDemuxToAudioConverter
                 downloadLink.setInternalTmpFilename(null);
             } catch (final Throwable e) {
             }
+            return true;
         } finally {
             downloadLink.removePluginProgress(set);
         }

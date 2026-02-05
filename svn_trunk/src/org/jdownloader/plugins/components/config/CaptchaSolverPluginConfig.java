@@ -105,11 +105,11 @@ public interface CaptchaSolverPluginConfig extends PluginConfigInterface {
 
     void setFilterListEnabled(boolean b);
 
-    @AboutConfig
+    @AboutConfig(inGUIVisible = false)
     @Order(501)
     @DescriptionForConfigEntry("Filter list")
     @DefaultOnNull
-    @DefaultJsonObject("[{\"name\":\"Example Block Example.com\",\"domain\":\"example.com\",\"captchaTypes\":[],\"regex\":false,\"enabled\":false,\"captchaRequestTypes\":[],\"filterType\":\"BLACKLIST\",\"broken\":false,\"id\":null,\"created\":1706000000000,\"position\":0},{\"name\":\"Example Allow Mega.nz - All Types\",\"domain\":\"mega\\.nz\",\"captchaTypes\":[\"IMAGE\",\"IMAGE_SINGLE_CLICK_CAPTCHA\",\"IMAGE_MULTI_CLICK_CAPTCHA\",\"RECAPTCHA_V3\",\"RECAPTCHA_V3_ENTERPRISE\",\"RECAPTCHA_V2_INVISIBLE\",\"RECAPTCHA_V2_ENTERPRISE\",\"RECAPTCHA_V2\",\"HCAPTCHA\",\"CUTCAPTCHA\",\"GEETEST_V1\",\"GEETEST_V4\",\"CLOUDFLARE_TURNSTILE\",\"MT_CAPTCHA\",\"FRIENDLY_CAPTCHA\"],\"regex\":true,\"enabled\":false,\"captchaRequestTypes\":[\"HOSTER_LOGIN\",\"HOSTER\",\"DECRYPTER\"],\"filterType\":\"WHITELIST\",\"broken\":false,\"id\":null,\"created\":1706100000000,\"position\":5}]")
+    @DefaultJsonObject("[{\"name\":\"Example Block Example.com\",\"domain\":\"example.com\",\"captchaTypes\":[],\"regex\":false,\"enabled\":false,\"captchaRequestTypes\":[],\"filterType\":\"BLACKLIST\",\"broken\":false,\"id\":null,\"created\":1706000000000,\"position\":0},{\"name\":\"Example Allow Mega.nz - All Types\",\"domain\":\"mega.nz\",\"captchaTypes\":[\"IMAGE\",\"IMAGE_SINGLE_CLICK_CAPTCHA\",\"IMAGE_MULTI_CLICK_CAPTCHA\",\"RECAPTCHA_V3\",\"RECAPTCHA_V3_ENTERPRISE\",\"RECAPTCHA_V2_INVISIBLE\",\"RECAPTCHA_V2_ENTERPRISE\",\"RECAPTCHA_V2\",\"HCAPTCHA\",\"CUTCAPTCHA\",\"GEETEST_V1\",\"GEETEST_V4\",\"CLOUDFLARE_TURNSTILE\",\"MT_CAPTCHA\",\"FRIENDLY_CAPTCHA\"],\"regex\":true,\"enabled\":false,\"captchaRequestTypes\":[\"HOSTER_LOGIN\",\"HOSTER\",\"DECRYPTER\"],\"filterType\":\"WHITELIST\",\"broken\":false,\"id\":null,\"created\":1706100000000,\"position\":5}]")
     // TODO: Add better default (json) value?
     List<CaptchaChallengeFilter> getFilterList();
 

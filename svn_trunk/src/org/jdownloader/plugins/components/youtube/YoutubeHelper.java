@@ -38,6 +38,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -106,22 +122,6 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
-
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 public class YoutubeHelper {
     private static final String REGEX_DASHMPD_FROM_JSPLAYER_SETUP          = "\"dashmpd\"\\s*:\\s*(\".*?\")";
@@ -2327,7 +2327,6 @@ public class YoutubeHelper {
     }
 
     protected boolean isAPIPrefered(Browser br) {
-        // WEB is fully potoken'd, https://github.com/ytdl-org/youtube-dl/issues/32905
         return true;
     }
 
@@ -2705,17 +2704,16 @@ public class YoutubeHelper {
         vid.subtitles = loadSubtitles();
     }
 
-    private static boolean API_TV_ENABLED = true;
+    private static boolean API_ENABLED = true;
 
     /**
      * https://github.com/zerodytrash/YouTube-Internal-Clients
      *
      *
-     * does also return opus audio codec, max video resolution is 1080p
      */
-    protected Request buildAPI_TV_Request(Browser br) throws Exception {
-        if (!API_TV_ENABLED) {
-            logger.info("buildAPI_TV_Request:disabled");
+    protected Request buildAPI_Request(Browser br) throws Exception {
+        if (!API_ENABLED) {
+            logger.info("buildAPI_Request:disabled");
             return null;
         }
         final boolean tempWorkaround = true;
@@ -2724,21 +2722,17 @@ public class YoutubeHelper {
         final int clientNameID;
         if (tempWorkaround) {
             // temp workaround
-            client.put("clientName", "ANDROID");
-            client.put("clientVersion", "20.10.38");
+            client.put("clientName", "ANDROID_VR");
+            client.put("clientVersion", "1.71.26");
+            client.put("deviceMake", "'Oculus");
+            client.put("deviceModel", "'Quest 3");
+            client.put("androidSdkVersion", 32);
+            client.put("userAgent", "com.google.android.apps.youtube.vr.oculus/1.71.26 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip");
             client.put("osName", "Android");
-            client.put("osVersion", "11");
-            clientNameID = 3;
-        } else if (vid.ageCheck) {
-            // This client can access age restricted videos (unless the uploader has disabled the 'allow embedding' option)
-            client.put("clientName", "TVHTML5_SIMPLY_EMBEDDED_PLAYER");
-            client.put("clientVersion", "2.0");
-            clientNameID = 85;
+            client.put("osVersion", "12L");
+            clientNameID = 28;
         } else {
-            client.put("clientName", "TVHTML5");
-            client.put("clientVersion", "7.20250312.16.00");
-            client.put("userAgent", "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version");
-            clientNameID = 7;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         client.put("hl", "en");
         client.put("timeZone", "UTC");
@@ -2789,14 +2783,14 @@ public class YoutubeHelper {
     }
 
     protected int collectMapsFromAPIResponse(Browser br) throws InterruptedException, Exception {
-        if (!API_TV_ENABLED) {
+        if (!API_ENABLED) {
             logger.info("collectMapsFromAPIResponse:disabled");
             return -1;
         }
         int ret = 0;
         try {
             final Browser brc = br.cloneBrowser();
-            final Request request = buildAPI_TV_Request(brc);
+            final Request request = buildAPI_Request(brc);
             if (request != null) {
                 brc.getPage(request);
                 if (brc.getRegex("\"status\"\\s*:\\s*\"LOGIN_REQUIRED\"").patternFind()) {
@@ -2815,7 +2809,7 @@ public class YoutubeHelper {
         } catch (InterruptedException e) {
             throw e;
         } catch (Exception e) {
-            API_TV_ENABLED = false;
+            API_ENABLED = false;
             logger.log(e);
         }
         return ret;
@@ -3868,6 +3862,9 @@ public class YoutubeHelper {
                             if (url == null) {
                                 continue;
                             } else {
+                                // enforce srv1 for YoutubeSRTConverter
+                                // available formats json3,srv1,srv2,srv3,ttml,srt,vtt
+                                url = url.replaceFirst("fmt=\\w+", "fmt=srt");
                                 url = br.getURL(url).toString();
                             }
                             final String name;

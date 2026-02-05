@@ -4,15 +4,15 @@ import java.io.File;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.views.downloads.columns.ETAColumn;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.PluginTaskID;
 import org.jdownloader.utils.SubtitleConverter;
-
-import jd.plugins.DownloadLink;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
 
 public class YoutubeSRTConverter implements YoutubeConverter {
     private static final YoutubeSRTConverter INSTANCE = new YoutubeSRTConverter();
@@ -35,7 +35,7 @@ public class YoutubeSRTConverter implements YoutubeConverter {
     }
 
     @Override
-    public void run(DownloadLink downloadLink, PluginForHost plugin) {
+    public boolean run(DownloadLink downloadLink, PluginForHost plugin) {
         PluginProgress set = null;
         try {
             downloadLink.addPluginProgress(set = new PluginProgress(0, 100, null) {
@@ -70,14 +70,19 @@ public class YoutubeSRTConverter implements YoutubeConverter {
                     return "Convert";
                 }
             });
-            File file = new File(downloadLink.getFileOutput());
-            File finalFile;
-            SubtitleConverter.convertGoogleCC2SRTSubtitles(file, finalFile = new File(file.getAbsolutePath().replaceFirst("\\.srt\\.tmp$", ".srt")));
+            final File file = new File(downloadLink.getFileOutput());
+            final File finalFile = new File(file.getAbsolutePath().replaceFirst("\\.srt\\.tmp$", ".srt"));
             try {
-
-                downloadLink.setInternalTmpFilenameAppend(null);
-                downloadLink.setInternalTmpFilename(null);
-            } catch (final Throwable e) {
+                final boolean ret = SubtitleConverter.convertGoogleCC2SRTSubtitles(file, finalFile);
+                try {
+                    downloadLink.setInternalTmpFilenameAppend(null);
+                    downloadLink.setInternalTmpFilename(null);
+                } catch (final Throwable e) {
+                }
+                return ret;
+            } catch (Exception e) {
+                plugin.getLogger().log(e);
+                return false;
             }
         } finally {
             downloadLink.removePluginProgress(set);

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
@@ -50,7 +51,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52221 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52254 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -165,6 +166,9 @@ public class SerienStreamTo extends PluginForDecrypt {
         String episodeTitle = null;
         if (isNewWebsite) {
             seriesTitle = br.getRegex("id=\"seasonsEpisodesModalLabel\">([^<]+)</h5>").getMatch(0);
+            if (seriesTitle == null) {
+                seriesTitle = br.getRegex("<h5 class=\"modal-title\" id=\"trailerModalLabel\"[^>]*>([^<]+) Trailer</h5>").getMatch(0);
+            }
             episodeTitle = br.getRegex("<h2 class=\"h4 mb-1\"[^>]*>([^<]+)</h2>").getMatch(0);
         } else {
             seriesTitle = br.getRegex("class=\"hostSeriesTitle\"[^>]*>\\s*<strong>([^<]+)</strong>").getMatch(0);
@@ -178,13 +182,42 @@ public class SerienStreamTo extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String seriesTitleSlug = urlinfo_series.getMatch(0);
-        String seasonNumberStr = urlinfo_series.getMatch(2);
-        if (seasonNumberStr == null) {
+        final String seasonNumberStrFromURL = urlinfo_series.getMatch(2);
+        if (seasonNumberStrFromURL == null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /*
              * No season slug given -> Use season 1 as default to get same results as website which displays episodes of season 1 if no
              * season is given in URL.
              */
-            seasonNumberStr = "1";
+            /* Crawl all user selected seasons */
+            /* TODO: Finish implementation */
+            final String[] seasonNumbers = br.getRegex(seriesTitleSlug + "/staffel-(\\d+)").getColumn(0);
+            if (seasonNumbers == null || seasonNumbers.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final List<String> seasonNumbersWithoutDupes = new ArrayList<String>();
+            for (final String seasonNumber : seasonNumbers) {
+                if (seasonNumbersWithoutDupes.contains(seasonNumber)) {
+                    continue;
+                }
+                seasonNumbersWithoutDupes.add(seasonNumber);
+            }
+            final List<String> selectedSeasonNumbers = new ArrayList<String>();
+            if (seasonNumbersWithoutDupes.size() > 1) {
+                // TODO: Ask user
+            }
+            logger.info("Selected seasons by user: " + "TODO/" + seasonNumbersWithoutDupes.size());
+            if (selectedSeasonNumbers.remove("1")) {
+                final ArrayList<DownloadLink> episodes = this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, "1");
+                if (selectedSeasonNumbers.isEmpty()) {
+                    /*
+                     * User wants only season 1 -> Episodes of season 1 are already in html code so we can crawl them right away without the
+                     * need to do any additional html requests
+                     */
+                    return episodes;
+                }
+                ret.addAll(episodes);
+            }
+            // TODO: Add logic to crawl the rest of users' selected seasons
         }
         final String episodeNumberStr = urlinfo_series.getMatch(4);
         if (seriesTitle == null) {
@@ -195,29 +228,14 @@ public class SerienStreamTo extends PluginForDecrypt {
         /* 2026-01-30: Movies are listed as season 0 and then have "normal" episode numbers starting from 1. */
         // final boolean isMovie = seriesSeasonNumberStr.equals("0");
         final Set<String> dupes = new HashSet<String>();
-        crawlEpisodesOfSeason: if (episodeNumberStr == null) {
-            /* No specific episode/film -> Crawl all episodes of a series */
-            final String[] urls = br.getRegex(Pattern.quote(seriesTitleSlug) + "/staffel-" + seasonNumberStr + "/episode-\\d+").getColumn(-1);
-            if (urls == null || urls.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (episodeNumberStr == null) {
+            /* No specific episode/film -> Crawl all episodes of a season */
+            if (seasonNumberStrFromURL != null) {
+                return this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, seasonNumberStrFromURL);
+            } else {
+                /* No specific season number given -> Crawl season 1 */
+                return this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, "1");
             }
-            for (String url : urls) {
-                if (isNewWebsite) {
-                    url = "/serie/" + url;
-                } else {
-                    url = "/anime/stream/" + url;
-                }
-                url = br.getURL(url).toExternalForm();
-                if (!dupes.add(url)) {
-                    continue;
-                }
-                final DownloadLink link = createDownloadlink(url);
-                link.setProperty(PROPERTY_IS_PART_OF_COMPLETE_SEASON_CRAWLING, true);
-                ret.add(link);
-            }
-            logger.info("Found " + ret.size() + " episodes of season: " + seasonNumberStr);
-            logger.info("Crawled season " + seasonNumberStr + " | Found episodes: " + ret.size());
-            return ret;
         }
         /* Assume we got a single episode or film -> Crawl all mirrors */
         final List<String> allRedirectURLs = new ArrayList<String>();
@@ -465,14 +483,14 @@ public class SerienStreamTo extends PluginForDecrypt {
         final DownloadLink parent = param.getDownloadLink();
         final FilePackage fp = FilePackage.getInstance();
         if (parent != null && parent.hasProperty(PROPERTY_IS_PART_OF_COMPLETE_SEASON_CRAWLING)) {
-            fp.setName(seriesTitle + " S" + seasonNumberStr);
+            fp.setName(seriesTitle + " S" + seasonNumberStrFromURL);
         } else if (episodeTitle != null) {
             fp.setName(seriesTitle + " " + episodeTitle);
         } else {
             /* Fallback: Set series title only */
             fp.setName(seriesTitle + " E" + episodeNumberStr);
         }
-        fp.setPackageKey(getHost() + "/series/" + seriesTitleSlug + "/season/" + seasonNumberStr);
+        fp.setPackageKey(getHost() + "/series/" + seriesTitleSlug + "/season/" + seasonNumberStrFromURL);
         fp.setAllowMerge(true);
         fp.setAllowInheritance(true);
         int index = -1;
@@ -517,6 +535,33 @@ public class SerienStreamTo extends PluginForDecrypt {
         if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        return ret;
+    }
+
+    /** Crawls all episodes of season which is present in html code of current public browser instance. */
+    private ArrayList<DownloadLink> crawlCurrentSeason(final CryptedLink param, final String contenturl, final String seriesTitleSlug, final String seasonNumberStr) throws PluginException, InterruptedException, DecrypterException, IOException {
+        final Set<String> dupes = new HashSet<String>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final boolean isNewWebsite = new Regex(contenturl, TYPE_SERIES_NEW).patternFind();
+        final String[] urls = br.getRegex(Pattern.quote(seriesTitleSlug) + "/staffel-" + seasonNumberStr + "/episode-\\d+").getColumn(-1);
+        if (urls == null || urls.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        for (String url : urls) {
+            if (isNewWebsite) {
+                url = "/serie/" + url;
+            } else {
+                url = "/anime/stream/" + url;
+            }
+            url = br.getURL(url).toExternalForm();
+            if (!dupes.add(url)) {
+                continue;
+            }
+            final DownloadLink link = createDownloadlink(url);
+            link.setProperty(PROPERTY_IS_PART_OF_COMPLETE_SEASON_CRAWLING, true);
+            ret.add(link);
+        }
+        logger.info("Crawled season " + seasonNumberStr + " | Found episodes: " + ret.size());
         return ret;
     }
 

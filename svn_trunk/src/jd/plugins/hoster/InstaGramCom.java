@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 52230 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52252 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -119,7 +119,7 @@ public class InstaGramCom extends PluginForHost {
 
     public static Browser prepBRAltAPI(final Browser br) {
         /* https://github.com/qsniyg/maxurl/blob/master/userscript.user.js */
-        br.getHeaders().put("User-Agent", "Instagram 146.0.0.27.125 Android (23/6.0.1; 640dpi; 1440x2560; samsung; SM-G930F; herolte; samsungexynos8890; en_US)");
+        br.getHeaders().put("User-Agent", "Instagram 361.0.0.35.82 (iPad13,8; iOS 18_0; en_US; en-US; scale=2.00; 2048x2732; 674117118) AppleWebKit/420+");
         // 429 == too many requests, we need to rate limit requests.
         // 400 , {"message":"Media not found or unavailable","status":"fail"}
         br.setAllowedResponseCodes(new int[] { 400, 429 });

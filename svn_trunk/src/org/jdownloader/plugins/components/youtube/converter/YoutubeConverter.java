@@ -5,6 +5,6 @@ import jd.plugins.PluginForHost;
 
 public interface YoutubeConverter {
 
-    void run(DownloadLink downloadLink, PluginForHost plugin) throws Exception;
+    boolean run(DownloadLink downloadLink, PluginForHost plugin) throws Exception;
 
 }

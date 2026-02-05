@@ -73,68 +73,55 @@ public class SubtitleConverter {
      * @param downloadlink
      *            . The finished link to the Google CC subtitle file.
      * @return The success of the conversion.
+     * @throws IOException
      */
-    public static boolean convertGoogleCC2SRTSubtitles(final File in, File out) {
-
-        BufferedWriter dest = null;
-        FileOutputStream fos = null;
+    public static boolean convertGoogleCC2SRTSubtitles(final File in, File out) throws IOException {
+        final StringBuilder xml = new StringBuilder();
+        int counter = 1;
+        FileInputStream fis = null;
         try {
-            try {
-
-                dest = new BufferedWriter(new OutputStreamWriter(fos = new FileOutputStream(out), "UTF-8"));
-            } catch (IOException e1) {
-                return false;
+            final Scanner scan = new Scanner(new InputStreamReader(fis = new FileInputStream(in), "UTF-8"));
+            while (scan.hasNext()) {
+                xml.append(scan.nextLine() + LINE_SEPERATOR);
             }
-
-            final StringBuilder xml = new StringBuilder();
-            int counter = 1;
-
-            FileInputStream fis = null;
-            try {
-                Scanner scan = new Scanner(new InputStreamReader(fis = new FileInputStream(in), "UTF-8"));
-                while (scan.hasNext()) {
-                    xml.append(scan.nextLine() + LINE_SEPERATOR);
-                }
-                scan.close();
-            } catch (Exception e) {
-                return false;
-            } finally {
-                try {
-                    fis.close();
-                } catch (final Throwable e) {
-                }
-            }
-
-            String[][] matches = new Regex(xml.toString(), "<text start=\"(.*?)\".*?(dur=\"(.*?)\")?>(.*?)</text>").getMatches();
-
-            try {
-                String[] prevMatch = null;
-                for (String[] match : matches) {
-                    if (prevMatch != null) {
-
-                        writeNewLine(dest, prevMatch[0], match[0], prevMatch[3], counter++);
-                        prevMatch = null;
-                    }
-                    if (match[1] == null) {
-                        /* no end time stamp */
-                        prevMatch = match;
-                        continue;
-                    }
-                    /* we have start/end time stamps */
-                    writeNewLine(dest, match[0], match[2], match[3], counter++);
-                }
-            } catch (Exception e) {
-                return false;
-            }
+            scan.close();
+        } catch (Exception e) {
+            return false;
         } finally {
             try {
-                dest.close();
-            } catch (Throwable e) {
+                fis.close();
+            } catch (final Throwable e) {
             }
-            try {
-                fos.close();
-            } catch (Throwable e) {
+        }
+        final String[][] matches = new Regex(xml.toString(), "<text start=\"(.*?)\".*?(dur=\"(.*?)\")?>(.*?)</text>").getMatches();
+        if (matches.length == 0) {
+            return false;
+        }
+        final BufferedWriter dest;
+        try {
+            dest = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(out), "UTF-8"));
+        } catch (IOException e1) {
+            return false;
+        }
+        try {
+            String[] prevMatch = null;
+            for (String[] match : matches) {
+                if (prevMatch != null) {
+                    writeNewLine(dest, prevMatch[0], match[0], prevMatch[3], counter++);
+                    prevMatch = null;
+                }
+                if (match[1] == null) {
+                    /* no end time stamp */
+                    prevMatch = match;
+                    continue;
+                }
+                /* we have start/end time stamps */
+                writeNewLine(dest, match[0], match[2], match[3], counter++);
             }
+        } catch (Exception e) {
+            return false;
+        } finally {
+            dest.close();
         }
         in.delete();
         return true;

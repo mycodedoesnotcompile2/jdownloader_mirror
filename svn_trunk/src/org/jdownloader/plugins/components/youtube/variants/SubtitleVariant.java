@@ -71,6 +71,12 @@ public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
     }
 
     @Override
+    public boolean hasConverter(DownloadLink downloadLink) {
+        // TODO: check for fmt in URL
+        return false;
+    }
+
+    @Override
     public String getFileNamePattern(final DownloadLink downloadLink) {
         return PluginJsonConfig.get(YoutubeConfig.class).getSubtitleFilenamePattern2();
     }
