@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52266 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     /* 2024-06-14: Alternative domain: cocodebrid.com */
     private static final String          API_ENDPOINT       = "https://members.cocoleech.com/auth/api";
@@ -56,8 +56,8 @@ public class CocoleechCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public CocoleechCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://members." + getHost() + "/");
-        this.setStartIntervall(3000l);
+        enablePremium("https://members." + getHost() + "/");
+        setStartIntervall(3000l);
     }
 
     @Override
@@ -115,8 +115,8 @@ public class CocoleechCom extends PluginForHost {
             dllink = storedDirecturl;
         } else {
             /* Request creation of downloadlink */
-            this.br.getPage(API_ENDPOINT + "?key=" + Encoding.urlEncode(account.getPass()) + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
-            final Map<String, Object> entries = handleAPIErrors(this.br, account, link);
+            br.getPage(API_ENDPOINT + "?key=" + Encoding.urlEncode(account.getPass()) + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+            final Map<String, Object> entries = handleAPIErrors(account, link);
             final Object chunksO = entries.get("chunks");
             if (chunksO != null) {
                 final String maxchunksStr = chunksO.toString();
@@ -132,11 +132,11 @@ public class CocoleechCom extends PluginForHost {
             link.setProperty(PROPERTY_DIRECTURL, dllink);
         }
         try {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, isResumeable(link, account), getMaxChunks(link, account));
+            if (!looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 if (dl.getConnection().getContentType().contains("json")) {
-                    handleAPIErrors(this.br, account, link);
+                    handleAPIErrors(account, link);
                 }
                 mhm.handleErrorGeneric(account, link, "Unknown download error", 50, 5 * 60 * 1000l);
             }
@@ -148,7 +148,7 @@ public class CocoleechCom extends PluginForHost {
                 throw e;
             }
         }
-        this.dl.startDownload();
+        dl.startDownload();
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -204,7 +204,7 @@ public class CocoleechCom extends PluginForHost {
             ai.setStatus(accountPackage);
         }
         br.getPage(API_ENDPOINT + "/hosts-status");
-        final Map<String, Object> hoststatusmap = handleAPIErrors(br, account, null);
+        final Map<String, Object> hoststatusmap = handleAPIErrors(account, null);
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hosters = (List<Map<String, Object>>) hoststatusmap.get("result");
         for (final Map<String, Object> hostinfo : hosters) {
@@ -224,11 +224,11 @@ public class CocoleechCom extends PluginForHost {
         synchronized (account) {
             br.getPage(API_ENDPOINT + "/info?key=" + Encoding.urlEncode(account.getPass()));
             /* No error here = account is valid. */
-            return handleAPIErrors(this.br, account, null);
+            return handleAPIErrors(account, null);
         }
     }
 
-    private Map<String, Object> handleAPIErrors(final Browser br, final Account account, final DownloadLink link) throws Exception {
+    private Map<String, Object> handleAPIErrors(final Account account, final DownloadLink link) throws Exception {
         Map<String, Object> entries = null;
         try {
             /* 2024-11-21: Hotfix for API returning invalid json: "1{"val" (string starts with "1" and not with "{". */
@@ -275,9 +275,10 @@ public class CocoleechCom extends PluginForHost {
                 throw new AccountUnavailableException(statusmsg, 3 * 60 * 1000l);
             } else {
                 mhm.handleErrorGeneric(account, link, statusmsg, 50, 5 * 60 * 1000l);
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        return entries;
     }
 
     @Override

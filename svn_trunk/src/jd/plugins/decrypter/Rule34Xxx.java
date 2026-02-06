@@ -21,6 +21,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.plugins.components.config.Rule34xxxConfig;
+import org.jdownloader.plugins.components.config.Rule34xxxConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,17 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.plugins.components.config.Rule34xxxConfig;
-import org.jdownloader.plugins.components.config.Rule34xxxConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 51719 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 52266 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String        prefixLinkID                          = getHost().replaceAll("[\\.\\-]+", "") + "://";
     private static final String ERROR_MESSAG_API_CREDENTIALS_REQUIRED = "API credentials required. Add them in plugin settings or change access mode to website and try again.";
@@ -383,13 +383,12 @@ public class Rule34Xxx extends PluginForDecrypt {
                 } else if (!hasNextPage) {
                     logger.info("Stopping because: Reached last page: " + page + " | Index: " + maxIndex);
                     break;
-                } else {
-                    sleep(1000, param);
-                    page++;
-                    query.addAndReplace("pid", Integer.toString(index));
-                    br.getPage(relativeURLWithoutParams + "?" + query.toString());
-                    continue;
                 }
+                sleep(1000, param);
+                page++;
+                query.addAndReplace("pid", Integer.toString(index));
+                br.getPage(relativeURLWithoutParams + "?" + query.toString());
+                continue;
             } while (true);
         }
         return ret;

@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 52223 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52267 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -424,9 +424,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             /* Return cached userID */
             return cachedUserID;
         }
-        /* Use website to find userID. */
         final boolean allowUseSearchToFindUserID = true;
-        final boolean useallowUsebProfileInfoAPIToFindUserID = true;
+        /* 2026-02-05: This doesn't work anymore -> IG endlessly responds with response 429 */
+        final boolean useallowUsebProfileInfoAPIToFindUserID = false;
         String userID = null;
         final String userProfileURL = this.generateURLProfile(username);
         if (useallowUsebProfileInfoAPIToFindUserID) {
@@ -435,7 +435,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* 2022-05-11: New method: Faster and json only */
-            Request req = br.createGetRequest(InstaGramCom.ALT_API_BASE + "/users/web_profile_info/?username=" + username);
+            final Request req = br.createGetRequest(InstaGramCom.ALT_API_BASE + "/users/web_profile_info/?username=" + username);
             /* None of these headers are mandatory atm. */
             req.getHeaders().put("Referer", userProfileURL);
             req.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -460,65 +460,67 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
             }
         }
-        if (userID == null) {
-            if (allowUseSearchToFindUserID) {
-                /**
-                 * 2025-02-24: For some profiles, this API did not return the expected results or at least not on "pagination page 1". <br>
-                 * For this reason, another method will be preferred over this one from now on.
+        if (userID == null && allowUseSearchToFindUserID) {
+            /**
+             * 2025-02-24: For some profiles, this API did not return the expected results or at least not on "pagination page 1". <br>
+             * For this reason, other methods should be preferred over this one from now on.
+             */
+            /* 2022-05-11: New method: Faster and json only */
+            logger.info("Trying to find user-id via website search function");
+            Request req = br.createGetRequest("https://www." + this.getHost() + "/web/search/topsearch/?context=blended&query=" + username + "&include_reel=true");
+            /* None of these headers are mandatory atm. */
+            req.getHeaders().put("Referer", userProfileURL);
+            req.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            getPageAutoLogin(account, loggedIN, req.getUrl(), param, br, req, null, null);
+            Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.TRUE.equals(entries.get("require_login")) || br.getHttpConnection().getResponseCode() == 401) {
+                /*
+                 * 2022-10-07 E.g.
+                 * {"message":"Bitte warte einige Minuten und versuche es dann noch einmal.","require_login":true,"status":"fail"}
                  */
-                /* 2022-05-11: New method: Faster and json only */
-                Request req = br.createGetRequest("https://www." + this.getHost() + "/web/search/topsearch/?context=blended&query=" + username + "&include_reel=true");
-                /* None of these headers are mandatory atm. */
-                req.getHeaders().put("Referer", userProfileURL);
-                req.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                getPageAutoLogin(account, loggedIN, req.getUrl(), param, br, req, null, null);
-                Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                if (Boolean.TRUE.equals(entries.get("require_login")) || br.getHttpConnection().getResponseCode() == 401) {
-                    /*
-                     * 2022-10-07 E.g.
-                     * {"message":"Bitte warte einige Minuten und versuche es dann noch einmal.","require_login":true,"status":"fail"}
-                     */
-                    /* 2023-11-08: Also possible: response 401 with {"message":"Server Error","status":"fail"} */
-                    if (loggedIN.get()) {
-                        /* Already logged in -> This should never happen */
-                        logger.warning("Login required but we're already logged in -> Possible problem with account/session");
-                        throw new AccountRequiredException();
-                    } else if (account == null) {
-                        /* Account required but not available */
-                        throw new AccountRequiredException();
-                    }
-                    sleep(2000, param);
-                    logger.info("Logging in because: " + entries.get("message"));
-                    /* We're logged in now -> Perform request again. */
-                    req = req.cloneRequest();
-                    getPageAutoLogin(account, loggedIN, true, req.getUrl(), param, br, req, null, null);
-                    entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                /* 2023-11-08: Also possible: response 401 with {"message":"Server Error","status":"fail"} */
+                if (loggedIN.get()) {
+                    /* Already logged in -> This should never happen */
+                    logger.warning("Login required but we're already logged in -> Possible problem with account/session");
+                    throw new AccountRequiredException();
+                } else if (account == null) {
+                    /* Account required but not available */
+                    throw new AccountRequiredException();
                 }
-                if ("fail".equals(entries.get("status"))) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                sleep(2000, param);
+                logger.info("Logging in because: " + entries.get("message"));
+                /* We're logged in now -> Perform request again. */
+                req = req.cloneRequest();
+                getPageAutoLogin(account, loggedIN, true, req.getUrl(), param, br, req, null, null);
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            }
+            if ("fail".equals(entries.get("status"))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final List<Map<String, Object>> users = (List<Map<String, Object>>) entries.get("users");
+            for (final Map<String, Object> entry : users) {
+                final Map<String, Object> user = (Map<String, Object>) entry.get("user");
+                if (StringUtils.equalsIgnoreCase(username, StringUtils.valueOfOrNull(user.get("username")))) {
+                    userID = user.get("pk").toString();
+                    break;
                 }
-                final List<Map<String, Object>> users = (List<Map<String, Object>>) entries.get("users");
-                for (final Map<String, Object> entry : users) {
-                    final Map<String, Object> user = (Map<String, Object>) entry.get("user");
-                    if (StringUtils.equalsIgnoreCase(username, StringUtils.valueOfOrNull(user.get("username")))) {
-                        userID = user.get("pk").toString();
-                        break;
-                    }
-                }
+            }
+            if (StringUtils.isEmpty(userID)) {
+                /* Most likely that profile doesn't exist */
+                logger.warning("Failed to find user-id via search -> Invalid profile?");
+            }
+        }
+        if (userID == null) {
+            /* Search user-id via website */
+            logger.info("Trying to find user-id via website");
+            getPageAutoLogin(account, loggedIN, userProfileURL, param, br, userProfileURL, null, null);
+            final String json = websiteGetJson();
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            userID = (String) get(entries, "entry_data/ProfilePage/{0}/user/id", "entry_data/ProfilePage/{0}/graphql/user/id");
+            if (StringUtils.isEmpty(userID)) {
+                userID = br.getRegex("\"owner\":\\s*\\{\"id\":\\s*\"(\\d+)\"\\}").getMatch(0);
                 if (StringUtils.isEmpty(userID)) {
-                    /* Most likely that profile doesn't exist */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Profile not found");
-                }
-            } else {
-                getPageAutoLogin(account, loggedIN, userProfileURL, param, br, userProfileURL, null, null);
-                final String json = websiteGetJson();
-                final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-                userID = (String) get(entries, "entry_data/ProfilePage/{0}/user/id", "entry_data/ProfilePage/{0}/graphql/user/id");
-                if (StringUtils.isEmpty(userID)) {
-                    userID = br.getRegex("\"owner\":\\s*\\{\"id\":\\s*\"(\\d+)\"\\}").getMatch(0);
-                    if (StringUtils.isEmpty(userID)) {
-                        userID = br.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
-                    }
+                    userID = br.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
                 }
             }
         }

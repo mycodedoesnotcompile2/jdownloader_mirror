@@ -1541,11 +1541,144 @@
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
       "version":"2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48"
+    },
+    {
+      "changes":"2025.328.0 bf4f2d47e2b6a58eb160df6deba3acb217f7f9a2\t: Add xtooldevice.com (#2613)\r\n2025.328.1 6be64e4d01d9e5dde6afab60154c546e3caecd14\t: add sld ᬩᬮᬶ.id (#2673)\r\n2025.328.2 565e9dc7907cba1b3ae6b6d588120ec54d789806\t: Add grebedoc.dev (#2664)\r\n2025.330.0 d572776986ac2431fe72536339cf23c52d36d9ee\t: Brave Submissions to the Public Suffix List - Q4 2025 (#2668)\r\n2025.330.1 57fe3782c08b97be51672e098c9ccc529538b408\t: Remove `obl.ong` (#2368)\r\n2025.330.2 d74821138fd58ad8caab21d3b91f1a7fa3c09e91\t: Add Microsoft Azure US government cloud service domains (#2660)\n\n* Add US government cloud service domains\r\n2025.330.3 7456e993bf8822a643b3f807234ae2a76f6f6512\t: Add Gadget Software Inc. domains: `gadget.app` and `gadget.host` (#2666)\r\n2025.331.0 d3567de748c61e2de5a3156cc52ef0e0fdc1dc0c\t: Add AgentbaseAI *.auiusercontent.com to public suffix list (#2676)\r\n2025.338.0 f6e59d0fcbf77987d8dff6ba69a7700026a6141b\t: Remove lk3.ru (#1149) (#2682)\r\n2025.338.1 a79ee032efd3a77ed6b107e0be702c4f547d8f29\t: Add new public suffix 'preview.emergentagent.com' (#2681)\r\n2025.338.2 ea600e443a922cd3f1e2f96e1db3f860d0b097ea\t: Add Redpanda Data entries for rdpa.co (#2679)\r\n2025.340.0 24874d0227995dff18964458432da2b987eb4837\t: util: gTLD data autopull updates for 2025-12-06T15:17:26 UTC (#2686)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520\t: Adding co.scot, me.scot, and org.scot (#2683)",
+      "date":"2025-12-08T14:51:51.778+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"74c6de09a8f99ec3af903e83f628104ea911979b7d89e1379f63a1a817426cd7"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520"
+    },
+    {
+      "changes":"2025.350.0 388317f415fdcce0a73433370d7b0ba5f8f3cb36\t: Add sav.case to the Public Suffix List (#2624)\n\nMerging, the sorting and all other aspects of this are fine.\n\n@mukul-sav if you later do a PR to change this to a role account, we're glad to fast-merge it.  Otherwise please request your colleagues to forward your email to your peers in the future should you win the lottery and not continue to work with that company. \n\nPlease say hello and happy holidays to Anthos from Jothan, if you'd be so kind",
+      "date":"2025-12-17T10:09:59.550+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"9d78b0c34f7f7643d1d62350db1a04a0c0ab6af772a58ed72b3e9794a085288a"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2025.350.0 388317f415fdcce0a73433370d7b0ba5f8f3cb36"
+    },
+    {
+      "changes":"2025.351.0 f2d04623b74d787252aa6aa743b7fa498da7a789\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.1 32f4178799a747d18f3a6c99f649edfa0d80e904\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.2 e15afbc8f0a789b28e6ade7b43f3d2e19bdd4860\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.3 3d01fa4aaf7e099837ea9e632fe4e7d2b79b1807\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.4 a82f39e9f9265dc959ee1e58ad55bbeab13bd0d5\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.0 d08780d3147529cb13f07d6eccf38d15a0aedc31\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.1 44bf7aac6858882e64ac20440367fac80486a7ce\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.2 b87eacf9e3f88357d6de5b3627b5060b3a7868e7\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.3 2cd181c0767cfc0990aac74928f366de2849a6f3\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.4 461e4b0fb95f439932707ef36496f5369292b7d8\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.353.0 b07656aaea78f464241f79cbf346c61bc93dde0d\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.353.1 3be833212471408940c0d59e5e59914b3f35f338\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.355.0 59cdd7656e3fd925392c2a24e2a5007d5d6ed6e0\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.355.1 a0814017572883671d2f48e789e2173bb2a1e57d\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.356.0 d3070bf6ac0c27fc1f711f13b3ed21a510c8fe50\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.",
+      "date":"2025-12-22T10:47:36.882+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"d75140ec2e9d866d278d224b2838a9ea8ec117e1da6e3963b9a3a8cc97376adf"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2025.356.0 d3070bf6ac0c27fc1f711f13b3ed21a510c8fe50"
+    },
+    {
+      "changes":"2025.356.1 ff39edc8197bda400b1420b40d40fb5543ad7426\t: Add new public suffix entries for nett.to (#2722)\r\n2025.356.2 0f491e1366180d889b77fb98f51f4b62d1380413\t: Add ae.kg to Public Suffix List (#2711)\r\n2025.362.0 583a1710a5215a1dd9b70001b35577bbdb901391\t: Add gv.uy to public suffix list (#2718)\r\n2025.362.1 1ef6d3bc102c85d12e92be54ec0dad8ee990dd5f\t: Add uk.cc, ec.cc, eu.cc, gu.cc, us.cc to PSL (#2645)",
+      "date":"2026-01-05T18:10:01.173+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"25d100199dd39263ee00b2b8a125a6a121905cefc814a7679ed3bbe135748ade"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2025.362.1 1ef6d3bc102c85d12e92be54ec0dad8ee990dd5f"
+    },
+    {
+      "changes":"2026.7.0 1ae64cea692daa5b6a9aa403631f0397e3433203\t: FIXED #2619 / #2729 (#2732)\n\nRemoved and re-added Hercules entries in the public suffix list.\r\n2026.7.1 53cafd4ef52f8121b892c0f7ccece7f163509eb8\t: Update contact information indevs.in (#2730)\r\n2026.7.2 ea80631703315ae9f16a6d95f38262e2afc4edee\t: Remove perso.sn (#2693)\r\n2026.7.3 5a923762fb9bdf498ec3feda0cbf4075ff3749d8\t: Remove AVStack entries from public_suffix_list.dat (#2688)\n\nRemoved entries related to AVStack Pte. Ltd. from the public suffix list.\r\n2026.7.4 9b4c0b6bcb0fafce75b0040a274bd1a9a3713199\t: Remove TwoDNS entries (#2689)\n\nRemoved entries related to TwoDNS from the public suffix list.\r\n2026.7.5 84ec50da2dfc39528e71ac99740800db687e8c78\t: Remove skygearapp.com (#2691)\r\n2026.7.6 6aad681b718fff8d10285e8e12460ef0aa49ddd2\t: Remove Authentick UG entry (#2692)\r\n2026.7.7 c31f9acf86ab34199f11634fea42b1ff6346f4a6\t: Add deuxfleurs.eu and deuxfleurs.page (#2727)\r\n2026.8.0 2218b3633b8bb5121e127a3f23d8dac809018f77\t: added *.bwcloud-os-instance.de (#2728)\r\n2026.9.0 6b35badef402235289e85f09b29b07c651159b68\t: util: gTLD data autopull updates for 2026-01-08T15:25:34 UTC (#2738) `.TOP` RO change\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.9.1 6e5697a037da7d0a848e269cf9a9429b91817f22\t: Add eliv-api.kr (#2735)",
+      "date":"2026-01-09T17:52:29.394+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"23538c19b647afebd949b3dbcac445e9fa8d0c252693742572842a62dcdc952b"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.9.1 6e5697a037da7d0a848e269cf9a9429b91817f22"
+    },
+    {
+      "changes":"2026.13.0 3fe97e93dc111b13d36af21dc538f6a24de8c52d\t: Add base44.app and base44-sandbox.com to Wix.com section (#2736)\r\n2026.16.0 944fb53321606f08740f04ef7c386f64df34ff76\t: Add kiloapps.ai, kiloapps.io to PRIVATE section (#2701)",
+      "date":"2026-01-19T16:13:18.176+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"8932f171723344c037d0f4a7fe5e4c553880f6f70e3e3e317ea15383c6e3e4e2"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.16.0 944fb53321606f08740f04ef7c386f64df34ff76"
+    },
+    {
+      "changes":"2026.20.0 d372af084b07ad6f6d26b3d63abeee1738456c09\t: Add spawnbase.app (#2742)",
+      "date":"2026-01-22T12:08:48.841+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"1c49afac15f7e4d9b161be383aaa3f16d3a95af4a28c33fb804145600aace416"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.20.0 d372af084b07ad6f6d26b3d63abeee1738456c09"
     }
   ],
   "installed":{
-    "changes":"2025.328.0 bf4f2d47e2b6a58eb160df6deba3acb217f7f9a2\t: Add xtooldevice.com (#2613)\r\n2025.328.1 6be64e4d01d9e5dde6afab60154c546e3caecd14\t: add sld ᬩᬮᬶ.id (#2673)\r\n2025.328.2 565e9dc7907cba1b3ae6b6d588120ec54d789806\t: Add grebedoc.dev (#2664)\r\n2025.330.0 d572776986ac2431fe72536339cf23c52d36d9ee\t: Brave Submissions to the Public Suffix List - Q4 2025 (#2668)\r\n2025.330.1 57fe3782c08b97be51672e098c9ccc529538b408\t: Remove `obl.ong` (#2368)\r\n2025.330.2 d74821138fd58ad8caab21d3b91f1a7fa3c09e91\t: Add Microsoft Azure US government cloud service domains (#2660)\n\n* Add US government cloud service domains\r\n2025.330.3 7456e993bf8822a643b3f807234ae2a76f6f6512\t: Add Gadget Software Inc. domains: `gadget.app` and `gadget.host` (#2666)\r\n2025.331.0 d3567de748c61e2de5a3156cc52ef0e0fdc1dc0c\t: Add AgentbaseAI *.auiusercontent.com to public suffix list (#2676)\r\n2025.338.0 f6e59d0fcbf77987d8dff6ba69a7700026a6141b\t: Remove lk3.ru (#1149) (#2682)\r\n2025.338.1 a79ee032efd3a77ed6b107e0be702c4f547d8f29\t: Add new public suffix 'preview.emergentagent.com' (#2681)\r\n2025.338.2 ea600e443a922cd3f1e2f96e1db3f860d0b097ea\t: Add Redpanda Data entries for rdpa.co (#2679)\r\n2025.340.0 24874d0227995dff18964458432da2b987eb4837\t: util: gTLD data autopull updates for 2025-12-06T15:17:26 UTC (#2686)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520\t: Adding co.scot, me.scot, and org.scot (#2683)",
-    "date":"2025-12-08T14:51:51.778+01:00",
+    "changes":"2026.23.0 f429d72bab7aadaed365fed57afe7bb38906a029\t: Add shiptoday to Public Suffix List (#2753)\r\n2026.23.1 17c84fbc603f0990073b83f5b73e7fed5680da31\t: Add discourse.diy (#2748)\r\n2026.23.2 d090f4ea5c77195d0c82c08cd5c773ea9fb21af6\t: Add `corespeed.app` (#2743)\r\n2026.23.3 2bb8b06cc2e02a81121552f8edccb045f0e3040b\t: Add miren.app and miren.systems (#2749)\r\n2026.25.0 6c40921fc61160568b101aff506d548ba3300ba6\t: AWS Submissions to the Public Suffix List - Q4 2025 (#2656)\r\n2026.29.0 f7f358a9fd6e42b21578dd850e5355e726174e0d\t: Add sol.site (#2746)\r\n2026.29.1 2c58444d6538c6f8d8b8ed7816809938a6ccba2f\t: Add crm.dev subdomains (#2734)\r\n2026.29.2 89871fd9b00edccf2cbbf6d33f3b7f6b2fc99536\t: util: gTLD data autopull updates for 2026-01-29T15:35:05 UTC (#2758)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.29.3 b3b679163072581b2c8afcc8b94c79772fa5c679\t: Add Keenetic KeenDNS domains (#2713)\r\n2026.33.0 0655e33693931345844eb05b97a851d85b9233bd\t: remove 12chars block (#2760)\r\n2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919\t: Add new public suffixes for US Government cloud Azure services (#2700)\n\n* Add new public suffixes for Azure services\n\nAdding usgovtrafficmanager.net and blob.core.usgovcloudapi.net to Public Suffix List\n\n* Add new public suffixes for Azure services",
+    "date":"2026-02-03T10:19:59.523+01:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -1650,7 +1783,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"74c6de09a8f99ec3af903e83f628104ea911979b7d89e1379f63a1a817426cd7"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"342593764635f7a1a886fd2725ed585a13cd517f0f1936c50baf8a6fca77983f"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1661,7 +1794,7 @@
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
     "signatures":{},
-    "version":"2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520"
+    "version":"2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919"
   },
   "minJRE":null,
   "provider":"github-clone",

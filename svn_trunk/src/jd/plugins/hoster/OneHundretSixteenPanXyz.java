@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52263 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +70,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "116pan.xyz" }); // formerly known as 116pan.com
+        ret.add(new String[] { "116pan.xyz", "116pan.com" }); // formerly known as 116pan.com
         return ret;
     }
     // @Override
