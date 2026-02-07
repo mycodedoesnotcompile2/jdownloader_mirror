@@ -750,16 +750,10 @@ public class MultiHostAccountSettingsPanelBuilder {
     }
 
     private ExtTextColumn<MultiHostHost> createCreatedColumn() {
-        return new ExtTextColumn<MultiHostHost>("Data age") {
+        return new ExtTextColumn<MultiHostHost>("Last updated timestamp") {
             @Override
             public String getStringValue(final MultiHostHost mhost) {
-                final long timestamp = mhost.getUpdateTimestamp();
-                if (timestamp <= 0) {
-                    return "unknown";
-                }
-                final long currentTime = System.currentTimeMillis();
-                final long elapsedMillis = currentTime - timestamp;
-                return CaptchaSolverAccountSettingsPanelBuilder.formatElapsedTime(elapsedMillis);
+                return new ElapsedTimeFormatter().setUseNaturalLanguage(true).formatTimestamp(mhost.getUpdateTimestamp());
             }
 
             @Override

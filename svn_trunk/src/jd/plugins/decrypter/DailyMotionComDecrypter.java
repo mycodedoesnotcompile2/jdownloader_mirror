@@ -26,14 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -58,8 +50,16 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DailyMotionCom;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52123 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52268 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,6 +91,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         String contenturl = param.getCryptedUrl().replace("embed/video/", "video/").replaceAll("\\.com/swf(/video)?/", ".com/video/").replace("http://", "https://");
         // embedded video player -> rewrite URL
         contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player/[a-z0-9]+.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
+        contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player\\.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
         br.setFollowRedirects(true);
         DailyMotionCom.prepBrowser(this.br);
         synchronized (ctrlLock) {
@@ -246,8 +247,14 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         FilePackage fp = null;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
-            final PostRequest playlistPagination = br.createJSonPostRequest(DailyMotionCom.API_BASE_GRAPHQL, "{\"operationName\":\"DESKTOP_COLLECTION_VIDEO_QUERY\",\"variables\":{\"xid\":\"" + playlist_id + "\",\"pageCV\":" + page
-                    + ",\"allowExplicit\":false},\"query\":\"fragment COLLECTION_BASE_FRAGMENT on Collection {\\n  id\\n  xid\\n  updatedAt\\n  __typename\\n}\\n\\nfragment COLLECTION_IMAGES_FRAGMENT on Collection {\\n  thumbURLx60: thumbnailURL(size: \\\"x60\\\")\\n  thumbURLx120: thumbnailURL(size: \\\"x120\\\")\\n  thumbURLx180: thumbnailURL(size: \\\"x180\\\")\\n  thumbURLx240: thumbnailURL(size: \\\"x240\\\")\\n  thumbURLx360: thumbnailURL(size: \\\"x360\\\")\\n  thumbURLx480: thumbnailURL(size: \\\"x480\\\")\\n  thumbURLx720: thumbnailURL(size: \\\"x720\\\")\\n  __typename\\n}\\n\\nfragment CHANNEL_BASE_FRAGMENT on Channel {\\n  id\\n  xid\\n  name\\n  displayName\\n  isArtist\\n  logoURL(size: \\\"x60\\\")\\n  isFollowed\\n  accountType\\n  __typename\\n}\\n\\nfragment CHANNEL_IMAGES_FRAGMENT on Channel {\\n  coverURLx375: coverURL(size: \\\"x375\\\")\\n  __typename\\n}\\n\\nfragment CHANNEL_UPDATED_FRAGMENT on Channel {\\n  isFollowed\\n  stats {\\n    views {\\n      total\\n      __typename\\n    }\\n    followers {\\n      total\\n      __typename\\n    }\\n    videos {\\n      total\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment CHANNEL_NORMAL_FRAGMENT on Channel {\\n  ...CHANNEL_BASE_FRAGMENT\\n  ...CHANNEL_IMAGES_FRAGMENT\\n  ...CHANNEL_UPDATED_FRAGMENT\\n  __typename\\n}\\n\\nfragment ALTERNATIVE_VIDEO_BASE_FRAGMENT on Video {\\n  id\\n  xid\\n  title\\n  description\\n  thumbnail: thumbnailURL(size: \\\"x240\\\")\\n  thumbURLx60: thumbnailURL(size: \\\"x60\\\")\\n  thumbURLx120: thumbnailURL(size: \\\"x120\\\")\\n  thumbURLx240: thumbnailURL(size: \\\"x240\\\")\\n  thumbURLx360: thumbnailURL(size: \\\"x360\\\")\\n  thumbURLx480: thumbnailURL(size: \\\"x480\\\")\\n  thumbURLx720: thumbnailURL(size: \\\"x720\\\")\\n  thumbURLx1080: thumbnailURL(size: \\\"x1080\\\")\\n  bestAvailableQuality\\n  viewCount\\n  duration\\n  createdAt\\n  isInWatchLater\\n  isLiked\\n  isWatched\\n  isExplicit\\n  canDisplayAds\\n  stats {\\n    views {\\n      total\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment COLLECTION_UPDATED_FRAGMENT on Collection {\\n  name\\n  description\\n  stats {\\n    videos {\\n      total\\n      __typename\\n    }\\n    __typename\\n  }\\n  videos(first: 15, page: $pageCV, allowExplicit: $allowExplicit) {\\n    pageInfo {\\n      hasNextPage\\n      nextPage\\n      __typename\\n    }\\n    edges {\\n      node {\\n        __typename\\n        ...ALTERNATIVE_VIDEO_BASE_FRAGMENT\\n        channel {\\n          ...CHANNEL_BASE_FRAGMENT\\n          __typename\\n        }\\n      }\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment COLLECTION_FRAGMENT on Collection {\\n  ...COLLECTION_BASE_FRAGMENT\\n  ...COLLECTION_UPDATED_FRAGMENT\\n  ...COLLECTION_IMAGES_FRAGMENT\\n  channel {\\n    ...CHANNEL_NORMAL_FRAGMENT\\n    __typename\\n  }\\n  __typename\\n}\\n\\nquery DESKTOP_COLLECTION_VIDEO_QUERY($xid: String!, $pageCV: Int!, $allowExplicit: Boolean) {\\n  collection(xid: $xid) {\\n    ...COLLECTION_FRAGMENT\\n    __typename\\n  }\\n}\\n\"}");
+            final PostRequest playlistPagination = br
+                    .createJSonPostRequest(
+                            DailyMotionCom.API_BASE_GRAPHQL,
+                            "{\"operationName\":\"DESKTOP_COLLECTION_VIDEO_QUERY\",\"variables\":{\"xid\":\""
+                                    + playlist_id
+                                    + "\",\"pageCV\":"
+                                    + page
+                                    + ",\"allowExplicit\":false},\"query\":\"fragment COLLECTION_BASE_FRAGMENT on Collection {\\n  id\\n  xid\\n  updatedAt\\n  __typename\\n}\\n\\nfragment COLLECTION_IMAGES_FRAGMENT on Collection {\\n  thumbURLx60: thumbnailURL(size: \\\"x60\\\")\\n  thumbURLx120: thumbnailURL(size: \\\"x120\\\")\\n  thumbURLx180: thumbnailURL(size: \\\"x180\\\")\\n  thumbURLx240: thumbnailURL(size: \\\"x240\\\")\\n  thumbURLx360: thumbnailURL(size: \\\"x360\\\")\\n  thumbURLx480: thumbnailURL(size: \\\"x480\\\")\\n  thumbURLx720: thumbnailURL(size: \\\"x720\\\")\\n  __typename\\n}\\n\\nfragment CHANNEL_BASE_FRAGMENT on Channel {\\n  id\\n  xid\\n  name\\n  displayName\\n  isArtist\\n  logoURL(size: \\\"x60\\\")\\n  isFollowed\\n  accountType\\n  __typename\\n}\\n\\nfragment CHANNEL_IMAGES_FRAGMENT on Channel {\\n  coverURLx375: coverURL(size: \\\"x375\\\")\\n  __typename\\n}\\n\\nfragment CHANNEL_UPDATED_FRAGMENT on Channel {\\n  isFollowed\\n  stats {\\n    views {\\n      total\\n      __typename\\n    }\\n    followers {\\n      total\\n      __typename\\n    }\\n    videos {\\n      total\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment CHANNEL_NORMAL_FRAGMENT on Channel {\\n  ...CHANNEL_BASE_FRAGMENT\\n  ...CHANNEL_IMAGES_FRAGMENT\\n  ...CHANNEL_UPDATED_FRAGMENT\\n  __typename\\n}\\n\\nfragment ALTERNATIVE_VIDEO_BASE_FRAGMENT on Video {\\n  id\\n  xid\\n  title\\n  description\\n  thumbnail: thumbnailURL(size: \\\"x240\\\")\\n  thumbURLx60: thumbnailURL(size: \\\"x60\\\")\\n  thumbURLx120: thumbnailURL(size: \\\"x120\\\")\\n  thumbURLx240: thumbnailURL(size: \\\"x240\\\")\\n  thumbURLx360: thumbnailURL(size: \\\"x360\\\")\\n  thumbURLx480: thumbnailURL(size: \\\"x480\\\")\\n  thumbURLx720: thumbnailURL(size: \\\"x720\\\")\\n  thumbURLx1080: thumbnailURL(size: \\\"x1080\\\")\\n  bestAvailableQuality\\n  viewCount\\n  duration\\n  createdAt\\n  isInWatchLater\\n  isLiked\\n  isWatched\\n  isExplicit\\n  canDisplayAds\\n  stats {\\n    views {\\n      total\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment COLLECTION_UPDATED_FRAGMENT on Collection {\\n  name\\n  description\\n  stats {\\n    videos {\\n      total\\n      __typename\\n    }\\n    __typename\\n  }\\n  videos(first: 15, page: $pageCV, allowExplicit: $allowExplicit) {\\n    pageInfo {\\n      hasNextPage\\n      nextPage\\n      __typename\\n    }\\n    edges {\\n      node {\\n        __typename\\n        ...ALTERNATIVE_VIDEO_BASE_FRAGMENT\\n        channel {\\n          ...CHANNEL_BASE_FRAGMENT\\n          __typename\\n        }\\n      }\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment COLLECTION_FRAGMENT on Collection {\\n  ...COLLECTION_BASE_FRAGMENT\\n  ...COLLECTION_UPDATED_FRAGMENT\\n  ...COLLECTION_IMAGES_FRAGMENT\\n  channel {\\n    ...CHANNEL_NORMAL_FRAGMENT\\n    __typename\\n  }\\n  __typename\\n}\\n\\nquery DESKTOP_COLLECTION_VIDEO_QUERY($xid: String!, $pageCV: Int!, $allowExplicit: Boolean) {\\n  collection(xid: $xid) {\\n    ...COLLECTION_FRAGMENT\\n    __typename\\n  }\\n}\\n\"}");
             br.openRequestConnection(playlistPagination);
             br.loadConnection(null);
             Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());

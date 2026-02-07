@@ -44,6 +44,33 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import jd.PluginWrapper;
+import jd.config.Property;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.HashResult;
+
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
@@ -88,33 +115,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.config.Property;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.HashResult;
-
-@HostPlugin(revision = "$Revision: 52044 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52268 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -303,8 +304,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         if (getMegaNzConfig().is5GBFreeLimitEnabled() && !isPremium && link.getView().getBytesTotal() > 5368709120l) {
             /**
              * 2024-07-02: Skip files over 5GB as we cannot download them in free mode and user has configured plugin to skip them
-             * immediately, see: </br>
-             * https://board.jdownloader.org/showthread.php?t=75268
+             * immediately, see: </br> https://board.jdownloader.org/showthread.php?t=75268
              */
             throw new AccountRequiredException("Free download of files >5GB is disabled in plugin settings");
         }
@@ -429,6 +429,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                     fileKey = getUserInput("Decryption key?", link);
                     askedUserForDecryptKey = true;
                 }
+                // see crypto_procattr
                 fileInfo = decrypt(at, fileKey);
                 keySuccess = true;
                 break;
@@ -460,6 +461,10 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         final String fileName = valueOf(fileInfo.get("n"));
         if (fileName == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final long lastModified = getTimestamp(this, fileInfo);
+        if (lastModified != -1) {
+            link.setLastModifiedTimestamp(lastModified);
         }
         link.setFinalFileName(fileName.replaceAll("\\\\", ""));
         try {
@@ -505,8 +510,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             final String sid = apiLogin(account);
-            final Map<String, Object> uq = apiRequest(account, sid, null, "uq"/* userQuota */, new Object[] { "xfer"/* xfer */, 1 },
-                    new Object[] { "pro"/* pro */, 1 });
+            final Map<String, Object> uq = apiRequest(account, sid, null, "uq"/* userQuota */, new Object[] { "xfer"/* xfer */, 1 }, new Object[] { "pro"/* pro */, 1 });
             if (uq == null || uq.size() == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -762,8 +766,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     try {
-                        response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail },
-                                new Object[] { "uh"/* emailHash */, uh });
+                        response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail }, new Object[] { "uh"/* emailHash */, uh });
                     } catch (PluginException e) {
                         if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM && e.getValue() == PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE && account.getBooleanProperty("mfa", Boolean.FALSE)) {
                             try {
@@ -771,8 +774,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                                 mfaDialog.setTimeout(5 * 60 * 1000);
                                 final InputDialogInterface handler = UIOManager.I().show(InputDialogInterface.class, mfaDialog);
                                 handler.throwCloseExceptions();
-                                response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail },
-                                        new Object[] { "uh"/* emailHash */, uh }, new Object[] { "mfa"/* ping */, handler.getText() });
+                                response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail }, new Object[] { "uh"/* emailHash */, uh }, new Object[] { "mfa"/* ping */, handler.getText() });
                             } catch (DialogNoAnswerException e2) {
                                 throw Exceptions.addSuppressed(e, e2);
                             }
@@ -983,6 +985,28 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             }
         }
         return result_aLong;
+    }
+
+    public static long getTimestamp(Plugin plugin, Map<String, Object> fileAttrMap) {
+        if (fileAttrMap.get("t") instanceof Number) {
+            return ((Number) fileAttrMap.get("t")).longValue();
+        } else if (fileAttrMap.get("c") instanceof String) {
+            try {
+                final byte[] h = Base64.decode(toBase64(fileAttrMap.get("c").toString()));
+                final int count = h[16];
+                if (count <= 4) {
+                    // FIXME: change to 5 before the year 2106
+                    long t = 0;
+                    for (int i = count - 1; i >= 0; i--) {
+                        t = t * 256 + h[17 + i];
+                    }
+                    return t;
+                }
+            } catch (Exception e) {
+                plugin.getLogger().log(e);
+            }
+        }
+        return -1;
     }
 
     public static String calcuate_login_hash_uh(final String email, final long[] password) throws Exception {
@@ -1356,8 +1380,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     /**
      * MEGA limits can be tricky: They can sit on specific files, on IP ("global limit") or also quota based (also global) e.g. 5GB per day
      * per IP or per Free-Account. For these reasons the user can define the max wait time. The wait time given by MEGA must not be true.
-     * </br>
-     * 2021-01-21 TODO: Use this for ALL limit based errors
+     * </br> 2021-01-21 TODO: Use this for ALL limit based errors
      */
     private void fileOrIPDownloadlimitReached(final Account account, final String msg, final long waitMilliseconds) throws PluginException {
         final MegaNzConfig config = getMegaNzConfig();
@@ -1680,10 +1703,10 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                             link.setInternalTmpFilename(null);
                         } catch (final Throwable e) {
                         }
-                        final Number lastModifiedDate = (Number) link.getProperty("ts");
-                        if (lastModifiedDate != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
+                        final long lastModifiedDate = link.getLastModifiedTimestamp();
+                        if (lastModifiedDate != -1 && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
                             /* set desired/original lastModified timestamp */
-                            dst.setLastModified(lastModifiedDate.longValue() * 1000);
+                            dst.setLastModified(lastModifiedDate * 1000);
                         }
                         new MegaHashCheck(link, dst).finalHashResult();
                     }

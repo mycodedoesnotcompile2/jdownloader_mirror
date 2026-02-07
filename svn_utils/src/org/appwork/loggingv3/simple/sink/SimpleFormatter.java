@@ -81,8 +81,8 @@ public class SimpleFormatter implements Formatter {
         private int i;
     }
 
-    protected int            maxThreadNameLength;
-    protected int            maxSourceStringLength;
+    protected int          maxThreadNameLength;
+    protected int          maxSourceStringLength;
     protected IByReference offsetForthreadID;
     protected IByReference offsetForThreadName;
     protected IByReference offsetForTimestamp;
@@ -115,7 +115,7 @@ public class SimpleFormatter implements Formatter {
     }
 
     protected String createPre(LogRecord2 record, String sourceString) {
-        return "--" + fillPre(String.valueOf(record.threadID), " ", offsetForthreadID) + fillPost("(" + abbr(record.threadName, maxThreadNameLength) + ")", " ", offsetForThreadName) + " " + fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - " + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
+        return "--" + fillPre(String.valueOf(record.threadID), " ", offsetForthreadID) + fillPost("(" + abbr(record.threadName, maxThreadNameLength) + ")", " ", offsetForThreadName) + " " + fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
     }
 
     /**

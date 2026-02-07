@@ -378,9 +378,7 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                 if (lastEntry == null) {
                     return "never";
                 }
-                final long currentTime = System.currentTimeMillis();
-                final long elapsedMillis = currentTime - lastEntry.getTimestamp();
-                return formatElapsedTime(elapsedMillis);
+                return new ElapsedTimeFormatter().setUseNaturalLanguage(true).formatTimestamp(lastEntry.getTimestamp());
             }
 
             @Override
@@ -514,41 +512,5 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                 }
             }
         };
-    }
-
-    /**
-     * Formats elapsed time in milliseconds to a human-readable string. Examples: "1 minute ago", "2 hours ago", "3 days ago", "never" TODO:
-     * Move this somewhere else (TimeFormatter?) and add localization.
-     *
-     * @param elapsedMillis
-     *            The elapsed time in milliseconds
-     * @return A formatted string representing the elapsed time
-     */
-    public static String formatElapsedTime(final long elapsedMillis) {
-        if (elapsedMillis < 0) {
-            return "never";
-        }
-        final long seconds = elapsedMillis / 1000;
-        final long minutes = seconds / 60;
-        final long hours = minutes / 60;
-        final long days = hours / 24;
-        final long weeks = days / 7;
-        final long months = days / 30;
-        final long years = days / 365;
-        if (seconds < 60) {
-            return seconds == 1 ? "1 second ago" : seconds + " seconds ago";
-        } else if (minutes < 60) {
-            return minutes == 1 ? "1 minute ago" : minutes + " minutes ago";
-        } else if (hours < 24) {
-            return hours == 1 ? "1 hour ago" : hours + " hours ago";
-        } else if (days < 7) {
-            return days == 1 ? "1 day ago" : days + " days ago";
-        } else if (weeks < 4) {
-            return weeks == 1 ? "1 week ago" : weeks + " weeks ago";
-        } else if (months < 12) {
-            return months == 1 ? "1 month ago" : months + " months ago";
-        } else {
-            return years == 1 ? "1 year ago" : years + " years ago";
-        }
     }
 }

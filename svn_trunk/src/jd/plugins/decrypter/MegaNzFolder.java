@@ -23,25 +23,6 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.storage.config.MaxTimeSoftReference;
-import org.appwork.storage.config.MaxTimeSoftReferenceCleanupCallback;
-import org.appwork.storage.simplejson.JSonParser;
-import org.appwork.storage.simplejson.JSonValue;
-import org.appwork.storage.simplejson.MinimalMemoryMap;
-import org.appwork.utils.ByteArrayWrapper;
-import org.appwork.utils.IO;
-import org.appwork.utils.JVMVersion;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.plugins.components.config.MegaNzConfig.InvalidOrMissingDecryptionKeyAction;
-import org.jdownloader.plugins.components.config.MegaNzFolderConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GeneralSettings;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.LinkCrawler;
@@ -63,7 +44,24 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.MegaNz;
 
-@DecrypterPlugin(revision = "$Revision: 51681 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.config.MaxTimeSoftReference;
+import org.appwork.storage.config.MaxTimeSoftReferenceCleanupCallback;
+import org.appwork.storage.simplejson.JSonParser;
+import org.appwork.storage.simplejson.JSonValue;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
+import org.appwork.utils.ByteArrayWrapper;
+import org.appwork.utils.IO;
+import org.appwork.utils.JVMVersion;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.plugins.components.config.MegaNzConfig.InvalidOrMissingDecryptionKeyAction;
+import org.jdownloader.plugins.components.config.MegaNzFolderConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52268 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaNz.class })
 public class MegaNzFolder extends PluginForDecrypt {
     private static AtomicLong CS = new AtomicLong(System.currentTimeMillis());
@@ -96,8 +94,7 @@ public class MegaNzFolder extends PluginForDecrypt {
     public static final Pattern PATTERN_FOLDER_NEW                = Pattern.compile("folder/([a-zA-Z0-9]+)((?:#|%23)([a-zA-Z0-9_-]+))?(/(file|folder)/([a-zA-Z0-9]+))?", Pattern.CASE_INSENSITIVE);
 
     /**
-     * Returns ID of preferred subfolder or file. </br>
-     * Returns non-validated result!
+     * Returns ID of preferred subfolder or file. </br> Returns non-validated result!
      */
     private static String getPreferredNodeID(final String url) {
         String id = new Regex(url, PATTERN_FOLDER_NEW).getMatch(5);
@@ -351,7 +348,6 @@ public class MegaNzFolder extends PluginForDecrypt {
                     }
                     final Object response;
                     try {
-                        final boolean lastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
                         JSonParser factory = new JSonParser(IO.BOM.read(IO.readStream(-1, con.getInputStream()), IO.BOM.UTF8.getCharSet())) {
                             @Override
                             protected Map<String, ? extends Object> createJSonObject() {
@@ -363,9 +359,6 @@ public class MegaNzFolder extends PluginForDecrypt {
                                 if (("p".equals(key) || "u".equals(key)) && value instanceof String) {
                                     // dedupe parent node (ID)
                                     value = dedupeString((String) value);
-                                } else if ("ts".equals(key) && !lastModified) {
-                                    // remove unused timestamp
-                                    return;
                                 }
                                 super.putKeyValuePair(newPath, map, key, value);
                             }
@@ -530,6 +523,7 @@ public class MegaNzFolder extends PluginForDecrypt {
                         if (!success) {
                             throw new DecrypterException(DecrypterException.PASSWORD);
                         }
+                        // see crypto_procattr
                         nodeAttr = decrypt(encryptedNodeAttr, nodeKey);
                         if (nodeAttr != null) {
                             break;
@@ -702,7 +696,6 @@ public class MegaNzFolder extends PluginForDecrypt {
                 // alternative: https://mega.nz/folder/folderID#masterKey/file/nodeID
                 link.setProperty("fa", toObject(folderNode.get("fa")));// file attributes
                 link.setFinalFileName(nodeName);
-                link.setProperty("ts", folderNode.get("ts"));
                 if (path != null) {
                     link.setRelativeDownloadFolderPath(path);
                     /*

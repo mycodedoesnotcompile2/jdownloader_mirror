@@ -28,17 +28,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.config.SerienStreamToConfig;
+import org.jdownloader.plugins.components.config.SerienStreamToConfig.SeasonCrawlMode;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.gui.UserIO;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
@@ -51,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52254 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52270 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -160,6 +161,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final SerienStreamToConfig cfg = (SerienStreamToConfig) PluginJsonConfig.get(this.getConfigInterface());
         final boolean isNewWebsite = new Regex(contenturl, TYPE_SERIES_NEW).patternFind();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String seriesTitle = null;
@@ -183,61 +185,92 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
         final String seriesTitleSlug = urlinfo_series.getMatch(0);
         final String seasonNumberStrFromURL = urlinfo_series.getMatch(2);
-        if (seasonNumberStrFromURL == null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /*
-             * No season slug given -> Use season 1 as default to get same results as website which displays episodes of season 1 if no
-             * season is given in URL.
-             */
-            /* Crawl all user selected seasons */
-            /* TODO: Finish implementation */
-            final String[] seasonNumbers = br.getRegex(seriesTitleSlug + "/staffel-(\\d+)").getColumn(0);
-            if (seasonNumbers == null || seasonNumbers.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final List<String> seasonNumbersWithoutDupes = new ArrayList<String>();
-            for (final String seasonNumber : seasonNumbers) {
-                if (seasonNumbersWithoutDupes.contains(seasonNumber)) {
-                    continue;
-                }
-                seasonNumbersWithoutDupes.add(seasonNumber);
-            }
-            final List<String> selectedSeasonNumbers = new ArrayList<String>();
-            if (seasonNumbersWithoutDupes.size() > 1) {
-                // TODO: Ask user
-            }
-            logger.info("Selected seasons by user: " + "TODO/" + seasonNumbersWithoutDupes.size());
-            if (selectedSeasonNumbers.remove("1")) {
-                final ArrayList<DownloadLink> episodes = this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, "1");
-                if (selectedSeasonNumbers.isEmpty()) {
-                    /*
-                     * User wants only season 1 -> Episodes of season 1 are already in html code so we can crawl them right away without the
-                     * need to do any additional html requests
-                     */
-                    return episodes;
-                }
-                ret.addAll(episodes);
-            }
-            // TODO: Add logic to crawl the rest of users' selected seasons
-        }
         final String episodeNumberStr = urlinfo_series.getMatch(4);
         if (seriesTitle == null) {
             logger.warning("Failed to find seriesTitle -> Using fallback: " + seriesTitleSlug);
             seriesTitle = seriesTitleSlug.replace("-", " ").trim();
         }
         seriesTitle = Encoding.htmlDecode(seriesTitle).trim();
+        if (episodeNumberStr == null) {
+            /* No single episode number given -> Crawl current- or selected seasons */
+            if (seasonNumberStrFromURL != null) {
+                /* Crawl season from url */
+                return this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, seasonNumberStrFromURL);
+            }
+            /* Crawl seasons selected by user */
+            /*
+             * No season slug given -> Use season 1 as default to get same results as website which displays episodes of season 1 if no
+             * season is given in URL.
+             */
+            /* Crawl all user selected seasons */
+            final String[] seasonNumbers = br.getRegex(seriesTitleSlug + "/staffel-(\\d+)").getColumn(0);
+            if (seasonNumbers == null || seasonNumbers.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            /* Season numbers without dupes */
+            final List<String> seasonNumbersFinal = new ArrayList<String>();
+            for (final String seasonNumber : seasonNumbers) {
+                if (seasonNumbersFinal.contains(seasonNumber)) {
+                    continue;
+                }
+                seasonNumbersFinal.add(seasonNumber);
+            }
+            final SeasonCrawlMode mode = cfg.getSeasonCrawlMode();
+            final List<String> selectedSeasonNumbers = new ArrayList<String>();
+            if (seasonNumbersFinal.size() > 1 && mode == SeasonCrawlMode.ASK) {
+                final String[] userOptions = new String[seasonNumbersFinal.size()];
+                for (int i = 0; i < seasonNumbersFinal.size(); i++) {
+                    userOptions[i] = "Staffel " + seasonNumbersFinal.get(i);
+                }
+                final int[] selectedItems = UserIO.getInstance().requestMultiSelectionDialog(0, episodeTitle, "Staffelauswahl für " + seriesTitle, userOptions, null, "Ausgewählte Staffeln crawlen", "Nichts crawlen", null);
+                if (selectedItems == null) {
+                    logger.info("User aborted season crawl dialog -> Crawling nothing");
+                    return ret;
+                } else if (selectedItems.length == 0) {
+                    logger.info("User selected zero seasons to crawl in season crawl dialog -> Crawling nothing");
+                    return ret;
+                }
+                for (final int selectedItemIndex : selectedItems) {
+                    selectedSeasonNumbers.add(seasonNumbersFinal.get(selectedItemIndex));
+                }
+            } else if (mode == SeasonCrawlMode.FIRST_SEASON_PRESENTED_IN_BROWSER) {
+                /* Crawl first season only */
+                /* Important: First season does not have to be season 1! It can also be season 0!! */
+                selectedSeasonNumbers.add(seasonNumbersFinal.get(0));
+            } else {
+                /* Crawl all seasons */
+                selectedSeasonNumbers.addAll(seasonNumbersFinal);
+            }
+            logger.info("Selected seasons by user: " + selectedSeasonNumbers.size() + "/" + seasonNumbersFinal.size() + " | " + selectedSeasonNumbers);
+            /* Check if first season is in user selection */
+            final String firstSeason = seasonNumbersFinal.get(0);
+            if (selectedSeasonNumbers.remove(firstSeason)) {
+                final ArrayList<DownloadLink> episodes = this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, firstSeason);
+                if (selectedSeasonNumbers.isEmpty()) {
+                    /*
+                     * User wants only first season -> Episodes of that season are already in html code so we can crawl them right away
+                     * without the need to do any additional html requests
+                     */
+                    /* Early return */
+                    return episodes;
+                }
+                ret.addAll(episodes);
+            }
+            for (final String seasonNumStr : selectedSeasonNumbers) {
+                final String url = br.getURL() + "/staffel-" + seasonNumStr;
+                final DownloadLink link = this.createDownloadlink(url);
+                ret.add(link);
+            }
+            return ret;
+        }
         /* 2026-01-30: Movies are listed as season 0 and then have "normal" episode numbers starting from 1. */
         // final boolean isMovie = seriesSeasonNumberStr.equals("0");
         final Set<String> dupes = new HashSet<String>();
-        if (episodeNumberStr == null) {
-            /* No specific episode/film -> Crawl all episodes of a season */
-            if (seasonNumberStrFromURL != null) {
-                return this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, seasonNumberStrFromURL);
-            } else {
-                /* No specific season number given -> Crawl season 1 */
-                return this.crawlCurrentSeason(param, contenturl, seriesTitleSlug, "1");
-            }
-        }
         /* Assume we got a single episode or film -> Crawl all mirrors */
+        /* Check for offline status */
+        if (br.containsHTML(">\\s*😰 Kein Videoplayer für diese Episode verfügbar|>\\s*Bitte schaue später noch einmal vorbei oder melde dieses Problem")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final List<String> allRedirectURLs = new ArrayList<String>();
         /* Collect and group mirrors */
         String[] newsite_languages = null;
@@ -333,7 +366,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         final Set<String> userLanguageIDsPrioList = new LinkedHashSet<String>();
         final Set<String> userHosterPrioList = new LinkedHashSet<String>();
         /* Collect language name -> ID mapping if needed */
-        final String userLanguagePrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getLanguagePriorityString();
+        final String userLanguagePrioListStr = cfg.getLanguagePriorityString();
         final Map<String, String> languageIdTitleMap = new HashMap<String, String>();
         findUserPreferredAndExistingLanguages: if (userLanguagePrioListStr != null) {
             /* Find existing languages and their internal IDs */
@@ -410,7 +443,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             }
             logger.info("Found " + userLanguageIDsPrioList.size() + " user preferred languages: " + userLanguageIDsPrioList);
         }
-        String userHosterPrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getHosterPriorityString();
+        String userHosterPrioListStr = cfg.getHosterPriorityString();
         if (!StringUtils.isEmpty(userHosterPrioListStr)) {
             userHosterPrioListStr = userHosterPrioListStr.replace(" ", "").toLowerCase(Locale.ROOT);
             userHosterPrioList.addAll(Arrays.asList(userHosterPrioListStr.split(",")));
