@@ -75,6 +75,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Application;
 import org.appwork.utils.JDK8BufferHelper;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
@@ -127,7 +128,7 @@ public class HTTPConnectionUtils {
             if (hostNameVerifier == null) {
                 hostNameVerifier = HttpsURLConnection.getDefaultHostnameVerifier();
             }
-            Boolean hostNameVerifierResult = hostNameVerifier != null ? hostNameVerifier.verify(host, sslSession) : null;
+            final Boolean hostNameVerifierResult = hostNameVerifier != null ? hostNameVerifier.verify(host, sslSession) : null;
             if (sslSession != null && sslSession.getPeerCertificates().length > 0) {
                 final Certificate certificate = sslSession.getPeerCertificates()[0];
                 if (certificate instanceof X509Certificate) {
@@ -195,7 +196,8 @@ public class HTTPConnectionUtils {
                             }
                         }
                     }
-                    if (hostNameVerifierResult != null) {
+                    // HttpsURLConnection$DefaultHostnameVerifier always returns false
+                    if (hostNameVerifierResult != null && !ReflectionUtils.isInstanceOf("javax.net.ssl.HttpsURLConnection$DefaultHostnameVerifier", hostNameVerifier)) {
                         if (hostNameVerifierResult.booleanValue() != result) {
                             org.appwork.loggingv3.LogV3.severe("Please check NativeSSLSocketStreamFactory.verifySSLHostname for " + host + "|HostnameVerifier<" + hostNameVerifierResult + "> != verifySSLHostname<" + result + ">");
                         }

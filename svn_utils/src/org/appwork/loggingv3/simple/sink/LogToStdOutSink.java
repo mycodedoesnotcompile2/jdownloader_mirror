@@ -69,7 +69,7 @@ public class LogToStdOutSink extends AbstractSink {
                     sourceString = " (" + source.getFileName() + ":" + source.getLineNumber() + ")";
                 }
                 sourceString += "." + source.getMethodName();
-                return fillPre(timeOnly.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - " + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
+                return fillPre(timeOnly.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
             }
         };
     }

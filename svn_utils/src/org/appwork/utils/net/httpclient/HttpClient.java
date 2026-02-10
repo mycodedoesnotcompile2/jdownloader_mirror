@@ -101,7 +101,7 @@ public class HttpClient {
         private OutputStream            target          = new ByteArrayOutputStream();
         private int                     postDataLength;
         private InputStream             postDataStream;
-        private int                     readTimeout     = 0;
+        private int                     readTimeout     = -1;
         public URL                      redirectTo;
         private long                    resumePosition  = -1;
         private DownloadProgress        uploadProgress;
@@ -661,14 +661,14 @@ public class HttpClient {
                         LogV3.fine("HttpClient.connect: Starting connection.connect() to " + context.getUrl());
                     }
                     context.getConnection().connect();
-                    final long connectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectStartTime;
                     if (this.isVerboseLog()) {
+                        final long connectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectStartTime;
                         LogV3.fine("HttpClient.connect: connection.connect() completed in " + connectElapsed + "ms");
                     }
                     final long onConnectedStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     context.onConnected();
-                    final long onConnectedElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectedStartTime;
                     if (this.isVerboseLog()) {
+                        final long onConnectedElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectedStartTime;
                         LogV3.fine("HttpClient.connect: context.onConnected() completed in " + onConnectedElapsed + "ms");
                     }
                     if (Thread.interrupted()) {
@@ -690,15 +690,15 @@ public class HttpClient {
                 }
             }
         } catch (final IOException e) {
-            final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
             if (this.isVerboseLog()) {
+                final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
                 LogV3.fine("HttpClient.connect: connect method failed after " + connectMethodElapsed + "ms: " + e.getMessage());
             }
             throw new HttpClientException(context, new ReadIOException(e));
         }
         if (!returnOutputStream) {
-            final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
             if (this.isVerboseLog()) {
+                final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
                 LogV3.fine("HttpClient.connect: connect method completed (no output stream) in " + connectMethodElapsed + "ms");
             }
             return null;
@@ -708,12 +708,12 @@ public class HttpClient {
                 LogV3.fine("HttpClient.connect: Starting getOutputStream()");
             }
             final HTTPOutputStream raw = context.getConnection().getOutputStream();
-            final long getOutputStreamElapsed = Time.systemIndependentCurrentJVMTimeMillis() - getOutputStreamStartTime;
             if (this.isVerboseLog()) {
+                final long getOutputStreamElapsed = Time.systemIndependentCurrentJVMTimeMillis() - getOutputStreamStartTime;
                 LogV3.fine("HttpClient.connect: getOutputStream() completed in " + getOutputStreamElapsed + "ms");
             }
-            final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
             if (this.isVerboseLog()) {
+                final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
                 LogV3.fine("HttpClient.connect: connect method completed (with output stream) in " + connectMethodElapsed + "ms");
             }
             return raw;
@@ -724,7 +724,9 @@ public class HttpClient {
         HTTPConnection connection;
         try {
             if (context.redirectTo != null) {
-                LogV3.fine("HttpClient: Redirect " + context.getUrl() + "->" + context.redirectTo);
+                if (isVerboseLog()) {
+                    LogV3.fine("HttpClient: Redirect " + context.getUrl() + "->" + context.redirectTo);
+                }
             }
             connection = createHTTPConnection(context.redirectTo != null ? context.redirectTo : new URL(context.getUrl()), this.getProxy());
         } catch (final MalformedURLException e) {
@@ -733,9 +735,13 @@ public class HttpClient {
         connection.setTrustProvider(getTrustProvider());
         if (this.keyManagers != null) {
             connection.setKeyManagers(getKeyManagers());
-            LogV3.fine("HttpClient.createHTTPConnection: setKeyManagers on connection, length=" + getKeyManagers().length);
+            if (isVerboseLog()) {
+                LogV3.fine("HttpClient.createHTTPConnection: setKeyManagers on connection, length=" + getKeyManagers().length);
+            }
         } else {
-            LogV3.fine("HttpClient.createHTTPConnection: keyManagers is null, not setting on connection");
+            if (isVerboseLog()) {
+                LogV3.fine("HttpClient.createHTTPConnection: keyManagers is null, not setting on connection");
+            }
         }
         context.setConnection(connection);
         return connection;
@@ -1027,7 +1033,9 @@ public class HttpClient {
      */
     public RequestContext execute(final RequestContext context) throws InterruptedException, HttpClientException {
         final long executeStartTime = Time.systemIndependentCurrentJVMTimeMillis();
-        LogV3.fine("HttpClient.execute: Starting request to " + context.getUrl());
+        if (isVerboseLog()) {
+            LogV3.fine("HttpClient.execute: Starting request to " + context.getUrl());
+        }
         context.executed = true;
         context.client = this;
         this.requests.add(context);
@@ -1061,7 +1069,9 @@ public class HttpClient {
                 }
                 if (context.getPostDataStream() != null) {
                     final long postStartTime = Time.systemIndependentCurrentJVMTimeMillis();
-                    LogV3.fine("HttpClient.post: Starting POST data sending, postDataLength=" + context.getPostDataLength());
+                    if (isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: Starting POST data sending, postDataLength=" + context.getPostDataLength());
+                    }
                     if (context.getPostDataLength() < 0) {
                         connection.setRequestProperty(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED);
                     }
@@ -1086,7 +1096,9 @@ public class HttpClient {
                     }
                     // if (context.getPostDataLength() > 0) {
                     final long dataSendStartTime = Time.systemIndependentCurrentJVMTimeMillis();
-                    LogV3.fine("HttpClient.post: Starting to send " + context.getPostDataLength() + " bytes of POST data");
+                    if (isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: Starting to send " + context.getPostDataLength() + " bytes of POST data");
+                    }
                     final byte[] buffer = new byte[32767];
                     int len;
                     long totalSent = 0;
@@ -1102,10 +1114,9 @@ public class HttpClient {
                     }
                     input.close();
                     final long dataSendElapsed = Time.systemIndependentCurrentJVMTimeMillis() - dataSendStartTime;
-                    LogV3.fine("HttpClient.post: Sent " + totalSent + " bytes of POST data in " + dataSendElapsed + "ms");
-                    // } else {
-                    // LogV3.fine("HttpClient.post: postDataLength <= 0, skipping data send");
-                    // }
+                    if (isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: Sent " + totalSent + " bytes of POST data in " + dataSendElapsed + "ms");
+                    }
                     final long beforeFlushTime = Time.systemIndependentCurrentJVMTimeMillis();
                     final boolean before = directHTTPConnectionOutputStream.isClosingAllowed();
                     try {
@@ -1118,7 +1129,9 @@ public class HttpClient {
                         directHTTPConnectionOutputStream.setClosingAllowed(before);
                     }
                     final long flushElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeFlushTime;
-                    LogV3.fine("HttpClient.post: Flush and close completed in " + flushElapsed + "ms");
+                    if (isVerboseLog()) {
+                        LogV3.fine("HttpClient.post: Flush and close completed in " + flushElapsed + "ms");
+                    }
                     final long finalizeConnectStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     connection.finalizeConnect();
                     final long finalizeConnectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - finalizeConnectStartTime;
@@ -1127,12 +1140,14 @@ public class HttpClient {
                     }
                     final long onConnectedStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                     context.onConnected();
-                    final long onConnectedElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectedStartTime;
                     if (this.isVerboseLog()) {
+                        final long onConnectedElapsed = Time.systemIndependentCurrentJVMTimeMillis() - onConnectedStartTime;
                         LogV3.fine("HttpClient.post: context.onConnected() completed in " + onConnectedElapsed + "ms");
                     }
-                    final long postElapsed = Time.systemIndependentCurrentJVMTimeMillis() - postStartTime;
-                    LogV3.fine("HttpClient.post: Total POST data sending time: " + postElapsed + "ms");
+                    if (isVerboseLog()) {
+                        final long postElapsed = Time.systemIndependentCurrentJVMTimeMillis() - postStartTime;
+                        LogV3.fine("HttpClient.post: Total POST data sending time: " + postElapsed + "ms");
+                    }
                 } else {
                     this.connect(context, false);
                 }
@@ -1175,8 +1190,10 @@ public class HttpClient {
             throw e;
         } finally {
             context.unlinkInterrupt();
-            final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
-            LogV3.fine("HttpClient.execute: Request completed in " + executeElapsed + "ms");
+            if (isVerboseLog()) {
+                final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
+                LogV3.fine("HttpClient.execute: Request completed in " + executeElapsed + "ms");
+            }
         }
         if (followRedirect) {
             if (context.redirectsStarted > 0 && Time.systemIndependentCurrentJVMTimeMillis() - context.redirectsStarted >= this.getRedirectTimeout(context)) {
@@ -1222,8 +1239,10 @@ public class HttpClient {
             // the redirect will not be a POST again
             return this.execute(context);
         }
-        final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
-        LogV3.fine("HttpClient.execute: Returning context after " + executeElapsed + "ms, response code: " + context.getCode());
+        if (isVerboseLog()) {
+            final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
+            LogV3.fine("HttpClient.execute: Returning context after " + executeElapsed + "ms, response code: " + context.getCode());
+        }
         return context;
     }
 

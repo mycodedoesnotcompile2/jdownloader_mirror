@@ -44,6 +44,7 @@ import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.security.cert.X509Certificate;
 
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
@@ -90,7 +91,6 @@ public abstract class SimpleUseNet {
         },
         STAT,
         QUIT;
-
         public boolean isMultiLineResponse(int code) {
             return false;
         };
@@ -167,6 +167,11 @@ public abstract class SimpleUseNet {
             @Override
             public TrustProviderInterface getTrustProvider() {
                 return TrustUtils.getDefaultProvider();
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return null;
             }
         });
     }
@@ -302,11 +307,11 @@ public abstract class SimpleUseNet {
     }
 
     private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream() {
-        @Override
-        public synchronized byte[] toByteArray() {
-            return buf;
-        };
-    };
+                                                       @Override
+                                                       public synchronized byte[] toByteArray() {
+                                                           return buf;
+                                                       };
+                                                   };
 
     protected synchronized String readLine() throws IOException {
         return readLine(lineBuffer);

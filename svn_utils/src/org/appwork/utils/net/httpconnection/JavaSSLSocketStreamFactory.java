@@ -47,11 +47,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
@@ -110,6 +110,11 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                 @Override
                 public TrustProviderInterface getTrustProvider() {
                     return TrustUtils.getDefaultProvider();
+                }
+
+                @Override
+                public KeyManager[] getKeyManager() {
+                    return null;
                 }
             }), null);
             final SSLParameters parameters = context.getSupportedSSLParameters();
@@ -238,7 +243,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         TLS_1_2("TLSv1.2"),
         TLS_1_1("TLSv1.1"),
         TLS_1_0("TLSv1");
-
         public final String id;
 
         private TLS(final String id) {
@@ -288,6 +292,11 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                     @Override
                     public TrustProviderInterface getTrustProvider() {
                         return TrustUtils.getDefaultProvider();
+                    }
+
+                    @Override
+                    public KeyManager[] getKeyManager() {
+                        return null;
                     }
                 });
                 sslContext = getSSLContext(options, trustBridge, null);
@@ -450,42 +459,121 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoClose, final SSLSocketStreamOptions options, TrustProviderInterface trustProvider, KeyManager[] keyManagers) throws IOException {
-        if (trustProvider == null) {
-            throw new NullPointerException("trustProvider");
-        }
-        final boolean sniEnabled = !StringUtils.isEmpty(host) && (options == null || options.isSNIEnabled());
-        final TrustResult[] resultStore = new TrustResult[] { null };
-        TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoClose, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider, final KeyManager[] keyManagers) throws IOException {
+        return create(socketStream, host, port, autoClose, options, new TrustCallback() {
             @Override
             public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
-                resultStore[0] = result;
             }
 
             @Override
             public TrustProviderInterface getTrustProvider() {
                 return trustProvider;
             }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManagers;
+            }
         });
-        final SSLContext sslContext = getSSLContext(options, trustBridge, keyManagers);
+    }
+
+    @Override
+    public String retry(SSLSocketStreamOptions options, Exception e) {
+        if (e instanceof TrustValidationFailedException) {
+            return null;
+        }
+        if (e instanceof IllegalSSLHostnameException) {
+            return null;
+        }
+        if (isTLSSupported(TLS.TLS_1_3, options, null) && options.isTLSConfigurationException(e)) {
+            // https://www.bouncycastle.org/docs/tlsdocs1.5on/org/bouncycastle/tls/AlertDescription.html
+            if (options.getCustomFactorySettings().add(TLS13_ENABLED)) {
+                // retry with TLS1.3 enabled
+                return options.addRetryReason("(TLS)enable TLS1.3");
+            }
+            final String jsseRetry = options.enableNextDisabledCipher("GCM");
+            if (jsseRetry != null) {
+                // retry with TLS1.3 and GCM
+                return options.addRetryReason("(TLS)enable " + jsseRetry + " for TLS1.3");
+            }
+        }
+        if (options.isHandshakeException(e)) {
+            final String jsseRetry = options.enableNextDisabledCipher("GCM");
+            if (jsseRetry != null) {
+                // retry with TLS1.2 GCM
+                return options.addRetryReason("(Handshake)enable " + jsseRetry + " for TLS1.2/TLS1.3");
+            } else if (options.getCustomFactorySettings().add(TLS10_11_DISABLED)) {
+                // disable old TLS1.0 and TLS1.1 and retry with TLS1.2
+                return options.addRetryReason("(Handshake)disable TLS1.0/TLS1.1");
+            } else if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
+                // retry with TLS1.3 enabled
+                return options.addRetryReason("(Handshake)enable TLS1.3");
+            }
+        }
+        if (options.isConnectionResetException(e)) {
+            final String jsseRetry = options.enableNextDisabledCipher("GCM");
+            if (jsseRetry != null) {
+                // retry with TLS1.2 GCM
+                return options.addRetryReason("(Reset)enable " + jsseRetry + " for TLS1.2/TLS1.3");
+            } else if (options.getCustomFactorySettings().add(TLS10_11_DISABLED)) {
+                // disable old TLS1.0 and TLS1.1 and retry with TLS1.2
+                return options.addRetryReason("(Reset)disable TLS1.0/TLS1.1");
+            } else if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
+                // retry with TLS1.3 enabled
+                return options.addRetryReason("(Reset)enable TLS1.3");
+            }
+        }
+        // always check for TLS1.3
+        if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
+            // retry with TLS1.3 enabled
+            return options.addRetryReason("(Retry)Enable TLS1.3");
+        }
+        return null;
+    }
+
+    /**
+     * @see org.appwork.utils.net.httpconnection.SSLSocketStreamFactory#create(org.appwork.utils.net.httpconnection.SocketStreamInterface,
+     *      java.lang.String, int, boolean, org.appwork.utils.net.httpconnection.SSLSocketStreamOptions,
+     *      org.appwork.utils.net.httpconnection.trust.TrustCallback)
+     */
+    @Override
+    public SSLSocketStreamInterface create(SocketStreamInterface socketStream, String host, int port, boolean autoClose, final SSLSocketStreamOptions options, final TrustCallback trustCallback) throws IOException {
+        final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
+        if (trustCallback == null) {
+            throw new NullPointerException("trustCallback");
+        }
+        final boolean sniEnabled = !StringUtils.isEmpty(host) && (options == null || options.isSNIEnabled());
+        final AtomicReference<TrustResult> trustResult = new AtomicReference<TrustResult>();
+        final TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {
+            @Override
+            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                trustResult.set(result);
+                trustCallback.onTrustResult(provider, chain, authType, result);
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustCallback.getTrustProvider();
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return trustCallback.getKeyManager();
+            }
+        });
+        final SSLContext sslContext = getSSLContext(options, trustBridge, trustCallback.getKeyManager());
         final SSLSocketFactory sslFactory = getSSLSocketFactory(sslContext, options, sniEnabled ? host : null);
         final SSLSocket sslSocket = (SSLSocket) sslFactory.createSocket(socketStream.getSocket(), sniEnabled ? host : "", port, autoClose);
-        try {
-            sslSocket.startHandshake();
-        } catch (final SSLHandshakeException e) {
-            throw new SSLHandshakeWithTrustResultException(e, resultStore[0], "SSL handshake failed: " + e.getMessage());
-        } catch (final IOException e) {
-            throw new IOWithTrustResultException(e, resultStore[0], "SSL handshake failed: " + e.getMessage());
-        }
+        sslSocket.startHandshake();
         try {
             trustProvider.verifyHostname(sslSocket.getSession(), host, this);
         } catch (IllegalSSLHostnameException e) {
-            e.setTrustResult(resultStore[0]);
+            e.setTrustResult(trustResult.get());
             e.getTrustResult().exception(e);
             throw e;
         } catch (RuntimeException e) {
             IllegalSSLHostnameException thr = new IllegalSSLHostnameException(host, e);
-            thr.setTrustResult(resultStore[0]);
+            thr.setTrustResult(trustResult.get());
             thr.getTrustResult().exception(e);
             throw thr;
         }
@@ -548,63 +636,10 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
             @Override
             public TrustResult getTrustResult() {
-                DebugMode.breakIf(resultStore[0] == null);
-                return resultStore[0];
+                final TrustResult ret = trustResult.get();
+                DebugMode.breakIf(ret == null);
+                return ret;
             }
         };
-    }
-
-    @Override
-    public String retry(SSLSocketStreamOptions options, Exception e) {
-        if (e instanceof TrustValidationFailedException) {
-            return null;
-        }
-        if (e instanceof IllegalSSLHostnameException) {
-            return null;
-        }
-        if (isTLSSupported(TLS.TLS_1_3, options, null) && options.isTLSConfigurationException(e)) {
-            // https://www.bouncycastle.org/docs/tlsdocs1.5on/org/bouncycastle/tls/AlertDescription.html
-            if (options.getCustomFactorySettings().add(TLS13_ENABLED)) {
-                // retry with TLS1.3 enabled
-                return options.addRetryReason("(TLS)enable TLS1.3");
-            }
-            final String jsseRetry = options.enableNextDisabledCipher("GCM");
-            if (jsseRetry != null) {
-                // retry with TLS1.3 and GCM
-                return options.addRetryReason("(TLS)enable " + jsseRetry + " for TLS1.3");
-            }
-        }
-        if (options.isHandshakeException(e)) {
-            final String jsseRetry = options.enableNextDisabledCipher("GCM");
-            if (jsseRetry != null) {
-                // retry with TLS1.2 GCM
-                return options.addRetryReason("(Handshake)enable " + jsseRetry + " for TLS1.2/TLS1.3");
-            } else if (options.getCustomFactorySettings().add(TLS10_11_DISABLED)) {
-                // disable old TLS1.0 and TLS1.1 and retry with TLS1.2
-                return options.addRetryReason("(Handshake)disable TLS1.0/TLS1.1");
-            } else if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
-                // retry with TLS1.3 enabled
-                return options.addRetryReason("(Handshake)enable TLS1.3");
-            }
-        }
-        if (options.isConnectionResetException(e)) {
-            final String jsseRetry = options.enableNextDisabledCipher("GCM");
-            if (jsseRetry != null) {
-                // retry with TLS1.2 GCM
-                return options.addRetryReason("(Reset)enable " + jsseRetry + " for TLS1.2/TLS1.3");
-            } else if (options.getCustomFactorySettings().add(TLS10_11_DISABLED)) {
-                // disable old TLS1.0 and TLS1.1 and retry with TLS1.2
-                return options.addRetryReason("(Reset)disable TLS1.0/TLS1.1");
-            } else if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
-                // retry with TLS1.3 enabled
-                return options.addRetryReason("(Reset)enable TLS1.3");
-            }
-        }
-        // always check for TLS1.3
-        if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
-            // retry with TLS1.3 enabled
-            return options.addRetryReason("(Retry)Enable TLS1.3");
-        }
-        return null;
     }
 }

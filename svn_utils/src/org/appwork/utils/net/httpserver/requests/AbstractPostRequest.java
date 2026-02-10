@@ -41,8 +41,10 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.commonInterface.SerializerInterface;
 import org.appwork.storage.simplejson.JSonObject;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
@@ -174,7 +176,6 @@ public abstract class AbstractPostRequest extends HttpRequest {
                     inputStream = new LimitedInputStream(this.connection.getInputStream(), Long.parseLong(contentLength.getValue()));
                 }
             }
-
             // Handle Content-Encoding (gzip, deflate)
             final HTTPHeader contentEncoding = this.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_CONTENT_ENCODING);
             if (contentEncoding != null) {
@@ -190,7 +191,6 @@ public abstract class AbstractPostRequest extends HttpRequest {
                     // Note: "identity" or "none" means no encoding, so we don't wrap
                 }
             }
-
             // Apply post-processing limit AFTER decompression (if enabled)
             RequestSizeLimits limits = getServer().getRequestSizeLimits();
             if (limits != null) {
@@ -199,7 +199,6 @@ public abstract class AbstractPostRequest extends HttpRequest {
                     inputStream = new LimitedInputStreamWithException(inputStream, maxPostProcessing);
                 }
             }
-
             this.inputStream = new PostRequestInputStream(inputStream);
         }
         return this.inputStream;
@@ -289,28 +288,41 @@ public abstract class AbstractPostRequest extends HttpRequest {
         return this.postParameters;
     }
 
+    /**
+     * @param updateClient
+     * @return
+     */
+    public SerializerInterface getDeser(final Object context) {
+        return Deser.get(context == null ? this : context);
+    }
+
     protected List<KeyValuePair> readPostParameters(final CONTENT_TYPE content_type, final String charSet) throws IOException, UnsupportedEncodingException {
         if (content_type != null) {
-            InputStream inputStream = this.getInputStream();
-
+            final InputStream inputStream = this.getInputStream();
             switch (content_type) {
             case JSON: {
                 final byte[] jsonBytes = IO.readStream(-1, inputStream);
-                String jsonString = new String(jsonBytes, charSet);
-                jsonString = modifyByContentType(content_type, jsonString);
+                final String jsonString = modifyByContentType(content_type, new String(jsonBytes, charSet));
                 // try to parse JSonRequest object
-                JSonRequest jsonRequest = JSonStorage.restoreFromString(jsonString, JSonRequest.TYPE_REF);
-                if (jsonRequest == null || jsonRequest.getParams() == null) {
-                    // fallback to raw json object
-                    final Object rawJSON = JSonStorage.restoreFromString(jsonString, TypeRef.OBJECT);
-                    if (rawJSON instanceof List) {
-                        jsonRequest = new JSonRequest();
-                        // List of Param Objects
-                        jsonRequest.setParams(((List) rawJSON).toArray(new Object[0]));
-                    } else if (rawJSON != null) {
-                        jsonRequest = new JSonRequest();
-                        // Single Param Object
-                        jsonRequest.setParams(new Object[] { rawJSON });
+                JSonRequest jsonRequest = null;
+                if (jsonString.startsWith("[")) {
+                    jsonRequest = new JSonRequest();
+                    // List of Param Objects
+                    jsonRequest.setParams(getDeser(this).fromString(jsonString, TypeRef.LIST).toArray(new Object[0]));
+                } else {
+                    jsonRequest = getDeser(this).fromString(jsonString, JSonRequest.TYPE_REF);
+                    if (jsonRequest == null || jsonRequest.getParams() == null) {
+                        // fallback to raw json object
+                        final Object rawJSON = getDeser(this).fromString(jsonString, TypeRef.OBJECT);
+                        if (rawJSON instanceof List) {
+                            jsonRequest = new JSonRequest();
+                            // List of Param Objects
+                            jsonRequest.setParams(((List) rawJSON).toArray(new Object[0]));
+                        } else if (rawJSON != null) {
+                            jsonRequest = new JSonRequest();
+                            // Single Param Object
+                            jsonRequest.setParams(new Object[] { rawJSON });
+                        }
                     }
                 }
                 if (jsonRequest != null && jsonRequest.getParams() != null) {
@@ -322,7 +334,7 @@ public abstract class AbstractPostRequest extends HttpRequest {
                              */
                             ret.add(new KeyValuePair(null, parameter.toString()));
                         } else {
-                            final String jsonParameter = JSonStorage.serializeToJson(parameter);
+                            final String jsonParameter = getDeser(this).toString(parameter, SC.NETWORK_TRANSFER);
                             ret.add(new KeyValuePair(null, jsonParameter));
                         }
                     }
@@ -332,8 +344,7 @@ public abstract class AbstractPostRequest extends HttpRequest {
                 break;
             case X_WWW_FORM_URLENCODED: {
                 final byte[] formBytes = IO.readStream(-1, inputStream);
-                String formString = new String(formBytes, charSet);
-                formString = modifyByContentType(content_type, formString);
+                final String formString = modifyByContentType(content_type, new String(formBytes, charSet));
                 return HttpServerConnection.parseParameterList(formString);
             }
             case UNKNOWN:
@@ -400,5 +411,4 @@ public abstract class AbstractPostRequest extends HttpRequest {
      * @return
      */
     public abstract RequestMethod getRequestMethod();
-
 }

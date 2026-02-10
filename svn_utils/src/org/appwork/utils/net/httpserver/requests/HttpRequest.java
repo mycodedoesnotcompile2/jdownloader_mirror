@@ -43,7 +43,6 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.TrustResult;
-import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 
 /**
@@ -51,27 +50,38 @@ import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
  *
  */
 public abstract class HttpRequest implements HttpRequestInterface {
+    public static enum HTTP_VERSION {
+        UNKNOWN,
+        HTTP_0_9,
+        HTTP_1_0,
+        HTTP_1_1,
+        HTTP_2,
+        HTTP_3;
+        public static HTTP_VERSION parse(final String line) {
+            if ("HTTP/0.9".equals(line)) {
+                return HTTP_0_9;
+            } else if ("HTTP/1.0".equals(line)) {
+                return HTTP_1_0;
+            } else if ("HTTP/1.1".equals(line)) {
+                return HTTP_1_1;
+            } else if ("HTTP/2".equals(line) || "HTTP/2.0".equals(line)) {
+                return HTTP_2;
+            } else if ("HTTP/3".equals(line) || "HTTP/3.0".equals(line)) {
+                return HTTP_3;
+            } else {
+                return UNKNOWN;
+            }
+        }
+    }
+
     protected String           requestedURL   = null;
     protected HeaderCollection requestHeaders = null;
     protected String           requestedPath  = null;
 
     public abstract RequestMethod getRequestMethod();
 
-    @Deprecated
-    // will be removed by daniel
-    public HttpConnectionType getHttpConnectionType() {
-        switch (getRequestMethod()) {
-        case OPTIONS:
-            return HttpConnectionType.OPTIONS;
-        case GET:
-            return HttpConnectionType.GET;
-        case POST:
-            return HttpConnectionType.POST;
-        case HEAD:
-            return HttpConnectionType.HEAD;
-        default:
-            return HttpConnectionType.valueOf(getRequestMethod().name());
-        }
+    public HTTP_VERSION getHTTPVersion() {
+        return connection.getHTTPVersion();
     }
 
     public boolean isSSL() {

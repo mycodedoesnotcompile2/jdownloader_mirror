@@ -22,6 +22,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.BearerAuthentication;
@@ -39,13 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52274 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,7 +120,18 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                     query.appendEncoded("page", Integer.toString(page));
                 }
                 final GetRequest req = br.createGetRequest("https://api.redgifs.com/v2/users/" + username + "/search?" + query.toString());
-                plg.getPage(br, token, req);
+                try {
+                    plg.getPage(br, token, req);
+                } catch (final Exception e) {
+                    if (page > 1 && br.containsHTML("\"code\":\\s*\"BadPageNumber\"")) {
+                        /* {"error":{"code":"BadPageNumber","message":"Page number must be between 1 and 100","status":400}} */
+                        /* Explanation: https://www.reddit.com/r/jdownloader/comments/1ntrn9q/comment/ngzvytn/ */
+                        logger.info("Stopping because: Cannot crawl all pages due to server side bug");
+                        break pagination;
+                    }
+                    /* Dead end */
+                    throw e;
+                }
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 if (((Number) entries.get("total")).intValue() == 0) {
                     /* Profile contains zero items/content. */
@@ -158,30 +169,14 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                     logger.info("Stopping because: Aborted by user");
                     throw new InterruptedException();
                 }
-                if (false) {
-                    /**
-                     * 2025-08-25 -> api reports max 25 pages with 40 items/page, max 1000 but more pages may still exist e.g. <br>
-                     * /users/romythicc <br>
-                     * 2025-09-30: Also API allows max 100 pages due to a bug, see:
-                     * https://www.reddit.com/r/jdownloader/comments/1ntrn9q/redgif_plugin_is_broken_again/
-                     */
-                    if (isLastPage) {
-                        logger.info("Stopping because: Reached last page: " + pageMax);
-                        break pagination;
-                    } else if (ret.size() >= totalNumberofItems) {
-                        logger.info("Stopping because: Found all items: " + totalNumberofItems);
-                        break pagination;
-                    }
-                }
                 if (numberofNewItemsThisPage == 0) {
                     /* Additional fail safe which should not be needed. */
                     logger.info("Stopping because: Failed to find any new items on current page: " + page);
                     break pagination;
-                } else {
-                    /* Continue to next page */
-                    page++;
-                    continue pagination;
                 }
+                /* Continue to next page */
+                page++;
+                continue pagination;
             } while (true);
             final int numberofMissingItems = totalNumberofItems - ret.size();
             if (numberofMissingItems > 0) {

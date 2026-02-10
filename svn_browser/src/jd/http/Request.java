@@ -49,7 +49,7 @@ import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.KeepAliveSocketStreamException;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.parser.UrlQuery;
@@ -899,7 +899,7 @@ public abstract class Request {
         this.httpConnection.setContentDecoded(this.isContentDecodedSet());
         final Boolean isSSLTrustALL = this.isSSLTrustALLSet();
         if (Boolean.TRUE.equals(isSSLTrustALL)) {
-            this.httpConnection.setTrustProvider(TrustAllProvider.getInstance());
+            this.httpConnection.setTrustProvider(AllTrustProvider.getInstance());
         }
         final RequestHeader headers = this.getHeaders();
         if (headers != null) {

@@ -35,9 +35,9 @@
 package org.appwork.testframework;
 
 import java.io.File;
+import java.io.FilenameFilter;
 
 import org.appwork.utils.Application;
-import org.appwork.utils.Files;
 
 /**
  * Demonstrates the improvements in IDETestRunner2 vs IDETestRunner
@@ -46,21 +46,23 @@ import org.appwork.utils.Files;
  * @date Jan 18, 2026
  */
 public class TestRunnerComparison {
-
     public static void main(String[] args) {
         System.out.println("=================================================================");
         System.out.println("IDETestRunner vs IDETestRunner2 Comparison");
         System.out.println("=================================================================");
         System.out.println();
-
         try {
             Application.setApplication(".tests");
             File cfgDir = Application.getResource("cfg");
-
             // Show old cache structure
             System.out.println("--- OLD Cache Structure (IDETestRunner) ---");
             if (cfgDir.exists()) {
-                File[] oldCaches = cfgDir.listFiles((dir, name) -> name.startsWith("testcache_") && name.endsWith(".cache"));
+                File[] oldCaches = cfgDir.listFiles(new FilenameFilter() {
+                    @Override
+                    public boolean accept(File dir, String name) {
+                        return name.startsWith("testcache_") && name.endsWith(".cache");
+                    }
+                });
                 if (oldCaches != null && oldCaches.length > 0) {
                     long totalSize = 0;
                     for (File cache : oldCaches) {
@@ -70,7 +72,6 @@ public class TestRunnerComparison {
                     System.out.println("Total cache size:    " + String.format("%.2f KB", totalSize / 1024.0));
                     System.out.println("Average per file:    " + String.format("%.2f KB", totalSize / 1024.0 / oldCaches.length));
                     System.out.println();
-
                     // Show some examples
                     System.out.println("Example cache files (first 5):");
                     for (int i = 0; i < Math.min(5, oldCaches.length); i++) {
@@ -83,7 +84,6 @@ public class TestRunnerComparison {
                 System.out.println("No cfg directory found");
             }
             System.out.println();
-
             // Show new cache structure
             System.out.println("--- NEW Cache Structure (IDETestRunner2) ---");
             File unifiedCache = Application.getResource("cfg/unifiedTestCache.json");
@@ -95,7 +95,6 @@ public class TestRunnerComparison {
                 System.out.println("No unified cache found yet (will be created on first run)");
             }
             System.out.println();
-
             // Benefits
             System.out.println("--- BENEFITS OF IDETestRunner2 ---");
             System.out.println("✓ Single unified cache file instead of 100+ separate files");
@@ -106,7 +105,6 @@ public class TestRunnerComparison {
             System.out.println("✓ Much faster cache loading/saving");
             System.out.println("✓ Incremental cache updates");
             System.out.println();
-
             System.out.println("--- SUMMARY FEATURES ---");
             System.out.println("The new summary shows:");
             System.out.println("  • Statistics (executed vs skipped tests)");
@@ -115,12 +113,10 @@ public class TestRunnerComparison {
             System.out.println("  • Top classes by test impact");
             System.out.println("  • Cache efficiency metrics");
             System.out.println();
-
             System.out.println("=================================================================");
             System.out.println("To see the new runner in action, run:");
             System.out.println("  java org.appwork.testframework.IDETestRunner2");
             System.out.println("=================================================================");
-
         } catch (Exception e) {
             e.printStackTrace();
         }

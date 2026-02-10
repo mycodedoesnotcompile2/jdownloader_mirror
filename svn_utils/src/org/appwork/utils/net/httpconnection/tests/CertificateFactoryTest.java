@@ -54,11 +54,10 @@ import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
-import org.appwork.utils.net.httpconnection.tests.CertificateFactory;
-import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpserver.ExperimentalAutoSSLHttpServer;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
@@ -205,10 +204,10 @@ public class CertificateFactoryTest extends AWTest {
     private void cleanupTempFiles() {
         // No temp files: keystore is in-memory only
     }
+
     // =========================================================================================
     // Tests
     // =========================================================================================
-
     private HttpClient newClient(final TrustProviderInterface trustProvider) {
         final HttpClient c = new HttpClient();
         c.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
@@ -228,7 +227,7 @@ public class CertificateFactoryTest extends AWTest {
         if (this.sslContext == null) {
             return;
         }
-        final HttpClient client = newClient(TrustAllProvider.getInstance());
+        final HttpClient client = newClient(AllTrustProvider.getInstance());
         final String url = "https://" + host + ":" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("Hello " + host, "UTF-8");
         LogV3.info("Test: HTTPS Connection (TrustAll) -> " + host);
         try {
@@ -320,10 +319,10 @@ public class CertificateFactoryTest extends AWTest {
         // Convert raw IP bytes to textual representation
         return java.net.InetAddress.getByAddress(ipBytes).getHostAddress();
     }
+
     // =========================================================================================
     // Logging helper
     // =========================================================================================
-
     private void logContextOnFailure(final RequestContext context, final String message) {
         try {
             LogV3.severe("===========================================");

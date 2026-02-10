@@ -33,23 +33,23 @@ import org.appwork.utils.net.httpconnection.tests.CertificateFactory;
 import org.appwork.utils.net.httpconnection.tests.CertificateFactory.CACertificateResult;
 import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ClientCertificateResult;
 import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustWindowsProvider;
+import org.appwork.utils.net.httpconnection.trust.WindowsTrustProvider;
 import org.appwork.utils.net.httpserver.SSLHttpServer;
+import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsCertUtils;
-import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.User32;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinUser;
-import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
-import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * Tests for SSLHttpServer functionality.
@@ -94,7 +94,7 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  * <pre>
  * # Generate self-signed certificate and key
  * openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
- *
+ * 
  * # Convert to PKCS12
  * openssl pkcs12 -export -in cert.pem -inkey key.pem -out keystore.p12 -name "server" -passout pass:changeit
  * </pre>
@@ -197,8 +197,8 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Runs only the client-cert success test (for standalone runner).
-     * Creates certs, keystores, server with needClientAuth, client with KeyManagers, two GETs, asserts.
+     * Runs only the client-cert success test (for standalone runner). Creates certs, keystores, server with needClientAuth, client with
+     * KeyManagers, two GETs, asserts.
      */
     public void runClientCertTestOnly() throws Exception {
         try {
@@ -267,8 +267,8 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Creates in-memory PKCS12 keystore from generated certificates and SSLContext from it.
-     * Writes keystore to a temp file only for testPFXLoading (load-from-file tests).
+     * Creates in-memory PKCS12 keystore from generated certificates and SSLContext from it. Writes keystore to a temp file only for
+     * testPFXLoading (load-from-file tests).
      */
     private void createKeystore() throws Exception {
         LogV3.info("Creating PKCS12 keystore (in-memory)...");
@@ -360,7 +360,7 @@ public class SSLHttpServerTest extends AWTest {
         }
         // Test 5: Load with null password
         try {
-            SSLHttpServer.createSSLContextFromPKCS12(keystorePath, null);
+            SSLHttpServer.createSSLContextFromPKCS12(keystorePath, (String) null);
             assertTrue(false, "PFX loading with null password should throw exception");
         } catch (final NullPointerException e) {
             LogV3.info("PFX loading with null password correctly threw NullPointerException: " + e.getMessage());
@@ -475,9 +475,9 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Test: NEED server – all requests without client certificate are rejected.
-     * Server uses {@link SSLHttpServer.ClientAuthMode#NEED}; any request without a client cert must fail (handshake fails or connection rejected).
-     * Verifies multiple request types (GET to different paths) to ensure no request without cert gets through.
+     * Test: NEED server – all requests without client certificate are rejected. Server uses {@link SSLHttpServer.ClientAuthMode#NEED}; any
+     * request without a client cert must fail (handshake fails or connection rejected). Verifies multiple request types (GET to different
+     * paths) to ensure no request without cert gets through.
      */
     private void testClientCertRequiredRejected() throws Exception {
         LogV3.info("Test: NEED server – all requests without client cert are rejected");
@@ -499,11 +499,7 @@ public class SSLHttpServerTest extends AWTest {
             clientNoCert.setTrustProvider(this.caProvider);
             // no setKeyManagers – no client cert; all requests must be rejected
             final String baseUrl = "https://localhost:" + port;
-            final String[] urlsToReject = {
-                baseUrl + "/test/echo?message=noCert",
-                baseUrl + "/test/ping",
-                baseUrl + "/test/version"
-            };
+            final String[] urlsToReject = { baseUrl + "/test/echo?message=noCert", baseUrl + "/test/ping", baseUrl + "/test/version" };
             for (final String url : urlsToReject) {
                 boolean rejected = false;
                 try {
@@ -525,8 +521,8 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Creates server SSLContext with server cert and TrustManagers that trust the CA (for client cert verification).
-     * Uses in-memory serverKeyStore directly.
+     * Creates server SSLContext with server cert and TrustManagers that trust the CA (for client cert verification). Uses in-memory
+     * serverKeyStore directly.
      */
     private SSLContext createServerSSLContextWithClientAuthTrust() throws Exception {
         final KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -551,8 +547,7 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Creates a second CA and a client cert signed by it (untrusted by our server) for wrong-cert test.
-     * Uses in-memory KeyStore only.
+     * Creates a second CA and a client cert signed by it (untrusted by our server) for wrong-cert test. Uses in-memory KeyStore only.
      */
     private void createWrongClientCertificate() throws Exception {
         LogV3.info("Creating wrong client certificate (signed by other CA)...");
@@ -685,8 +680,8 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Test: NEED with valid client certificate – server NEED, client with valid cert → 200, hasClientCert=true.
-     * Uses EC client cert so the client actually sends the cert (JSSE may not send RSA with NEED in some setups).
+     * Test: NEED with valid client certificate – server NEED, client with valid cert → 200, hasClientCert=true. Uses EC client cert so the
+     * client actually sends the cert (JSSE may not send RSA with NEED in some setups).
      */
     private void testClientCertNeedWithValidCert() throws Exception {
         LogV3.info("Test: NEED server – request with valid client cert succeeds");
@@ -819,12 +814,12 @@ public class SSLHttpServerTest extends AWTest {
         try {
             installCertificateWithAutoConfirm(caCert, WindowsCertUtils.KeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME);
             assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be in Windows store after install");
-            TrustWindowsProvider.getInstance().reload();
+            WindowsTrustProvider.getInstance().reload();
             final HttpClient client = new HttpClient();
             client.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
             client.setReadTimeout((int) TimeUnit.SECONDS.toMillis(10));
             client.putRequestHeader(HTTPConstants.X_APPWORK, "1");
-            client.setTrustProvider(TrustWindowsProvider.getInstance());
+            client.setTrustProvider(WindowsTrustProvider.getInstance());
             final String url = "https://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("TrustWindowsOK", "UTF-8");
             final RequestContext ctx = client.get(url);
             assertTrue(ctx.getCode() == 200, "TrustWindowsProvider: HTTPS request to server should return 200, was " + ctx.getCode());
@@ -834,7 +829,7 @@ public class SSLHttpServerTest extends AWTest {
             try {
                 removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER);
                 assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be removed from Windows store after uninstall");
-                TrustWindowsProvider.getInstance().reload();
+                WindowsTrustProvider.getInstance().reload();
             } catch (final Throwable e) {
                 LogV3.log(e);
             }
@@ -844,7 +839,8 @@ public class SSLHttpServerTest extends AWTest {
     /**
      * Test-only helper: Waits for Windows certificate dialog and confirms it (OK/Yes).
      *
-     * @param maxWaitMs maximum time to wait for dialog (milliseconds)
+     * @param maxWaitMs
+     *            maximum time to wait for dialog (milliseconds)
      * @return true if dialog was found and confirmed
      */
     private static boolean autoConfirmCertificateDialog(final int maxWaitMs) {
@@ -1042,8 +1038,8 @@ public class SSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Test: Client using TrustAllProvider allows all requests to the server regardless of server certificate.
-     * Verifies that with TrustAllProvider the client accepts the connection and requests succeed (200).
+     * Test: Client using TrustAllProvider allows all requests to the server regardless of server certificate. Verifies that with
+     * TrustAllProvider the client accepts the connection and requests succeed (200).
      */
     private void testTrustAllProviderAtServer() throws Exception {
         if (this.sslContext == null) {
@@ -1055,7 +1051,7 @@ public class SSLHttpServerTest extends AWTest {
         clientTrustAll.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
         clientTrustAll.setReadTimeout((int) TimeUnit.SECONDS.toMillis(10));
         clientTrustAll.putRequestHeader(HTTPConstants.X_APPWORK, "1");
-        clientTrustAll.setTrustProvider(TrustAllProvider.getInstance());
+        clientTrustAll.setTrustProvider(AllTrustProvider.getInstance());
         final String url = "https://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("TrustAllOK", "UTF-8");
         final RequestContext ctx = clientTrustAll.get(url);
         assertTrue(ctx.getCode() == 200, "TrustAllProvider: request to server should return 200, was " + ctx.getCode());

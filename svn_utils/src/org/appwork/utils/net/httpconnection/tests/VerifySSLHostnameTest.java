@@ -48,26 +48,27 @@ import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.IllegalSSLHostnameException;
 
 /**
- * Tests for {@link HTTPConnectionUtils#verifySSLHostname(HostnameVerifier, SSLSession, String)}:
- * match/mismatch with certificate CN and SAN (DNS and IP), null host, IPv6 normalization.
+ * Tests for {@link HTTPConnectionUtils#verifySSLHostname(HostnameVerifier, SSLSession, String)}: match/mismatch with certificate CN and SAN
+ * (DNS and IP), null host, IPv6 normalization.
  */
 public class VerifySSLHostnameTest extends AWTest {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
 
     @Override
     public void runTest() throws Exception {
-        final Certificate[] peerCerts = createLocalhostCertChain();
-        final SSLSession session = createMockSSLSession(peerCerts);
-
-        testVerifyMatchLocalhost(session);
-        testVerifyMatch127(session);
-        testVerifyMatchIPv6Normalized(session);
-        testVerifyMismatchThrows(session);
-        testVerifyNullHostReturnsNull();
-        testVerifyNullSessionUsesVerifierOnly();
+        try {
+            final Certificate[] peerCerts = createLocalhostCertChain();
+            final SSLSession session = createMockSSLSession(peerCerts);
+            testVerifyMatchLocalhost(session);
+            testVerifyMatch127(session);
+            testVerifyMatchIPv6Normalized(session);
+            testVerifyMismatchThrows(session);
+            testVerifyNullHostReturnsNull();
+            testVerifyNullSessionUsesVerifierOnly();
+        } finally {
+        }
     }
 
     private static Certificate[] createLocalhostCertChain() throws Exception {
@@ -76,8 +77,8 @@ public class VerifySSLHostnameTest extends AWTest {
     }
 
     /**
-     * Mock SSLSession that returns the given peer certificates; other methods return safe defaults.
-     * Uses dynamic proxy so we only need to handle getPeerCertificates (and getPeerPrincipal for default verifier).
+     * Mock SSLSession that returns the given peer certificates; other methods return safe defaults. Uses dynamic proxy so we only need to
+     * handle getPeerCertificates (and getPeerPrincipal for default verifier).
      */
     private static SSLSession createMockSSLSession(final Certificate[] peerCertificates) {
         final InvocationHandler h = new InvocationHandler() {

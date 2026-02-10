@@ -38,11 +38,10 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 
 /**
- * Base class for HTTP client tests that run over all connection variants (direct, SOCKS proxy, HTTP proxy, and native variants).
- * Provides proxy server lifecycle and {@link #getConnectionVariants()} so tests can iterate without duplicating setup.
+ * Base class for HTTP client tests that run over all connection variants (direct, SOCKS proxy, HTTP proxy, and native variants). Provides
+ * proxy server lifecycle and {@link #getConnectionVariants()} so tests can iterate without duplicating setup.
  */
 public abstract class ProxyConnectionTestBase extends SSLTrustProviderTestBase {
-
     private TestHttpProxyServer  httpProxyServer;
     private TestSocksProxyServer socksProxyServer;
     private List<HTTPProxy>      connectionVariants;
@@ -65,13 +64,15 @@ public abstract class ProxyConnectionTestBase extends SSLTrustProviderTestBase {
      * Stops proxy servers. Call from {@link #runTest()} in a finally block after tests.
      */
     protected void teardownProxyServers() {
+        final TestHttpProxyServer httpProxyServer = this.httpProxyServer;
         if (httpProxyServer != null) {
             httpProxyServer.stop();
-            httpProxyServer = null;
+            this.httpProxyServer = null;
         }
+        final TestSocksProxyServer socksProxyServer = this.socksProxyServer;
         if (socksProxyServer != null) {
             socksProxyServer.stop();
-            socksProxyServer = null;
+            this.socksProxyServer = null;
         }
         connectionVariants = null;
     }
@@ -83,6 +84,7 @@ public abstract class ProxyConnectionTestBase extends SSLTrustProviderTestBase {
      * @return list of HTTPProxy to test (never null after setup)
      */
     protected List<HTTPProxy> getConnectionVariants() {
+        final List<HTTPProxy> connectionVariants = this.connectionVariants;
         if (connectionVariants == null) {
             return ConnectionVariants.createDirectOnly();
         }
@@ -93,6 +95,7 @@ public abstract class ProxyConnectionTestBase extends SSLTrustProviderTestBase {
      * Returns true if proxy servers are running and full connection variants (including SOCKS/HTTP proxy) are available.
      */
     protected boolean isProxyServersRunning() {
+        final List<HTTPProxy> connectionVariants = this.connectionVariants;
         return connectionVariants != null && connectionVariants.size() > 2;
     }
 }

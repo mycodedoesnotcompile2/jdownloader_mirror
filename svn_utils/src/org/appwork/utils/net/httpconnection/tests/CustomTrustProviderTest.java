@@ -41,7 +41,7 @@ import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustCurrentJREProvider;
+import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
 
 /**
  * Tests for CustomTrustProvider functionality including certificate validation, cacerts file loading, and trust store operations.
@@ -58,10 +58,10 @@ public class CustomTrustProviderTest extends ProxyConnectionTestBase {
             createTestCertificates();
             testCustomTrustProvider();
             testCustomTrustProviderWithCacerts();
-            cleanupTempFiles();
             LogV3.info("CustomTrustProvider tests completed successfully");
         } finally {
             teardownProxyServers();
+            cleanupTempFiles();
         }
     }
 
@@ -146,7 +146,7 @@ public class CustomTrustProviderTest extends ProxyConnectionTestBase {
         }
         // Test 6: Compare with TrustCurrentJREProvider (should have similar behavior)
         try {
-            final TrustCurrentJREProvider currentJREProvider = TrustCurrentJREProvider.getInstance();
+            final CurrentJRETrustProvider currentJREProvider = CurrentJRETrustProvider.getInstance();
             final java.security.KeyStore currentJRETrustStore = currentJREProvider.getTrustStore();
             final java.security.KeyStore cacertsTrustStore = cacertsProvider.getTrustStore();
             // Both should be non-null

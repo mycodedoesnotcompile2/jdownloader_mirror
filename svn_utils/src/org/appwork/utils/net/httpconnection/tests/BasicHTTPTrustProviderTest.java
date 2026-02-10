@@ -47,7 +47,7 @@ import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustCurrentJREProvider;
+import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
@@ -61,24 +61,28 @@ public class BasicHTTPTrustProviderTest extends SSLTrustProviderTestBase {
 
     @Override
     public void runTest() throws Exception {
-        createTestCertificates();
-        testTrustProviderGetterSetter();
-        testBasicHTTPConnectionReceivesTrustProvider();
-        testBasicHTTPRealHttpRequest();
-        testBasicHTTPHTTPSFailsWithWrongTrustProvider();
-        testBasicHTTPInvalidResponseCode();
-        cleanupTempFiles();
+        try {
+            createTestCertificates();
+            testTrustProviderGetterSetter();
+            testBasicHTTPConnectionReceivesTrustProvider();
+            testBasicHTTPRealHttpRequest();
+            testBasicHTTPHTTPSFailsWithWrongTrustProvider();
+            testBasicHTTPInvalidResponseCode();
+        } finally {
+            cleanupTempFiles();
+        }
         LogV3.info("BasicHTTP TrustProvider tests completed successfully");
     }
 
     /**
-     * Verifies getTrustProvider() / setTrustProvider(): default is default provider (never null), set and get roundtrip, set null resets to default.
+     * Verifies getTrustProvider() / setTrustProvider(): default is default provider (never null), set and get roundtrip, set null resets to
+     * default.
      */
     private void testTrustProviderGetterSetter() throws Exception {
         LogV3.info("Test: BasicHTTP TrustProvider getter/setter");
         final BasicHTTP basicHTTP = new BasicHTTP();
         assertTrue(basicHTTP.getTrustProvider() == TrustUtils.getDefaultProvider(), "Default TrustProvider should be default provider (never null)");
-        final TrustProviderInterface provider = TrustCurrentJREProvider.getInstance();
+        final TrustProviderInterface provider = CurrentJRETrustProvider.getInstance();
         basicHTTP.setTrustProvider(provider);
         assertTrue(basicHTTP.getTrustProvider() == provider, "getTrustProvider should return set provider");
         basicHTTP.setTrustProvider(null);
@@ -177,7 +181,7 @@ public class BasicHTTPTrustProviderTest extends SSLTrustProviderTestBase {
         final int serverPort = server.getActualPort();
         try {
             final BasicHTTP basicHTTP = new BasicHTTP();
-            basicHTTP.setTrustProvider(TrustCurrentJREProvider.getInstance());
+            basicHTTP.setTrustProvider(CurrentJRETrustProvider.getInstance());
             basicHTTP.setAllowedResponseCodes(200);
             basicHTTP.getRequestHeader().put(HTTPConstants.X_APPWORK, "1");
             basicHTTP.setConnectTimeout(5000);
@@ -213,12 +217,13 @@ public class BasicHTTPTrustProviderTest extends SSLTrustProviderTestBase {
             basicHTTP.setAllowedResponseCodes(200);
             basicHTTP.getRequestHeader().put(HTTPConstants.X_APPWORK, "1");
             basicHTTP.setConnectTimeout(5000);
-            basicHTTP.setReadTimeout(5000);
+            basicHTTP.setReadTimeout(50000);
             final String urlString = "http://localhost:" + serverPort + "/test/nonexistent";
             try {
                 basicHTTP.getPage(new URL(urlString));
                 assertTrue(false, "getPage with disallowed response code should throw");
             } catch (final BasicHTTPException e) {
+                LogV3.log(e);
                 final Throwable cause = e.getCause();
                 assertTrue(cause instanceof InvalidResponseCode, "Cause should be InvalidResponseCode, got: " + (cause != null ? cause.getClass().getSimpleName() : "null"));
                 LogV3.info("Expected InvalidResponseCode: " + cause.getMessage());

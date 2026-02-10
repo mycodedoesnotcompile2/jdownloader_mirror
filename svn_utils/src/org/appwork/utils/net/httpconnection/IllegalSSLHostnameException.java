@@ -35,7 +35,9 @@
 package org.appwork.utils.net.httpconnection;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author thomas
@@ -55,12 +57,12 @@ public class IllegalSSLHostnameException extends IOException implements TrustRes
     /**
      * @return the is
      */
-    public HashSet<String> getIs() {
-        return is;
+    public Set<String> getSubjects() {
+        return subjects;
     }
 
-    public final HashSet<String> is;
-    private TrustResult          trustResult;
+    public final Set<String> subjects;
+    private TrustResult      trustResult;
 
     /**
      * @return the trustResult
@@ -73,10 +75,10 @@ public class IllegalSSLHostnameException extends IOException implements TrustRes
      * @param host
      * @param subjects
      */
-    public IllegalSSLHostnameException(String host, HashSet<String> subjects) {
+    public IllegalSSLHostnameException(String host, Set<String> subjects) {
         super("HTTPS hostname wrong:  should be <" + host + "> != " + subjects);
         this.expected = host;
-        this.is = subjects;
+        this.subjects = subjects != null ? Collections.unmodifiableSet(new HashSet<String>(subjects)) : null;
     }
 
     /**
@@ -85,7 +87,7 @@ public class IllegalSSLHostnameException extends IOException implements TrustRes
     public IllegalSSLHostnameException(String host, String string) {
         super(string);
         this.expected = host;
-        this.is = null;
+        this.subjects = null;
     }
 
     /**
@@ -95,13 +97,14 @@ public class IllegalSSLHostnameException extends IOException implements TrustRes
     public IllegalSSLHostnameException(String host, Exception e) {
         super("Illegal Hostname", e);
         this.expected = host;
-        this.is = null;
+        this.subjects = null;
     }
 
     /**
      * @param trustResult
      */
-    public void setTrustResult(TrustResult trustResult) {
+    public IllegalSSLHostnameException setTrustResult(TrustResult trustResult) {
         this.trustResult = trustResult;
+        return this;
     }
 }

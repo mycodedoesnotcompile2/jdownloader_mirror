@@ -57,7 +57,6 @@ import org.appwork.utils.net.httpserver.HttpServer;
  * @author AppWork
  */
 public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -80,7 +79,6 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
      */
     private void testIsLocalhostOnlyFlag() throws Exception {
         LogV3.info("Test 1: isLocalhostOnly() flag");
-
         final boolean isLocalhostOnly = httpServer.isLocalhostOnly();
         assertTrue(isLocalhostOnly, "Server isLocalhostOnly() should return true, was: " + isLocalhostOnly);
         LogV3.info("Test 1 passed: isLocalhostOnly() = " + isLocalhostOnly);
@@ -93,7 +91,6 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
         LogV3.info("Test 2: getLocalAddresses() returns only loopback addresses");
         final List<SocketAddress> localAddresses = httpServer.getLocalAddresses();
         assertTrue(localAddresses != null && localAddresses.size() > 0, "getLocalAddresses() should return at least one address");
-
         for (final SocketAddress socketAddress : localAddresses) {
             assertTrue(socketAddress instanceof InetSocketAddress, "SocketAddress should be InetSocketAddress");
             final InetSocketAddress inetSocketAddress = (InetSocketAddress) socketAddress;
@@ -116,9 +113,7 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
             @SuppressWarnings("unchecked")
             final java.util.concurrent.atomic.AtomicReference<List<ServerSocket>> controlSocketsRef = (java.util.concurrent.atomic.AtomicReference<List<ServerSocket>>) controlSocketsField.get(httpServer);
             final List<ServerSocket> controlSockets = controlSocketsRef.get();
-
             assertTrue(controlSockets != null && controlSockets.size() > 0, "controlSockets should contain at least one ServerSocket");
-
             for (final ServerSocket serverSocket : controlSockets) {
                 final SocketAddress localSocketAddress = serverSocket.getLocalSocketAddress();
                 assertTrue(localSocketAddress instanceof InetSocketAddress, "ServerSocket local address should be InetSocketAddress");
@@ -126,10 +121,9 @@ public class HttpServerLocalhostBindingTest extends HttpServerTestBase {
                 final InetAddress boundAddress = inetSocketAddress.getAddress();
                 assertTrue(boundAddress != null, "Bound InetAddress should not be null");
                 assertTrue(boundAddress.isLoopbackAddress(), "ServerSocket should be bound to loopback address, but found: " + boundAddress.getHostAddress());
-
                 // Verify it's specifically 127.0.0.1 or ::1 (not 0.0.0.0 or any other address)
                 final String hostAddress = boundAddress.getHostAddress();
-                assertTrue(hostAddress.equals("127.0.0.1") || hostAddress.equals("::1") || hostAddress.equals("0:0:0:0:0:0:0:1"), "ServerSocket should be bound to 127.0.0.1 or ::1, but found: " + hostAddress);
+                assertTrue(hostAddress.equals("127.0.0.1") || hostAddress.equals("::1") || hostAddress.equals("0:0:0:0:0:0:0:1") || hostAddress.equals("0:0:0:0:0:0:0:1%lo"), "ServerSocket should be bound to 127.0.0.1 or ::1, but found: " + hostAddress);
                 LogV3.info("Test 3 passed: ServerSocket bound to " + hostAddress + ":" + inetSocketAddress.getPort());
             }
         } catch (final NoSuchFieldException e) {

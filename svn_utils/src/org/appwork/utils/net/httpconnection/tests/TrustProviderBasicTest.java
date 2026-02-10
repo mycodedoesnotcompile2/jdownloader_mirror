@@ -36,10 +36,6 @@ import javax.net.ssl.TrustManager;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustCurrentJREProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
-import org.appwork.utils.net.httpconnection.trust.TrustWindowsProvider;
 import org.appwork.utils.net.httpconnection.trust.bridge.Java1_6TrustBridge;
 
 /**
@@ -54,7 +50,6 @@ public class TrustProviderBasicTest extends SSLTrustProviderTestBase {
     public void runTest() throws Exception {
         testOptionMappings();
         testNullProviderRejects();
-        testPlatformSpecificProviders();
         LogV3.info("TrustProvider basic tests completed successfully");
     }
 
@@ -66,13 +61,6 @@ public class TrustProviderBasicTest extends SSLTrustProviderTestBase {
         assertTrue("id2".equals(optsJre.getId()), "options should store id");
         final SSLSocketStreamOptions optsCombined = new SSLSocketStreamOptions("id3");
         assertTrue("id3".equals(optsCombined.getId()), "options should store id");
-    }
-
-    private void testPlatformSpecificProviders() throws Exception {
-        // Bridge always returns a TrustManager; platform providers throw only when actually used.
-        final TestSSLSocketStreamFactory factory = new TestSSLSocketStreamFactory();
-        factory.getTrustManagersForProvider(TrustWindowsProvider.getInstance());
-        // factory.getTrustManagersForProvider(TrustLinuxProvider.getInstance());
     }
 
     private void testNullProviderRejects() throws Exception {

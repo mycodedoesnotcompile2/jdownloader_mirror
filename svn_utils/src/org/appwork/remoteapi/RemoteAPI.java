@@ -71,8 +71,8 @@ import org.appwork.remoteapi.responsewrapper.DataObject;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.Application;
 import org.appwork.utils.IO;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
 import org.appwork.utils.net.ChunkedOutputStream;
@@ -85,6 +85,7 @@ import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.requests.HttpRequestInterface;
 import org.appwork.utils.net.httpserver.requests.HttpServerInterface;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
@@ -174,7 +175,7 @@ public class RemoteAPI implements HttpRequestHandler {
         return null;
     }
 
-    public static boolean gzip(final HttpRequest request) {
+    public static boolean gzip(final HttpRequestInterface request) {
         final HTTPHeader acceptEncoding = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING);
         if (acceptEncoding != null) {
             final String value = acceptEncoding.getValue();
@@ -185,7 +186,14 @@ public class RemoteAPI implements HttpRequestHandler {
         return false;
     }
 
-    public static boolean deflate(final HttpRequest request) {
+    public static boolean chunked(final HttpRequest request) {
+        return request != null && HttpRequest.HTTP_VERSION.HTTP_1_1.equals(request.getHTTPVersion());
+    }
+
+    public static boolean deflate(final HttpRequestInterface request) {
+        if (!JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_6)) {
+            return false;
+        }
         final HTTPHeader acceptEncoding = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING);
         if (acceptEncoding != null) {
             final String value = acceptEncoding.getValue();
@@ -194,14 +202,6 @@ public class RemoteAPI implements HttpRequestHandler {
             }
         }
         return false;
-    }
-
-    public static boolean deflate(final RemoteAPIRequest request) {
-        return deflate(request.getHttpRequest());
-    }
-
-    public static boolean gzip(final RemoteAPIRequest request) {
-        return gzip(request.getHttpRequest());
     }
 
     /* hashmap that holds all registered interfaces and their paths */
@@ -248,10 +248,15 @@ public class RemoteAPI implements HttpRequestHandler {
                     count++;
                 }
             }
+            final String beforeThreadName = Thread.currentThread().getName();
+            final Thread currentThread = Thread.currentThread();
+            currentThread.setName("API Method: " + method.getName() + "|" + beforeThreadName);
             try {
                 responseData = request.getIface().invoke(method, parameters);
             } catch (final InvocationTargetException e) {
                 throw e.getTargetException();
+            } finally {
+                currentThread.setName(beforeThreadName);
             }
             if (methodHasResponseParameter && !methodHasReturnTypeAndAResponseParameter) {
                 /*
@@ -800,7 +805,7 @@ public class RemoteAPI implements HttpRequestHandler {
      */
     public static void sendBytesCompressed(HttpRequest request, HttpResponse response, final InputStream is) throws IOException {
         final boolean gzip = RemoteAPI.gzip(request);
-        final boolean deflate = RemoteAPI.deflate(request) && Application.getJavaVersion() >= Application.JAVA16;
+        final boolean deflate = RemoteAPI.deflate(request);
         final boolean isHeadRequest = RequestMethod.HEAD == request.getRequestMethod();
         if (deflate) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "deflate"));
@@ -808,8 +813,7 @@ public class RemoteAPI implements HttpRequestHandler {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
         }
         OutputStream os;
-        final HttpServerInterface bridge = request != null ? request.getServer() : null;
-        if (bridge == null || bridge.isChunkedEncodedResponseAllowed(request, response)) {
+        if (RemoteAPI.chunked(request)) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
             os = new ChunkedOutputStream(response.getOutputStream(true));
         } else {
@@ -840,7 +844,7 @@ public class RemoteAPI implements HttpRequestHandler {
      */
     public static void sendBytesCompressed(HttpRequest request, HttpResponse response, byte[] bytes) throws IOException {
         final boolean gzip = RemoteAPI.gzip(request);
-        final boolean deflate = RemoteAPI.deflate(request) && Application.getJavaVersion() >= Application.JAVA16;
+        final boolean deflate = RemoteAPI.deflate(request);
         final boolean isHeadRequest = RequestMethod.HEAD.equals(request.getRequestMethod());
         long contentLength = bytes.length;
         if ((gzip == false && deflate == false) || contentLength == 0) {
@@ -887,8 +891,7 @@ public class RemoteAPI implements HttpRequestHandler {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
             }
             OutputStream os;
-            final HttpServerInterface bridge = request != null ? request.getServer() : null;
-            if (bridge == null || bridge.isChunkedEncodedResponseAllowed(request, response)) {
+            if (RemoteAPI.chunked(request)) {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
                 os = new ChunkedOutputStream(response.getOutputStream(true));
             } else {

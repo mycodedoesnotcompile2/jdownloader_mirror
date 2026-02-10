@@ -344,7 +344,11 @@ public class BasicHTTP implements Interruptible {
                 } catch (final BasicHTTPException e) {
                     throw handleInterrupt(e);
                 } catch (final IOException e) {
-                    throw handleInterrupt(new BasicHTTPException(connection, new ReadIOException(e)));
+                    if (e instanceof DontWrapIOException) {
+                        throw handleInterrupt(new BasicHTTPException(connection, e));
+                    } else {
+                        throw handleInterrupt(new BasicHTTPException(connection, new ReadIOException(e)));
+                    }
                 } finally {
                     if (addedInterruptible) {
                         InterruptibleThread.remove(this);
@@ -424,7 +428,11 @@ public class BasicHTTP implements Interruptible {
             } catch (final BasicHTTPException e) {
                 throw handleInterrupt(e);
             } catch (final IOException e) {
-                throw handleInterrupt(new BasicHTTPException(connection, new ReadIOException(e)));
+                if (e instanceof DontWrapIOException) {
+                    throw handleInterrupt(new BasicHTTPException(connection, e));
+                } else {
+                    throw handleInterrupt(new BasicHTTPException(connection, new ReadIOException(e)));
+                }
             } finally {
                 try {
                     if (addedInterruptible) {
@@ -555,7 +563,7 @@ public class BasicHTTP implements Interruptible {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override

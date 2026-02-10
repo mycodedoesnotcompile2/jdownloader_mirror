@@ -39,22 +39,22 @@ import java.util.List;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
+import org.appwork.utils.net.httpconnection.tests.CertificateFactory;
+import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsCertUtils;
 import org.appwork.utils.os.WindowsCertUtils.CertListEntry;
 import org.appwork.utils.os.WindowsCertUtils.KeyStore;
-import org.appwork.utils.net.httpconnection.tests.CertificateFactory;
-import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
 
+import com.sun.jna.Native;
+import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.User32;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinUser;
-import com.sun.jna.Pointer;
-import com.sun.jna.Native;
 
 /**
- * Test suite for WindowsCertUtils focusing on certificate installation, listing, and uninstallation with friendly names.
- * Based on HTTPSIntegrationTest but without HTTP functionality.
+ * Test suite for WindowsCertUtils focusing on certificate installation, listing, and uninstallation with friendly names. Based on
+ * HTTPSIntegrationTest but without HTTP functionality.
  *
  * @author thomas
  * @date 03.02.2026
@@ -62,14 +62,13 @@ import com.sun.jna.Native;
 @TestDependency({ "org.appwork.utils.os.WindowsCertUtils" })
 public class WindowsCertUtilsTest extends AWTest {
     private static final String TEST_FRIENDLY_NAME = "AppWorkTestCert";
-    private static final String TEST_CA_NAME = "AppWork AWTest CA";
+    private static final String TEST_CA_NAME       = "AppWork AWTest CA";
     /** OID id-kp-serverAuth (Erweiterte Schlüsselverwendung / Zweck) */
-    private static final String EKU_SERVER_AUTH = "1.3.6.1.5.5.7.3.1";
+    private static final String EKU_SERVER_AUTH    = "1.3.6.1.5.5.7.3.1";
     /** OID id-kp-clientAuth (Erweiterte Schlüsselverwendung / Zweck) */
-    private static final String EKU_CLIENT_AUTH = "1.3.6.1.5.5.7.3.2";
-
-    private X509Certificate caCertificate;
-    private String caCertificateFingerPrint;
+    private static final String EKU_CLIENT_AUTH    = "1.3.6.1.5.5.7.3.2";
+    private X509Certificate     caCertificate;
+    private String              caCertificateFingerPrint;
 
     public static void main(final String[] args) {
         run();
@@ -81,27 +80,22 @@ public class WindowsCertUtilsTest extends AWTest {
             logInfoAnyway("Test must run on Windows!");
             return;
         }
-        
         LogV3.info("Starting WindowsCertUtils test...");
-        
         // Create test certificates
-        createTestCertificates();
-        
-        // Verify CA certificate has correct Extended Key Usage (Zweck)
-        testCaCertificateExtendedKeyUsage();
-        
-        // Clean up any existing test certificates
-        cleanupExistingTestCertificates();
-        
-        // Test installation with friendly name
-        testInstallCertificate();
-        
-        // Test listing certificates
-        testListCertificates();
-        
-        // Test uninstallation
-        testUninstallCertificate();
-        
+        try {
+            createTestCertificates();
+            // Verify CA certificate has correct Extended Key Usage (Zweck)
+            testCaCertificateExtendedKeyUsage();
+            // Clean up any existing test certificates
+            cleanupExistingTestCertificates();
+            // Test installation with friendly name
+            testInstallCertificate();
+            // Test listing certificates
+            testListCertificates();
+            // Test uninstallation
+            testUninstallCertificate();
+        } finally {
+        }
         LogV3.info("WindowsCertUtils test completed successfully");
     }
 
@@ -116,7 +110,6 @@ public class WindowsCertUtilsTest extends AWTest {
         assertNotNull(certResult.getServerCertificate(), "Server certificate should not be null");
         assertNotNull(certResult.getServerKeyPair(), "Server key pair should not be null");
         this.caCertificate = certResult.getCaCertificate();
-        
         // Calculate CA certificate fingerprint
         final MessageDigest md = MessageDigest.getInstance("SHA-1");
         md.update(caCertificate.getEncoded());
@@ -151,14 +144,12 @@ public class WindowsCertUtilsTest extends AWTest {
             LogV3.info("Removing existing certificate: " + c.thumbprint);
             removeCertificateWithAutoConfirm(c.thumbprint, KeyStore.CURRENT_USER);
         }
-        
         // Also check by friendly name
         list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, null, null, TEST_FRIENDLY_NAME);
         for (CertListEntry c : list) {
             LogV3.info("Removing existing certificate by friendly name: " + c.thumbprint);
             removeCertificateWithAutoConfirm(c.thumbprint, KeyStore.CURRENT_USER);
         }
-        
         // Verify cleanup
         boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
         assertFalse(isInstalled, "Certificate should not be installed before test");
@@ -170,18 +161,14 @@ public class WindowsCertUtilsTest extends AWTest {
      */
     private void testInstallCertificate() throws Exception {
         LogV3.info("Test: Installing certificate with friendly name...");
-        
         // Verify certificate is not installed
         boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
         assertFalse(isInstalled, "Certificate should not be installed before installation");
-        
         // Install certificate with friendly name
         installCertificateWithAutoConfirm(caCertificate, KeyStore.CURRENT_USER, TEST_FRIENDLY_NAME);
-        
         // Verify installation
         isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
         assertTrue(isInstalled, "Certificate should be installed after installation");
-        
         LogV3.info("Certificate installation test passed");
     }
 
@@ -190,11 +177,9 @@ public class WindowsCertUtilsTest extends AWTest {
      */
     private void testListCertificates() throws Exception {
         LogV3.info("Test: Listing certificates and verifying friendly name...");
-        
         // List by thumbprint
         List<CertListEntry> list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, TEST_CA_NAME, null, null);
         assertTrue(list.size() > 0, "Should find at least one certificate");
-        
         boolean found = false;
         for (CertListEntry entry : list) {
             if (caCertificateFingerPrint.equalsIgnoreCase(entry.thumbprint)) {
@@ -205,7 +190,6 @@ public class WindowsCertUtilsTest extends AWTest {
             }
         }
         assertTrue(found, "Should find the installed certificate");
-        
         // List by friendly name
         list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, null, null, TEST_FRIENDLY_NAME);
         assertTrue(list.size() > 0, "Should find certificate by friendly name");
@@ -217,7 +201,6 @@ public class WindowsCertUtilsTest extends AWTest {
             }
         }
         assertTrue(found, "Should find certificate by friendly name");
-        
         LogV3.info("Certificate listing test passed");
     }
 
@@ -226,19 +209,15 @@ public class WindowsCertUtilsTest extends AWTest {
      */
     private void testUninstallCertificate() throws Exception {
         LogV3.info("Test: Uninstalling certificate...");
-        
         // Verify certificate is installed
         boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
         assertTrue(isInstalled, "Certificate should be installed before uninstallation");
-        
         // Uninstall certificate
         boolean removed = removeCertificateWithAutoConfirm(caCertificateFingerPrint, KeyStore.CURRENT_USER);
         assertTrue(removed, "Certificate should be removed");
-        
         // Verify uninstallation
         isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
         assertFalse(isInstalled, "Certificate should not be installed after uninstallation");
-        
         LogV3.info("Certificate uninstallation test passed");
     }
 

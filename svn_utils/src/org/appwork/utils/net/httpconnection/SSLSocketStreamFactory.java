@@ -52,7 +52,10 @@ public interface SSLSocketStreamFactory {
      * @param keyManagers
      *            Optional client cert key managers for mutual TLS, or null
      */
+    @Deprecated
     public SSLSocketStreamInterface create(SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, SSLSocketStreamOptions options, TrustProviderInterface trustProvider, KeyManager[] keyManagers) throws IOException;
+
+    public SSLSocketStreamInterface create(SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, SSLSocketStreamOptions options, TrustCallback trustCallback) throws IOException;
 
     public String retry(SSLSocketStreamOptions options, Exception e);
 

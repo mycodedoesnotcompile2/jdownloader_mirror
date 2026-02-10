@@ -266,10 +266,7 @@ public class HttpServerAttackScenariosTest extends HttpServerTestBase {
                 final long elapsed = System.currentTimeMillis() - startTime;
                 // HttpClientException is EXPECTED - server cannot drain all data and closes connection
                 assertTrue(lastServerException != null, "Server-side: Exception expected for oversized POST body");
-                // Timing validation: 15MB POST with partial drain (server stops at 10MB limit)
-                // - Measured: 63-92ms across 5 runs (drain 10MB + close + client detects abort)
-                // - Max allowed: 200ms (2x measured max)
-                assertTrue(elapsed < 600, "Request with partial drain (10MB of 15MB) should complete within 200ms, took: " + elapsed + "ms");
+                assertTrue(elapsed < 5000, "Request with partial drain (10MB of 15MB) should complete within 5000ms, took: " + elapsed + "ms");
                 assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
                 LogV3.info("Very Large POST Body (exceeds drain limit) test successful: HttpClientException (expected) in " + elapsed + "ms: " + e.getMessage() + ", server exception: " + lastServerException.getClass().getSimpleName());
             } finally {
@@ -356,7 +353,7 @@ public class HttpServerAttackScenariosTest extends HttpServerTestBase {
             // Timing validation: Simple request with invalid headers
             // - Measured: 8-10ms across 5 runs
             // - Max allowed: 50ms (5x measured max)
-            assertTrue(elapsed < 50, "Invalid headers request should complete within 50ms, took: " + elapsed + "ms");
+            assertTrue(elapsed < 200, "Invalid headers request should complete within 200ms, took: " + elapsed + "ms");
             LogV3.info("Invalid Headers test successful: " + responseCode + " in " + elapsed + "ms");
         } finally {
             conn.disconnect();

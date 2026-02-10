@@ -1,8 +1,10 @@
 package org.appwork.utils.net.httpserver;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -12,6 +14,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLPeerUnverifiedException;
@@ -19,6 +22,8 @@ import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 
+import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.TrustCallback;
@@ -39,16 +44,15 @@ import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
  * <li>{@link ClientAuthMode#NEED}: Client cert is required; connection fails if none or untrusted.</li>
  * </ul>
  * <p>
- * Client certificate validation is done during the TLS handshake by the {@link SSLContext}'s TrustManagers
- * ({@link javax.net.ssl.X509TrustManager#checkClientTrusted}). To fully control validation, use a custom
- * TrustManager or the TrustProvider-based constructor below.
+ * Client certificate validation is done during the TLS handshake by the {@link SSLContext}'s TrustManagers (
+ * {@link javax.net.ssl.X509TrustManager#checkClientTrusted}). To fully control validation, use a custom TrustManager or the
+ * TrustProvider-based constructor below.
  * </p>
  * <p>
- * <b>Using the TrustProvider system (full override):</b> Use the constructor that takes
- * {@link TrustProviderInterface} to delegate client certificate validation entirely to the same abstraction used by
- * the HttpClient stack. The provider's {@link TrustProviderInterface#getAcceptedIssuers()} and
- * {@link TrustProviderInterface#checkClientTrusted} are used during the TLS handshake (via an internal
- * {@link javax.net.ssl.X509TrustManager} bridge). Example: {@code new CustomTrustProvider(caCert)} or your own
+ * <b>Using the TrustProvider system (full override):</b> Use the constructor that takes {@link TrustProviderInterface} to delegate client
+ * certificate validation entirely to the same abstraction used by the HttpClient stack. The provider's
+ * {@link TrustProviderInterface#getAcceptedIssuers()} and {@link TrustProviderInterface#checkClientTrusted} are used during the TLS
+ * handshake (via an internal {@link javax.net.ssl.X509TrustManager} bridge). Example: {@code new CustomTrustProvider(caCert)} or your own
  * implementation (e.g. validate against a keystore, CRL, or custom rules).
  * </p>
  */
@@ -65,8 +69,8 @@ public class SSLHttpServer extends HttpServer {
         NEED
     }
 
-    private final SSLContext              sslContext;
-    private final ClientAuthMode          clientAuthMode;
+    private final SSLContext               sslContext;
+    private final ClientAuthMode           clientAuthMode;
     /** Set when using TrustProvider constructor; used to capture TrustResult from handshake callback. */
     private final ThreadLocal<TrustResult> clientCertTrustResultHolder;
 
@@ -92,11 +96,11 @@ public class SSLHttpServer extends HttpServer {
     }
 
     /**
-     * Creates an SSL HTTP server with client certificate validation fully delegated to a {@link TrustProviderInterface}.
-     * Same abstraction as the HttpClient stack: the provider's {@link TrustProviderInterface#getAcceptedIssuers()} and
-     * {@link TrustProviderInterface#checkClientTrusted} are used during the TLS handshake (no separate
-     * TrustManager needed). Use e.g. {@link org.appwork.utils.net.httpconnection.trust.CustomTrustProvider} with your
-     * CA cert(s), or your own implementation (keystore, CRL, custom rules).
+     * Creates an SSL HTTP server with client certificate validation fully delegated to a {@link TrustProviderInterface}. Same abstraction
+     * as the HttpClient stack: the provider's {@link TrustProviderInterface#getAcceptedIssuers()} and
+     * {@link TrustProviderInterface#checkClientTrusted} are used during the TLS handshake (no separate TrustManager needed). Use e.g.
+     * {@link org.appwork.utils.net.httpconnection.trust.CustomTrustProvider} with your CA cert(s), or your own implementation (keystore,
+     * CRL, custom rules).
      *
      * @param port
      *            server port (0 = choose automatically)
@@ -117,11 +121,9 @@ public class SSLHttpServer extends HttpServer {
         super(port);
         if (serverKeystore == null) {
             throw new IllegalArgumentException("serverKeystore is null");
-        }
-        if (clientCertTrustProvider == null) {
+        } else if (clientCertTrustProvider == null) {
             throw new IllegalArgumentException("clientCertTrustProvider is null");
-        }
-        if (clientAuthMode == null) {
+        } else if (clientAuthMode == null) {
             throw new IllegalArgumentException("clientAuthMode is null");
         }
         this.clientCertTrustResultHolder = new ThreadLocal<TrustResult>();
@@ -130,9 +132,9 @@ public class SSLHttpServer extends HttpServer {
     }
 
     /**
-     * Builds an SSLContext with server identity from the keystore and client-cert validation from the TrustProvider.
-     * Used by the constructor that takes TrustProviderInterface. When a client cert is validated, the callback
-     * stores the TrustResult in holder so createHttpConnection can pass it to the request.
+     * Builds an SSLContext with server identity from the keystore and client-cert validation from the TrustProvider. Used by the
+     * constructor that takes TrustProviderInterface. When a client cert is validated, the callback stores the TrustResult in holder so
+     * createHttpConnection can pass it to the request.
      */
     private static SSLContext createSSLContext(final KeyStore serverKeystore, final char[] serverKeystorePassword, final TrustProviderInterface clientCertTrustProvider, final ThreadLocal<TrustResult> holder) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
         final KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -147,6 +149,11 @@ public class SSLHttpServer extends HttpServer {
             public TrustProviderInterface getTrustProvider() {
                 return clientCertTrustProvider;
             }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return null;
+            }
         };
         final TrustManager trustManager = JavaSSLSocketStreamFactory.generateTrustManagerDelegate(callback);
         final SSLContext sc = SSLContext.getInstance("TLS");
@@ -154,17 +161,42 @@ public class SSLHttpServer extends HttpServer {
         return sc;
     }
 
+    /** ALPN protocol "http/1.1" (used only on Java 9+ via reflection to avoid compile dependency on {@code javax.net.ssl.SSLParameters}). */
+    private static final String[] ALPN_HTTP_1_1 = new String[] { "http/1.1" };
+
+    /**
+     * Sets ALPN to "http/1.1" on the given SSLServerSocket when running on Java 9+. No-op on JRE 1.6–8. Uses reflection only so that
+     * {@code javax.net.ssl.SSLParameters} (Java 7+) and {@code setApplicationProtocols} (Java 9+) are never loaded on JRE 1.6, keeping the
+     * module runnable with target runtime 1.6.
+     */
+    private static void setAlpnHttp11IfSupported(final SSLServerSocket sslServerSocket) {
+        if (!JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
+            return;
+        }
+        try {
+            final Object params = sslServerSocket.getClass().getMethod("getSSLParameters").invoke(sslServerSocket);
+            params.getClass().getMethod("setApplicationProtocols", String[].class).invoke(params, (Object) ALPN_HTTP_1_1);
+            sslServerSocket.getClass().getMethod("setSSLParameters", params.getClass()).invoke(sslServerSocket, params);
+        } catch (final Throwable e) {
+            LogV3.finest("ALPN not set: " + e.getMessage());
+        }
+    }
+
     @Override
     protected ServerSocket createServerSocket() throws IOException {
         final SSLServerSocket sslServerSocket = (SSLServerSocket) this.sslContext.getServerSocketFactory().createServerSocket();
         sslServerSocket.setReuseAddress(true);
-        // Only call one of the two: the second call would override the first (per Javadoc).
-        if (this.clientAuthMode == ClientAuthMode.NEED) {
+        setAlpnHttp11IfSupported(sslServerSocket);
+        switch (clientAuthMode) {
+        case NEED:
             sslServerSocket.setNeedClientAuth(true);
-        } else if (this.clientAuthMode == ClientAuthMode.WANT) {
+            break;
+        case WANT:
             sslServerSocket.setWantClientAuth(true);
-        } else {
+            break;
+        default:
             sslServerSocket.setWantClientAuth(false);
+            break;
         }
         return sslServerSocket;
     }
@@ -174,52 +206,95 @@ public class SSLHttpServer extends HttpServer {
         if (clientSocket == null) {
             throw new IOException("ClientSocket is null");
         }
-        // When using SSLServerSocket, accept() always returns an SSLSocket with handshake completed
         final SSLSocket sslSocket = (SSLSocket) clientSocket;
-        final javax.net.ssl.SSLSession serverSession = sslSocket.getSession();
-        X509Certificate[] clientCertChain = null;
         try {
-            final Certificate[] peerCerts = serverSession.getPeerCertificates();
-            if (peerCerts != null && peerCerts.length > 0) {
-                clientCertChain = new X509Certificate[peerCerts.length];
-                for (int i = 0; i < peerCerts.length; i++) {
-                    clientCertChain[i] = (X509Certificate) peerCerts[i];
+            // Triggers SSL handshake; client may abort (e.g. Chrome cancelling speculative connections)
+            final javax.net.ssl.SSLSession serverSession = sslSocket.getSession();
+            X509Certificate[] clientCertChain = null;
+            try {
+                final Certificate[] peerCerts = serverSession.getPeerCertificates();
+                if (peerCerts != null && peerCerts.length > 0) {
+                    clientCertChain = new X509Certificate[peerCerts.length];
+                    for (int i = 0; i < peerCerts.length; i++) {
+                        clientCertChain[i] = (X509Certificate) peerCerts[i];
+                    }
                 }
+            } catch (final SSLPeerUnverifiedException e) {
+                // No client certificate presented (NONE/WANT without cert)
             }
-        } catch (final SSLPeerUnverifiedException e) {
-            // No client certificate presented (NONE/WANT without cert)
+            final ThreadLocal<TrustResult> clientCertTrustResultHolder = this.clientCertTrustResultHolder;
+            TrustResult trustResult = null;
+            if (clientCertTrustResultHolder != null) {
+                trustResult = clientCertTrustResultHolder.get();
+                clientCertTrustResultHolder.remove();
+            }
+            if (trustResult == null && clientCertChain != null && clientCertChain.length > 0) {
+                trustResult = new TrustResult(null, clientCertChain, null, TrustResult.TrustType.CLIENT);
+            }
+            return new HttpServerConnection(this, sslSocket, sslSocket.getInputStream(), sslSocket.getOutputStream(), true, trustResult);
+        } catch (final SocketException e) {
+            // Client closed/aborted (e.g. browser cancelled connection, TLS abort, recv failed)
+            closeQuietly(sslSocket);
+            return null;
+        } catch (final IOException e) {
+            // Best-effort: treat common JSSE/client-abort messages as benign (avoid logging as error).
+            final String msg = e.getMessage();
+            if (msg != null && (msg.contains("closed") || msg.contains("abort") || msg.contains("recv failed") || msg.contains("write error"))) {
+                closeQuietly(sslSocket);
+                return null;
+            }
+            throw e;
         }
-        TrustResult trustResult = null;
-        if (this.clientCertTrustResultHolder != null) {
-            trustResult = this.clientCertTrustResultHolder.get();
-            this.clientCertTrustResultHolder.remove();
-        }
-        if (trustResult == null && clientCertChain != null && clientCertChain.length > 0) {
-            trustResult = new TrustResult(null, clientCertChain, null, TrustResult.TrustType.CLIENT);
-        }
-        return new HttpServerConnection(this, sslSocket, sslSocket.getInputStream(), sslSocket.getOutputStream(), true, trustResult);
     }
 
-    public static SSLContext createSSLContextFromPKCS12(final String keystorePath, final String keystorePassword) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException, UnrecoverableKeyException, KeyManagementException {
-        final KeyStore ks = KeyStore.getInstance("PKCS12");
-        java.io.FileInputStream fis = null;
+    private static void closeQuietly(final SSLSocket sslSocket) {
+        LogV3.fine("SSL connection closed by client or handshake abort");
         try {
-            fis = new java.io.FileInputStream(keystorePath);
-            ks.load(fis, keystorePassword.toCharArray());
-        } finally {
-            if (fis != null) {
-                try {
-                    fis.close();
-                } catch (final java.io.IOException ignored) {
-                }
+            if (sslSocket != null) {
+                sslSocket.close();
             }
+        } catch (final Throwable ignored) {
         }
-        return createSSLContextFromKeyStore(ks, keystorePassword.toCharArray());
     }
 
     /**
-     * Creates an SSLContext from an in-memory KeyStore (e.g. from {@link org.appwork.utils.net.httpconnection.tests.CertificateFactory#createPKCS12KeyStore}).
-     * Avoids writing keystores to temp files when certificates are created on-the-fly.
+     * Creates an SSLContext from a PKCS12 keystore file.
+     *
+     * @param keystorePath
+     *            path to the .p12/.pfx file
+     * @param keystorePassword
+     *            keystore password (prefer {@link #createSSLContextFromPKCS12(String, char[])} to avoid keeping password in String memory)
+     * @return initialized SSLContext
+     */
+    public static SSLContext createSSLContextFromPKCS12(final String keystorePath, final String keystorePassword) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException, UnrecoverableKeyException, KeyManagementException {
+        return createSSLContextFromPKCS12(keystorePath, keystorePassword == null ? null : keystorePassword.toCharArray());
+    }
+
+    /**
+     * Creates an SSLContext from a PKCS12 keystore file. Prefer this overload when the password is sensitive (char[] can be cleared after
+     * use).
+     *
+     * @param keystorePath
+     *            path to the .p12/.pfx file
+     * @param keystorePassword
+     *            keystore password; may be null for password-less keystores
+     * @return initialized SSLContext
+     */
+    public static SSLContext createSSLContextFromPKCS12(final String keystorePath, final char[] keystorePassword) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException, UnrecoverableKeyException, KeyManagementException {
+        final FileInputStream fis = new FileInputStream(keystorePath);
+        final KeyStore ks = KeyStore.getInstance("PKCS12");
+        try {
+            ks.load(fis, keystorePassword);
+        } finally {
+            fis.close();
+        }
+        return createSSLContextFromKeyStore(ks, keystorePassword);
+    }
+
+    /**
+     * Creates an SSLContext from an in-memory KeyStore (e.g. from
+     * {@link org.appwork.utils.net.httpconnection.tests.CertificateFactory#createPKCS12KeyStore}). Avoids writing keystores to temp files
+     * when certificates are created on-the-fly.
      *
      * @param keyStore
      *            PKCS12 or other KeyStore containing the server certificate and private key

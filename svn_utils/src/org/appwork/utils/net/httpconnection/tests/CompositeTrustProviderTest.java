@@ -38,36 +38,45 @@ import java.util.List;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.net.httpconnection.CompositeTrustResult;
 import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustCurrentJREProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustWindowsProvider;
+import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustLinuxProvider;
+import org.appwork.utils.net.httpconnection.trust.WindowsTrustProvider;
+import org.appwork.utils.os.CrossSystem;
 
 /**
  * Tests for CompositeTrustProvider functionality including delegate management, failed provider tracking, and composite trust results.
  */
 public class CompositeTrustProviderTest extends SSLTrustProviderTestBase {
-
     public static void main(final String[] args) {
         run();
     }
 
     @Override
     public void runTest() throws Exception {
-        createTestCertificates();
-        testCompositeTrustProvider();
-        testCompositeSSLTrustInfoWithFailedProviders();
-        cleanupTempFiles();
+        try {
+            createTestCertificates();
+            testCompositeTrustProvider();
+            testCompositeSSLTrustInfoWithFailedProviders();
+        } finally {
+            cleanupTempFiles();
+        }
         LogV3.info("CompositeTrustProvider tests completed successfully");
     }
 
     private void testCompositeTrustProvider() throws Exception {
         final CompositeTrustProvider emptyComposite = new CompositeTrustProvider();
         assertTrue(emptyComposite.getDelegates().length == 0, "Empty CompositeTrustProvider has no delegates");
-        final CompositeTrustProvider singleComposite = new CompositeTrustProvider(TrustAllProvider.getInstance());
+        final CompositeTrustProvider singleComposite = new CompositeTrustProvider(AllTrustProvider.getInstance());
         assertTrue(singleComposite.getDelegates().length == 1, "Single-provider composite has one delegate");
-        final CompositeTrustProvider multiComposite = new CompositeTrustProvider(TrustCurrentJREProvider.getInstance(), TrustWindowsProvider.getInstance());
-        assertTrue(multiComposite.getDelegates().length == 2, "Multi-provider composite has three delegates");
+        if (CrossSystem.isWindows()) {
+            final CompositeTrustProvider multiComposite = new CompositeTrustProvider(CurrentJRETrustProvider.getInstance(), WindowsTrustProvider.getInstance());
+            assertTrue(multiComposite.getDelegates().length == 2, "Multi-provider composite has three delegates");
+        } else if (CrossSystem.isLinux()) {
+            final CompositeTrustProvider multiComposite = new CompositeTrustProvider(CurrentJRETrustProvider.getInstance(), TrustLinuxProvider.getInstance());
+            assertTrue(multiComposite.getDelegates().length == 2, "Multi-provider composite has three delegates");
+        }
     }
 
     /**
@@ -77,9 +86,9 @@ public class CompositeTrustProviderTest extends SSLTrustProviderTestBase {
     private void testCompositeSSLTrustInfoWithFailedProviders() throws Exception {
         // Create composite provider: JRE -> Windows -> TrustAll
         // JRE and Windows will reject the self-signed certificate, TrustAll will accept it
-        final TrustCurrentJREProvider jreProvider = TrustCurrentJREProvider.getInstance();
-        final TrustWindowsProvider windowsProvider = TrustWindowsProvider.getInstance();
-        final TrustAllProvider trustAllProvider = TrustAllProvider.getInstance();
+        final CurrentJRETrustProvider jreProvider = CurrentJRETrustProvider.getInstance();
+        final AllTrustProvider trustAllProvider = AllTrustProvider.getInstance();
+        final WindowsTrustProvider windowsProvider = WindowsTrustProvider.getInstance();
         final CompositeTrustProvider composite = new CompositeTrustProvider(jreProvider, windowsProvider, trustAllProvider);
         // Create a certificate chain with just the server certificate (self-signed, not in JRE/Windows trust stores)
         final X509Certificate[] chain = new X509Certificate[] { serverCertificate };

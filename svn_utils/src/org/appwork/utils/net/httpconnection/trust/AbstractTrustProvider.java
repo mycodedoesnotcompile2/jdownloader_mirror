@@ -59,11 +59,13 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
                 throw new IllegalSSLHostnameException(host, "Failed");
             }
         } catch (IllegalSSLHostnameException e) {
-            throw e;
+            throw e.setTrustResult(latestTrustResult);
         } catch (IOException e) {
-            throw new IllegalSSLHostnameException(host, e);
+            throw new IllegalSSLHostnameException(host, e).setTrustResult(latestTrustResult);
         }
     }
+
+    protected TrustResult latestTrustResult = null;
 
     /**
      * Creates SSLTrustInfo from a certificate chain. Extracts subject, serial number, and SHA-256 hash.
@@ -78,13 +80,13 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
         if (chain == null || chain.length == 0) {
             throw new WTFException();
         }
-        return new TrustResult(this, chain, e, type);
+        return latestTrustResult = new TrustResult(this, chain, e, type);
     }
 
     @Override
     public TrustResult checkServerTrusted(final X509Certificate[] chain, final String authType, final Object context) {
         try {
-            X509TrustManager tm = getTrustManager();
+            final X509TrustManager tm = getTrustManager();
             if (ReflectionUtils.isInstanceOf(JAVAX_NET_SSL_X509_EXTENDED_TRUST_MANAGER, tm)) {
                 if (context instanceof Socket) {
                     ((javax.net.ssl.X509ExtendedTrustManager) tm).checkServerTrusted(chain, authType, (Socket) context);
@@ -105,7 +107,7 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
     @Override
     public TrustResult checkClientTrusted(final X509Certificate[] chain, final String authType, final Object context) {
         try {
-            X509TrustManager tm = getTrustManager();
+            final X509TrustManager tm = getTrustManager();
             if (ReflectionUtils.isInstanceOf(JAVAX_NET_SSL_X509_EXTENDED_TRUST_MANAGER, tm)) {
                 if (context instanceof Socket) {
                     ((javax.net.ssl.X509ExtendedTrustManager) tm).checkClientTrusted(chain, authType, (Socket) context);
@@ -127,7 +129,7 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
      * @return
      * @throws SSLException
      */
-    protected abstract X509TrustManager getTrustManager() throws SSLException;
+    protected abstract X509TrustManager getTrustManager() throws Exception;
 
     @Override
     public X509Certificate[] getAcceptedIssuers() {
@@ -150,7 +152,7 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
      * @return
      * @throws SSLException
      */
-    abstract public KeyStore getTrustStore() throws SSLException;
+    abstract public KeyStore getTrustStore() throws Exception;
 
     /**
      *

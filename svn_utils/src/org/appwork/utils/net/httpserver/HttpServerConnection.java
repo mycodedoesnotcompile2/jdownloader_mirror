@@ -74,6 +74,7 @@ import org.appwork.utils.net.httpserver.requests.DeleteRequest;
 import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HeadRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.requests.HttpRequest.HTTP_VERSION;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.requests.LockRequest;
 import org.appwork.utils.net.httpserver.requests.MkcolRequest;
@@ -97,56 +98,6 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  *
  */
 public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConnectionInterface {
-    @Deprecated
-    // will be removed by daniel
-    public static enum HttpConnectionType {
-        DELETE,
-        CONNECT,
-        PUT,
-        HEAD,
-        GET,
-        POST,
-        OPTIONS,
-        UNKNOWN;
-
-        private final byte[] requestTypeBytes;
-
-        private HttpConnectionType() {
-            byte[] bytes = null;
-            try {
-                bytes = this.name().getBytes("ISO-8859-1");
-            } catch (final Throwable e) {
-                bytes = this.name().getBytes();
-            }
-            this.requestTypeBytes = bytes;
-        }
-
-        private final boolean isRequestType(final byte[] input) {
-            if (input.length < this.requestTypeBytes.length) {
-                return false;
-            }
-            for (int i = 0; i < this.requestTypeBytes.length; i++) {
-                if (this.requestTypeBytes[i] != input[i]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        public static HttpConnectionType get(final byte[] input) {
-            for (HttpConnectionType type : values()) {
-                if (type.isRequestType(input)) {
-                    return type;
-                }
-            }
-            return HttpConnectionType.UNKNOWN;
-        }
-
-        public final int length() {
-            return this.requestTypeBytes.length;
-        }
-    }
-
     public static List<KeyValuePair> parseParameterList(final String requestedParameters) throws IOException {
         final List<KeyValuePair> requestedURLParameters = new LinkedList<KeyValuePair>();
         if (!StringUtils.isEmpty(requestedParameters)) {
@@ -177,6 +128,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
     protected final Socket               clientSocket;
     /** True if this connection is over SSL/TLS. */
     protected final boolean              ssl;
+    protected HttpRequest.HTTP_VERSION   requestHttpVersion;
     /** Client certificate trust result (chain + provider + exception); null if no client cert. */
     protected final TrustResult          trustResult;
     protected boolean                    outputStreamInUse = false;
@@ -194,12 +146,13 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                                                                    return Pattern.quote(((RequestMethod) s).getHeaderValue());
                                                                };
                                                            }.join(RequestMethod.values()) + ")");
+    private static final Pattern         REQUESTHTTP       = Pattern.compile("\\s+.+\\s+(HTTP/([0-9\\.]+))");
     private static final Pattern         REQUESTLINE       = Pattern.compile("\\s+(.+)\\s+HTTP/");
     public static final Pattern          REQUESTURL        = Pattern.compile("^(/.*?)($|\\?)");
     public static final Pattern          REQUESTPARAM      = Pattern.compile("^/.*?\\?(.+)");
 
     protected HttpServerConnection(final AbstractServerBasics server, final Socket clientSocket, final InputStream is, final OutputStream os) throws IOException {
-        this(server, clientSocket, is, os, false, (TrustResult) null);
+        this(server, clientSocket, is, os, false, null);
     }
 
     /**
@@ -399,6 +352,8 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         }
         // TOTO: requestLine may be "" in some cases (chrome pre connection...?)
         final RequestMethod connectionType = this.parseConnectionType(requestLine);
+        final String requestHTTP = new Regex(requestLine, HttpServerConnection.REQUESTHTTP).getMatch(0);
+        this.requestHttpVersion = HttpRequest.HTTP_VERSION.parse(requestHTTP);
         String requestedURL = new Regex(requestLine, HttpServerConnection.REQUESTLINE).getMatch(0);
         if (!StringUtils.startsWithCaseInsensitive(requestedURL, "/")) {
             requestedURL = "/" + StringUtils.valueOrEmpty(requestedURL);
@@ -1079,9 +1034,9 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
             }
             try {
                 final AbstractServerBasics server = this.getServer();
-                this.response = createErrorResponse();
+                final HttpResponse errorResponse = this.response = createErrorResponse();
                 final long beforeOnExceptionTime = Time.systemIndependentCurrentJVMTimeMillis();
-                closeConnection = server.onException(e, this.request, this.response);
+                closeConnection = server.onException(e, getRequest(), errorResponse);
                 final long afterOnExceptionTime = Time.systemIndependentCurrentJVMTimeMillis();
                 if (isVerboseLogEnabled()) {
                     LogV3.fine("HttpConnection.run: onException completed in " + (afterOnExceptionTime - beforeOnExceptionTime) + "ms");
@@ -1365,5 +1320,10 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         } else {
             return "HttpConnectionThread: IS and OS";
         }
+    }
+
+    @Override
+    public HTTP_VERSION getHTTPVersion() {
+        return requestHttpVersion;
     }
 }

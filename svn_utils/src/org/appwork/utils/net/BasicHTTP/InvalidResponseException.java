@@ -42,7 +42,7 @@ import org.appwork.utils.net.httpconnection.HTTPConnection;
  * @date 19.11.2018
  *
  */
-public class InvalidResponseException extends IOException {
+public class InvalidResponseException extends IOException implements DontWrapIOException {
     protected final HTTPConnection connection;
 
     public HTTPConnection getConnection() {

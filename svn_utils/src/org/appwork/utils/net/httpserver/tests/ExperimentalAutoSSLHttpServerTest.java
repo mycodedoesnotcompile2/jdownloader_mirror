@@ -9,16 +9,18 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.security.KeyStore;
 import java.security.KeyManagementException;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
 import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
@@ -82,7 +84,7 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  * <pre>
  * # Generate self-signed certificate and key
  * openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
- *
+ * 
  * # Convert to PKCS12
  * openssl pkcs12 -export -in cert.pem -inkey key.pem -out keystore.p12 -name "server" -passout pass:changeit
  * </pre>
@@ -94,7 +96,6 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  * @author AppWork
  */
 public class ExperimentalAutoSSLHttpServerTest extends AWTest {
-
     /**
      * JSSE-based SSL-enabled HTTP server for testing
      */
@@ -176,8 +177,8 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
     }
 
     /**
-     * Creates in-memory PKCS12 keystore from generated certificates and SSLContext from it.
-     * Writes keystore to temp file only for testPFXLoading (load-from-file tests).
+     * Creates in-memory PKCS12 keystore from generated certificates and SSLContext from it. Writes keystore to temp file only for
+     * testPFXLoading (load-from-file tests).
      */
     private void createKeystore() throws Exception {
         LogV3.info("Creating PKCS12 keystore (in-memory)...");
@@ -474,7 +475,12 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
             final URL url = new URL(urlString);
             final HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
             connection.setSSLSocketFactory(trustAllContext.getSocketFactory());
-            connection.setHostnameVerifier((hostname, session) -> true); // Accept all hostnames
+            connection.setHostnameVerifier(new HostnameVerifier() {
+                @Override
+                public boolean verify(String hostname, SSLSession session) {
+                    return true;
+                }
+            }); // Accept all hostnames
             connection.addRequestProperty(HTTPConstants.X_APPWORK, "1");
             connection.setRequestMethod("GET");
             connection.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));

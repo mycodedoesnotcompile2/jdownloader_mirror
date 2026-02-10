@@ -55,6 +55,8 @@ public interface RawHttpConnectionInterface {
 
     public HttpRequest getRequest();
 
+    public HttpRequest.HTTP_VERSION getHTTPVersion();
+
     public void closeConnection();
 
     public void close();
@@ -62,7 +64,6 @@ public interface RawHttpConnectionInterface {
     public void setHook(ConnectionHook hook);
 
     public ConnectionHook getHook();
-
     /**
      * Returns the client certificate trust result (chain, provider, exception). Use {@link TrustResult#getChain()} for the certificate
      * chain.

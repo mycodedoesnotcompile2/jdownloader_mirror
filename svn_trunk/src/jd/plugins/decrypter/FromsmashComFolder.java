@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FromsmashCom;
 
-@DecrypterPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52275 $", interfaceVersion = 3, names = {}, urls = {})
 public class FromsmashComFolder extends PluginForDecrypt {
     public FromsmashComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -195,18 +196,19 @@ public class FromsmashComFolder extends PluginForDecrypt {
             /* E.g. "Expired" */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String fpName = (String) transfer.get("title");
-        if (StringUtils.isEmpty(fpName)) {
-            fpName = folderID;
+        String folderTitle = (String) transfer.get("title");
+        if (StringUtils.isEmpty(folderTitle)) {
+            folderTitle = folderID;
         }
         final int numberofItems = ((Number) transfer.get("filesNumber")).intValue();
+        final Map<String, FilePackage> packages = new HashMap<String, FilePackage>();
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(fpName);
+        fp.setName(folderTitle);
         /* 2021-09-29: Website is using max. 9 items --> Probably because of their 3-pair grid layout. */
         final int maxItemsPerPage = 9;
         final UrlQuery query = new UrlQuery();
-        query.add("version", "07-2020");
-        query.add("limit", Integer.toString(maxItemsPerPage));
+        query.appendEncoded("version", "07-2020");
+        query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
         int page = 0;
         String next = null;
         do {
@@ -217,7 +219,11 @@ public class FromsmashComFolder extends PluginForDecrypt {
             for (final Map<String, Object> file : files) {
                 final String fileid = file.get("id").toString();
                 final DownloadLink link = this.createDownloadlink("https://" + this.getHost() + "/" + folderID + "#fileid=" + fileid);
-                link.setFinalFileName(file.get("name").toString());
+                final String path = file.get("name").toString();
+                final String[] pathSegments = path.split("/");
+                /* Last part of the path = filename */
+                final String filename = pathSegments[pathSegments.length - 1];
+                link.setFinalFileName(filename);
                 link.setVerifiedFileSize(((Number) file.get("size")).longValue());
                 link.setAvailable(true);
                 link.setProperty(FromsmashCom.PROPERTY_DIRECTURL, file.get("download").toString());
@@ -233,7 +239,31 @@ public class FromsmashComFolder extends PluginForDecrypt {
                      */
                     link.setProperty(FromsmashCom.PROPERTY_STATIC_DOWNLOAD_PASSWORD, passCode);
                 }
-                link._setFilePackage(fp);
+                if (pathSegments.length == 1) {
+                    /* Loose file without specific subfolder structure */
+                    link._setFilePackage(fp);
+                } else {
+                    /**
+                     * File nested in subfolder structure -> Get path without filename <br>
+                     * If the uploader has uploaded a folder, all files' name items in it start with "nameOfBaseFolder/".
+                     */
+                    String pathWithoutFilename = "";
+                    for (int i = 0; i < pathSegments.length - 1; i++) {
+                        final String pathSegment = pathSegments[i];
+                        if (pathWithoutFilename.length() > 0) {
+                            pathWithoutFilename += "/";
+                        }
+                        pathWithoutFilename += pathSegment;
+                    }
+                    link.setRelativeDownloadFolderPath(pathWithoutFilename);
+                    FilePackage thisFp = packages.get(pathWithoutFilename);
+                    if (thisFp == null) {
+                        thisFp = FilePackage.getInstance();
+                        packages.put(pathWithoutFilename, thisFp);
+                        thisFp.setName(pathWithoutFilename);
+                    }
+                    link._setFilePackage(thisFp);
+                }
                 distribute(link);
                 ret.add(link);
             }

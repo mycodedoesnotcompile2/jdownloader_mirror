@@ -187,7 +187,6 @@ public class IDETestRunner {
             }
         }
         // testClasses.add("org.appwork.utils.net.httpserver.tests.HttpServerConnectionTimeoutsTest");
-
         if (testClasses.size() == 0) {
             for (final URL url : ClassPathScanner.getClassPath()) {
                 // System.out.println(url);
@@ -218,7 +217,6 @@ public class IDETestRunner {
         }
         final int testClassesFound = testClasses.size();
         int skippedTestClasses = 0;
-
         if (false) {
             {
                 final ListIterator<String> it = testClasses.listIterator();
@@ -251,7 +249,6 @@ public class IDETestRunner {
                     it.remove();
                 }
             }
-
         }
         {
             // shuffle test classes, tests must not rely on specific order of execution
@@ -271,13 +268,11 @@ public class IDETestRunner {
         AWTest.logInfoAnyway("Found  " + testClassesFound + " - Skipped Tests: " + skippedTestClasses);
         int count = 0;
         nextTest: for (final String testClass : testClasses) {
-
             count++;
             AWTest.logInfoAnyway("Next  " + " - " + count + "/" + testClassesFound + " : " + testClass);
             Map<String, String> references = new ClassCollector().getClasses(testClass, true);
             File file = Application.getResource("cfg/testcache_" + testClass + ".cache");
             HashMap<String, String> known = new HashMap<String, String>();
-
             if (file.isFile()) {
                 known = Deser.fromByteArray(IO.readFile(file), TypeRef.HASHMAP_STRING);
             } else {
@@ -306,16 +301,13 @@ public class IDETestRunner {
                     }
                 }
             }
-
             if (skip) {
                 skippedTestClasses++;
                 AWTest.logInfoAnyway(testClass + " SKIPPED! Total: " + skippedTestClasses + " of " + testClassesFound);
                 continue;
             }
-
             final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
             runTestInternal(cls);
-
             IO.secureWrite(file, Deser.toByteArray(references, SC.READABLE));
             // final Map<String, String> refClasses = new ClassCollector().getClasses(testClass, true);
             knownClasses.putAll(references);
@@ -364,7 +356,7 @@ public class IDETestRunner {
                 AWTest.clearLoggerCache();
                 AWTest.logInfoAnyway("    >> SUCCESS");
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             AWTest.setLoggerSilent(false, true);
             // Force to cached error log.
             LogV3.info("FAILED " + cls.getName());

@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 50867 $", interfaceVersion = 3, names = { "urlgalleries.net" }, urls = { "https?://(?:[\\w\\-]+\\.)?urlgalleries\\.net/[\\w\\-]+.+" })
+@DecrypterPlugin(revision = "$Revision: 52277 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     private static String agent = null;
 
@@ -62,6 +62,34 @@ public class RlGalleriesNt extends PluginForDecrypt {
         br.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
         br.setFollowRedirects(true);
         return br;
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "urlgalleries.com", "urlgalleries.net" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[\\w\\-]+.+");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -129,96 +157,107 @@ public class RlGalleriesNt extends PluginForDecrypt {
                         page++;
                     }
                 } while (true);
-            } else {
-                /* Website */
-                final String url = URLHelper.getUrlWithoutParams(contenturl);
-                /* Display as many items as possible to avoid having to deal with pagination. */
-                final UrlQuery query = UrlQuery.parse(contenturl);
-                /* Display all images on one page */
-                query.addAndReplace("a", "10000");
-                /* Start from page 1 else we may get an empty page (website is buggy). */
-                query.addAndReplace("p", "1");
-                br.getPage(url + "?" + query.toString());
-                if (isOffline(br)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                if (br.containsHTML("Continue to the image")) {
-                    /* 2025-03-26: Single image */
-                    final String finallink = br.getRegex("window\\.location\\.href = '(http?://[^']+)").getMatch(0);
-                    if (finallink == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    ret.add(this.createDownloadlink(finallink));
-                    return ret;
-                }
-                String title = br.getRegex("border='0' /></a></div>(?:\\s*<h\\d+[^>]*>\\s*)?(.*?)(?:\\s*</h\\d+>\\s*)?</td></tr><tr>").getMatch(0);
-                if (title == null) {
-                    title = br.getRegex("<title>([^<]*?)</title>").getMatch(0);
-                }
-                final FilePackage fp = FilePackage.getInstance();
-                if (title != null) {
-                    title = Encoding.htmlDecode(title).trim();
-                    title = title.replaceAll("(?i) - URLGalleries$", "");
-                }
-                if (!StringUtils.isEmpty(title)) {
-                    fp.setName(title);
-                } else {
-                    /* Fallback */
-                    fp.setName(br._getURL().getPath());
-                }
-                int page = 1;
-                String nextpage = null;
-                final HashSet<String> dupes = new HashSet<String>();
-                do {
-                    logger.info("Crawling page " + page + " of ??");
-                    final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
-                    final String[] redirecturls = br.getRegex("rel='nofollow noopener' href='(/[^/\\']+)' target='_blank'").getColumn(0);
-                    /*
-                     * Check for special thumbnails that our host plugins will change to the original URLs without needing to crawl the
-                     * individual urlgalleries.net URLs -> Speeds up things a lot!
-                     */
-                    final String[] thumbnailurls = br.getRegex("class='gallery' src='(https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com)/[^<>\"\\']+)'").getColumn(0);
-                    for (final String thumbnailurl : thumbnailurls) {
-                        if (dupes.add(thumbnailurl)) {
-                            final DownloadLink link = this.createDownloadlink(thumbnailurl);
-                            newitems.add(link);
-                        }
-                    }
-                    if (redirecturls != null && thumbnailurls != null && redirecturls.length > thumbnailurls.length) {
-                        for (String redirecturl : redirecturls) {
-                            if (!dupes.add(redirecturl)) {
-                                continue;
-                            }
-                            redirecturl = br.getURL(redirecturl).toExternalForm();
-                            final DownloadLink link = this.createDownloadlink(redirecturl);
-                            newitems.add(link);
-                        }
-                    } else {
-                        logger.info("Thumbnail crawling was successful");
-                    }
-                    for (final DownloadLink newitem : newitems) {
-                        newitem._setFilePackage(fp);
-                        ret.add(newitem);
-                        distribute(newitem);
-                    }
-                    logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
-                    nextpage = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "\\?p=" + (page + 1) + ")").getMatch(0);
-                    if (isAbort()) {
-                        logger.info("Stopping because: Aborted by user");
-                        break;
-                    } else if (newitems.size() == 0) {
-                        /* Fail-safe */
-                        logger.info("Stopping because: Failed to find any new item on this page");
-                        break;
-                    } else if (nextpage == null || !dupes.add(nextpage)) {
-                        logger.info("Stopping because: Reached last page?");
-                        break;
-                    } else {
-                        br.getPage(nextpage);
-                        page++;
-                    }
-                } while (!this.isAbort());
+                return ret;
             }
+            /* Website */
+            final String url = URLHelper.getUrlWithoutParams(contenturl);
+            /* Display as many items as possible to avoid having to deal with pagination. */
+            final UrlQuery query = UrlQuery.parse(contenturl);
+            /* Display all images on one page */
+            query.addAndReplace("a", "10000");
+            /* Start from page 1 else we may get an empty page (website is buggy). */
+            query.addAndReplace("p", "1");
+            br.getPage(url + "?" + query.toString());
+            if (isOffline(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (br.containsHTML("Continue to the image")) {
+                /* 2025-03-26: Single image */
+                final String finallink = br.getRegex("window\\.location\\.href = '(http?://[^']+)").getMatch(0);
+                if (finallink == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                ret.add(this.createDownloadlink(finallink));
+                return ret;
+            }
+            String title = br.getRegex("border='0' /></a></div>(?:\\s*<h\\d+[^>]*>\\s*)?(.*?)(?:\\s*</h\\d+>\\s*)?</td></tr><tr>").getMatch(0);
+            if (title == null) {
+                title = br.getRegex("<title>([^<]*?)</title>").getMatch(0);
+            }
+            final FilePackage fp = FilePackage.getInstance();
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
+                title = title.replaceAll("(?i) - URLGalleries$", "");
+            }
+            if (!StringUtils.isEmpty(title)) {
+                fp.setName(title);
+            } else {
+                /* Fallback */
+                fp.setName(br._getURL().getPath());
+            }
+            final String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"(https?://[^\"]+)").getMatch(0);
+            if (zip_url != null) {
+                final DownloadLink zip = this.createDownloadlink(zip_url);
+                zip._setFilePackage(fp);
+                ret.add(zip);
+                distribute(zip);
+            }
+            int page = 1;
+            String nextpage = null;
+            final HashSet<String> dupes = new HashSet<String>();
+            final Pattern allowed_thumbnail_urls = Pattern.compile("(https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com)/[^<>\"\\']+)");
+            do {
+                logger.info("Crawling page " + page + " of ??");
+                final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
+                final String[] redirecturls = br.getRegex("rel='nofollow noopener' href='(/[^/\\']+)' target='_blank'").getColumn(0);
+                /*
+                 * Check for special thumbnails that our host plugins will change to the original URLs without needing to crawl the
+                 * individual urlgalleries.net URLs -> Speeds up things a lot!
+                 */
+                String[] thumbnailurls = br.getRegex("class='gallery' src='" + allowed_thumbnail_urls.pattern() + "'").getColumn(0);
+                if (thumbnailurls == null || thumbnailurls.length == 0) {
+                    thumbnailurls = br.getRegex("class=\"thumb\"\\s*src=\"" + allowed_thumbnail_urls.pattern() + "\"").getColumn(0);
+                }
+                for (final String thumbnailurl : thumbnailurls) {
+                    if (dupes.add(thumbnailurl)) {
+                        final DownloadLink link = this.createDownloadlink(thumbnailurl);
+                        newitems.add(link);
+                    }
+                }
+                if (redirecturls != null && thumbnailurls != null && redirecturls.length > thumbnailurls.length) {
+                    for (String redirecturl : redirecturls) {
+                        if (!dupes.add(redirecturl)) {
+                            continue;
+                        }
+                        redirecturl = br.getURL(redirecturl).toExternalForm();
+                        final DownloadLink link = this.createDownloadlink(redirecturl);
+                        newitems.add(link);
+                    }
+                } else {
+                    logger.info("Thumbnail crawling was successful");
+                }
+                for (final DownloadLink newitem : newitems) {
+                    newitem._setFilePackage(fp);
+                    ret.add(newitem);
+                    distribute(newitem);
+                }
+                logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
+                nextpage = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "\\?p=" + (page + 1) + ")").getMatch(0);
+                if (isAbort()) {
+                    logger.info("Stopping because: Aborted by user");
+                    break;
+                } else if (newitems.size() == 0) {
+                    /* Fail-safe */
+                    logger.info("Stopping because: Failed to find any new item on this page");
+                    break;
+                } else if (nextpage == null || !dupes.add(nextpage)) {
+                    logger.info("Stopping because: Reached last page?");
+                    break;
+                } else {
+                    br.getPage(nextpage);
+                    page++;
+                }
+            } while (!this.isAbort());
             if (ret.isEmpty()) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

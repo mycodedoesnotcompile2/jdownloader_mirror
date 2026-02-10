@@ -32,7 +32,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection.tests;
 
-import java.io.File;
 import java.io.InputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -56,12 +55,14 @@ import org.appwork.utils.net.httpconnection.HTTPProxy.TYPE;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.TrustValidationFailedException;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustCurrentJREProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustLinuxProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
-import org.appwork.utils.net.httpconnection.trust.TrustWindowsProvider;
+import org.appwork.utils.net.httpconnection.trust.WindowsTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsCertUtils;
 import org.appwork.utils.os.WindowsCertUtils.CertListEntry;
@@ -88,6 +89,9 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
 
     @Override
     public void runTest() throws Exception {
+        if (!CrossSystem.isWindows()) {
+            return;
+        }
         try {
             setupProxyServers();
             createTestCertificates();
@@ -106,29 +110,29 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
             // Test various certificate scenarios over all connection variants
             for (final HTTPProxy proxy : getConnectionVariants()) {
                 LogV3.info("badssl / public HTTPS tests via " + proxy);
-                new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get("https://sha256.badssl.com/");
+                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha256.badssl.com/");
                 try {
-                    new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get("https://sha384.badssl.com/");
+                    new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha384.badssl.com/");
                     throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
                 } catch (HttpClientException e) {
                 }
                 try {
-                    new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get("https://sha512.badssl.com/");
+                    new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha512.badssl.com/");
                     throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
                 } catch (HttpClientException e) {
                 }
-                new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get("https://rsa2048.badssl.com/");
-                new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get("https://rsa4096.badssl.com/");
+                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://rsa2048.badssl.com/");
+                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://rsa4096.badssl.com/");
                 testPublicHttpsWithValidCertificateForProxy(proxy);
                 testPublicHttpsByIpForProxy(proxy);
             }
             testLocalServerBy127_0_0_1();
             testNativeHttpsURLConnectionWithTrustProvider();
             testAllProvidersWithRealHTTPS();
-            cleanupTempFiles();
             LogV3.info("HTTPS integration tests completed successfully");
         } finally {
             teardownProxyServers();
+            cleanupTempFiles();
         }
     }
 
@@ -138,12 +142,41 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
      */
     private void testPublicHttpsWithValidCertificateForProxy(final HTTPProxy proxy) throws Exception {
         final String url = "https://example.com/";
-        final RequestContext trustAllOk = new HttpClient().proxy(proxy).trust(TrustAllProvider.getInstance()).get(url);
-        final RequestContext jreOk = new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get(url);
-        final RequestContext combinedOk = new HttpClient().proxy(proxy).trust(new CompositeTrustProvider(TrustCurrentJREProvider.getInstance(), TrustWindowsProvider.getInstance())).get(url);
-        assertTrue(trustAllOk.getTrustResult().isTrusted(), "TrustAllProvider should reach " + url + " via " + proxy);
-        assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
-        assertTrue(combinedOk.getTrustResult().isTrusted(), "CompositeTrustProvider (JRE+Windows) must accept valid CA-signed cert for " + url + " via " + proxy + (combinedOk.getTrustResult().getException() != null ? ": " + combinedOk.getTrustResult().getException().getMessage() : ""));
+        {
+            final RequestContext trustAllOk = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(url);
+            assertTrue(trustAllOk.getTrustResult().getTrustProvider() instanceof AllTrustProvider);
+            assertTrue(trustAllOk.getTrustResult().isTrusted(), "TrustAllProvider should reach " + url + " via " + proxy);
+        }
+        {
+            final RequestContext jreOk = new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get(url);
+            assertTrue(jreOk.getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
+            assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
+        }
+        {
+            final RequestContext ccadbOk = new HttpClient().proxy(proxy).trust(new CCADBTrustProvider()).get(url);
+            assertTrue(ccadbOk.getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
+            assertTrue(ccadbOk.getTrustResult().isTrusted(), "CCADBTrustProvider must accept valid CA-signed cert for " + url + " via " + proxy + (ccadbOk.getTrustResult().getException() != null ? ": " + ccadbOk.getTrustResult().getException().getMessage() : ""));
+        }
+        if (CrossSystem.isLinux()) {
+            {
+                final RequestContext linuxOk = new HttpClient().proxy(proxy).trust(TrustLinuxProvider.getInstance()).get(url);
+                assertTrue(linuxOk.getTrustResult().getTrustProvider() instanceof TrustLinuxProvider);
+                assertTrue(linuxOk.getTrustResult().isTrusted(), "TrustLinuxProvider must accept valid CA-signed cert for " + url + " via " + proxy + (linuxOk.getTrustResult().getException() != null ? ": " + linuxOk.getTrustResult().getException().getMessage() : ""));
+            }
+            final RequestContext combinedOk = new HttpClient().proxy(proxy).trust(new CompositeTrustProvider(CurrentJRETrustProvider.getInstance(), TrustLinuxProvider.getInstance())).get(url);
+            assertTrue(combinedOk.getTrustResult().getTrustProvider() instanceof CompositeTrustProvider);
+            assertTrue(combinedOk.getTrustResult().isTrusted(), "CompositeTrustProvider (JRE+Linux) must accept valid CA-signed cert for " + url + " via " + proxy + (combinedOk.getTrustResult().getException() != null ? ": " + combinedOk.getTrustResult().getException().getMessage() : ""));
+        }
+        if (CrossSystem.isWindows()) {
+            {
+                final RequestContext windowsOk = new HttpClient().proxy(proxy).trust(WindowsTrustProvider.getInstance()).get(url);
+                assertTrue(windowsOk.getTrustResult().getTrustProvider() instanceof WindowsTrustProvider);
+                assertTrue(windowsOk.getTrustResult().isTrusted(), "WindowsTrustProvider must accept valid CA-signed cert for " + url + " via " + proxy + (windowsOk.getTrustResult().getException() != null ? ": " + windowsOk.getTrustResult().getException().getMessage() : ""));
+            }
+            final RequestContext combinedOk = new HttpClient().proxy(proxy).trust(new CompositeTrustProvider(CurrentJRETrustProvider.getInstance(), WindowsTrustProvider.getInstance())).get(url);
+            assertTrue(combinedOk.getTrustResult().getTrustProvider() instanceof CompositeTrustProvider);
+            assertTrue(combinedOk.getTrustResult().isTrusted(), "CompositeTrustProvider (JRE+Windows) must accept valid CA-signed cert for " + url + " via " + proxy + (combinedOk.getTrustResult().getException() != null ? ": " + combinedOk.getTrustResult().getException().getMessage() : ""));
+        }
     }
 
     /**
@@ -154,10 +187,10 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         final String host = "jdownloader.org";
         final String ip = InetAddress.getByName(host).getHostAddress();
         final String urlByIp = "https://" + ip + "/";
-        final RequestContext trustAllOk = new HttpClient().proxy(proxy).trust(TrustAllProvider.getInstance()).get(urlByIp);
+        final RequestContext trustAllOk = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(urlByIp);
         assertTrue(trustAllOk.getTrustResult().isTrusted(), "TrustAllProvider via " + proxy);
         try {
-            new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get(urlByIp);
+            new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get(urlByIp);
             throw new WTFException("This should fail");
         } catch (HttpClientException e) {
             // expected
@@ -184,9 +217,9 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         final int port = server.getActualPort();
         try {
             final String url127 = "https://127.0.0.1:" + port + "/test/echo?message=ip";
-            final RequestContext trustAllOk = new HttpClient().trust(TrustAllProvider.getInstance()).get(url127);
+            final RequestContext trustAllOk = new HttpClient().trust(AllTrustProvider.getInstance()).get(url127);
             try {
-                new HttpClient().trust(TrustCurrentJREProvider.getInstance()).get(url127);
+                new HttpClient().trust(CurrentJRETrustProvider.getInstance()).get(url127);
                 throw new WTFException("Unexpected. this should fail");
             } catch (HttpClientException e) {
                 // expected
@@ -225,10 +258,10 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         proxy.setPreferNativeImplementation(true);
         final RequestContext jreNative = new HttpClient().proxy(proxy).get(url);
         assertTrue(jreNative.getTrustResult().isTrusted(), "Native HttpsURLConnection with TrustCurrentJREProvider must reach " + url + (jreNative.getTrustResult().getException() != null ? ": " + jreNative.getTrustResult().getException().getMessage() : ""));
-        final RequestContext trustAllNative = new HttpClient().proxy(proxy).trust(TrustAllProvider.getInstance()).get(url);
+        final RequestContext trustAllNative = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(url);
         assertTrue(trustAllNative.getTrustResult().isTrusted(), "Native HttpsURLConnection with TrustAllProvider must reach " + url);
         // Optional: url.openStream() style – same stack, just trigger getInputStream()
-        try (InputStream stream = openStreamWithTrustProvider(url, TrustCurrentJREProvider.getInstance())) {
+        try (InputStream stream = openStreamWithTrustProvider(url, CurrentJRETrustProvider.getInstance())) {
             assertTrue(stream != null, "url.openStream() with TrustCurrentJREProvider should return stream");
             final byte[] buf = new byte[512];
             final int n = stream.read(buf);
@@ -255,7 +288,7 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
             final String url = "https://localhost:" + serverPort + "/test/echo?message=" + URLEncoder.encode("Hello Trust", "UTF-8");
             for (final HTTPProxy proxy : getConnectionVariants()) {
                 LogV3.info("Provider tests via " + proxy);
-                testProviderWithServer(url, TrustAllProvider.getInstance(), true, "TrustAllProvider", proxy);
+                testProviderWithServer(url, AllTrustProvider.getInstance(), true, "TrustAllProvider", proxy);
                 testProviderWithServer(url, new CustomTrustProvider(serverCertificate), true, "CustomTrustProvider with server cert", proxy);
                 testProviderWithServer(url, new CustomTrustProvider(caCertificate), true, "CustomTrustProvider with CA cert", proxy);
                 assertFileExists(tempKeystoreFile);
@@ -266,20 +299,21 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
                     // expected... keystoreFile does not contain the certificates?
                 }
                 testProviderWithServer(url, new CustomTrustProvider(caCertificate), true, "CustomTrustProvider from PEM (in-memory CA)", proxy);
-                testProviderWithServer(url, TrustCurrentJREProvider.getInstance(), false, "TrustCurrentJREProvider", proxy);
-                testProviderWithServer(url, new CompositeTrustProvider(new CustomTrustProvider(serverCertificate), TrustCurrentJREProvider.getInstance()), true, "CompositeTrustProvider (Custom+JRE)", proxy);
+                testProviderWithServer(url, CurrentJRETrustProvider.getInstance(), false, "TrustCurrentJREProvider", proxy);
+                testProviderWithServer(url, new CompositeTrustProvider(new CustomTrustProvider(serverCertificate), CurrentJRETrustProvider.getInstance()), true, "CompositeTrustProvider (Custom+JRE)", proxy);
                 testProviderWithServer(url, null, true, "Null Provider", proxy);
             }
             LogV3.info("Installing certificate to user store (with auto-confirm)");
             installCertificateWithAutoConfirm(caCertificate, WindowsCertUtils.KeyStore.CURRENT_USER);
             assertTrue(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.KeyStore.CURRENT_USER));
-            TrustWindowsProvider.getInstance().reload();
+            final WindowsTrustProvider windowsProvider = WindowsTrustProvider.getInstance();
+            windowsProvider.reload();
             for (final HTTPProxy proxy : getConnectionVariants()) {
                 LogV3.info("TrustWindowsProvider / composite tests via " + proxy);
                 final boolean windowsExpectedSuccess = CrossSystem.isWindows();
-                testProviderWithServer(url, TrustWindowsProvider.getInstance(), windowsExpectedSuccess, "TrustWindowsProvider", proxy);
+                testProviderWithServer(url, WindowsTrustProvider.getInstance(), windowsExpectedSuccess, "TrustWindowsProvider", proxy);
                 final boolean compositeWindowsExpectedSuccess = CrossSystem.isWindows();
-                testProviderWithServer(url, new CompositeTrustProvider(TrustCurrentJREProvider.getInstance(), TrustWindowsProvider.getInstance(), TrustAllProvider.getInstance()), compositeWindowsExpectedSuccess, "CompositeTrustProvider (JRE+Windows)", proxy);
+                testProviderWithServer(url, new CompositeTrustProvider(CurrentJRETrustProvider.getInstance(), windowsProvider, AllTrustProvider.getInstance()), compositeWindowsExpectedSuccess, "CompositeTrustProvider (JRE+Windows)", proxy);
             }
             LogV3.info("All provider tests with real HTTPS server completed");
         } finally {

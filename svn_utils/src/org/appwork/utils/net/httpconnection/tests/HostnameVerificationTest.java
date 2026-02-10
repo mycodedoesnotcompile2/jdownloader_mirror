@@ -42,16 +42,18 @@ import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.IllegalSSLHostnameException;
-import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustCurrentJREProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustWindowsProvider;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustLinuxProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
+import org.appwork.utils.net.httpconnection.trust.WindowsTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
+import org.appwork.utils.os.CrossSystem;
 
 /**
  * Tests for SSL hostname verification functionality.
  */
 public class HostnameVerificationTest extends ProxyConnectionTestBase {
-
     public static void main(final String[] args) {
         run();
     }
@@ -73,38 +75,93 @@ public class HostnameVerificationTest extends ProxyConnectionTestBase {
 
     private void testHostnameVerificationForProxy(final HTTPProxy proxy) throws Exception {
         final String url = "https://ipcheck1.jdownloader.org/";
-        final RequestContext trustAllOk = new HttpClient().proxy(proxy).trust(TrustAllProvider.getInstance()).get(url);
-        RequestContext javaDefaultOk;
-        try {
-            new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance()).get(url);
-            throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
-        } catch (HttpClientException e) {
-            javaDefaultOk = e.getContext();
-            assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
-        }
-        RequestContext combinedOk;
-        try {
-            new HttpClient().proxy(proxy).trust(TrustCurrentJREProvider.getInstance(), TrustWindowsProvider.getInstance()).get(url);
-            throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
-        } catch (HttpClientException e) {
-            combinedOk = e.getContext();
-            assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
-        }
-        RequestContext windowsOnlyOk;
-        try {
-            new HttpClient().proxy(proxy).trust(TrustWindowsProvider.getInstance()).get(url);
-            throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
-        } catch (HttpClientException e) {
-            windowsOnlyOk = e.getContext();
-            assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
-            assertTrue(Exceptions.containsInstanceOf(e.getContext().getTrustResult().getException(), IllegalSSLHostnameException.class));
-        }
+        final RequestContext trustAllOk = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(url);
         assertTrue(trustAllOk.getTrustResult().isTrusted(), "Invalid cert should only be reachable with TrustAllProvider");
-        assertFalse(javaDefaultOk.getTrustResult().isTrusted(), "Host Name check failed");
-        assertFalse(combinedOk.getTrustResult().isTrusted(), "Host Name check failed");
-        assertFalse(windowsOnlyOk.getTrustResult().isTrusted(), "Host Name check failed");
-        assertTrue(Exceptions.containsInstanceOf(javaDefaultOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
-        assertTrue(Exceptions.containsInstanceOf(combinedOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
-        assertTrue(Exceptions.containsInstanceOf(windowsOnlyOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+        {
+            final RequestContext javaDefaultOk;
+            try {
+                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                javaDefaultOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+            }
+            if (javaDefaultOk == null) {
+                System.out.println();
+            }
+            assertTrue(Exceptions.containsInstanceOf(javaDefaultOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(javaDefaultOk.getTrustResult().isTrusted(), "Host Name check failed");
+        }
+        {
+            final RequestContext ccadbDefaultOk;
+            try {
+                new HttpClient().proxy(proxy).trust(new CCADBTrustProvider()).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                ccadbDefaultOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+            }
+            assertTrue(Exceptions.containsInstanceOf(ccadbDefaultOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(ccadbDefaultOk.getTrustResult().isTrusted(), "Host Name check failed");
+        }
+        {
+            final RequestContext osDefaultOk;
+            try {
+                new HttpClient().proxy(proxy).trust(TrustUtils.getOSProvider()).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                osDefaultOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+            }
+            assertTrue(Exceptions.containsInstanceOf(osDefaultOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(osDefaultOk.getTrustResult().isTrusted(), "Host Name check failed");
+        }
+        if (CrossSystem.isWindows()) {
+            final WindowsTrustProvider windowsProvider = WindowsTrustProvider.getInstance();
+            final RequestContext combinedOk;
+            try {
+                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance(), windowsProvider).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                combinedOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+            }
+            assertTrue(Exceptions.containsInstanceOf(combinedOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(combinedOk.getTrustResult().isTrusted(), "Host Name check failed");
+            final RequestContext windowsOnlyOk;
+            try {
+                new HttpClient().proxy(proxy).trust(windowsProvider).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                windowsOnlyOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+                assertTrue(Exceptions.containsInstanceOf(e.getContext().getTrustResult().getException(), IllegalSSLHostnameException.class));
+            }
+            assertTrue(Exceptions.containsInstanceOf(windowsOnlyOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(windowsOnlyOk.getTrustResult().isTrusted(), "Host Name check failed");
+        } else if (CrossSystem.isLinux()) {
+            final TrustLinuxProvider linuxProvider = TrustLinuxProvider.getInstance();
+            final RequestContext combinedOk;
+            try {
+                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance(), linuxProvider).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                combinedOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+            }
+            assertTrue(Exceptions.containsInstanceOf(combinedOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(combinedOk.getTrustResult().isTrusted(), "Host Name check failed");
+            final RequestContext windowsOnlyOk;
+            try {
+                new HttpClient().proxy(proxy).trust(linuxProvider).get(url);
+                throw new WTFException("Expect HTTPS hostname wrong:  should be <ipcheck1.jdownloader.org> != [cdn15.appwork.org]");
+            } catch (HttpClientException e) {
+                windowsOnlyOk = e.getContext();
+                assertTrue(Exceptions.containsInstanceOf(e, IllegalSSLHostnameException.class));
+                assertTrue(Exceptions.containsInstanceOf(e.getContext().getTrustResult().getException(), IllegalSSLHostnameException.class));
+            }
+            assertTrue(Exceptions.containsInstanceOf(windowsOnlyOk.getTrustResult().getException(), IllegalSSLHostnameException.class));
+            assertFalse(windowsOnlyOk.getTrustResult().isTrusted(), "Host Name check failed");
+        }
     }
 }

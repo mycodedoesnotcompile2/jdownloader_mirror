@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,77 +32,34 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpserver.requests;
+package org.appwork.utils.net.httpconnection.trust.ccadb;
 
-import java.util.List;
-import java.util.Set;
+import java.io.IOException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 
-import org.appwork.utils.net.httpconnection.RequestMethod;
-import org.appwork.utils.net.httpserver.ConnectionTimeouts;
-import org.appwork.utils.net.httpserver.CorsHandler;
-import org.appwork.utils.net.httpserver.HeaderValidationRules;
-import org.appwork.utils.net.httpserver.RequestSizeLimits;
-import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
-import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
 /**
- * Interface for HTTP server implementations that defines the contract for security, CORS, limits, and configuration functionality.
+ * @author daniel
+ * @date Feb 5, 2026
  *
- * For convenience, most classes should extend {@link org.appwork.utils.net.httpserver.AbstractServerBasics} which provides default
- * implementations of all methods in this interface.
- *
- * @author Thomas
- * @date 28.03.2017
  */
-public interface HttpServerInterface {
-    List<HttpRequestHandler> getHandler();
-
+public final class CCADBTrustProvider extends CustomTrustProvider {
     /**
-     * Returns the response security headers configuration.
-     *
-     * @return the response security headers configuration or null if security headers are disabled
+     * https://www.ccadb.org/resources *
      */
-    ResponseSecurityHeaders getResponseSecurityHeaders();
+    public CCADBTrustProvider() throws IOException, CertificateException {
+        super(CCADBTrustProvider.class.getSimpleName(), loadCCADB());
+    }
 
-    /**
-     * Returns the set of allowed HTTP methods.
-     *
-     * @return the set of allowed methods or null if method validation is disabled
-     */
-    Set<RequestMethod> getAllowedMethods();
+    private static X509Certificate[] loadCCADB() throws CertificateException, IOException {
+        return TrustUtils.loadCertificatesFromPEM(CCADBTrustProvider.class.getResourceAsStream("IncludedRootsPEM.txt"));
+    }
 
-    /**
-     * Returns the header validation rules configuration.
-     *
-     * @return the header validation rules or null if header validation is disabled
-     */
-    HeaderValidationRules getHeaderValidationRules();
-
-    /**
-     * Returns the request size limits configuration.
-     *
-     * @return the request size limits or null if size limits are disabled
-     */
-    RequestSizeLimits getRequestSizeLimits();
-
-    /**
-     * Returns the connection timeouts configuration.
-     *
-     * @return the connection timeouts configuration or null if timeouts are disabled
-     */
-    ConnectionTimeouts getConnectionTimeouts();
-
-    /**
-     * Returns the CORS configuration.
-     *
-     * @return the CORS configuration or null if CORS is disabled
-     */
-    CorsHandler getCorsHandler();
-
-    /**
-     * Returns the response Server header value.
-     *
-     * @return the Server header value, or null to disable the Server header
-     */
-    String getResponseServerHeader();
+    @Override
+    public String getId() {
+        return getClass().getSimpleName();
+    }
 }

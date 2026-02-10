@@ -66,10 +66,12 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  * @author AppWork GmbH
  */
 public abstract class AbstractServerBasics implements HttpServerInterface {
+    public static final String        UNEXPECTED_EXCEPTION = "Unexpected Exception";
+    public static final String        FORBIDDEN_HEADERS    = "Forbidden Headers!";
     /**
-     * 
+     *
      */
-    public static final String FORBIDDEN_ORIGIN = "Forbidden Origin!";
+    public static final String        FORBIDDEN_ORIGIN     = "Forbidden Origin!";
     // Security and CORS configuration
     protected ResponseSecurityHeaders responseSecurityHeaders;
     protected CorsHandler             corsHandler;
@@ -104,8 +106,8 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
     public void setAllowedMethods(RequestMethod... methods) {
         this.setAllowedMethods(new HashSet<RequestMethod>(Arrays.asList(methods)));
     }
-    // HttpServerInterface implementation
 
+    // HttpServerInterface implementation
     @Override
     public ResponseSecurityHeaders getResponseSecurityHeaders() {
         return this.responseSecurityHeaders;
@@ -220,20 +222,8 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
     public void setResponseServerHeaderValue(final String responseServerHeader) {
         this.responseServerHeaderValue = responseServerHeader;
     }
+
     // Abstract methods that must be implemented by subclasses
-
-    /**
-     * Returns whether chunked encoded responses are allowed for the given request/response.
-     *
-     * @param httpRequest
-     *            The HTTP request
-     * @param httpResponse
-     *            The HTTP response
-     * @return true if chunked encoding is allowed, false otherwise
-     */
-    @Override
-    public abstract boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse);
-
     /**
      * Returns the list of request handlers.
      *
@@ -317,83 +307,6 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.fine("validateRequest: Validation completed in " + validateElapsed + "ms");
         }
     }
-    // /**
-    // * Helper method to extract the request method from a request object. Works with both HttpRequest and HTTPServerRequest.
-    // *
-    // * @param request
-    // * The request object
-    // * @return The request method, or UNKNOWN if not available
-    // */
-    // protected RequestMethod getRequestMethod(final CorsRequestInterface request) {
-    // if (request instanceof HttpRequest) {
-    // return ((HttpRequest) request).getRequestMethod();
-    // }
-    // // Try to get method via reflection for HTTPServerRequest (from FastCGIInterface package)
-    // try {
-    // final java.lang.reflect.Method method = request.getClass().getMethod("getRequestMethod");
-    // final Object result = method.invoke(request);
-    // if (result instanceof RequestMethod) {
-    // return (RequestMethod) result;
-    // }
-    // } catch (final Throwable e) {
-    // // Ignore - method not available
-    // }
-    // return RequestMethod.UNKNOWN;
-    // }
-    //
-    // /**
-    // * Helper method to extract the request URL from a request object. Works with both HttpRequest and HTTPServerRequest.
-    // *
-    // * @param request
-    // * The request object
-    // * @return The request URL/URI, or "unknown" if not available
-    // */
-    // protected String getRequestUrlString(final CorsRequestInterface request) {
-    // if (request instanceof HttpRequest) {
-    // return ((HttpRequest) request).getRequestedURL();
-    // }
-    // // Try to get URI via reflection for HTTPServerRequest (from FastCGIInterface package)
-    // try {
-    // final java.lang.reflect.Method method = request.getClass().getMethod("getRequestURI");
-    // final Object result = method.invoke(request);
-    // if (result instanceof String) {
-    // return (String) result;
-    // }
-    // } catch (final Throwable e) {
-    // // Ignore - method not available
-    // }
-    // return "unknown";
-    // }
-    // /**
-    // * Helper method to extract the remote address from a request object. Works with both HttpRequest and HTTPServerRequest.
-    // *
-    // * @param request
-    // * The request object
-    // * @return The remote address as a comma-separated string, or "unknown" if not available
-    // */
-    // protected String getRemoteAddressString(final CorsRequestInterface request) {
-    // if (request instanceof HttpRequest) {
-    // final List<String> remoteAddresses = ((HttpRequest) request).getRemoteAddress();
-    // if (remoteAddresses != null && !remoteAddresses.isEmpty()) {
-    // return StringUtils.join(remoteAddresses, ", ");
-    // }
-    // } else {
-    // // Try to get remote address via reflection for HTTPServerRequest (from FastCGIInterface package)
-    // try {
-    // final java.lang.reflect.Method method = request.getClass().getMethod("getRemoteAddress");
-    // final Object result = method.invoke(request);
-    // if (result instanceof String) {
-    // final String remoteAddress = (String) result;
-    // if (!StringUtils.isEmpty(remoteAddress)) {
-    // return remoteAddress;
-    // }
-    // }
-    // } catch (final Throwable e) {
-    // // Ignore - method not available
-    // }
-    // }
-    // return "unknown";
-    // }
 
     /**
      * Result class for onException method that contains both the response and close connection flag.
@@ -508,7 +421,7 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             // Apply default headers (security, CORS, server) before setting content
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=UTF-8"));
             try {
-                final String message = "Forbidden Headers!";
+                final String message = FORBIDDEN_HEADERS;
                 final byte[] bytes = message.getBytes("UTF-8");
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
                 response.getOutputStream(true).write(bytes);
@@ -524,7 +437,7 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
             LogV3.log(e);
             // Apply default headers (security, CORS, server) before setting content
             // do not return stacktraces!
-            final byte[] bytes = "Unexpected Exception".getBytes("UTF-8");
+            final byte[] bytes = UNEXPECTED_EXCEPTION.getBytes("UTF-8");
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text; charset=UTF-8"));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, bytes.length + ""));
             response.getOutputStream(true).write(bytes);

@@ -44,13 +44,14 @@ import java.util.regex.Pattern;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLSession;
 
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.TrustResult;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustCallback;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
@@ -70,9 +71,9 @@ public abstract class QNAP implements HardwareTypeInterface {
         if (CrossSystem.isLinux()) {
             /*
              * /sbin/getcfg system version
-             *
+             * 
              * /sbin/getcfg system model
-             *
+             * 
              * /sbin/get_display_name
              */
             final boolean hasShellCommands = new File("/sbin/get_display_name").isFile() || new File("/sbin/getcfg").isFile();
@@ -104,7 +105,12 @@ public abstract class QNAP implements HardwareTypeInterface {
 
                                 @Override
                                 public TrustProviderInterface getTrustProvider() {
-                                    return TrustAllProvider.getInstance();
+                                    return AllTrustProvider.getInstance();
+                                }
+
+                                @Override
+                                public KeyManager[] getKeyManager() {
+                                    return null;
                                 }
                             }));
                             ((HttpsURLConnection) connection).setHostnameVerifier(new HostnameVerifier() {

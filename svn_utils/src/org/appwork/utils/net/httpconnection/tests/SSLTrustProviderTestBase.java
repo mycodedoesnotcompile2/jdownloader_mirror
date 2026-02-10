@@ -42,6 +42,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 
 import org.appwork.loggingv3.LogV3;
@@ -63,16 +64,16 @@ public abstract class SSLTrustProviderTestBase extends AWTest {
     /**
      *
      */
-    public static final String APP_WORK_AW_TEST_CA = "AppWork AWTest CA";
+    public static final String  APP_WORK_AW_TEST_CA = "AppWork AWTest CA";
     /** OID id-kp-serverAuth (Erweiterte Schlüsselverwendung / Zweck) */
-    private static final String EKU_SERVER_AUTH = "1.3.6.1.5.5.7.3.1";
+    private static final String EKU_SERVER_AUTH     = "1.3.6.1.5.5.7.3.1";
     /** OID id-kp-clientAuth (Erweiterte Schlüsselverwendung / Zweck) */
-    private static final String EKU_CLIENT_AUTH = "1.3.6.1.5.5.7.3.2";
-    protected File             tempKeystoreFile;
-    protected SSLContext       sslContext;
-    protected X509Certificate  serverCertificate;
-    protected X509Certificate  caCertificate;
-    protected String           caCertificateFingerPrint;
+    private static final String EKU_CLIENT_AUTH     = "1.3.6.1.5.5.7.3.2";
+    protected File              tempKeystoreFile;
+    protected SSLContext        sslContext;
+    protected X509Certificate   serverCertificate;
+    protected X509Certificate   caCertificate;
+    protected String            caCertificateFingerPrint;
 
     /**
      * Creates test certificates using CertificateFactory.
@@ -100,7 +101,8 @@ public abstract class SSLTrustProviderTestBase extends AWTest {
         assertNotNull(caEku, "CA certificate should have Extended Key Usage extension");
         assertTrue(caEku.contains(EKU_SERVER_AUTH), "CA certificate should contain id-kp-serverAuth, got: " + caEku);
         assertTrue(caEku.contains(EKU_CLIENT_AUTH), "CA certificate should contain id-kp-clientAuth, got: " + caEku);
-        // Create in-memory PKCS12 keystore and SSL context; write to temp file only for tests that need file path (e.g. CustomTrustProvider from keystore)
+        // Create in-memory PKCS12 keystore and SSL context; write to temp file only for tests that need file path (e.g. CustomTrustProvider
+        // from keystore)
         final char[] password = "testpassword".toCharArray();
         final KeyStore serverKs = CertificateFactory.createPKCS12KeyStore(this.serverCertificate, certResult.getServerKeyPair().getPrivate(), password, "server", this.caCertificate);
         this.sslContext = ExperimentalAutoSSLHttpServer.createSSLContextFromKeyStore(serverKs, password);
@@ -189,6 +191,11 @@ public abstract class SSLTrustProviderTestBase extends AWTest {
                 @Override
                 public org.appwork.utils.net.httpconnection.trust.TrustProviderInterface getTrustProvider() {
                     return provider;
+                }
+
+                @Override
+                public KeyManager[] getKeyManager() {
+                    return null;
                 }
             }) };
         }

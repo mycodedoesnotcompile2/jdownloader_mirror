@@ -62,8 +62,6 @@ import org.appwork.utils.Time;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
  * @author daniel
@@ -71,7 +69,6 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  */
 public class HttpServer extends AbstractServerBasics implements Runnable {
     public static final String                             APP_WORK_GMB_H_HTTP_SERVER = "AppWork GmbH HttpServer";
-
     private final int                                      wishPort;
     private final AtomicReference<List<ServerSocket>>      controlSockets             = new AtomicReference<List<ServerSocket>>(null);
     private volatile Thread                                serverThread               = null;
@@ -79,76 +76,69 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
     private boolean                                        debug                      = false;
     private boolean                                        verboseLog                 = false;
     private final CopyOnWriteArrayList<HttpRequestHandler> requestHandlers            = new CopyOnWriteArrayList<HttpRequestHandler>();
-
     private ThreadPoolExecutor                             threadPool;
-
     /**
      * Maximum thread pool size for concurrent HTTP connections.
-     * 
+     *
      * <p>
      * <b>Default: 20</b>
      * </p>
-     * 
+     *
      * <p>
-     * <b>Rationale:</b> 20 threads provide a good compromise between parallelism and resource consumption.
-     * HTTP requests are typically I/O-bound (network, file system), so a few threads can efficiently handle many
-     * concurrent connections. A higher value would consume more memory and stack space per thread
-     * (typically ~1MB stack per thread) without providing significant benefit for I/O-bound operations.
-     * For most use cases (local APIs, internal services) 20 is sufficient. For very high load or
-     * CPU-intensive handlers, this value can be increased.
+     * <b>Rationale:</b> 20 threads provide a good compromise between parallelism and resource consumption. HTTP requests are typically
+     * I/O-bound (network, file system), so a few threads can efficiently handle many concurrent connections. A higher value would consume
+     * more memory and stack space per thread (typically ~1MB stack per thread) without providing significant benefit for I/O-bound
+     * operations. For most use cases (local APIs, internal services) 20 is sufficient. For very high load or CPU-intensive handlers, this
+     * value can be increased.
      * </p>
-     * 
+     *
      * <p>
-     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used
-     * differently or as a real web server, these values should be adjusted accordingly.
+     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used differently or as a real web
+     * server, these values should be adjusted accordingly.
      * </p>
      */
-    private int                                             maxThreadPoolSize         = 20;
-
+    private int                                            maxThreadPoolSize          = 20;
     /**
      * Queue size for waiting requests in the thread pool.
-     * 
+     *
      * <p>
      * <b>Default: 100</b>
      * </p>
-     * 
+     *
      * <p>
-     * <b>Rationale:</b> A queue size of 100 allows buffering of up to 100 waiting requests before new
-     * threads need to be created. This prevents {@link RejectedExecutionException} during short load spikes and
-     * enables smooth load distribution. The memory overhead is minimal (only references to Runnable objects).
-     * For very high load, this value can be increased to buffer more requests, though {@link #maxThreadPoolSize}
-     * should also be adjusted accordingly to limit wait times in the queue.
+     * <b>Rationale:</b> A queue size of 100 allows buffering of up to 100 waiting requests before new threads need to be created. This
+     * prevents {@link RejectedExecutionException} during short load spikes and enables smooth load distribution. The memory overhead is
+     * minimal (only references to Runnable objects). For very high load, this value can be increased to buffer more requests, though
+     * {@link #maxThreadPoolSize} should also be adjusted accordingly to limit wait times in the queue.
      * </p>
-     * 
+     *
      * <p>
-     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used
-     * differently or as a real web server, these values should be adjusted accordingly.
+     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used differently or as a real web
+     * server, these values should be adjusted accordingly.
      * </p>
      */
-    private int                                             threadPoolQueueSize       = 100;
-
+    private int                                            threadPoolQueueSize        = 100;
     /**
      * Keep-alive time for inactive threads in the pool (in milliseconds).
-     * 
+     *
      * <p>
      * <b>Default: 10000 (10 seconds)</b>
      * </p>
-     * 
+     *
      * <p>
-     * <b>Rationale:</b> 10 seconds is a balanced value that automatically terminates threads under low load to
-     * save resources, while keeping threads quickly available during active use. The time is long enough to
-     * bridge short pauses between request bursts (e.g., in interactive applications), but short enough to
-     * avoid unnecessarily binding memory and system resources. Since {@link ThreadPoolExecutor#allowCoreThreadTimeOut(boolean)}
-     * is set to {@code true}, core threads are also terminated after this time, which is useful for local/internal
-     * servers that are not permanently under load.
+     * <b>Rationale:</b> 10 seconds is a balanced value that automatically terminates threads under low load to save resources, while
+     * keeping threads quickly available during active use. The time is long enough to bridge short pauses between request bursts (e.g., in
+     * interactive applications), but short enough to avoid unnecessarily binding memory and system resources. Since
+     * {@link ThreadPoolExecutor#allowCoreThreadTimeOut(boolean)} is set to {@code true}, core threads are also terminated after this time,
+     * which is useful for local/internal servers that are not permanently under load.
      * </p>
-     * 
+     *
      * <p>
-     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used
-     * differently or as a real web server, these values should be adjusted accordingly.
+     * <b>Note:</b> These default values are optimized for a local REST API HTTP server. If the server is used differently or as a real web
+     * server, these values should be adjusted accordingly.
      * </p>
      */
-    private long                                            threadPoolKeepAliveTime   = 10000L;
+    private long                                           threadPoolKeepAliveTime    = 10000L;
 
     public HttpServer(final int port) {
         super("AppWork GmbH HttpServer");
@@ -158,7 +148,6 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
     protected HttpConnectionRunnable createHttpConnection(Socket clientSocket) throws IOException {
         InputStream inputStream = clientSocket.getInputStream();
         HttpServerConnection con = new HttpServerConnection(this, clientSocket, inputStream, null);
-
         return con;
     }
 
@@ -295,7 +284,6 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     public void run() {
         final List<ServerSocket> controlSockets = this.controlSockets.get();
-
         try {
             if (controlSockets == null || controlSockets.size() == 0) {
                 return;
@@ -327,7 +315,6 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                     /*
                      * WORKAROUND for stupid SUN /ORACLE way of "how a threadpool should work" !
                      */
-
                     final int active = threadPool.getPoolSize();
                     final int max = threadPool.getMaximumPoolSize();
                     if (active < max) {
@@ -345,14 +332,11 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                         final Socket socket = (r instanceof HttpConnectionRunnable) ? ((HttpConnectionRunnable) r).getClientSocket() : null;
                         ((HttpConnectionThread) t).setCurrentConnection(connection, socket);
                         httpT.setName(HttpServer.this, socket);
-
                     }
-
                     super.beforeExecute(t, r);
                 }
             };
             threadPool.allowCoreThreadTimeOut(true);
-
             final List<Thread> controlSocketThreads = new ArrayList<Thread>();
             for (final ServerSocket controlSocket : controlSockets) {
                 final Thread controlSocketThread = new Thread(Thread.currentThread().getName() + ":Listener:" + controlSocket.getLocalSocketAddress()) {
@@ -386,14 +370,12 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                             continue;
                                         }
                                     }
-
                                     final long createConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                     final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
                                     final long createConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - createConnectionStartTime;
                                     if (HttpServer.this.verboseLog) {
                                         LogV3.fine("HttpServer: createHttpConnection completed in " + createConnectionElapsed + "ms");
                                     }
-
                                     if (connection != null) {
                                         final long executeStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                         threadPool.execute(connection);
@@ -407,7 +389,6 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                     LogV3.log(e);
                                 } catch (final Throwable e) {
                                     LogV3.log(e);
-
                                 } finally {
                                     if (closeSocket && clientSocket != null) {
                                         try {
@@ -464,7 +445,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Runnable#run()
      */
     /**
@@ -492,12 +473,11 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Sets the maximum thread pool size for concurrent HTTP connections.
-     * 
+     *
      * <p>
-     * This setting only takes effect on the next server start. Changes while the server is running have no
-     * effect.
+     * This setting only takes effect on the next server start. Changes while the server is running have no effect.
      * </p>
-     * 
+     *
      * @param maxThreadPoolSize
      *            maximum number of threads (must be >= 1)
      * @throws IllegalArgumentException
@@ -513,7 +493,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Returns the currently configured maximum thread pool size.
-     * 
+     *
      * @return maximum thread pool size
      */
     public int getMaxThreadPoolSize() {
@@ -522,12 +502,11 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Sets the queue size for waiting requests in the thread pool.
-     * 
+     *
      * <p>
-     * This setting only takes effect on the next server start. Changes while the server is running have no
-     * effect.
+     * This setting only takes effect on the next server start. Changes while the server is running have no effect.
      * </p>
-     * 
+     *
      * @param threadPoolQueueSize
      *            queue size (must be >= 1)
      * @throws IllegalArgumentException
@@ -543,7 +522,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Returns the currently configured thread pool queue size.
-     * 
+     *
      * @return thread pool queue size
      */
     public int getThreadPoolQueueSize() {
@@ -552,12 +531,11 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Sets the keep-alive time for inactive threads in the pool.
-     * 
+     *
      * <p>
-     * This setting only takes effect on the next server start. Changes while the server is running have no
-     * effect.
+     * This setting only takes effect on the next server start. Changes while the server is running have no effect.
      * </p>
-     * 
+     *
      * @param threadPoolKeepAliveTime
      *            keep-alive time in milliseconds (must be >= 0, 0 = threads are terminated immediately when inactive)
      * @throws IllegalArgumentException
@@ -573,7 +551,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Returns the currently configured keep-alive time for threads in the pool.
-     * 
+     *
      * @return keep-alive time in milliseconds
      */
     public long getThreadPoolKeepAliveTime() {
@@ -612,7 +590,6 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
     /**
      *
      */
-
     public synchronized void start() throws IOException {
         List<ServerSocket> serverSockets = new ArrayList<ServerSocket>();
         try {
@@ -712,17 +689,4 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
             requestHandlers.remove(handler);
         }
     }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.appwork.utils.net.httpserver.requests.HTTPBridge#canHandleChunkedEncoding(org.appwork.utils.net.httpserver.requests.HttpRequest,
-     * org.appwork.utils.net.httpserver.responses.HttpResponse)
-     */
-    @Override
-    public boolean isChunkedEncodedResponseAllowed(HttpRequest request, HttpResponse response) {
-        return true;
-    }
-
 }

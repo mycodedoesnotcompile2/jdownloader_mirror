@@ -54,6 +54,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -80,6 +81,7 @@ import org.appwork.utils.KeyValueStringEntry;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
+import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.net.ChunkedInputStream;
 import org.appwork.utils.net.CountingInputStream;
@@ -91,6 +93,7 @@ import org.appwork.utils.net.SocketFactory;
 import org.appwork.utils.net.StreamValidEOF;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.NetworkInterfaceException.ERROR;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.bridge.RejectedByTrustProviderException;
 import org.appwork.utils.os.CrossSystem;
@@ -1037,8 +1040,26 @@ public class HTTPConnectionImpl implements HTTPConnection {
                                 sslSocketStreamOptions = getSSLSocketStreamOptions(hostName, port);
                             }
                             factory = getSSLSocketStreamFactory(sslSocketStreamOptions);
-                            this.connectionSocket = factory.create(connectionSocket, hostName, port, true, sslSocketStreamOptions, getTrustProvider(), getKeyManagers());
-                            setTrustResult(((TrustResultProvider) connectionSocket).getTrustResult());
+                            final TrustCallback trustCallback = new TrustCallback() {
+                                private final TrustProviderInterface trustProviderInterface = HTTPConnectionImpl.this.getTrustProvider();
+                                private final KeyManager[]           keyManager             = HTTPConnectionImpl.this.getKeyManagers();
+
+                                @Override
+                                public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                                    HTTPConnectionImpl.this.setTrustResult(result);
+                                }
+
+                                @Override
+                                public TrustProviderInterface getTrustProvider() {
+                                    return trustProviderInterface;
+                                }
+
+                                @Override
+                                public KeyManager[] getKeyManager() {
+                                    return keyManager;
+                                }
+                            };
+                            this.connectionSocket = factory.create(connectionSocket, hostName, port, true, sslSocketStreamOptions, trustCallback);
                         }
                         this.connectTime = Time.systemIndependentCurrentJVMTimeMillis() - startMS;
                         ee = null;
@@ -1681,8 +1702,8 @@ public class HTTPConnectionImpl implements HTTPConnection {
                 sb.append("Local: ").append(this.proxy.getLocal()).append("\r\n");
             }
         }
-        sb.append("Connection-Timeout: ").append(getConnectTimeout() + "ms").append("\r\n");
-        sb.append("Read-Timeout: ").append(getReadTimeout() + "ms").append("\r\n");
+        sb.append("Connection-Timeout: ").append(TimeSpan.fromMillis(getConnectTimeout()).toReadableString()).append("\r\n");
+        sb.append("Read-Timeout: ").append(TimeSpan.fromMillis(getReadTimeout()).toReadableString()).append("\r\n");
         if (this.connectExceptions.size() > 0) {
             sb.append("----------------ConnectionExceptions-------------------------\r\n");
             int index = 0;

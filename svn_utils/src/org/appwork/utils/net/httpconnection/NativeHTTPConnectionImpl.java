@@ -401,6 +401,13 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
     }
 
+    /**
+     * @param trustResult
+     */
+    protected void setTrustResult(TrustResult trustResult) {
+        this.trustResult = trustResult;
+    }
+
     protected Proxy       nativeProxy = null;
     protected TrustResult trustResult;
 
@@ -452,18 +459,26 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                 // TODO: add support for SSLSocketStreamOptions cache/retry
                 final SSLSocketStreamOptions options = getNewSSLSocketStreamOptionsInstance(urlHost, hostPort);
                 final SSLSocketStreamFactory nativeSSLSocketStreamFactory = getSSLSocketStreamFactory(options);
-                trustResult = null;
-                scon.setSSLSocketFactory(nativeSSLSocketStreamFactory.getSSLSocketFactory(options, urlHost, getKeyManagers(), new TrustCallback() {
-                    @Override
-                    public TrustProviderInterface getTrustProvider() {
-                        return NativeHTTPConnectionImpl.this.getTrustProvider();
-                    }
+                final TrustCallback trustCallback = new TrustCallback() {
+                    private final TrustProviderInterface trustProviderInterface = NativeHTTPConnectionImpl.this.getTrustProvider();
+                    private final KeyManager[]           keyManager             = NativeHTTPConnectionImpl.this.getKeyManagers();
 
                     @Override
                     public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
-                        NativeHTTPConnectionImpl.this.trustResult = result;
+                        NativeHTTPConnectionImpl.this.setTrustResult(result);
                     }
-                }));
+
+                    @Override
+                    public TrustProviderInterface getTrustProvider() {
+                        return trustProviderInterface;
+                    }
+
+                    @Override
+                    public KeyManager[] getKeyManager() {
+                        return keyManager;
+                    }
+                };
+                scon.setSSLSocketFactory(nativeSSLSocketStreamFactory.getSSLSocketFactory(options, urlHost, trustCallback.getKeyManager(), trustCallback));
                 scon.setHostnameVerifier(new HostnameVerifiedDelegate(urlHost, scon));
             }
             this.con.setConnectTimeout(this.connectTimeout);

@@ -34,10 +34,25 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection.trust;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -67,10 +82,29 @@ public class TrustUtils {
     }
 
     /**
+     * Returns the OS-specific trust provider: Windows -> TrustWindowsProvider, Linux -> TrustLinuxProvider, Mac -> TrustMacProvider, else
+     * -> TrustCurrentJREProvider. Never returns null.
+     *
+     * @return the appropriate TrustProviderInterface for the current OS
+     */
+    public static TrustProviderInterface getOSProvider() {
+        switch (CrossSystem.getOSFamily()) {
+        case WINDOWS:
+            return WindowsTrustProvider.getInstance();
+        case LINUX:
+            return TrustLinuxProvider.getInstance();
+        case MAC:
+            return ExperimentalMacTrustProvider.getInstance();
+        default:
+            return CurrentJRETrustProvider.getInstance();
+        }
+    }
+
+    /**
      * @return
      */
     private static TrustProviderInterface create() {
-        String bySystem = System.getProperty("TRUST_PROVIDER");
+        final String bySystem = System.getProperty("TRUST_PROVIDER");
         if (StringUtils.isNotEmpty(bySystem)) {
             try {
                 return (TrustProviderInterface) Class.forName(bySystem).getConstructor(new Class[] {}).newInstance();
@@ -78,12 +112,102 @@ public class TrustUtils {
                 LogV3.log(e);
             }
         }
-        ArrayList<TrustProviderInterface> ret = new ArrayList<TrustProviderInterface>();
-        if (CrossSystem.isWindows()) {
-            ret.add(TrustWindowsProvider.getInstance());
+        final Set<TrustProviderInterface> ret = new LinkedHashSet<TrustProviderInterface>();
+        ret.add(getOSProvider());
+        try {
+            ret.add(new CCADBTrustProvider());
+        } catch (Exception e) {
+            LogV3.log(e);
         }
-        ret.add(TrustCurrentJREProvider.getInstance());
-        ret.add(TrustAllProvider.getInstance());
+        ret.add(CurrentJRETrustProvider.getInstance());
+        ret.add(AllTrustProvider.getInstance());
         return new CompositeTrustProvider(ret.toArray(new TrustProviderInterface[0]));
+    }
+
+    public static X509Certificate[] loadCertificatesFromPEM(final InputStream is) throws IOException, CertificateException {
+        try {
+            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            final List<X509Certificate> certs = new ArrayList<X509Certificate>();
+            final Collection<? extends Certificate> loaded = cf.generateCertificates(is);
+            for (final Certificate cert : loaded) {
+                if (cert instanceof X509Certificate) {
+                    certs.add((X509Certificate) cert);
+                }
+            }
+            if (certs.isEmpty()) {
+                throw new CertificateException("No X509 certificates found in PEM file");
+            }
+            return certs.toArray(new X509Certificate[0]);
+        } finally {
+            is.close();
+        }
+    }
+
+    public static X509Certificate[] loadCertificatesFromPEM(final File pemFile) throws IOException, CertificateException {
+        try {
+            final FileInputStream is = new FileInputStream(pemFile);
+            try {
+                return loadCertificatesFromPEM(is);
+            } finally {
+                is.close();
+            }
+        } catch (IOException e) {
+            throw new CertificateException("Failed to load certificates from PEM file:" + pemFile, e);
+        } catch (CertificateException e) {
+            throw new CertificateException("Failed to load certificates from PEM file:" + pemFile, e);
+        }
+    }
+
+    public static boolean isPEMFile(final File file) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        final String name = file.getName().toLowerCase(Locale.ROOT);
+        return name.endsWith(".crt") || name.endsWith(".pem") || name.endsWith(".cer") || name.endsWith(".cert");
+    }
+
+    public static X509Certificate[] loadCertificatesFromKeystore(final File keystoreFile, final char[] keystorePassword, final String keystoreType) throws IOException, CertificateException {
+        try {
+            final String[] typesToTry = keystoreType != null ? new String[] { keystoreType } : new String[] { "PKCS12", "JKS" };
+            Exception lastException = null;
+            KeyStore loadedKeyStore = null;
+            for (final String type : typesToTry) {
+                final FileInputStream is = new FileInputStream(keystoreFile);
+                try {
+                    final KeyStore keyStore = KeyStore.getInstance(type);
+                    keyStore.load(is, keystorePassword);
+                    loadedKeyStore = keyStore;
+                    break;
+                } catch (final Exception e) {
+                    lastException = e;
+                } finally {
+                    is.close();
+                }
+            }
+            if (loadedKeyStore == null) {
+                throw new CertificateException("Failed to load keystore: " + keystoreFile.getAbsolutePath(), lastException);
+            }
+            final List<X509Certificate> certs = new ArrayList<X509Certificate>();
+            final java.util.Enumeration<String> aliases = loadedKeyStore.aliases();
+            while (aliases.hasMoreElements()) {
+                final String alias = aliases.nextElement();
+                if (loadedKeyStore.isCertificateEntry(alias)) {
+                    final Certificate cert = loadedKeyStore.getCertificate(alias);
+                    if (cert instanceof X509Certificate) {
+                        certs.add((X509Certificate) cert);
+                    }
+                }
+            }
+            if (certs.isEmpty()) {
+                throw new CertificateException("No CA certificates found in keystore: " + keystoreFile.getAbsolutePath());
+            }
+            return certs.toArray(new X509Certificate[0]);
+        } catch (CertificateException e) {
+            throw e;
+        } catch (IOException e) {
+            throw e;
+        } catch (final Exception e) {
+            throw new CertificateException("Failed to load certificates from keystore: " + keystoreFile.getAbsolutePath(), e);
+        }
     }
 }
