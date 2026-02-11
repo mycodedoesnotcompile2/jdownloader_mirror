@@ -70,7 +70,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 52141 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52278 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -383,7 +383,7 @@ public class RedditComCrawler extends PluginForDecrypt {
             final String dateFormatted = new SimpleDateFormat("yyy-MM-dd").format(new Date(createdDateTimestampMillis));
             final String title = (String) data.get("title");
             final String subredditTitle = (String) data.get("subreddit");
-            final String permalink = (String) data.get("permalink");
+            final String permalink_path = (String) data.get("permalink");
             final String postText = (String) data.get("selftext");
             if (!"t3".equalsIgnoreCase(kind)) {
                 /*
@@ -394,7 +394,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                 /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final String urlSlug = new Regex(permalink, PATTERN_POST).getMatch(4);
+            final String urlSlug = new Regex(permalink_path, PATTERN_POST).getMatch(4);
             if (urlSlug == null) {
                 /* This should never happen! */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -549,6 +549,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                          */
                     }
                 }
+                boolean gallerySpecialOffline = false;
                 if (preview != null && crawlPreview) {
                     final List<Map<String, Object>> images = (List<Map<String, Object>>) preview.get("images");
                     for (final Map<String, Object> image : images) {
@@ -620,12 +621,16 @@ public class RedditComCrawler extends PluginForDecrypt {
                 boolean postContainsRealMedia = true;
                 /* 2022-03-10: When a gallery is removed, 'is_gallery' can be true while 'gallery_data' does not exist. */
                 final Object is_galleryO = data.get("is_gallery");
-                final Object galleryO = data.get("gallery_data");
-                if (is_galleryO == Boolean.TRUE && galleryO != null) {
+                final Map<String, Object> gallery_data = (Map<String, Object>) data.get("gallery_data");
+                final Map<String, Object> media_metadata = (Map<String, Object>) data.get("media_metadata");
+                if (is_galleryO == Boolean.TRUE && gallery_data != null && media_metadata == null) {
+                    /* 2026-02-10: Example: /r/JustHotWomen/comments/1qws04e/maddy/ */
+                    logger.warning("Detected gallery-post with empty/offline/missing images: " + permalink_path);
+                    gallerySpecialOffline = true;
+                }
+                if (is_galleryO == Boolean.TRUE && gallery_data != null && media_metadata != null) {
                     /* Image gallery */
-                    final Map<String, Object> gallery_data = (Map<String, Object>) galleryO;
                     final List<Map<String, Object>> galleryItems = (List<Map<String, Object>>) gallery_data.get("items");
-                    final Map<String, Object> media_metadata = (Map<String, Object>) data.get("media_metadata");
                     int imageNumber = 1;
                     for (final Map<String, Object> galleryItem : galleryItems) {
                         final String mediaID = galleryItem.get("media_id").toString();
@@ -660,12 +665,11 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 } else {
                     /**
-                     * No image gallery </br>
+                     * No image gallery or offline image gallery. </br>
                      * --> Look for embedded content from external sources - the object is always given but can be empty
                      */
                     final Map<String, Object> embeddedMediaInfo = (Map<String, Object>) data.get("media_embed");
                     if (embeddedMediaInfo != null && !embeddedMediaInfo.isEmpty()) {
-                        logger.info("Found media_embed");
                         String mediaEmbedStr = (String) embeddedMediaInfo.get("content");
                         final String[] urls = HTMLParser.getHttpLinks(mediaEmbedStr, this.br.getURL());
                         for (final String url : urls) {
@@ -674,6 +678,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                         }
                     }
                     if (!addedRedditSelfhostedVideo) {
+                        /* Add preview video links if no selfhosted video was found. */
                         thisCrawledLinks.addAll(thisCrawledPreviewVideoLinks);
                     }
                     /* Look for selfhosted photo content, Only add image if nothing else is found */
@@ -711,7 +716,10 @@ public class RedditComCrawler extends PluginForDecrypt {
                         }
                     }
                 }
-                /* If this != null the post was removed. Still we might be able to find an external image URL sometimes (field "url"). */
+                /**
+                 * If removed_by_category != null the post was removed. <br>
+                 * Still we might be able to find an external image URL sometimes (field "url").
+                 */
                 final String removed_by_category = (String) data.get("removed_by_category");
                 if (!StringUtils.isEmpty(postText) && removed_by_category == null) {
                     /* Look for URLs inside post text. Field 'selftext' is always present but empty when not used. */
@@ -730,7 +738,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 }
                             }
                         } else {
-                            /* All possible URLs have been skipped */
+                            /* All possible URLs have been skipped by user setting. */
                             numberofSkippedItems += urls.length;
                         }
                     }
@@ -748,9 +756,14 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 }
                 if ((thisCrawledLinks.isEmpty() && thisCrawledExternalLinks.isEmpty()) && numberofSkippedItems == 0) {
+                    /* No items were skipped and we did not find anything */
                     if (removed_by_category != null) {
-                        final String subredditURL = "https://" + this.getHost() + permalink;
-                        final DownloadLink dummy = this.createOfflinelink(subredditURL, "REMOVED_BY_" + removed_by_category + "_" + postID, "This post has been removed by " + removed_by_category + ".");
+                        final String permalink_url = "https://" + this.getHost() + permalink_path;
+                        final DownloadLink dummy = this.createOfflinelink(permalink_url, "REMOVED_BY_" + removed_by_category + "_" + postID, "This post has been removed by " + removed_by_category + ".");
+                        thisCrawledLinks.add(dummy);
+                    } else if (gallerySpecialOffline) {
+                        final String permalink_url = "https://" + this.getHost() + permalink_path;
+                        final DownloadLink dummy = this.createOfflinelink(permalink_url, "EMPTY_OR_BROKEN_GALLERY_" + postID, "The gallery contained in this post is empty or broken.");
                         thisCrawledLinks.add(dummy);
                     } else {
                         logger.warning("Post is offline or contains unsupported content: " + postID);

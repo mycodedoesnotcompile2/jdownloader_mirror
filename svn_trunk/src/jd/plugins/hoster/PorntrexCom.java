@@ -25,7 +25,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51052 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52279 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorntrexCom extends KernelVideoSharingComV2 {
     public PorntrexCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,5 +82,15 @@ public class PorntrexCom extends KernelVideoSharingComV2 {
     @Override
     public Class<? extends KVSConfig> getConfigInterface() {
         return KVSConfigPorntrexCom.class;
+    }
+
+    @Override
+    protected boolean isAgeVerificationBlockedWebsite(final Browser br) {
+        return isAgeVerificedBlocked(br);
+    }
+
+    public static boolean isAgeVerificedBlocked(final Browser br) {
+        // 2026-02-10
+        return br.containsHTML("<title>\\s*Service Unavailable in the UK") || br.containsHTML("/online-safety/protecting-children/age-checks");
     }
 }

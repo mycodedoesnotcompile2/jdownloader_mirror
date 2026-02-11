@@ -92,7 +92,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52242 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52283 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -384,9 +384,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return true;
         } else if (br.containsHTML("/e/" + fuid)) {
             /* A lot of newer XFS templates got such embed URLs. */
-            return true;
-        } else if (br.containsHTML(fuid + "_t\\.jpg")) {
-            /* e.g. casthq.to */
             return true;
         } else if (br.containsHTML(fuid + "_o")) {
             /* e.g. casthq.to */
@@ -6223,6 +6220,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Do not override unless really needed!
      */
     protected final boolean internal_isVideohosterEmbed(final Browser br) {
+        if (this.isImagehoster()) {
+            return false;
+        }
         return isVideohosterEmbed() || isVideohosterEmbedHTML(br);
     }
 

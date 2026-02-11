@@ -41,6 +41,8 @@ import jd.parser.Regex;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -48,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 52266 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 52280 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String        prefixLinkID                          = getHost().replaceAll("[\\.\\-]+", "") + "://";
     private static final String ERROR_MESSAG_API_CREDENTIALS_REQUIRED = "API credentials required. Add them in plugin settings or change access mode to website and try again.";
@@ -274,6 +276,8 @@ public class Rule34Xxx extends PluginForDecrypt {
         } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "/index.php?page=post&s=list&tags=all")) {
             // redirect to base list page of all content/tags.. we don't want to crawl the entire website
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 429) {
+            throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
         }
         final boolean preferServerFilenames = PluginJsonConfig.get(this.getConfigInterface()).isPreferServerFilenamesOverPluginDefaultFilenames();
         if (contenturl.contains("&s=view&")) {

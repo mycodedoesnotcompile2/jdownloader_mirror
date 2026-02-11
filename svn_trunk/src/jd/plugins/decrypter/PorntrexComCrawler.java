@@ -25,12 +25,15 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -40,11 +43,18 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PorntrexCom;
 
-@DecrypterPlugin(revision = "$Revision: 48803 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52280 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PorntrexCom.class })
 public class PorntrexComCrawler extends PluginForDecrypt {
     public PorntrexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -87,12 +97,13 @@ public class PorntrexComCrawler extends PluginForDecrypt {
             /* Photo album */
             final String slug = photoalbum.getMatch(1);
             final String title = slug.replace("-", " ").trim();
-            br.setFollowRedirects(true);
             br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">\\s*This album is a private album uploaded by")) {
-                throw new AccountRequiredException("Private album -> Account required to access it");
+                throw new AccountRequiredException("Private album | Account required to access it");
+            } else if (PorntrexCom.isAgeVerificedBlocked(br)) {
+                throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);
@@ -118,22 +129,25 @@ public class PorntrexComCrawler extends PluginForDecrypt {
             fp.setName(Encoding.htmlDecode(url_slug).replace("-", " ").trim());
             final UrlQuery query = UrlQuery.parse("mode=async&function=get_block&block_id=playlist_view_playlist_view_dev&sort_by=added2fav_date&_=" + System.currentTimeMillis());
             int page = 1;
-            int addedItems = 0;
             final int minItemsPerPage = 4;
             final String url_base = contenturl;
             boolean hasNextPage = false;
-            do {
+            pagination: do {
                 final UrlQuery thisQuery = query;
                 thisQuery.add("from1", page + "");
                 br.getPage(url_base + "?" + thisQuery.toString());
+                if (PorntrexCom.isAgeVerificedBlocked(br)) {
+                    throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
+                }
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     if (page > 1) {
                         logger.info("404 response --> Probably reached last page");
-                        break;
+                        break pagination;
                     } else {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
                 }
+                int addedItemsThisPage = 0;
                 final String[] urls = br.getRegex("data-playlist-item=\"(https?://[^\"]*/video/\\d+/[a-z0-9\\-]+)\"").getColumn(0);
                 for (final String url : urls) {
                     if (!dupes.add(url)) {
@@ -149,11 +163,20 @@ public class PorntrexComCrawler extends PluginForDecrypt {
                     dl._setFilePackage(fp);
                     distribute(dl);
                     ret.add(dl);
-                    addedItems++;
+                    addedItemsThisPage++;
                 }
+                logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
                 page++;
                 hasNextPage = br.containsHTML("from1:0*" + page);
-            } while (addedItems >= minItemsPerPage && hasNextPage && !this.isAbort());
+                if (!hasNextPage) {
+                    logger.info("Stopping because: Reached last page");
+                    break pagination;
+                } else if (addedItemsThisPage < minItemsPerPage) {
+                    logger.info("Stopping because: Current page contains less items than a full page should contain");
+                    break pagination;
+                }
+                /* Continue to next page */
+            } while (!this.isAbort());
         }
         return ret;
     }

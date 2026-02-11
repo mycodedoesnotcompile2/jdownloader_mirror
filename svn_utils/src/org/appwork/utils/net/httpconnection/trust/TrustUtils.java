@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -208,6 +209,21 @@ public class TrustUtils {
             throw e;
         } catch (final Exception e) {
             throw new CertificateException("Failed to load certificates from keystore: " + keystoreFile.getAbsolutePath(), e);
+        }
+    }
+
+    public static X509Certificate[] loadCertificatesFromPEM(final URL url) throws CertificateException {
+        try {
+            final InputStream is = url.openStream();
+            try {
+                return loadCertificatesFromPEM(is);
+            } finally {
+                is.close();
+            }
+        } catch (IOException e) {
+            throw new CertificateException("Failed to load certificates from PEM url:" + url, e);
+        } catch (CertificateException e) {
+            throw new CertificateException("Failed to load certificates from PEM url:" + url, e);
         }
     }
 }

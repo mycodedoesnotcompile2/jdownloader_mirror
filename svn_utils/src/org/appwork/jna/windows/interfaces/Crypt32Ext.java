@@ -37,6 +37,8 @@ package org.appwork.jna.windows.interfaces;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.WString;
+import com.sun.jna.platform.win32.WinCrypt.CERT_CONTEXT;
+import com.sun.jna.platform.win32.WinCrypt.HCERTSTORE;
 import com.sun.jna.platform.win32.WinCrypt.HCRYPTMSG;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
@@ -44,56 +46,98 @@ import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.W32APIOptions;
 
 /**
+ * Extended Crypt32 (wincrypt) JNA interface. MSDN: <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/">wincrypt.h</a>
+ *
  * @author thomas
  * @date 11.10.2025
- *
  */
 public interface Crypt32Ext extends com.sun.jna.platform.win32.Crypt32 {
     Crypt32Ext INSTANCE = Native.load("crypt32", Crypt32Ext.class, W32APIOptions.UNICODE_OPTIONS);
 
-    // BOOL CryptMsgGetParam(HCRYPTMSG, DWORD dwParamType, DWORD dwIndex, void* pvData, DWORD* pcbData);
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptmsggetparam">CryptMsgGetParam</a> */
     boolean CryptMsgGetParam(HCRYPTMSG hCryptMsg, int dwParamType, int dwIndex, Pointer pvData, IntByReference pcbData);
 
-    // void CryptMsgClose(HCRYPTMSG);
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptmsgclose">CryptMsgClose</a> */
     void CryptMsgClose(HCRYPTMSG hCryptMsg);
 
-    // BOOL CryptDecodeObject(DWORD dwCertEncodingType, LPCSTR lpszStructType,
-    // const BYTE *pbEncoded, DWORD cbEncoded, DWORD dwFlags,
-    // void *pvStructInfo, DWORD *pcbStructInfo);
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptdecodeobject">CryptDecodeObject</a> */
     boolean CryptDecodeObject(int dwCertEncodingType, Pointer lpszStructType, Pointer pbEncoded, int cbEncoded, int dwFlags, Pointer pvStructInfo, IntByReference pcbStructInfo);
 
-    // int CERT_STORE_PROV_SYSTEM = 10;
-    // int CERT_SYSTEM_STORE_CURRENT_USER = 0x00010000;
-    // int CERT_SYSTEM_STORE_LOCAL_MACHINE = 0x00020000;
-    // int CERT_STORE_OPEN_EXISTING_FLAG = 0x00004000;
-    // int X509_ASN_ENCODING = 0x00000001;
-    // int PKCS_7_ASN_ENCODING = 0x00010000;
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore">CertOpenStore</a> – CERT_STORE_PROV_SYSTEM=10, CERT_SYSTEM_STORE_* etc. */
     int CERT_STORE_ADD_REPLACE_EXISTING = 3;
-    // Thumbprint (SHA-1 hash) property id
+    /** Thumbprint (SHA-1 hash) property id; @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatecontextproperty">CertGetCertificateContextProperty</a> */
     int CERT_SHA1_HASH_PROP_ID          = 3;
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore">CertOpenStore</a> */
     HANDLE CertOpenStore(int lpszStoreProvider, int dwMsgAndCertEncodingType, Pointer hCryptProv, int dwFlags, WString pvPara);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certclosestore">CertCloseStore</a> */
     boolean CertCloseStore(HANDLE hCertStore, int dwFlags);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certaddencodedcertificatetostore">CertAddEncodedCertificateToStore</a> */
     boolean CertAddEncodedCertificateToStore(HANDLE hCertStore, int dwCertEncodingType, byte[] pbCertEncoded, int cbCertEncoded, int dwAddDisposition, PointerByReference pAdded);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certsetcertificatecontextproperty">CertSetCertificateContextProperty</a> */
     boolean CertSetCertificateContextProperty(Pointer pCertContext, int dwPropId, int dwFlags, Pointer pvData);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certduplicatecertificatecontext">CertDuplicateCertificateContext</a> */
     Pointer CertDuplicateCertificateContext(Pointer pCertContext);
 
+    /** CertGetNameStringW display type / flags; @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetnamestringw">CertGetNameStringW</a> */
     int                     CERT_NAME_SIMPLE_DISPLAY_TYPE = 4;
     int                     CERT_NAME_ISSUER_FLAG         = 0x00000001;
+    /** CertOpenStore / CertAddEncodedCertificateToStore disposition; @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore">CertOpenStore</a> */
     int                     CERT_STORE_ADD_ALWAYS         = 4;
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatecontextproperty">CertGetCertificateContextProperty</a>, <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certsetcertificatecontextproperty">CertSetCertificateContextProperty</a> */
     public static final int CERT_FRIENDLY_NAME_PROP_ID    = 11;
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetnamestringw">CertGetNameStringW</a> */
     int CertGetNameStringW(Pointer pCertContext, int dwType, int dwFlags, Pointer pvTypePara, char[] pszNameString, int cchNameString);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certenumcertificatesinstore">CertEnumCertificatesInStore</a> */
     Pointer CertEnumCertificatesInStore(HANDLE hCertStore, Pointer pPrevCertContext);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatecontextproperty">CertGetCertificateContextProperty</a> */
     boolean CertGetCertificateContextProperty(Pointer pCertContext, int dwPropId, byte[] pvData, IntByReference pcbData);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certdeletecertificatefromstore">CertDeleteCertificateFromStore</a> */
     boolean CertDeleteCertificateFromStore(Pointer pCertContext);
 
+    /** @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certfreecertificatecontext">CertFreeCertificateContext</a> */
     boolean CertFreeCertificateContext(Pointer pCertContext);
+
+    /**
+     * Creates a certificate context from an encoded certificate. The context is not persisted to a store and must be freed with
+     * CertFreeCertificateContext.
+     *
+     * @param dwCertEncodingType
+     *            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING
+     * @param pbCertEncoded
+     *            encoded certificate bytes
+     * @param cbCertEncoded
+     *            length of encoded data
+     * @return CERT_CONTEXT or null on failure
+     * @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certcreatecertificatecontext">CertCreateCertificateContext</a>
+     */
+    CERT_CONTEXT.ByReference CertCreateCertificateContext(int dwCertEncodingType, Pointer pbCertEncoded, int cbCertEncoded);
+
+    /**
+     * Adds an encoded certificate to a certificate store.
+     *
+     * @param hCertStore
+     *            store handle
+     * @param dwCertEncodingType
+     *            encoding type
+     * @param pbCertEncoded
+     *            encoded certificate
+     * @param cbCertEncoded
+     *            length
+     * @param dwAddDisposition
+     *            CERT_STORE_ADD_* (e.g. CERT_STORE_ADD_NEW = 1)
+     * @param ppCertContext
+     *            optional output; can be null
+     * @return true on success
+     * @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certaddencodedcertificatetostore">CertAddEncodedCertificateToStore</a>
+     */
+    boolean CertAddEncodedCertificateToStore(HCERTSTORE hCertStore, int dwCertEncodingType, Pointer pbCertEncoded, int cbCertEncoded, int dwAddDisposition, PointerByReference ppCertContext);
 }

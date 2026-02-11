@@ -418,11 +418,22 @@ public interface YoutubeConfig extends PluginConfigInterface {
             public String getLabel() {
                 return "Auto";
             }
+
+            @Override
+            public String getInternalTitleString() {
+                return "Auto/Untouched/Default";
+            }
         },
         LATEST {
             @Override
             public String getLabel() {
                 return _JDT.T.YoutubeDash_ChannelCrawlerSortModeLatest();
+            }
+
+            @Override
+            public String getInternalTitleString() {
+                /* 2023-07-21: Serverside default */
+                return "Latest";
             }
         },
         POPULAR {
@@ -430,13 +441,25 @@ public interface YoutubeConfig extends PluginConfigInterface {
             public String getLabel() {
                 return _JDT.T.YoutubeDash_ChannelCrawlerSortModePopular();
             }
+
+            @Override
+            public String getInternalTitleString() {
+                return "Popular";
+            }
         },
         OLDEST {
             @Override
             public String getLabel() {
                 return _JDT.T.YoutubeDash_ChannelCrawlerSortModeOldest();
             }
+
+            @Override
+            public String getInternalTitleString() {
+                return "Oldest";
+            }
         };
+
+        public abstract String getInternalTitleString();
     }
 
     @AboutConfig

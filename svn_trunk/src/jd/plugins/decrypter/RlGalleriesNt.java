@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 52277 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52283 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     private static String agent = null;
 
@@ -84,10 +84,13 @@ public class RlGalleriesNt extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    public static final Pattern PATTERN_GALLERY         = Pattern.compile("/[\\w\\-]+.+");
+    public static final Pattern PATTERN_SINGLE_REDIRECT = Pattern.compile("/d/([0-9]+)/?");
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[\\w\\-]+.+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SINGLE_REDIRECT.pattern() + "|" + PATTERN_GALLERY.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -99,12 +102,27 @@ public class RlGalleriesNt extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final String contenturl = param.getCryptedUrl().replace("http://", "https://");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        if (new Regex(contenturl, PATTERN_SINGLE_REDIRECT).patternFind()) {
+            /* Crawl single redirect link */
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(false);
+            brc.getPage(contenturl);
+            if (brc.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final String redirect = brc.getRedirectLocation();
+            if (redirect == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            ret.add(this.createDownloadlink(redirect));
+            return ret;
+        }
         String galleryID = new Regex(contenturl, "(?i)https?://[^/]+/[^/]+/(\\d+)").getMatch(0);
         if (galleryID == null) {
             /* For old links */
             galleryID = new Regex(contenturl, "(?i)(?:porn-gallery-|blog_gallery\\.php\\?id=)(\\d+)").getMatch(0);
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (galleryID != null) {
             /* Gallery */
             logger.info("Crawling gallery");
@@ -195,8 +213,9 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 /* Fallback */
                 fp.setName(br._getURL().getPath());
             }
-            final String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"(https?://[^\"]+)").getMatch(0);
+            String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"((http|/)[^\"]+)").getMatch(0);
             if (zip_url != null) {
+                zip_url = br.getURL(zip_url).toExternalForm();
                 final DownloadLink zip = this.createDownloadlink(zip_url);
                 zip._setFilePackage(fp);
                 ret.add(zip);

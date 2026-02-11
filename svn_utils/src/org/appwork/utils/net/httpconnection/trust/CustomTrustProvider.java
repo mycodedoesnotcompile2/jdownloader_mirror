@@ -10,6 +10,7 @@ package org.appwork.utils.net.httpconnection.trust;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -31,7 +32,7 @@ import javax.net.ssl.X509TrustManager;
  *
  * <pre>
  * File cacertsFile = new File(System.getProperty(&quot;java.home&quot;), &quot;lib/security/cacerts&quot;);
- *                                                                                       CustomTrustProvider provider = new CustomTrustProvider(cacertsFile, &quot;changeit&quot;.toCharArray(), &quot;JKS&quot;);
+ * CustomTrustProvider provider = new CustomTrustProvider(cacertsFile, &quot;changeit&quot;.toCharArray(), &quot;JKS&quot;);
  * </pre>
  *
  * </p>
@@ -135,6 +136,17 @@ public class CustomTrustProvider extends AbstractTrustProvider {
             }
             throw new CertificateException("No X509TrustManager found");
         }
+    }
+
+    /**
+     * Creates a provider from a URL (e.g. class resource). Loads PEM-encoded X.509 certificate(s) from the stream.
+     *
+     * @param url
+     *            URL to PEM data (e.g. Class.getResource("certs/client-ca.cert"))
+     * @throws CertificateException
+     */
+    public CustomTrustProvider(final URL url) throws CertificateException {
+        this(TrustUtils.loadCertificatesFromPEM(url));
     }
 
     /**

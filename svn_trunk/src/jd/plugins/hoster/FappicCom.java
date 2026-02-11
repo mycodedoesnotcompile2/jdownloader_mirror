@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49390 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52284 $", interfaceVersion = 3, names = {}, urls = {})
 public class FappicCom extends XFileSharingProBasic {
     public FappicCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,7 @@ public class FappicCom extends XFileSharingProBasic {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?::\\d+)?" + XFileSharingProBasic.getDefaultAnnotationPatternPart();
+            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[a-z0-9]{12}(/[^/#]+)?";
             regex += "|https?://img\\d+\\." + buildHostsPatternPart(domains) + "/i/\\d+/[a-z0-9]{12}_t\\.jpg";
             ret.add(regex);
         }
@@ -140,5 +140,18 @@ public class FappicCom extends XFileSharingProBasic {
     public String getLoginURL() {
         // 2024-07-22
         return getMainPage() + "/?op=login";
+    }
+
+    @Override
+    protected String getContentURL(final DownloadLink link) {
+        if (link == null) {
+            return null;
+        }
+        final String fuid = this.getFUIDFromURL(link);
+        if (fuid != null) {
+            return "https://" + getHost() + "/" + fuid;
+        } else {
+            return super.getContentURL(link);
+        }
     }
 }

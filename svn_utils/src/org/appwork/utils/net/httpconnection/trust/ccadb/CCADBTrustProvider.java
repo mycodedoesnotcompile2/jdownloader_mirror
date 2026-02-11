@@ -55,7 +55,7 @@ public final class CCADBTrustProvider extends CustomTrustProvider {
     }
 
     private static X509Certificate[] loadCCADB() throws CertificateException, IOException {
-        return TrustUtils.loadCertificatesFromPEM(CCADBTrustProvider.class.getResourceAsStream("IncludedRootsPEM.txt"));
+        return TrustUtils.loadCertificatesFromPEM(CCADBTrustProvider.class.getResourceAsStream("common-ca-database.pem"));
     }
 
     @Override

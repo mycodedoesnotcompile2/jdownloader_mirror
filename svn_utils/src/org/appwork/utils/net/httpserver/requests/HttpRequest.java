@@ -57,6 +57,7 @@ public abstract class HttpRequest implements HttpRequestInterface {
         HTTP_1_1,
         HTTP_2,
         HTTP_3;
+
         public static HTTP_VERSION parse(final String line) {
             if ("HTTP/0.9".equals(line)) {
                 return HTTP_0_9;

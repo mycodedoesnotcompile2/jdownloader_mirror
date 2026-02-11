@@ -1,0 +1,29 @@
+{
+  "artefact":"common-ca-database/server-auth-root",
+  "dependencies":null,
+  "filter":null,
+  "history":[],
+  "installed":{
+    "changes":null,
+    "date":"2026-02-10T12:36:40.917+01:00",
+    "dependencies":null,
+    "description":"PEM-encoded Root CA certificates from the Common CA Database (CCADB), covering TLS/SSL server authentication trust across major root programs (e.g. Mozilla).",
+    "files":["", "common-ca-database.pem"],
+    "hashes":{"../src/org/appwork/utils/net/httpconnection/trust/ccadb/common-ca-database.pem":"1343c97a7090778840d1344970692f8122d1fabdc084c1584a64b80eb824b163"},
+    "licenses":[{
+      "name":"CDLA-2.0 Permissive",
+      "url":"https://www.ccadb.org/rootstores/usage"
+    }],
+    "minJRE":null,
+    "name":"CCADB TLS Root CAs",
+    "signatures":{},
+    "version":"1.0.0"
+  },
+  "minJRE":null,
+  "provider":"simple-web",
+  "renames":{"common-ca-database.pem":"../src/org/appwork/utils/net/httpconnection/trust/ccadb/common-ca-database.pem"},
+  "requiredBy":[],
+  "version":null,
+  "autoRenameEnabled":true,
+  "confirm":true
+}

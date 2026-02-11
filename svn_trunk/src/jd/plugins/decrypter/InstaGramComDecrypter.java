@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 52267 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52282 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -460,7 +460,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
             }
         }
-        if (userID == null && allowUseSearchToFindUserID) {
+        findUserIdViaTopSearch: if (userID == null && allowUseSearchToFindUserID) {
             /**
              * 2025-02-24: For some profiles, this API did not return the expected results or at least not on "pagination page 1". <br>
              * For this reason, other methods should be preferred over this one from now on.
@@ -485,7 +485,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                     throw new AccountRequiredException();
                 } else if (account == null) {
                     /* Account required but not available */
-                    throw new AccountRequiredException();
+                    logger.info("Failed to obtain user-id via topsearch method because: Account required");
+                    break findUserIdViaTopSearch;
                 }
                 sleep(2000, param);
                 logger.info("Logging in because: " + entries.get("message"));
@@ -510,7 +511,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 logger.warning("Failed to find user-id via search -> Invalid profile?");
             }
         }
-        if (userID == null) {
+        findUserIdViaWebsite: if (userID == null) {
             /* Search user-id via website */
             logger.info("Trying to find user-id via website");
             getPageAutoLogin(account, loggedIN, userProfileURL, param, br, userProfileURL, null, null);
@@ -522,6 +523,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 if (StringUtils.isEmpty(userID)) {
                     userID = br.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
                 }
+            }
+            if (StringUtils.isEmpty(userID)) {
+                logger.info("Failed to find user-id via website method");
             }
         }
         /*

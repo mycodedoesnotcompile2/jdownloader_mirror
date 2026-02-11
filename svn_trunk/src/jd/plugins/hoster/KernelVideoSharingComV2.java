@@ -79,7 +79,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52211 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52279 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -559,9 +559,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                     useEmbedWorkaround = true;
                     break embedHandling;
                 }
-                if (isOfflineWebsite(this.br)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
+                this.checkErrorsWebsite(br, link, account);
                 /* Rare case: Embedded content -> URL does not contain a title -> Look for "real" URL in html and get title from there! */
                 /* Try to find URL-title */
                 /*
@@ -620,7 +618,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                         final Browser brc = this.createNewBrowserInstance();
                         brc.getPage(realURL);
                         /* Fail-safe: Only set this URL as PluginPatternMatcher if it contains our expected videoID! */
-                        if ((!this.hasFUIDInsideURL(null) || (this.hasFUIDInsideURL(null) && brc.getURL().contains(fuid))) && new Regex(brc.getURL(), this.getSupportedLinks()).matches() && !this.isOfflineWebsite(brc)) {
+                        if ((!this.hasFUIDInsideURL(null) || (this.hasFUIDInsideURL(null) && brc.getURL().contains(fuid))) && new Regex(brc.getURL(), this.getSupportedLinks()).patternFind() && !this.isOfflineWebsite(brc)) {
                             logger.info("Successfully found real URL: " + realURL);
                             link.setPluginPatternMatcher(brc.getURL());
                             br.setRequest(brc.getRequest());
@@ -641,9 +639,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 br.getPage(contenturl);
                 /* in case there is http<->https or url format redirect */
                 br.followRedirect();
-                if (isOfflineWebsite(this.br)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
+                this.checkErrorsWebsite(br, link, account);
                 /* Look for real unique videoID just in case it is not present in our use-given URL. */
                 String fuidInsideHTML = br.getRegex("\"https?://" + Pattern.quote(br.getHost()) + "/embed/(\\d+)/?\"").getMatch(0);
                 if (fuidInsideHTML == null) {
@@ -679,9 +675,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             /* Embed URL --> Build fake real URL and just go for it */
             final String fakeContentURL = this.generateContentURL(this.getWorkingDomain(link), fuid, "dummystring");
             br.getPage(fakeContentURL);
-            if (isOfflineWebsite(this.br)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+            this.checkErrorsWebsite(br, link, account);
             logger.info("Embed workaround result: Presumed real ContentURL: " + br.getURL());
         }
         if (br.containsHTML("\"iab_extended\"")) {
@@ -928,6 +922,28 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             ret = Long.toString(Long.parseLong(ret));
         }
         return ret;
+    }
+
+    protected boolean isAgeVerificationBlockedWebsite(final Browser br) {
+        return false;
+    }
+
+    protected void checkErrorsWebsite(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        if (isAgeVerificationBlockedWebsite(br)) {
+            // TODO: Add translation for this message and make use of it here
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Age verification required: Change IP or use VPN/proxy");
+        }
+        if (this.isPrivateVideo(link)) {
+            final String msg = this.getPrivateVideoWebsiteMessage(br);
+            if (msg != null) {
+                throw new AccountRequiredException(msg);
+            } else {
+                throw new AccountRequiredException("Private videos can only be watched by registered users or friends of the uploader");
+            }
+        }
+        if (this.isOfflineWebsite(br)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
     }
 
     protected boolean isOfflineWebsite(final Browser br) {

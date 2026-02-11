@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "pan.baidu.com" }, urls = { "https?://(?:www\\.)?pan\\.baidudecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 52281 $", interfaceVersion = 3, names = { "pan.baidu.com" }, urls = { "https?://(?:www\\.)?pan\\.baidudecrypted\\.com/\\d+" })
 public class PanBaiduCom extends PluginForHost {
     public PanBaiduCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,6 +77,8 @@ public class PanBaiduCom extends PluginForHost {
     public static final String   PROPERTY_INTERNAL_UK                       = "origurl_uk";
     public static final String   PROPERTY_INTERNAL_SHAREID                  = "origurl_shareid";
     public static final String   PROPERTY_SERVER_FILENAME                   = "server_filename";
+    /* Required for multihoster support */
+    public static final String   PROPERTY_POSITION_ARRAY                    = "positionarray";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {

@@ -63,7 +63,8 @@ import com.sun.jna.platform.win32.WinUser;
  * <li>Certificate loading from PKCS12</li>
  * <li>TLS version support</li>
  * <li>Client authentication support: NEED, WANT, NONE; NEED with valid client cert; TrustProvider constructor; EC client cert</li>
- * <li>On Windows: TrustWindowsProvider with CA installed in Windows store (install CA → HTTPS with TrustWindowsProvider → uninstall CA)</li>
+ * <li>On Windows: TrustWindowsProvider with CA installed in Windows store (install CA → HTTPS with TrustWindowsProvider → uninstall
+ * CA)</li>
  * <li>TrustAllProvider at client: all requests to the server are allowed regardless of server certificate</li>
  * <li>Error handling (null SSLContext, etc.)</li>
  * </ul>
@@ -94,7 +95,7 @@ import com.sun.jna.platform.win32.WinUser;
  * <pre>
  * # Generate self-signed certificate and key
  * openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
- * 
+ *
  * # Convert to PKCS12
  * openssl pkcs12 -export -in cert.pem -inkey key.pem -out keystore.p12 -name "server" -passout pass:changeit
  * </pre>
@@ -360,7 +361,7 @@ public class SSLHttpServerTest extends AWTest {
         }
         // Test 5: Load with null password
         try {
-            SSLHttpServer.createSSLContextFromPKCS12(keystorePath, (String) null);
+            SSLHttpServer.createSSLContextFromPKCS12(keystorePath, (char[]) null);
             assertTrue(false, "PFX loading with null password should throw exception");
         } catch (final NullPointerException e) {
             LogV3.info("PFX loading with null password correctly threw NullPointerException: " + e.getMessage());

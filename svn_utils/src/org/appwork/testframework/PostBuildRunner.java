@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -486,7 +486,7 @@ public class PostBuildRunner {
                     if (result.getErrOutString().length() > 0) {
                         LogV3.info("      " + result.getErrOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
                     }
-                    throw new Exception("Failed test with classloader error although it is marked with -force in the build.xml");
+                    throw new Exception("Failed test with classloader error although it is marked with -force in the build.xml: " + cls.getName());
                 }
                 String missingResource = new Regex(result.getStdOutString(), "not in JAR\\:\\s*([^\r\n]+)").getMatch(0);
                 if (missingResource != null) {

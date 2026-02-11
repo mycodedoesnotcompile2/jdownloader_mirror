@@ -24,6 +24,13 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,14 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.PanBaiduCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52281 $", interfaceVersion = 3, names = {}, urls = {})
 public class PanBaiduComCrawler extends PluginForDecrypt {
     public PanBaiduComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -131,7 +131,7 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                 br.setCookie(getHost(), "BDCLND", pwcookie);
             }
             link_password = source.getDownloadPassword();
-            position_arrayStr = source.getStringProperty("positionarray");
+            position_arrayStr = source.getStringProperty(PanBaiduCom.PROPERTY_POSITION_ARRAY);
             uk = source.getStringProperty(PanBaiduCom.PROPERTY_INTERNAL_UK);
             shareid = source.getStringProperty(PanBaiduCom.PROPERTY_INTERNAL_SHAREID);
         }
@@ -207,6 +207,7 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                 surl = new Regex(br.getURL(), "(?:/s/|/e/|surl=)([A-Za-z0-9-_]+)").getMatch(0);
             }
             if (br.getURL().contains("/share/init") || br.getURL().contains("/e/verify")) {
+                /* Handle passwword protected link */
                 if (surl == null) {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find surl");
@@ -278,11 +279,6 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                 is_subfolder = true;
             } else {
             }
-            br.getHeaders().put("Accept", "Accept");
-            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            int page = 1;
-            long errno = -1;
-            final int maxitemsperpage = 100;
             Map<String, Object> entries = null;
             List<Map<String, Object>> ressourcelist = null;
             /* Find and parse json from html if possible */
@@ -317,10 +313,15 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
             if (shareidO != null) {
                 shareid = shareidO.toString();
             }
+            br.getHeaders().put("Accept", "Accept");
+            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            int page = 1;
+            final int maxitemsperpage = 100;
             pagination: do {
                 int newLinksThisPage = 0;
-                if (entries != null || !is_subfolder) {
+                if (page == 1 && entries != null && !is_subfolder) {
                     /* First page and json was parsed from html */
+                    logger.info("Skipping XHR request for first page");
                 } else {
                     if (uk == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -353,7 +354,7 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                     entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     ressourcelist = (List) entries.get("list");
                 }
-                errno = JavaScriptEngineFactory.toLong(entries.get("errno"), 0);
+                long errno = JavaScriptEngineFactory.toLong(entries.get("errno"), 0);
                 final String bothFolderIDs = shareid + "_" + uk;
                 final String filenameForEmptyFolder;
                 if (dirName != null) {
@@ -382,6 +383,7 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                     logger.info("Stopping because: Reached end");
                     break pagination;
                 }
+                /* Continue to next page */
                 page++;
             } while (!this.isAbort());
         }
@@ -423,7 +425,7 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                 logger.info("shorturl_id is empty");
                 return;
             }
-            subdir_link = "https://pan.baidu.com/s/" + surl + "#dir/path=" + URLEncode.encodeURIComponent(path);
+            subdir_link = "https://pan.baidu.com/s/" + surl + "#list/path=" + URLEncode.encodeURIComponent(path);
             dl = createDownloadlink(subdir_link);
         } else {
             /*
@@ -520,8 +522,7 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
         }
         dl.setProperty(PanBaiduCom.PROPERTY_INTERNAL_UK, uk);
         dl.setProperty(PanBaiduCom.PROPERTY_INTERNAL_SHAREID, shareid);
-        /* Required for multihoster support */
-        dl.setProperty("positionarray", position_arrayStr_current);
+        dl.setProperty(PanBaiduCom.PROPERTY_POSITION_ARRAY, position_arrayStr_current);
         if (link_password != null) {
             dl.setDownloadPassword(link_password);
         }

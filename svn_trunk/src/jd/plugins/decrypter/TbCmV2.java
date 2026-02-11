@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51941 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52280 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -464,12 +464,14 @@ public class TbCmV2 extends PluginForDecrypt {
                         return ret;
                     }
                 }
+                boolean isChannelAsPlaylist = false;
                 if (playlistID != null) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Playlist";
                     playlistHandlingHumanReadableTitle = "Playlist | " + playlistID;
                 } else if (userName != null && cfg.getProfileCrawlMode() == ProfileCrawlMode.PLAYLIST) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Playlist of channel uploads";
                     playlistHandlingHumanReadableTitle = "Playlist | Uploads by " + userName;
+                    isChannelAsPlaylist = true;
                 } else if (userName != null && "shorts".equals(channelTabName)) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Channel Shorts";
                     playlistHandlingHumanReadableTitle = "Channel | " + userName + " | Shorts";
@@ -503,6 +505,14 @@ public class TbCmV2 extends PluginForDecrypt {
                         String messageDialogText = "This URL is a " + playlistHandlingHumanReadableTypeOfUrlToCrawl + " link. What would you like to do?";
                         if (paginationIsBroken) {
                             messageDialogText += "\r\nJDownloader can only crawl the first " + maxItemsPerPage + " items automatically.\r\nIf there are more than " + maxItemsPerPage + " items, you need to use external tools to grab the single URLs to all videos and add those to JD manually.";
+                        }
+                        final ChannelCrawlerSortMode sortMode = cfg.getChannelCrawlerPreferredSortMode();
+                        if (isChannelAsPlaylist && sortMode != ChannelCrawlerSortMode.AUTO) {
+                            messageDialogText += "\r\nWarning: You've defined custom preferred sort mode '" + sortMode.getInternalTitleString() + "' but at the same time configured channels to be crawled as playlists!";
+                            messageDialogText += "\r\nCustom sorting isn't available for playlists -> Set channel crawl mode to channel if you want your sort oder to be respected.";
+                        } else if (this.playlistID == null && sortMode != ChannelCrawlerSortMode.AUTO) {
+                            /* We are crawling a channel in desired sort mode. */
+                            messageDialogText += "\r\nTrying to crawl in desired sort mode '" + sortMode.getInternalTitleString() + "'.";
                         }
                         messageDialogText += "\r\nIf you wish to hide this dialog, you can pre-select your preferred option under Settings -> Plugins -> youtube.com.";
                         final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, playlistHandlingHumanReadableTitle, messageDialogText, null, buttonTextCrawlPlaylistOrProfile, "Do nothing") {
@@ -683,7 +693,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (channelID != null) {
                     putGlobalProperty(null, YoutubeHelper.YT_CHANNEL_ID, channelID);
                 }
-                final ArrayList<YoutubeClipData> playlist = crawlPlaylistOrChannel(helper, br, playlistID, userName, channelID, cleanedurl, userDefinedMaxPlaylistOrProfileItemsLimit);
+                final List<YoutubeClipData> playlist = crawlPlaylistOrChannel(helper, br, playlistID, userName, channelID, cleanedurl, userDefinedMaxPlaylistOrProfileItemsLimit);
                 if (playlist != null && playlist.size() > 0) {
                     videoIdsToAdd.addAll(playlist);
                     final ChannelPlaylistCrawlerPackagingMode mode = cfg.getChannelPlaylistCrawlerPackagingMode();
@@ -1303,7 +1313,7 @@ public class TbCmV2 extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<YoutubeClipData> crawlPlaylistOrChannel(final YoutubeHelper helper, final Browser br, final String playlistID, final String userName, final String channelID, final String referenceUrl, final int maxItemsLimit) throws Exception {
+    private List<YoutubeClipData> crawlPlaylistOrChannel(final YoutubeHelper helper, final Browser br, final String playlistID, final String userName, final String channelID, final String referenceUrl, final int maxItemsLimit) throws Exception {
         if (StringUtils.isEmpty(playlistID) && StringUtils.isEmpty(userName) && StringUtils.isEmpty(channelID)) {
             /* Developer mistake */
             throw new IllegalArgumentException();
@@ -1359,15 +1369,10 @@ public class TbCmV2 extends PluginForDecrypt {
         String userWishedSortTitle = null;
         /* Check if user wishes different sort than default */
         final ChannelCrawlerSortMode sortMode = cfg.getChannelCrawlerPreferredSortMode();
-        if (sortMode == ChannelCrawlerSortMode.LATEST) {
-            /* 2023-07-21: Serverside default */
-            userWishedSortTitle = "Latest";
-        } else if (sortMode == ChannelCrawlerSortMode.POPULAR) {
-            userWishedSortTitle = "Popular";
-        } else if (sortMode == ChannelCrawlerSortMode.OLDEST) {
-            userWishedSortTitle = "Oldest";
+        if (sortMode != ChannelCrawlerSortMode.AUTO) {
+            userWishedSortTitle = sortMode.getInternalTitleString();
         }
-        String activeSort = "Untouched/Default";
+        String activeSort = "Auto/Untouched/Default";
         String sortToken = null;
         short run = -1;
         Map<String, Object> rootMap;
@@ -1577,7 +1582,7 @@ public class TbCmV2 extends PluginForDecrypt {
             logger.info("Channel/playlist URL used differs from URL that was initially added: Original: " + originalURL.toString() + " | Actually used: " + br.getURL());
             helper.setChannelPlaylistCrawlerContainerUrlOverride(br.getURL());
         }
-        final ArrayList<YoutubeClipData> ret = new ArrayList<YoutubeClipData>();
+        final List<YoutubeClipData> ret = new ArrayList<YoutubeClipData>();
         humanReadableTitle += " sorted by " + activeSort;
         int round = 0;
         final String INNERTUBE_CLIENT_NAME = helper.getYtCfgSet() != null ? String.valueOf(helper.getYtCfgSet().get("INNERTUBE_CONTEXT_CLIENT_NAME")) : null;
@@ -1602,7 +1607,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 int numberOfVideoItemsOnThisPage = 0;
-                final ArrayList<YoutubeClipData> newItems = processVideoArray(varray, playListDupes, maxItemsLimit, videoPositionCounter);
+                final List<YoutubeClipData> newItems = processVideoArray(varray, playListDupes, maxItemsLimit, videoPositionCounter);
                 ret.addAll(newItems);
                 // Check if we reached our limit
                 reachedUserDefinedMaxItemsLimit = (maxItemsLimit > 0 && playListDupes.size() >= maxItemsLimit);
@@ -1960,14 +1965,14 @@ public class TbCmV2 extends PluginForDecrypt {
     private Object findSortToken(final Object o, final String sortText) {
         if (o instanceof Map) {
             final Map<String, Object> map = (Map<String, Object>) o;
-            final String thisSortText = (String) JavaScriptEngineFactory.walkJson(map, "chipCloudChipRenderer/text/simpleText");
-            final String thisContinuationCommand = (String) JavaScriptEngineFactory.walkJson(map, "chipCloudChipRenderer/navigationEndpoint/continuationCommand/token");
+            final Object thisSortText = map.get("text");
+            final String thisContinuationCommand = (String) JavaScriptEngineFactory.walkJson(map, "tapCommand/innertubeCommand/continuationCommand/token");
             /*
              * If isSelected is true, that is our current sort -> In that case we do not want to return anything if that is the sort we want
              * as we already have it and we do not want the upper handling to just reload the list in the order we already have.
              */
-            final Boolean isSelected = (Boolean) JavaScriptEngineFactory.walkJson(map, "chipCloudChipRenderer/isSelected");
-            if (sortText.equalsIgnoreCase(thisSortText) && thisContinuationCommand != null && !Boolean.TRUE.equals(isSelected)) {
+            final Boolean isSelected = (Boolean) map.get("selected");
+            if (thisSortText instanceof String && StringUtils.equalsIgnoreCase(thisSortText.toString(), sortText) && thisContinuationCommand != null && !Boolean.TRUE.equals(isSelected)) {
                 return thisContinuationCommand;
             }
             for (final Map.Entry<String, Object> entry : map.entrySet()) {
