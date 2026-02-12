@@ -14,6 +14,20 @@ import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
 
+import org.appwork.utils.IO;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.bouncycastle.crypto.digests.WhirlpoolDigest;
+import org.jdownloader.controlling.FileCreationManager;
+import org.jdownloader.plugins.FinalLinkState;
+import org.jdownloader.plugins.HashCheckPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+
 import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -33,20 +47,6 @@ import jd.plugins.PluginForHost.FILENAME_SOURCE;
 import jd.plugins.PluginProgress;
 import jd.plugins.download.HashInfo.TYPE;
 import jd.plugins.hoster.DirectHTTP;
-
-import org.appwork.utils.IO;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
-import org.bouncycastle.crypto.digests.WhirlpoolDigest;
-import org.jdownloader.controlling.FileCreationManager;
-import org.jdownloader.plugins.FinalLinkState;
-import org.jdownloader.plugins.HashCheckPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
 
 public class DownloadLinkDownloadable implements Downloadable {
     private static volatile boolean crcHashingInProgress = false;
@@ -718,6 +718,11 @@ public class DownloadLinkDownloadable implements Downloadable {
         }
         final String fileNameFromURL = FILENAME_SOURCE.URL.getFilename(plugin, downloadLink, connection);
         if (StringUtils.isNotEmpty(fileNameFromURL) && isAllowFilenameFromURL(connection)) {
+            /**
+             * TODO: Maybe only do this if no name at all is set? This even overwrites names set via DownloadLink.setName. <br>
+             * You can reproduce this with tiktok items crawled in website embed mode && remove line "dl.setAllowFilenameFromURL(false)" in
+             * Tiktok hosterplugin.
+             */
             /* Get filename from URL */
             final String newFinalFilename;
             if (isFixWrongEncoding(connection, fileNameFromURL)) {

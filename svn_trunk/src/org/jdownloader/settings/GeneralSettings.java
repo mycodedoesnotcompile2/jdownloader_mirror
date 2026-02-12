@@ -429,6 +429,7 @@ public interface GeneralSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("Use files' original last modified date when writing files to disk. In most cases this date is obtained from the \"Last-Modified\" http header. In some cases (for example mega.nz), this date is obtained from an API. If no specific last-modified date is given, the current date will be used.")
     boolean isUseOriginalLastModified();
 
     @AboutConfig

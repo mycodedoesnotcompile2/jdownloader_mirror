@@ -5,7 +5,7 @@
   "history":[],
   "installed":{
     "changes":null,
-    "date":"2026-02-10T12:36:40.917+01:00",
+    "date":"2026-02-11T11:11:42.453+01:00",
     "dependencies":null,
     "description":"PEM-encoded Root CA certificates from the Common CA Database (CCADB), covering TLS/SSL server authentication trust across major root programs (e.g. Mozilla).",
     "files":["", "common-ca-database.pem"],
@@ -17,7 +17,7 @@
     "minJRE":null,
     "name":"CCADB TLS Root CAs",
     "signatures":{},
-    "version":"1.0.0"
+    "version":"1.0.0-2026-02-11T11_00_04.418+01_00"
   },
   "minJRE":null,
   "provider":"simple-web",

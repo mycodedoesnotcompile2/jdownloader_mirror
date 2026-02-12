@@ -20,8 +20,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -44,11 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51887 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52288 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,38 +89,40 @@ public class XHamsterGallery extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    public static final Pattern PATTERN_PHOTO_GALLERY                = Pattern.compile("/photos/gallery/([0-9A-Za-z_\\-/]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PLAYLIST_MY_FAVORITES_VIDEOS = Pattern.compile("/my/favorites/videos(/([a-f0-9]{24})-([\\w\\-]+))?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PLAYLIST_NORMAL              = Pattern.compile("/playlists/([\\w-]+)-([a-f0-9]{24})", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_VIDEOS                  = Pattern.compile("/users/(?:profiles/)?([^/]+)/videos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_SHORTS_MOMENTS          = Pattern.compile("/users/(?:profiles/)?([^/]+)/(shorts|moments)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_FAVORITE_VIDEOS         = Pattern.compile("/users/(?:profiles/)?([^/]+)/favorites/videos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_CREATOR_PHOTOS          = Pattern.compile("/(creators|users)/(?:profiles/)?([^/]+)/photos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_CREATOR_SHORTS               = Pattern.compile("/(creators|users)/(?:profiles/)?([^/]+)/(shorts|moments)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_CHANNELS                     = Pattern.compile("/channels/([^/]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PORNSTARS                    = Pattern.compile("/(?:[^/]+/)?pornstars/([^/]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_CREATORS_VIDEOS              = Pattern.compile("/(?:[^/]+/)?creators/([^/]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             final StringBuilder sb = new StringBuilder();
             sb.append("https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains));
             sb.append("/(");
-            sb.append("photos/gallery/[0-9A-Za-z_\\-/]+-\\d+");
-            sb.append("|my/favorites/videos(?:/[a-f0-9]{24}-[\\w\\-]+)?");
-            sb.append("|users/(?:profiles/)?[^/]+/videos");
-            sb.append("|users/(?:profiles/)?[^/]+/(shorts|moments)");
-            sb.append("|users/(?:profiles/)?[^/]+/favorites/videos");
-            sb.append("|users/(?:profiles/)?[^/]+/photos");
-            sb.append("|creators/[^/]+/photos");
-            sb.append("|creators/[^/]+/shorts");
-            sb.append("|channels/[^/]+");
-            sb.append("|(?:[^/]+/)?pornstars/[^/]+");
-            sb.append("|(?:[^/]+/)?creators/[^/]+");
+            sb.append(PATTERN_PHOTO_GALLERY.pattern().substring(1)); // "/" entfernen
+            sb.append("|" + PATTERN_PLAYLIST_MY_FAVORITES_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_PLAYLIST_NORMAL.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_SHORTS_MOMENTS.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_FAVORITE_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_CREATOR_PHOTOS.pattern().substring(1));
+            sb.append("|" + PATTERN_CREATOR_SHORTS.pattern().substring(1));
+            sb.append("|" + PATTERN_CHANNELS.pattern().substring(1));
+            sb.append("|" + PATTERN_PORNSTARS.pattern().substring(1));
+            sb.append("|" + PATTERN_CREATORS_VIDEOS.pattern().substring(1));
             sb.append(")");
             ret.add(sb.toString());
         }
         return ret.toArray(new String[0]);
     }
-
-    private static final String TYPE_PHOTO_GALLERY                   = "(?i)https?://[^/]+/photos/gallery/[0-9A-Za-z_\\-/]+-(\\d+)";
-    private static final String TYPE_FAVORITES_OF_CURRENT_USER       = "(?i)https?://[^/]+/my/favorites/videos(/[a-f0-9]{24}-([\\w\\-]+))?";
-    private static final String TYPE_VIDEOS_OF_USER                  = "(?i)https?://[^/]+/users/(?:profiles/)?([^/]+)/videos";
-    private static final String TYPE_VIDEOS_FAVORITES_OF_USER        = "(?i)https?://[^/]+/users/(?:profiles/)?([^/]+)/favorites/videos";
-    private static final String TYPE_PHOTO_GALLERIES_OF_USER_CREATOR = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/photos";
-    private static final String TYPE_SHORTS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/(shorts|moments)";
-    private static final String TYPE_VIDEOS_OF_CHANNEL               = "(?i)https?://[^/]+/channels/([^/]+)";
-    private static final String TYPE_VIDEOS_OF_USER_PORNSTAR         = "(?i)https?://[^/]+/(?:[^/]+/)?pornstars/([^/]+)";
-    private static final String TYPE_VIDEOS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(?:[^/]+/)?creators/([^/]+)";
 
     public static String buildHostsPatternPart(String[] domains) {
         final StringBuilder pattern = new StringBuilder();
@@ -147,28 +151,32 @@ public class XHamsterGallery extends PluginForDecrypt {
         if (account != null) {
             hostPlugin.login(account, null, false);
         }
-        if (param.getCryptedUrl().matches(TYPE_VIDEOS_OF_USER)) {
+        final String url = param.getCryptedUrl();
+        if (new Regex(url, PATTERN_USER_VIDEOS).patternFind()) {
             /* Crawl all videos of a user */
             return crawlUserProfile(param);
-        } else if (param.getCryptedUrl().matches(TYPE_VIDEOS_FAVORITES_OF_USER)) {
+        } else if (new Regex(url, PATTERN_USER_FAVORITE_VIDEOS).patternFind()) {
             /* Crawl all videos of a user */
             return crawlUserProfileFavorites(param);
-        } else if (param.getCryptedUrl().matches(TYPE_VIDEOS_OF_USER_PORNSTAR)) {
+        } else if (new Regex(url, PATTERN_PORNSTARS).patternFind()) {
             /* Crawl all videos of a pornstar profile */
             return this.crawlUserProfilePornstar(param);
-        } else if (param.getCryptedUrl().matches(TYPE_VIDEOS_OF_USER_CREATOR)) {
+        } else if (new Regex(url, PATTERN_CREATORS_VIDEOS).patternFind()) {
             /* Crawl all videos of a creator profile */
             return this.crawlUserProfileCreator(param);
-        } else if (param.getCryptedUrl().matches(TYPE_VIDEOS_OF_CHANNEL)) {
+        } else if (new Regex(url, PATTERN_CHANNELS).patternFind()) {
             /* Crawl all videos of a channel */
             return crawlChannel(param);
-        } else if (param.getCryptedUrl().matches(TYPE_FAVORITES_OF_CURRENT_USER)) {
+        } else if (new Regex(url, PATTERN_PLAYLIST_MY_FAVORITES_VIDEOS).patternFind()) {
             /* Crawl users own favorites */
             return this.crawlUserFavorites(param, account);
-        } else if (param.getCryptedUrl().matches(TYPE_PHOTO_GALLERIES_OF_USER_CREATOR)) {
+        } else if (new Regex(url, PATTERN_PLAYLIST_NORMAL).patternFind()) {
+            /* Crawl users own favorites */
+            return this.crawlPlaylist(param, account);
+        } else if (new Regex(url, PATTERN_USER_CREATOR_PHOTOS).patternFind()) {
             /* Crawl all photo galleries of a user/creator --> Goes back into crawler and crawler will crawl the single photos */
             return crawlAllGalleriesOfUserOrCreator(param);
-        } else if (param.getCryptedUrl().matches(TYPE_SHORTS_OF_USER_CREATOR)) {
+        } else if (new Regex(url, PATTERN_CREATOR_SHORTS).patternFind()) {
             /* Crawl all shorts/moments of a user/creator --> Goes back into crawler and crawler will crawl the single photos */
             return crawlAllShortsOfUserOrCreator(param);
         } else {
@@ -177,8 +185,8 @@ public class XHamsterGallery extends PluginForDecrypt {
         }
     }
 
-    private ArrayList<DownloadLink> crawlUserProfile(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_VIDEOS_OF_USER).getMatch(0);
+    private ArrayList<DownloadLink> crawlUserProfile(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_USER_VIDEOS).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -197,8 +205,8 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlUserProfileFavorites(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_VIDEOS_FAVORITES_OF_USER).getMatch(0);
+    private ArrayList<DownloadLink> crawlUserProfileFavorites(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_USER_FAVORITE_VIDEOS).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -219,8 +227,8 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlUserProfilePornstar(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_VIDEOS_OF_USER_PORNSTAR).getMatch(0);
+    private ArrayList<DownloadLink> crawlUserProfilePornstar(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_PORNSTARS).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -239,8 +247,8 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlUserProfileCreator(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_VIDEOS_OF_USER_CREATOR).getMatch(0);
+    private ArrayList<DownloadLink> crawlUserProfileCreator(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_CREATORS_VIDEOS).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -259,8 +267,8 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlChannel(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
-        final String channelname = new Regex(param.getCryptedUrl(), TYPE_VIDEOS_OF_CHANNEL).getMatch(0);
+    private ArrayList<DownloadLink> crawlChannel(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
+        final String channelname = new Regex(param.getCryptedUrl(), PATTERN_CHANNELS).getMatch(0);
         if (channelname == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -280,11 +288,11 @@ public class XHamsterGallery extends PluginForDecrypt {
     }
 
     /* Users can create custom favorites collections with custom names. This function can crawl them. */
-    private ArrayList<DownloadLink> crawlUserFavorites(final CryptedLink param, final Account account) throws IOException, PluginException, DecrypterRetryException {
+    private ArrayList<DownloadLink> crawlUserFavorites(final CryptedLink param, final Account account) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
         if (account == null) {
             throw new AccountRequiredException();
         }
-        final String favoritesName = new Regex(param.getCryptedUrl(), TYPE_FAVORITES_OF_CURRENT_USER).getMatch(1);
+        final String favoritesName = new Regex(param.getCryptedUrl(), PATTERN_PLAYLIST_MY_FAVORITES_VIDEOS).getMatch(2);
         if (favoritesName == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -300,12 +308,34 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
+    private ArrayList<DownloadLink> crawlPlaylist(final CryptedLink param, final Account account) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
+        final String playlistName = new Regex(param.getCryptedUrl(), PATTERN_PLAYLIST_NORMAL).getMatch(0);
+        if (playlistName == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String contenturl = XHamsterCom.getCorrectedURL(param.getCryptedUrl());
+        br.getPage(contenturl);
+        if (this.br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(playlistName);
+        final ArrayList<DownloadLink> ret = this.crawlPagination(param, fp);
+        if (ret.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+        }
+        return ret;
+    }
+
     /* Crawls all videos of all pages in given browsers' html. */
-    private ArrayList<DownloadLink> crawlPagination(final CryptedLink param, final FilePackage fp) throws IOException, PluginException {
+    private ArrayList<DownloadLink> crawlPagination(final CryptedLink param, final FilePackage fp) throws IOException, PluginException, InterruptedException, DecrypterRetryException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final HashSet<String> dupes = new HashSet<String>();
         int page = 1;
         int maxPage = -1;
+        int maxItems = -1;
+        int maxItemsPerPage = -1;
         final String[] pageNums = br.getRegex("data-page=\"(\\d+)\"").getColumn(0);
         if (pageNums != null && pageNums.length > 0) {
             for (final String pageNumStr : pageNums) {
@@ -315,61 +345,203 @@ public class XHamsterGallery extends PluginForDecrypt {
                 }
             }
         }
+        final XHamsterCom hostPlugin = (XHamsterCom) this.getNewPluginForHostInstance(this.getHost());
         final Pattern ignoreVideo = Pattern.compile("(?i).*/videos/[a-f0-9]{24}-watch-later.*");
-        do {
-            final String[] urlParts = br.getRegex("(/videos/[^<>\"']+)").getColumn(0);
-            if (urlParts == null || urlParts.length == 0) {
-                logger.info("Stopping because: Failed to find any items on current page");
-                break;
-            }
-            int numberofNewItems = 0;
-            for (String urlPart : urlParts) {
-                if (new Regex(urlPart, ignoreVideo).patternFind()) {
-                    continue;
-                } else if (!dupes.add(urlPart)) {
-                    /* Skip dupes */
-                    continue;
+        int numberofDeletedItemsTotal = 0;
+        pagination: do {
+            int numberofNewItemsThisPage = 0;
+            int numberofDeletedItemsThisPage = 0;
+            int nextPage = -1;
+            crawlJson: {
+                List<Map<String, Object>> videos = null;
+                try {
+                    final String json = br.getRegex("window\\.initials=(\\{.*?\\});</script>").getMatch(0);
+                    if (json == null) {
+                        logger.info("Failed to find json source");
+                        break crawlJson;
+                    }
+                    final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+                    final Map<String, Object> singlePlaylistComponent = (Map<String, Object>) entries.get("singlePlaylistComponent");
+                    final Map<String, Object> pagesCategoryComponent = (Map<String, Object>) entries.get("pagesCategoryComponent");
+                    final Map<String, Object> sponsorChannel = (Map<String, Object>) JavaScriptEngineFactory.walkJson(pagesCategoryComponent, "channelLandingInfoProps/sponsorChannel");
+                    if (singlePlaylistComponent != null) {
+                        /* Playlist */
+                        final Map<String, Object> playlist = (Map<String, Object>) singlePlaylistComponent.get("playlist");
+                        final Map<String, Object> playlist_meta = (Map<String, Object>) playlist.get("meta");
+                        // final Map<String, Object> playlist_data = (Map<String, Object>) playlist.get("data");
+                        maxItems = ((Number) playlist_meta.get("total")).intValue();
+                        final Map<String, Object> pagination = (Map<String, Object>) playlist_meta.get("pagination");
+                        maxPage = ((Number) pagination.get("maxPages")).intValue();
+                        nextPage = ((Number) pagination.get("next")).intValue();
+                        videos = (List<Map<String, Object>>) playlist.get("list");
+                    } else if (pagesCategoryComponent != null) {
+                        /* Channel */
+                        final Map<String, Object> paginationProps = (Map<String, Object>) pagesCategoryComponent.get("paginationProps");
+                        maxPage = ((Number) paginationProps.get("lastPageNumber")).intValue();
+                        videos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(pagesCategoryComponent, "trendingVideoListProps/videoThumbProps");
+                        if (sponsorChannel != null) {
+                            /* Channel */
+                            maxItems = ((Number) sponsorChannel.get("videoCount")).intValue();
+                        }
+                        maxItemsPerPage = ((Number) entries.get("perPage")).intValue();
+                    }
+                } catch (final Exception e) {
+                    logger.info("json handling failed with exception");
+                    break crawlJson;
                 }
-                numberofNewItems++;
-                final DownloadLink dl = this.createDownloadlink(br.getURL(urlPart).toString());
-                /* Set temp. name -> Will change once user starts downloading. */
-                final String titleFromURL = urlPart.replaceFirst("/videos/", "").replace("-", " ");
-                dl.setName(titleFromURL + ".mp4");
-                dl.setAvailable(true);
-                dl._setFilePackage(fp);
-                ret.add(dl);
-                distribute(dl);
+                if (videos == null || videos.isEmpty()) {
+                    logger.info("Failed to find video items in json source");
+                    break crawlJson;
+                }
+                for (final Map<String, Object> video : videos) {
+                    final String video_id = video.get("id").toString();
+                    final String title = video.get("title").toString();
+                    final String icon = (String) video.get("icon");
+                    final String url = (String) video.get("pageURL");
+                    if ("deleted".equalsIgnoreCase(icon)) {
+                        /* Item is offline */
+                        numberofDeletedItemsThisPage++;
+                        logger.info("Found deleted video: id: " + video_id + " | title: " + title);
+                        final String urlForOfflineItem;
+                        if (!StringUtils.isEmpty(url)) {
+                            urlForOfflineItem = url;
+                        } else {
+                            /* No URL given but we know how it would look */
+                            urlForOfflineItem = "https://xhamster.com/videos/" + this.toSlug(title) + "-" + video_id;
+                        }
+                        if (!dupes.add(urlForOfflineItem)) {
+                            /* This should never happen */
+                            logger.warning("WTF found offline dupe: " + urlForOfflineItem);
+                            continue;
+                        }
+                        final DownloadLink dummy = this.createDownloadlink(urlForOfflineItem);
+                        /*
+                         * A lot of deleted items have title "#deleted" so let's always include the video_id to make them easier to identify
+                         * in the linkgrabber.
+                         */
+                        dummy.setFinalFileName(video_id + "_" + title + ".mp4");
+                        dummy.setAvailable(false);
+                        dummy._setFilePackage(fp);
+                        ret.add(dummy);
+                        distribute(dummy);
+                        continue;
+                    }
+                    if (StringUtils.isEmpty(url)) {
+                        /* This should never happen: pageURL should only be null for offline items */
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    if (new Regex(url, ignoreVideo).patternFind()) {
+                        continue;
+                    } else if (!dupes.add(url)) {
+                        /* Skip dupes by url */
+                        continue;
+                    } else if (!dupes.add(video_id)) {
+                        /* Skip dupes by video_id */
+                        continue;
+                    }
+                    final DownloadLink dl = this.createDownloadlink(url);
+                    /* Set temp. name -> Will change once user starts downloading. */
+                    dl.setName(video.get("title") + ".mp4");
+                    dl.setAvailable(true);
+                    dl._setFilePackage(fp);
+                    ret.add(dl);
+                    distribute(dl);
+                    numberofNewItemsThisPage++;
+                }
             }
-            logger.info("Crawled page: " + page + "/" + maxPage + " | Found items on this page: " + numberofNewItems + " | Total: " + ret.size());
+            /* Crawl links from html (legacy method) */
+            final String[] urls = br.getRegex("(/videos/[^<>\"']+)").getColumn(0);
+            if (urls != null && urls.length > 0) {
+                for (String url : urls) {
+                    if (new Regex(url, ignoreVideo).patternFind()) {
+                        continue;
+                    } else if (!hostPlugin.canHandle(url)) {
+                        /* Skip items not supported by hosterplugin */
+                        continue;
+                    } else if (!dupes.add(url)) {
+                        /* Skip dupes */
+                        continue;
+                    }
+                    url = br.getURL(url).toExternalForm();
+                    final DownloadLink dl = this.createDownloadlink(url);
+                    /* Set temp. name -> Will change once user starts downloading. */
+                    final String titleFromURL = url.replaceFirst("/videos/", "").replace("-", " ");
+                    dl.setName(titleFromURL + ".mp4");
+                    dl.setAvailable(true);
+                    dl._setFilePackage(fp);
+                    ret.add(dl);
+                    distribute(dl);
+                    numberofNewItemsThisPage++;
+                }
+            }
+            numberofDeletedItemsTotal += numberofDeletedItemsThisPage;
+            final int effectiveNumberofNewItemsThisPage = numberofNewItemsThisPage + numberofDeletedItemsThisPage;
+            logger.info("Crawled page: " + page + "/" + maxPage + " | Found items so far: " + ret.size() + "/" + maxItems + " | Offline total: " + numberofDeletedItemsTotal + " | New this page: " + effectiveNumberofNewItemsThisPage + "/" + maxItemsPerPage + " | Offline this page: " + numberofDeletedItemsThisPage);
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            }
+            if (page == maxPage) {
+                logger.info("Stopping because: Reached last page: " + maxPage);
+                break pagination;
+            } else if (effectiveNumberofNewItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find any new items on page: " + page);
+                break pagination;
+            }
+            if (maxItemsPerPage != -1 && effectiveNumberofNewItemsThisPage < maxItemsPerPage) {
+                /* This can happen and is not yet a reason to stop */
+                logger.info("Current page contains less items than a full page | page: " + page + " | Items: " + effectiveNumberofNewItemsThisPage + "/" + maxItemsPerPage);
+            }
+            /* Try to continue to next page */
             page++;
             String nextpageurl = br.getRegex("class=\"xh-paginator-button[^\"]*\"[^>]*href=\"(https?://[^<>\"]+/" + page + ")\" data-page=\"" + page + "\">").getMatch(0);
             if (nextpageurl == null) {
                 final String maybeNextPage = br.getURL().replaceFirst("/\\d*$", "") + "/" + page;
                 if (br.containsHTML(Pattern.quote(maybeNextPage))) {
-                    logger.info("Using slightly corrected nextpageurl: " + maybeNextPage);
+                    logger.info("Using guessed nextpageurl by html: " + maybeNextPage);
+                    nextpageurl = maybeNextPage;
+                } else if (maxPage != -1) {
+                    /* If we know how many pages exist in total, we can just try to access the guessed next page URL. */
+                    logger.info("Using guessed nextpageurl by maxPage: " + maybeNextPage);
                     nextpageurl = maybeNextPage;
                 }
             }
-            if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break;
-            } else if (nextpageurl == null) {
+            if (nextpageurl == null) {
                 logger.info("Stopping because: Failed to find nextpage");
-                break;
-            } else if (numberofNewItems == 0) {
-                logger.info("Stopping because: Failed to find any new items on page: " + page);
-                break;
-            } else {
-                /* Continue with next page */
-                br.getPage(nextpageurl);
+                break pagination;
             }
+            /* Continue with next page */
+            br.getPage(nextpageurl);
         } while (!this.isAbort());
+        if (maxItems == 0) {
+            /* Edge case: There are 0 elements to crawl */
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+        } else if (maxItems != -1 && ret.size() < maxItems) {
+            logger.info("Looks like some items are missing: " + (maxItems - ret.size()));
+        }
         return ret;
     }
 
+    /* Copy & paste from OrfAt plugin */
+    private String toSlug(final String str) {
+        final String preparedSlug = str.toLowerCase(Locale.ENGLISH).replace("ü", "u").replace("ä", "a").replace("ö", "o");
+        String slug = preparedSlug.replaceAll("[^a-z0-9]", "-");
+        /* Remove double-minus */
+        slug = slug.replaceAll("-{2,}", "-");
+        /* Do not begin with minus */
+        if (slug.startsWith("-")) {
+            slug = slug.substring(1);
+        }
+        /* Do not end with minus */
+        if (slug.endsWith("-")) {
+            slug = slug.substring(0, slug.length() - 1);
+        }
+        return slug;
+    }
+
     private ArrayList<DownloadLink> crawlAllShortsOfUserOrCreator(final CryptedLink param) throws IOException, PluginException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_SHORTS_OF_USER_CREATOR).getMatch(1);
-        final String type = new Regex(param.getCryptedUrl(), TYPE_SHORTS_OF_USER_CREATOR).getMatch(0);
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_CREATOR_SHORTS).getMatch(1);
+        final String type = new Regex(param.getCryptedUrl(), PATTERN_CREATOR_SHORTS).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -414,8 +586,8 @@ public class XHamsterGallery extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlAllGalleriesOfUserOrCreator(final CryptedLink param) throws IOException, PluginException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_PHOTO_GALLERIES_OF_USER_CREATOR).getMatch(1);
-        final String type = new Regex(param.getCryptedUrl(), TYPE_PHOTO_GALLERIES_OF_USER_CREATOR).getMatch(0);
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_USER_CREATOR_PHOTOS).getMatch(1);
+        final String type = new Regex(param.getCryptedUrl(), PATTERN_USER_CREATOR_PHOTOS).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -505,7 +677,7 @@ public class XHamsterGallery extends PluginForDecrypt {
             total_numberof_picsInt = -1;
             logger.warning("Failed to find total number of images in this gallery");
         }
-        final String galleryID = new Regex(contenturl, TYPE_PHOTO_GALLERY).getMatch(0);
+        final String galleryID = new Regex(contenturl, PATTERN_PHOTO_GALLERY).getMatch(1);
         String title = br.getRegex("<title>\\s*(.*?)\\s*\\-\\s*\\d+\\s*(Pics|Bilder)\\s*(?:\\-|\\|)\\s*xHamster(\\.com|\\.xxx|\\.desi|\\.one)?\\s*</title>").getMatch(0);
         if (title == null) {
             title = br.getRegex("<title>(.*?)</title>").getMatch(0);
@@ -529,6 +701,7 @@ public class XHamsterGallery extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(Encoding.htmlDecode(title).trim());
         int page = 1;
+        int maxItemsPerPage = -1;
         int image_position = 1;
         final HashSet<String> dupes = new HashSet<String>();
         pagination: while (!this.isAbort()) {
@@ -584,8 +757,12 @@ public class XHamsterGallery extends PluginForDecrypt {
                 logger.info("Stopping because: Found number of expected images");
                 break pagination;
             } else if (numberof_new_items_this_page == 0) {
-                /* Last resort fail-safe to prevent infinite loops */
+                /* Fail-safe */
                 logger.info("Stopping because: Failed to find any new items on current page");
+                break pagination;
+            } else if (numberof_new_items_this_page < maxItemsPerPage) {
+                /* Fail-safe */
+                logger.info("Stopping because: Failed to find enough new items on current page");
                 break pagination;
             }
             logger.info("Getting page " + nextPage);

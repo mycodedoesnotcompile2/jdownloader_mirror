@@ -7,7 +7,7 @@
       "changes":null,
       "date":"2024-10-24T08:58:19.617+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"416dce8089ac5f46356c27875d40d268417cc8cf698444dfd1678a8f305728b4"},
       "licenses":[{
@@ -26,7 +26,7 @@
       "changes":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de\t: Remove `gov.cu` (#2233)",
       "date":"2024-10-24T10:04:04.124+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e27eae9a1648152e88978142cbd7987c188b80c53fbb583fa557b0e4312e6bb8"},
       "licenses":[{
@@ -45,7 +45,7 @@
       "changes":"2024.299.0 74e7b32304f2ea2b5fc261a90f01544be267be12\t: update `.io` section (#2236)\r\n2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa\t: Remove `presse.ci` and `md.ci`, other ccTLD stubs not associated w respective registry (#2198)",
       "date":"2024-10-26T10:41:56.574+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"16240a20e813570db0d95e0230871e1495cf1f1c49339ca1049963b0aaf7ff6f"},
       "licenses":[{
@@ -64,7 +64,7 @@
       "changes":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5\t: chore: remove 2nd level comment for `.sk` (#2238)\n\nCo-authored-by: William Harrison <william@williamdavidharrison.com.au>",
       "date":"2024-10-28T14:31:17.462+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"83c227f297b2ec9334a8eb24bede568d529b5b90a58334d70af107766fe2a707"},
       "licenses":[{
@@ -83,7 +83,7 @@
       "changes":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556\t: Add grafana-dev.net to public suffix list (#2188)",
       "date":"2024-10-29T10:48:07.798+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"40c185e992dfd7c637892133cfc1ecdbeff50a73a66743dd2068aae670c644a1"},
       "licenses":[{
@@ -102,7 +102,7 @@
       "changes":"2024.305.0 a4f696ccb433ab81c5a75d93a8d08a68279f1154\t: Add ip-ddns.com and ddns-ip.net (#2234)\r\n2024.305.1 9d7148986e82f2da0d99cb79fae34303f604d1f7\t: Add `taveusercontent.com` (#2239)\r\n2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc\t: Add home.arpa (#2220)",
       "date":"2024-10-31T10:58:48.10+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b8893aa380bbc9f26e29feb1e7f2848284a18a8ca4fe251c9f3f114f8607c9d1"},
       "licenses":[{
@@ -121,7 +121,7 @@
       "changes":"2024.305.3 a4a3877056578c2b7225fa10fd144115539f9c64\t: util: gTLD data autopull updates for 2024-10-31T15:17:41 UTC (#2242)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2024-11-04T09:15:28.742+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"91aeeed5dfc84a53265d95cfbb0e7bb52df8ed75a24a27568817cd69578a2f80"},
       "licenses":[{
@@ -140,7 +140,7 @@
       "changes":"2024.310.0 12c593cc533d82b56254972babfed81d8b3d8db5\t: remove `onred.one` (#2244)\r\n2024.310.1 e65bca4146a494d60dd4d3beb4a244376fb3825b\t: remove `bci.dnstrace.pro` (#2245)",
       "date":"2024-11-05T17:25:15.943+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e923d4f80e4f4584a54fe480c862263b18119bf8138167d45b27c4f191316d39"},
       "licenses":[{
@@ -159,7 +159,7 @@
       "changes":"2024.313.0 2733c1c9d0dad52c58e1fd04ea33952751a1f2fb\t: move `wdh.app` to new section (#2246)",
       "date":"2024-11-08T13:37:04.85+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"5e6e02f82e26d2e2e0a9da09dba569ad8717686fb331d3c6aa84de782b266052"},
       "licenses":[{
@@ -178,7 +178,7 @@
       "changes":"2024.316.0 9258f6f90ccebbe68bd128393e38d3c5d5430d99\t: add `co.bz` (#2249)",
       "date":"2024-11-11T09:38:56.706+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e6aceda566029a350cf81936149de7df76e423a9c32284e812be7a31aa4f1495"},
       "licenses":[{
@@ -197,7 +197,7 @@
       "changes":"2024.316.1 63d662f455c5f9b455681ad62e6da5ec5108823c\t: remove `corpnet.work`, update contact info (#2247)\r\n2024.316.2 ca9b2901aa9ba1a2a4174ba92d036ffeb496e25a\t: Update deploy-site.yml\n\nRename master to main",
       "date":"2024-11-12T08:23:39.786+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"5b5a98d89a635197c078454def4fbcf8a880beaa0bd6f79d080ab0f28d2f513f"},
       "licenses":[{
@@ -216,7 +216,7 @@
       "changes":"2024.317.0 e6ba3fdd7ae5b740cb937810965b806aa3c881b3\t: Add pages-research.it.hs-heilbronn.de (#2253)\r\n2024.317.1 20561c38a60aadac5e1b9443131baac6cf2e8809\t: chore(pr_template): remove syntax check (#2252)\r\n2024.317.2 9d782c4e2306cda242e9816a6d5f68496b024024\t: Master to main for the remote action in the website remote\r\n2024.317.3 c5a2c693abe0851e2aad80062f9ef654c05372ca\t: Adding LODMAN regional domains",
       "date":"2024-11-12T18:20:54.666+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"6a9e69295fd901f43264ec2986ba67a9decdd6c74420d5547282bb262e2418b5"},
       "licenses":[{
@@ -235,7 +235,7 @@
       "changes":"2024.323.0 c1dfaf426b6b2f6a84a6e84dedfafbacc6c27960\t: Heyflow GmbHs domains heyflow.page and heyflow.site\r\n2024.323.1 0d59ce568deb6190b711f43ef8cedd8f5f99f79b\t: Update .AU Section (#2267)\n\nRemove info.au\r\n2024.323.2 431c52a34c183c78581cb5daf040cf0c2d210846\t: Update .IS (#2266)\r\n2024.323.3 b00d15ea62059a24d57cac96740c98dcb80b6edc\t: remove `nom.ad` (#2263)",
       "date":"2024-11-19T09:10:27.889+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"973353faac4973418216872f7e70415255751d0f17627806ab6ff0dac8b1fb29"},
       "licenses":[{
@@ -254,7 +254,7 @@
       "changes":"2024.324.0 13e2f0eea723173585c29804333f8c3e2cf1f065\t: Update 2nd levels for .JO (Jordan) section (#2264)\r\n2024.324.1 368688468b5e6d08acf3ee4714b72ff6ec070b01\t: Update `.SG` Section (#2273)\r\n2024.324.2 6a941f25bc936de365755a2f691c3e7e39d83ee9\t: Update `.PL` comments and fix alphabetical sorting (#2270)\r\n2024.324.3 c4a7622b97f9191402274dee7d1e7ee1d82bf9f5\t: Update `.CO` Section (#2269)\r\n2024.324.4 87f027724d7e0d5890d3901e2f771ceecf77c339\t: Update `.RE` Section (#2271)\r\n2024.324.5 9f0b7d6f886de2cb8443f371544b25ee8f102ea8\t: alphabetise `.tm` section + add confirmation comment (#2268)\n\n* re-order .tm entries\r\n\r\n* update .tm url + add confirmation message\r\n2024.324.6 06514d3a8810e3de15124eef34e2f78723735c87\t: Update `.AZ` comments and fix sorting (#2275)\r\n2024.324.7 db236405deae4ed71e91b7374dd13f651671cc9d\t: remove `betainabox.com` (#2259)\r\n2024.324.8 e14b1e1a25ab0aab3fe7dd5e9850c926e6bfba37\t: update `.tt` section (#2272)\r\n2024.325.0 1548138afc7cee0798fa3140f11353610df7df2f\t: chore: Update `.CW` Section comments (#2281)\r\n2024.325.1 4129e0f71d1ae7be8721bf632f18f59622fc380b\t: chore: Update `.AF` Section link and sorting (#2279)\r\n2024.325.2 204403f44f41a1466f8c4a6dace5596258c86b14\t: Update `.MG` Section (#2274)",
       "date":"2024-11-20T10:21:17.832+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"522848e2dae3db25275462617c6e0243efb697ecb701bd040981698c7a6b07b1"},
       "licenses":[{
@@ -273,7 +273,7 @@
       "changes":"2024.325.3 fba15065541d422a313f027a143da078b42c1b8f\t: Update `.DM` Block (#2277)\r\n2024.325.4 ab15d334922d67b6063d0098b6b6ae49e3d34a0f\t: Update `.BO` (#2276)",
       "date":"2024-11-21T09:46:21.865+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"ed7b7c448f2c204e9556f731454a717a2e6bc2a36367967a83cf744d4a045d52"},
       "licenses":[{
@@ -292,7 +292,7 @@
       "changes":"2024.327.0 cb7517da54bfba1bc262c68e5151f6df52a90677\t: Update `.GE` Section (#2283)",
       "date":"2024-11-22T18:02:49.438+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b70f85f461b5933b42fb3fd7fd9107c368d112995b41993ed2a52b02ebec4390"},
       "licenses":[{
@@ -311,7 +311,7 @@
       "changes":"2024.328.0 931546b3beb45b544d0692aa116b420fb34b9dfa\t: Update company name and email address (#2285)",
       "date":"2024-11-25T10:09:43.641+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a9a037c6ebe7859ac8a08f49da9aca1a7ba62ca6c7a7c2df05786a8ec337bdfd"},
       "licenses":[{
@@ -330,7 +330,7 @@
       "changes":"2024.331.0 bf32ba1ae6228a185ebf297d636f1c6541149c45\t: Update `.CV` Section (#2286)",
       "date":"2024-11-26T17:03:25.581+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"60bc94a8601e229bc4a208428046f0370e02d8c4adc23d2ecf1a84e06cb5376d"},
       "licenses":[{
@@ -349,7 +349,7 @@
       "changes":"2024.332.0 408a7b0bdec993884865baaa2f0d14cc9a060885\t: Update `.TW` Section (#2289)\r\n2024.332.1 e17ca930038ced8343e8522be1b078fc03860a04\t: Adding RUB domain (#2292)\r\n2024.332.2 ff91ff2752d5537cec93a2056e8da93a1fe8c226\t: Update `.EG` Section (#2290)\r\n2024.332.3 e1b1608547b24bb84034c1083060e3293e7907d0\t: util: gTLD data autopull updates for 2024-11-27T15:18:00 UTC (#2293)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2024-11-28T14:55:27.542+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"fe3727e057b44d0d6dfd442be9f553eec7ab60d5ba3acb544bb2443803ff9c71"},
       "licenses":[{
@@ -368,7 +368,7 @@
       "changes":"2024.333.0 03c6a36304d4de698aff16f6fa33b9371af58786\t: remove `mcpe.me` (#2294)\r\n2024.334.0 f34b2f1a960238cf765d2e70ca8459ea2de51ec7\t: chore: Fix Alphabetizing for the ICANN section (#2287)\r\n2024.334.1 70df5fb64d3337f49a1cb5e2e9d3bf3aa7a20f0f\t: tools/internal/parser: enforce suffix ordering in the ICANN section (#2295)\n\nThe ordering rule is slightly different from the private section:\r\nsuffix blocks do not get reordered, only the suffixes within each block.\r\nAdditionally, the ICANN section contains many load-bearing inline comments.\r\nTo avoid semantic changes, the sorting does not move suffixes over such\r\ncomments. Unlike in the private section, such movement failures aren't\r\ntreated as errors, because the subsection comments in the ICANN block\r\nhave a reasonably consistent meaning.",
       "date":"2024-11-29T10:39:32.830+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"c6717a16340842406515934530fc621f1b9ef29c0ff77a2782a4aa0337f6688a"},
       "licenses":[{
@@ -387,7 +387,7 @@
       "changes":"2024.337.0 ebe70033757587d9f854c786d10632251e1c2eb6\t: added o365 sub domain (#2291)\n\nCo-authored-by: Jan Jäschke <jan.jaeschke@nospamproxy.com>\r\n2024.337.1 a12cce094e9c97b3ea7ce921faeea606fde7ef98\t: remove `upli.io` (#2302)",
       "date":"2024-12-03T09:53:16.988+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"f389214b3a36d69a71484028583217677de8e909b5174d64ccaeecafe8b8d358"},
       "licenses":[{
@@ -406,7 +406,7 @@
       "changes":"2024.339.0 d953b2f57b76ab085598bde05c0b0f287b9506f8\t: Allow 0e.vc to be isolated for all subdomains by adding wildcard (#2299)\r\n2024.339.1 7e9bf740f43749a8d57bc0d577783c8861d2663c\t: Add checkbox for contact method to the PR template (#2305)",
       "date":"2024-12-05T12:20:09.69+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"871f7cd7c3a331a2062488d76c05995b03587adc59bf0272085fa5d65981926d"},
       "licenses":[{
@@ -425,7 +425,7 @@
       "changes":"2024.341.0 d94154e5222aa000f70def82b9711df88b4612d9\t: update info + add note regarding 2LDs for `.name` (#2307)\r\n2024.344.0 d20bb7fddc89f1c840b006f19be3c293a9b9aa8a\t: rename `GetLocalCert` to `LocalCert` (#2309)",
       "date":"2024-12-09T09:38:55.590+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"0800764a84eec93e7fd996160325b8f6a80917d656c9dd81608cee24d62b9b2b"},
       "licenses":[{
@@ -444,7 +444,7 @@
       "changes":"2024.344.1 15795fdc02910204c95e7c70f3c7e2136f3f0683\t: Add `netlib.re` (#2308)\r\n2024.344.2 377aff2c47a582f988d288a8928281db2b212210\t: add on-fleek.xyz (#2303)\r\n2024.344.3 4db37886b4d00ad50279d6eca943e91dff1e748e\t: Add email policy (#2296)\r\n2024.344.4 d3ca4d535b3388c7bd6642cc76d579197dc63202\t: remove `test.ru` (#2301)\r\n2024.345.0 8ddd1834323e2e51a5208b6fa235c4750e19138c\t: Update `.PW` (#2314)",
       "date":"2024-12-10T09:25:06.454+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"07e88153d92cb201063cac8ccc979e55630a1f2ef1234ce12fef173dfb29c4b8"},
       "licenses":[{
@@ -463,7 +463,7 @@
       "changes":"2024.345.1 8df94846e1eb6ee83eda2cc23aa3d4a42421998e\t: update `.us` (#2316)\r\n2024.345.2 3fc7503b25d9aa745245ef324efc966c1baab06c\t: add aiven.app to public suffix (#2315)\r\n2024.345.3 2a0b5bec9e4b5b02ecbbe18224d41e56d1fd1766\t: remove Danger Science section (#2318)\r\n2024.346.0 5bd0f9f684349420b49232f4ef7e3071b3653643\t: remove `aaa.vodka` (#2323)\r\n2024.346.1 dfd9f96a940d952ec0f2a8c3dbb925717e02862b\t: remove `herokussl.com` (#2313)\r\n2024.346.2 55c3cbbaa5d46fb0dddef82a4ae443b50e6fe3a6\t: util: gTLD data autopull updates for 2024-12-10T15:19:18 UTC (#2321)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2024.346.3 50a9a133659df82fd4c411bc9b43aab05eed576b\t: Add addr.tools dynamic dns services (#2320)\r\n2024.346.4 2abdd00bae287291bb92474e9838fefc0dd1138e\t: Update comments for `.it`, `.jp`, `.se`, `.xn--fiqs8s`, `.xn--fiqz9s` (#2325)\r\n2024.346.5 77a1948db10ae4225281856933eb5317463c9377\t: chore(tools/internal/parser): remove unneeded exceptions (#2328)\r\n2024.347.0 6624d3d533ffed7c8b0c0c9ce552f9f05b99d017\t: Remove blogspot ccTLD domains (#2327)\r\n2024.347.1 6cebd5c468975f0971c4e4463cae0d9e389c4223\t: remove `yombo.me` (#2337)\r\n2024.347.2 dbba928143b54b632b622a6beb444a75091da102\t: remove `lelux.site` (#2336)\r\n2024.347.3 44084384a00a93d9ee602b97e379a11e05e681bc\t: add confirmation message to `.am` (#2330)\r\n2024.347.4 cbbab1f6b284cafa62e9b0291f91c52810eab1fc\t: update `.bw` section (#2339)\r\n2024.347.5 52592a8e00cf54616d3e51c7a54f61013b3cfafa\t: update `.az` section (#2331)\r\n2024.347.6 e0797a795a743072107f624f85c794a2f8c63229\t: fix some URLs (#2340)\r\n2024.347.7 d351216c9d8f2e1af9587dbfa285c8202c781bf3\t: remove `shiftedit.io` (#2312)",
       "date":"2024-12-12T14:51:43.86+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"152a5e1283f28ba773d3334cea7a6737f87ba113b688ad2f99143f7f11ab6b13"},
       "licenses":[{
@@ -482,7 +482,7 @@
       "changes":"2024.347.8 54119e116bb0dc5be5b1c0f4218eaa057db17d92\t: util: gTLD data autopull updates for 2024-12-12T15:18:57 UTC (#2341)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2024.350.0 0660ae7ec652fc051b3968c1cb36f03accd2a48c\t: remove `secaas.hk` (#2335)",
       "date":"2024-12-16T08:45:48.810+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e9009f3470dab9542c976b546a3aeef99440b1171fcecdae00b00ee16ac617cf"},
       "licenses":[{
@@ -501,7 +501,7 @@
       "changes":"2024.351.0 0f742fa58b243545e644a3336d50e091b2e73dc9\t: remove `n4t.co`, `001www.com`, `now-dns.top` (#2324)\r\n2024.351.1 bc9a4ea7bea6062240b3b6161125931925283dc1\t: remove `lab.ms` (#2334)",
       "date":"2024-12-17T11:49:40.772+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"4b89d49985de3a5a3a66e199e588320d185c65deec1c2d9e2ac6596902a2e74f"},
       "licenses":[{
@@ -520,7 +520,7 @@
       "changes":"2024.355.0 9e89e8b8a64027217dc22dda2e7c9dacd3d6ee6c\t: chore: update website URL (#2344)\r\n2024.358.0 a12a4d2dd9c8d27a4b187a42588f90577858ab5a\t: util: gTLD data autopull updates for 2024-12-23T15:16:32 UTC (#2357)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2024.359.0 60bb8d87995b9423bf55742da5360c68ec33ce84\t: remove `platter-app.com` (#2346)\r\n2024.359.1 f6f89086eb4c1e8d0c654ce5ba4cf425fb62bb96\t: remove `drud.io` and `drud.us` (#2347)\r\n2024.359.2 d2dd5f273d594b1a335fd3aadfc8c182df3ed787\t: remove `spacekit.io` (#2348)\r\n2024.359.3 eaebbab737795c84c6ab6159f8273fb2dfc84d9e\t: update email address (#2354)\r\n2024.359.4 304c0680cdcbc97c93a09a1b2dc387a7c411700a\t: add botdash domains (#2342)\r\n2024.359.5 b29032616d31b532d04092781b9aa61cf54c6fdc\t: remove Diher Solutions section (#2319)\r\n2024.359.6 9001793946007094caf862748aaeb7e5773541a9\t: remove `curv.dev` (#2317)\r\n2024.359.7 f229d7f87051bb6197b315f42adae05cb68e33b5\t: chore: formatting + fixes (#2329)",
       "date":"2024-12-28T11:56:45.646+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"998c28a066398a1e05864242e95327b905ce33c564c0e392ea8f4f0db4a5c0fb"},
       "licenses":[{
@@ -539,7 +539,7 @@
       "changes":"2025.5.0 397a13cba5672b1b4eb847995fc91e03fc3893e1\t: remove Hakaran domains (#2361)",
       "date":"2025-01-05T16:20:58.456+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"f76a284242bafc683eac6d1ba239cb6661144c3c5565a2e29a1f9de9081c06cf"},
       "licenses":[{
@@ -558,7 +558,7 @@
       "changes":"2025.7.0 fde49104ed0d33a0ff10762386bb4a36801b2121\t: Add Code of Conduct (#2364)\r\n2025.7.1 cc970cad8ae7694bd7c080f1f9f5cc7ae0d6a43f\t: Replace broken links (#2360)\r\n2025.7.2 0f5ad14268854e6bff2d2e53a6861e46cdb63dab\t: add PSL Sandbox (#2358)\r\n2025.7.3 17440f51f53e1fb0e53f1d843dceb235a25893cf\t: Add `cloudbeesusercontent.io` (#2298)",
       "date":"2025-01-08T10:39:18.908+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"f4e10aab4acadc5af9214ba711e2a9d737d9de696e1e9441a82b72809b274693"},
       "licenses":[{
@@ -577,7 +577,7 @@
       "changes":"2025.8.0 d1420f641cf8523ae758342e8b5661287718d33f\t: Add Liara (#2365)",
       "date":"2025-01-09T17:02:05.677+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"7c33ac889553eec4fd845214fafc373446995dbc6b4e8f8288fef77be833760f"},
       "licenses":[{
@@ -596,7 +596,7 @@
       "changes":"2025.9.0 d283cf7b0d097b0ac17b59e984e25827b91d4e69\t: AWS Submissions to the Public Suffix List - Q4 2024 (#2212)\n\n* Add rules for AWS Transfer Family web apps\r\n\r\n* Add rules for Amazon SageMaker Studio",
       "date":"2025-01-10T12:11:47.825+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"bd0982bdbf52e282c05da4685362d4db813ac4091216a4e5bc03477b6b283195"},
       "licenses":[{
@@ -615,7 +615,7 @@
       "changes":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370\t: add `edu.vg` (#2367)",
       "date":"2025-01-13T11:46:30.732+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"0271ce0c4bc237f906be5854430f04caa27c93accb54af80e36ca52480c628ab"},
       "licenses":[{
@@ -634,7 +634,7 @@
       "changes":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737\t: Add subsc-pay suffix domain (#2310)",
       "date":"2025-01-19T12:59:47.292+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"99a3bf14a398110b98dfe94ae08f067e05a94ba3cd1a559d7a205e3a70320602"},
       "licenses":[{
@@ -653,7 +653,7 @@
       "changes":"2025.20.0 fa6eb4dd7e8dc64ad41133ee23c0f43934d0b615\t: set label on PR based on check result (#2353)\r\n2025.21.0 b371b882f7fe81752866dd895d822b199e2b45dd\t: Bump golang.org/x/net from 0.26.0 to 0.33.0 in /tools (#2370)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.26.0 to 0.33.0.\r\n- [Commits](https://github.com/golang/net/compare/v0.26.0...v0.33.0)\r\n\r\n---\r\nupdated-dependencies:\r\n- dependency-name: golang.org/x/net\r\n  dependency-type: direct:production\r\n...\r\n\r\nSigned-off-by: dependabot[bot] <support@github.com>\r\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2025.21.1 47264b57765919188b9f4144de8d95cf77e1b6dc\t: Update `ml` (#2369)",
       "date":"2025-01-22T15:36:52.16+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"6191286505f456f850fef3dbb88474a28cbf11215cd5395b2c425afdbd0efb29"},
       "licenses":[{
@@ -672,7 +672,7 @@
       "changes":"2025.23.0 3bf13d1eddb9298971939d4fa868f94cd3999cb9\t: Revert \"set label on PR based on check result (#2353)\" (#2372)\n\nThis reverts commit fa6eb4dd7e8dc64ad41133ee23c0f43934d0b615.\r\n2025.25.0 2aa65d89a1b96b0065ad5970734200eed5a38713\t: Update ug (#2371)",
       "date":"2025-01-26T19:54:25.974+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"863ec7a5024c788ee7941d24c2437990f6cf1a27cad8c6d8403a388f9957f633"},
       "licenses":[{
@@ -691,7 +691,7 @@
       "changes":"2025.31.0 bcf753f217d791d8f24803430332f2819f20434f\t: Brave Submissions to the Public Suffix List - Q1 2025 (#2375)\r\n2025.31.1 92d3d4cb81b3fce96e4f0918fdd6c6bcf659a9c7\t: Add obj.ag to Public Suffix List (#2374)\r\n2025.31.2 5421ee732b6ad9733220267cd8d3d6b45a63ce05\t: Add localtonet.com and localto.net (#2237)",
       "date":"2025-02-03T10:39:43.270+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"d1f5dad081b29caf27a55141f69917aa882e8b0a9477b49c2b34abe230be0c58"},
       "licenses":[{
@@ -710,7 +710,7 @@
       "changes":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4\t: Add alibabacloudcs.com to Public Suffix List (#2373)",
       "date":"2025-02-06T18:33:18.511+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e242ac2c198cbbf0c0463980db0c544e20ac9a3b9da058ec039daafd1e821b5f"},
       "licenses":[{
@@ -729,7 +729,7 @@
       "changes":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577\t: Add laravel.cloud to Public Suffix List (#2381)",
       "date":"2025-02-10T10:25:40.873+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"813086477e37e6d278a52c2e4d0b4f47ea5fa2e5f05bf944384f9c89a04554d4"},
       "licenses":[{
@@ -748,7 +748,7 @@
       "changes":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8\t: Moved JPRS comment to appropreate position (#2383)",
       "date":"2025-02-11T09:25:35.726+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"5be6a61da1b6cba4f284a2ca7bc8101e9a95edc39211757332c13dc8445b54ab"},
       "licenses":[{
@@ -767,7 +767,7 @@
       "changes":"2025.43.0 560007a8aea8267f15cad9abcdbcff7848186bd8\t: add bubbleapps.io and cdn.bubble.io to public_suffix_list.dat (#2380)",
       "date":"2025-02-14T10:57:39.28+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"943c227b6c9ac0dacc62768c49dbefc787e8f023da0cf39e5ce7a7f0a4e6b096"},
       "licenses":[{
@@ -786,7 +786,7 @@
       "changes":"2025.49.0 445e11a2ebe9ef1ff9c1983ed8e1ff6e5b5cda28\t: Add Lovable to public_suffix_list.dat (#2379)",
       "date":"2025-02-18T10:34:29.278+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"11d3ede9b586a5a89192c3d5fcf998ab06cb5e7cd7af7af2f65963f103a06dd7"},
       "licenses":[{
@@ -805,7 +805,7 @@
       "changes":"2025.52.0 f83c8b19f351e813eda3ace0cc224ad965b79465\t: util: gTLD data autopull updates for 2025-02-21T15:17:09 UTC (#2390)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-02-23T09:08:16.954+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"ab665dd38a881c815f29852352cc06ce485296336cd18cffaed853e1b0752306"},
       "licenses":[{
@@ -824,7 +824,7 @@
       "changes":"2025.55.0 121df0549c95c3ed0f0db06ba8092a320de5d282\t: Add emprende.ve (#2394)\r\n2025.55.1 a9b0226059e71094e4aa36fb8b6e22c4d381c0d3\t: Add *.square.site for Block, Inc. (#2385)\r\n2025.57.0 77d7c4cda6a5dac13d0dca297b37b9ca561fffc4\t: util: gTLD data autopull updates for 2025-02-26T15:18:44 UTC (#2397)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.57.1 6969b4501b728bf9e2719cb20420d7b662a46da1\t: Add *.zerops.app (#2393)\r\n2025.58.0 23f7ef2b96a01338ac761a395aa5d37572850567\t: Add `zone.id` to the list (#2396)",
       "date":"2025-02-28T08:55:08.419+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"68de17319143257c1f56cea88dd4e0b4579f9fb0971096ccd691a894f4b6e5f0"},
       "licenses":[{
@@ -843,7 +843,7 @@
       "changes":"2025.59.0 efd2e6619780eac110988b3b529c4a88fcd64d96\t: Add cpanel.site to private section (#2398)\r\n2025.59.1 9020852e6fadfeb0ea31f73486ede566de9b3093\t: util: gTLD data autopull updates for 2025-02-28T15:17:59 UTC (#2401)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-03-02T09:02:02.772+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"26f54154014a23ef0c6e44c0dea590dbce288393adf0eb23eb3e2f4bdcb99e9d"},
       "licenses":[{
@@ -862,7 +862,7 @@
       "changes":"2025.64.0 b5aa82bff01b7f9ebd61ab118a224ad8ca57bf43\t: add deno.net (#2400)",
       "date":"2025-03-05T12:15:33.720+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"ad06c17a2579b3fce7dc8f52eea533d663ac838c16bd298cc22111769fa0d330"},
       "licenses":[{
@@ -881,7 +881,7 @@
       "changes":"2025.65.0 9146b3759249ffccf979205721ab282c44959fee\t: Add oninferno.net (#2402)\r\n2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7\t: Add deus-canvas.com to PSL (#2405)",
       "date":"2025-03-10T10:24:20.311+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a2c9acebd761842cd27f3213cea7fe606b284ee7d36bc70d6f1f9f6a55f5e78e"},
       "licenses":[{
@@ -900,7 +900,7 @@
       "changes":"2025.70.0 3dc28d7389f45a20dfca36284b84fae9d472c01c\t: Update pro.typeform.com contact (#2404)\r\n2025.71.0 b85018227bf5620427fc719c80fd652d52fd945f\t: Add ai.kr, io.kr, it.kr, me.kr (#2407)\r\n2025.73.0 b47586e8b40785602d1b540e67eef2f297ef794d\t: Update public_suffix_list.dat (#2403)\r\n2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91\t: add inbrowser.link and inbrowser.dev (#2413)",
       "date":"2025-03-14T14:58:32.223+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"5a9dd4a949d891752a814420f039c9819f9f8c42fa3f2e3f0d04e365d45675bb"},
       "licenses":[{
@@ -919,7 +919,7 @@
       "changes":"2025.76.0 7b9b3a0dff84cff9da97d8cab1b67ecc37e6f88d\t: Add devinapps.com (#2412)\r\n2025.76.1 32eb47d07246e98122c64c866ce0a33f09fc49ff\t: Add dpdns.org (#2414)\r\n2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded\t: Remove `router.management` (#2409)",
       "date":"2025-03-19T08:30:17.215+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"67567d9849ba4ff4f3ca65fb54e978ae310f8f9228c2d5c5ef23a2dabcbc7feb"},
       "licenses":[{
@@ -938,7 +938,7 @@
       "changes":"2025.86.0 0041a72f51491848484deece38e976dc3f04caee\t: Add storacha.link and w3s.link (#2417)\r\n2025.87.0 09be8307bc42500a7c65ac92d0263d2ef854b13f\t: feat: add Appwrite domains to the list (#2410)\r\n2025.87.1 b39e35ef3835c5db7aaf311c179fc1f6d92b92d5\t: util: gTLD data autopull updates for 2025-03-28T15:18:17 UTC (#2423)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-03-31T11:16:05.252+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"d3959e27d9273f84db15b7af807702a69a1b7e658ff4cd7cb35ebca0de49460b"},
       "licenses":[{
@@ -957,7 +957,7 @@
       "changes":"2025.97.0 5fc8d12c1624ddbc56a80e944aca151a8ee466a1\t: Add windsurf.app and windsurf.build (#2428)\r\n2025.100.0 2baccee4d0ac700b98c4d9c1fc4a798122bcd083\t: add `figma.site` (#2429)\r\n2025.100.1 1daef550aab77e1a43d67abd7de78cafa1110468\t: Add rules for Amazon Cognito (#2366)\r\n2025.101.0 61dd55b3527e555beb8c3c11a32340ca5280bc0e\t: Add *.devinapps.com (#2435)\r\n2025.101.1 da7559d9e2f8f107b1afab72e8b5246d7d67f83c\t: Add e2b.app (#2431)\r\n2025.101.2 bb94aa66cd4e03f482a94fcd03b1a240fce1393a\t: Add convex.app and convex.site (#2436)\r\n2025.101.3 54ed390e7c41b363942c07a19b8d456d4ca6aa13\t: Add seg.ar to public_suffix_list.dat (#2433)\n\nThis change adds the TLD seg.ar, which is defined in the official domain policy published by NIC Argentina: https://nic.ar/es/nic-argentina/normativa",
       "date":"2025-04-11T11:20:42.856+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"11cd2a45e246e2cfda5e1a5c7fc3c0865c86f43053f3205a5ded8c5409b9dc5f"},
       "licenses":[{
@@ -976,7 +976,7 @@
       "changes":"2025.105.0 b1d38256593253c7b333958910661e16234565cb\t: Update public_suffix_list.dat (#2437)\r\n2025.112.0 a88ef4b56cc81d25d7cd19ef053f186c286aadbc\t: Add val.run (#2432)\r\n2025.112.1 f3023100c9846deecf0460c1cd3df0bb5da5f79f\t: Add objectstorage.ch (#2439)\n\n`(rma|lpg).objectstorage.ch` points to the same object storage instance\nas `objects.(rma|lpg).cloudscale.ch` which is already included in the\nlist.\n\nThese domains serve our public S3 compatible object storage. They are\neither used as `<bucket>.(rma|lpg).objectstorage.ch` or\n`(rma|lpg).objectstorage.ch/<bucket>`.\r\n2025.112.2 6aeba31da00f72ffa035a8f1e4cd1b5c27dfaf01\t: Add `luyani.app` (#2440)",
       "date":"2025-04-22T20:27:03.639+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"050c738e73edd201280ab0aa91c991ec7d9b9e4ae7176ffcb57cbbf5a95d9a77"},
       "licenses":[{
@@ -995,7 +995,7 @@
       "changes":"2025.114.0 f8413ca3628c8c145945664dddd9b2b7f3989f10\t: add `preview.site` (#2445)\r\n2025.114.1 e02a5bfc67e4a67f2af5473fb701dc9e15b57304\t: dev.project-study.com (#2444)\r\n2025.114.2 c322c834229184ff0161394dfeb8a5d16381228f\t: Add mmv.kr / vki.kr (#2442)\r\n2025.114.3 88f6db627f211ec6d0284b1e7bc6e64516f4c56c\t: Bump golang.org/x/net from 0.33.0 to 0.38.0 in /tools (#2438)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.33.0 to 0.38.0.\n- [Commits](https://github.com/golang/net/compare/v0.33.0...v0.38.0)\n\n---\nupdated-dependencies:\n- dependency-name: golang.org/x/net\n  dependency-version: 0.38.0\n  dependency-type: direct:production\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2025.114.4 e881efa87f5703a2e53d4f83e5e53549c002c969\t: Run go mod tidy\r\n2025.114.5 24dd8c3da41bbc8e479bbe5f3eceed8a4dfd35e9\t: fix: autopin dependencies (#2430)\r\n2025.114.6 8605b91ddd176ffa4333adc3a6b4b6eece59f3b5\t: Add lp.dev to public_suffix_list.dat (#2391)",
       "date":"2025-04-24T10:25:12.966+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"4c814db1da1902fafb9067be614a8d700fcd6eadac639e3e9b2187fa45f0cc08"},
       "licenses":[{
@@ -1014,7 +1014,7 @@
       "changes":"2025.115.0 7be9636c95503ce3ad400089d5448db28b0c0596\t: util: gTLD data autopull updates for 2025-04-24T15:19:52 UTC (#2446)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-04-26T20:02:02.542+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"fc57bd230b8a69ca261eb8b9ffeed6d1970fecaf9385d6580a4f8c03b90b3857"},
       "licenses":[{
@@ -1033,7 +1033,7 @@
       "changes":"2025.116.0 b69f49c54e2ec6b0ba318f9c17b5881d6316b274\t: util: gTLD data autopull updates for 2025-04-26T15:16:32 UTC (#2447)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.119.0 e6828b0220ba84deedd48cc3477d2209649ca1ca\t: Adding `onid.ca` (#2452)",
       "date":"2025-04-30T10:18:56.656+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"00875ff96070d089485cb1c563d9df637b87407f0fe9a424a25819734aeaf0d6"},
       "licenses":[{
@@ -1052,7 +1052,7 @@
       "changes":"2025.121.0 acfdc56a9799590c9610e9ccd2b25f5af331e652\t: util: gTLD data autopull updates for 2025-04-30T15:19:32 UTC (#2454)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.122.0 8faa23431a2b9face2e2b54df47a5c75caf58972\t: fix(readme): remove preceding dots (#2456)\r\n2025.122.1 38015c25a1ecd231d411f599248563da3d64289a\t: Add code tags to domains in README",
       "date":"2025-05-05T10:53:27.138+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"fb03aaaebf9e0289f63ec3ce622562b6524c16f74db533bc0185adadb1353e7b"},
       "licenses":[{
@@ -1071,7 +1071,7 @@
       "changes":"2025.128.0 793008262a705eebff7db176a9d562200f31ccdc\t: remove `PSL Sandbox` (#2460)\r\n2025.128.1 5cabd6ba381e5e220bc7b29bc4c4e87ed6c0f107\t: remove `localhostcert.net` (#2464)\r\n2025.128.2 897e8928d9fe4bf733533029c22890a694d37abe\t: merge `Harrison Network` into `William Harrison` (#2463)\r\n2025.128.3 0c4a8de420882c00af48602dd104adcb4150bbca\t: update email contact for is-a.dev (#2465)\r\n2025.128.4 0f514676eb334e07cddb8551ac824a5e95f10985\t: chore: move Appwrite domains (#2467)\n\nMove after the Amazon block and place alphabetically.\n\nCo-authored-by: Steven Nguyen <stnguyen90@users.noreply.github.com>",
       "date":"2025-05-09T10:53:13.873+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"6a8549ec36d1a3ae4ab0dbaf979f02401ca6e13fb1ec4a5785cdabcbf6f1dc95"},
       "licenses":[{
@@ -1090,7 +1090,7 @@
       "changes":"2025.132.0 823beb1425def931c8b0b170a6bc33b424c3f9b0\t: Update public_suffix_list.dat (#2462)",
       "date":"2025-05-12T15:29:19.858+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a7384acc10692ac48d16fd7be5bc693e8f288558f072193b7332e99a3e05780f"},
       "licenses":[{
@@ -1109,7 +1109,7 @@
       "changes":"2025.137.0 d4f072b4db3db5c0bd6b144b54eba1802b763c96\t: util: gTLD data autopull updates for 2025-05-17T15:16:58 UTC (#2480)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-05-19T12:29:43.245+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"1e862f56b53b8932d688e121ca0e537d3ef949df8b13d207c9eee77200f640cd"},
       "licenses":[{
@@ -1128,7 +1128,7 @@
       "changes":"2025.140.0 e3b814bab0fa25acbcf5fea6d2bde42d1f345a40\t: Add biz.gh and net.gh SLD to Public Suffix List (#2455)\n\nCo-authored-by: Bonnie <bonnie@ghana.com>\r\n2025.140.1 71fb417d6c6c2a2b860fd258239d02144d55af2f\t: remove wildcard from `*.my.canvasite.cn` and `*.my.canva.site` (#2477)\r\n2025.140.2 029ca40de5b71cffc3446495335e7d81825ddb6e\t: Actualización de lista de extensiones del dominio ec en orden alfabético (#2420)\r\n2025.141.0 871165a43743f2944cf1065b4e9869a286d333d8\t: removing cloud66.zone as it is redundant now (#2483)\r\n2025.141.1 5e7035ffa191ae2a06340676287c9c1490288145\t: Add github.app to Public Suffix List (#2482)\r\n2025.141.2 28ea3465ed3a67750c5488686a42f259f78aff67\t: Add eliv-cdn.kr (#2479)\r\n2025.141.3 0ca8eaff2edde9ae0251389a5eee0d806f74d199\t: Add encr.app and lp.dev subdomains (#2450)\r\n2025.142.0 76b8e30f1913de596c835ac65b2efe5b5fe9eb43\t: Add iserv.host (#2461)\r\n2025.146.0 89800dc76a00a48f7b8ad0603e8da8548b6ca97a\t: Add icp0.io /  icp1.io / caffeine.site / caffeine.website for Internet Computer domains (#2424)\r\n2025.147.0 f011d9d9fb6e3a625575440a223ee3167125992d\t: add kop.id (#2489)",
       "date":"2025-05-27T14:45:58.160+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"4e33b4a83d591e3c02266df2382cd9fcba68ac7367f623fe7e26bad839b83235"},
       "licenses":[{
@@ -1147,7 +1147,7 @@
       "changes":"2025.147.1 ae6d7152aac42d2ad577f980af6ef4317d5828fe\t: Add schuldock.de (#2492)\r\n2025.148.0 faa2e8d226ac537daab3f45b43bed152ee21a2c4\t: Add Cloudflare Subdomain Notice to README.md (#2497)\r\n2025.148.1 9228b7033159f1490bbc9fe45159a5aeb8da62ad\t: Update public_suffix_list.dat (#2498)",
       "date":"2025-05-30T13:34:00.196+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"14c9a85a59254c2e6b4f33e76c864b00ce0c8ed2b969d8212845472f74502fe5"},
       "licenses":[{
@@ -1166,7 +1166,7 @@
       "changes":"2025.153.0 c792070bab60deb20e497677bf33e4e198433033\t: request to add `tche.br` (#2487)",
       "date":"2025-06-02T14:09:18.188+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"f739e998db8bc1503881b64a2ed5f9a23a7baffc2742bad6dcca46bcb1124dc0"},
       "licenses":[{
@@ -1185,7 +1185,7 @@
       "changes":"2025.155.0 ed70fdfd664cb348e0a6c02f953d100baaf6f2e8\t: Add `vercel.run` to the public suffix list (#2490)\r\n2025.155.1 f50ae882e118b57cb241fd377cff99bfc04f31fa\t: Add https://lutra.ai (#2500)\r\n2025.156.0 71c753e4b9f5beaf5dcf69f7d35eccc265e0c4a0\t: add *.mtls.run.app to public_suffix_list.dat (#2485)\r\n2025.157.0 8c55c0f59577c2939919834f88d43d03db8fcdae\t: TECCM-151074: Add webspace-host.com to PSL (#2504)\r\n2025.159.0 8d4a151ff8b0a401fb03d2fcec16c834cd454523\t: util: gTLD data autopull updates for 2025-06-07T15:17:54 UTC (#2507)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.161.0 9f9c1865c17a23edce0491aa6e697cc987fcdafa\t: Add 4.at, my.at, my.de, *.nxa.eu, nx.gw (#2495)\r\n2025.163.0 a01fe523d7359fc523d8b164bcb16834a4f2d8ba\t: Update Adobe entries with aem.network for Adobe Experience Manager (#2505)\r\n2025.167.0 2141aa8a1f634c2b839175c559ceaac6a849592c\t: Update public_suffix_list.dat (#2508)",
       "date":"2025-06-24T15:18:48.646+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"11fde94684a1334d1f03f65ed80f94d3bef849401ea224de132916c2194f0d09"},
       "licenses":[{
@@ -1204,7 +1204,7 @@
       "changes":"2025.177.0 9ae55199aa39694b19b7791d2e7b0b7592b3bdd7\t: update scaleway subdomains (#2503)",
       "date":"2025-07-03T11:42:20.524+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a70e07b64e1a8bb47958a279dd5bba3cce5f912b0ba0e966ba0465a938dba486"},
       "licenses":[{
@@ -1223,7 +1223,7 @@
       "changes":"2025.186.0 968c2cce548037261cd6b9c41bffc90138ed7e6f\t: Update v.ua in public_suffix_list.dat (#2511)\r\n2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b\t: Add *.oaiusercontent.com to the PSL. (#2516)",
       "date":"2025-07-08T15:54:26.890+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"1dfa2687264b375caef68a533c3c9a32ac3c3b618775a8a721f7dbefd4efd4ba"},
       "licenses":[{
@@ -1242,7 +1242,7 @@
       "changes":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953\t: util: gTLD data autopull updates for 2025-07-09T15:20:49 UTC (#2526)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-07-14T10:19:18.166+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"effcd21e71ff852f959f15172dc5e8b684ace0a853a8da647867bf5fdaf15200"},
       "licenses":[{
@@ -1261,7 +1261,7 @@
       "changes":"2025.197.0 5bf31808ae41eb25ab8e6feba0c0312cdb98c8d9\t: AWS Submissions to the Public Suffix List - Q2 2025 (#2434)\n\n* Add rules for Amazon Cognito\n\n* Add rules for AWS Transfer Family web apps\n\n* Add rules for Amazon Managed Workflows for Apache Airflow\r\n2025.197.1 ec9e649374faeea672d7f599c31d88c0bd3d31e4\t: Add beta.wmcloud.org (#2527)\r\n2025.197.2 f0e36343e894c3094e4a1f6e88d68496c95ab8c3\t: util: gTLD data autopull updates for 2025-07-16T15:22:08 UTC (#2538)\n\nCo-authored-by: GitHub <noreply@github.com>",
       "date":"2025-07-17T14:16:56.657+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"57f3f7a60aaa40325903392df7138a802be7afe5e6930b6c5abdd74319521852"},
       "licenses":[{
@@ -1280,7 +1280,7 @@
       "changes":"2025.199.0 8aeb90f43d76aacad4688524004f1969793ce133\t: Remove *.uberspace.de (#2540)\r\n2025.203.0 66d74ce941749134f5b0c9f0b9ab3393084b0c21\t: Update lovable domains (#2545)\n\n* Update lovable domains\n\n* lovable: correct ordering",
       "date":"2025-07-24T11:58:27.297+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"707c3e53ba145d9c91916ef3756e5cf1525ee6510f08f85d400e8a4441dbcb9b"},
       "licenses":[{
@@ -1299,7 +1299,7 @@
       "changes":"2025.213.0 758d5d610dffb02f3b38e8ee6783cec7def1c150\t: Add co.de to public suffix list (#2539)\n\n* Add co.de to public suffix list\n\n* Add co.de to public suffix list - www. added to website\n\n* Add co.de to public suffix list - business entry alphabetically sorted\n\n* Add missing abuse report for co.de\n\n* Add missing new line at end of file\n\n---------\n\nCo-authored-by: kv2 <sitouni@kv-gmbh.de>\nCo-authored-by: iliasitouni <sitouni1@uni-bremen.de>\r\n2025.220.0 3b58061c659c98e2dfbf7277eec3de30f85adcae\t: Update public_suffix_list.dat (#2517)\r\n2025.220.1 596a44137f4ae9a4e61a3e5008fb42d5fddb7ef2\t: Add hidns.co and hidns.vip (#2525)\n\nAdd hidns.co and hidns.vip\r\n2025.220.2 9375d3415dea4bfcc974248b676bf0f6e6f2daa8\t: Remove caffeine.ai, icp-api.to, id.ai (#2555)\r\n2025.223.0 d3a7d52e6b5204ab2dd2b17db1553cd4cb538b82\t: Add up.railway.app to the PSL (#2552)\r\n2025.223.1 568a834e835595f125e115cda197ab2ee66cc3db\t: Add on-forge.com and on-vapor.com (#2523)",
       "date":"2025-08-12T14:24:25.876+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b530418ea133404c8d56e23f390e886e9bd352680c862d75ab987c7914c1034f"},
       "licenses":[{
@@ -1318,7 +1318,7 @@
       "changes":"2025.224.0 0dc563d009443d96627fae0441ec15fab9b4435d\t: Add erp.dev and web.erp.dev (#2551)\r\n2025.224.1 6a3664b3f552dc784849af7f12d3a248bbae2647\t: Add qualyhqpartner.com and qualyhqportal.com (#2563)\r\n2025.225.0 985e2ddc71651804aaf78809174de0c5ae367dd5\t: Add *.icp.net (#2558)\r\n2025.225.1 2d435aebd8a70c0c77891e48516dc97cd7d28b1f\t: Add zabc.net (#2559)",
       "date":"2025-08-13T11:40:54.425+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"65ee266df5b9f9bdc742ec1ca1514bd68c0cd729ad024319f04af13bf6eaa731"},
       "licenses":[{
@@ -1337,7 +1337,7 @@
       "changes":"2025.226.0 2dbbb64390b7087a66e3d126032ab1a2951f35dc\t: Add gov.cz to Public Suffix List (#2554)\n\nCo-authored-by: thala <tomas.hala@nic.cz>\r\n2025.230.0 93a4746d99fae5dd169ad4e3fa2f0343e6fd2b13\t: Remove glitch.me (#2565)\r\n2025.230.1 f6d9f996b248aa92a6fcf7dd739730220f1cbabd\t: Add Million Software domains: same-app.com and same-preview.com (#2544)",
       "date":"2025-08-18T09:49:35.682+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"3644fd1b381b984e7576b4a5de37a819f1f2dd73e1096e6f4782f2ec00cde1af"},
       "licenses":[{
@@ -1356,7 +1356,7 @@
       "changes":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5\t: add `hrsn.au` & `vps.hrsn.au` (#2566)",
       "date":"2025-08-19T16:08:02.358+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b4d74b21810123f054314a0b36e666bd934dd050918b9abdaea50bc0b758b191"},
       "licenses":[{
@@ -1375,7 +1375,7 @@
       "changes":"2025.231.1 0654b20320910922259c7869606f027e6f7789d1\t: Add sourcecraft.site to the PSL (#2547)\r\n2025.231.2 db0dbe5d4852712c1e6b3bf06a053850c3e114c2\t: util: gTLD data autopull updates for 2025-08-19T15:20:18 UTC (#2567)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.232.0 8c9e8b967e7429b4cb0f2fe75f20c2c4b020402f\t: Update 611.to (#2561)\r\n2025.235.0 2b05f1fef3b52831d70b40a05da2614a031557ea\t: Update public_suffix_list.dat to remove schools.nsw.edu.au (#2556)\n\nRemoved schools.nsw.edu.au at the request of Andrew Zografos (NSW DoE) and Amanda Shay (ESA)\r\n2025.238.0 80eac0eba1e8215052b9b67654955e87d84d6141\t: Add api.br, ia.br, social.br, xyz.br to public section for Brazil (#2575)\r\n2025.238.1 44211b0fbb8b4e09b89a553f5b26c6a02f889c4b\t: Removing lib.de.us from PSL (#2572)\r\n2025.239.0 55b9732118f51fa4f14309b475aff6e0671026b3\t: chore: add realtime and storage to the psl (#2570)\r\n2025.239.1 7c7f76b6aef151082767f2f991bf99a824a654df\t: Add wal.app (#2529)\r\n2025.239.2 519af36326939e3b6c07fbbd30806f67a570b2ba\t: util: gTLD data autopull updates for 2025-08-27T15:19:07 UTC (#2578)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.240.0 4103956c4300902436b03d7da482536e757b3601\t: Add jote.cloud to Jotelulu's Public Suffix List (#2532)",
       "date":"2025-08-31T17:25:19.744+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"aef53a6329193716221ffaf1dca3327ab4b171cbe482932ed3cd4a4193c8591c"},
       "licenses":[{
@@ -1394,7 +1394,7 @@
       "changes":"2025.247.0 e80dbc5e78c74401484ba68b4d319b740c7cbc2c\t: Add hackclub.app (#2579)\r\n2025.247.1 5fcdf448d2e38174a7078b29c3fffd56411bedca\t: Remove \"lib.ms.us\" from PSL (#2581)\r\n2025.247.2 a818607e99f2016e857e7a9b7cd9956aff9b5305\t: Add shop.brendly.ba (#2582)\r\n2025.253.0 27156a8d603a01acf3f387ebdeae16bee9187f56\t: Remove mydrobo.com (#2591)\r\n2025.253.1 c5d0e29d0d1b094ca1173497ff4e46b998d149c1\t: Remove `servers.run` (#2590)",
       "date":"2025-09-11T10:19:20.28+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a949e711d6646ba5d2b8eed10e563722bec20909562054249455837844dd05bf"},
       "licenses":[{
@@ -1413,7 +1413,7 @@
       "changes":"2025.261.0 ed98f40371e7cbdfca40be0375542deb8b0b2b81\t: Add support.site (#2594)\r\n2025.261.1 4a97adbc7f153c31b7d0f62a32bf856f0f1ee6c2\t: Add Jotelulu domains (#2587)\n\nCo-authored-by: Javi <javier.nunez@jotelulu.com>",
       "date":"2025-09-19T10:13:06.411+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"006f4cc7cce3453209ccfb9255122cd5705f28dfaecf837e40f31126cbeaf1d9"},
       "licenses":[{
@@ -1432,7 +1432,7 @@
       "changes":"2025.265.0 08abe791d41986a3841bd981fa5efd5e0b7ff7d3\t: add e.id to public suffix list private domain (#2589)\r\n2025.265.1 fe0ff47a24a5e77fa530703be0a7e378f85e14ac\t: remove airkitapps.com, airkitapps.eu, and airkitapps-au.com (#2571)",
       "date":"2025-09-23T09:04:20.354+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b1b5f219474b63d1fd0825da3c44d9c68b33fea34b560a8a551e0cc623dc2b74"},
       "licenses":[{
@@ -1451,7 +1451,7 @@
       "changes":"2025.266.0 6defc0e19dbbe27dc2a0798256077d0b82d9c455\t: Add Teleport Cloud domain to isolate tenants (#2580)\r\n2025.268.0 c219a208200b713e056ad62d193672e34a539ab9\t: Add xenonconnect.de as public suffix (#2606)",
       "date":"2025-09-25T18:03:12.176+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"7fab3c6ef1597518f751fdecaa5eb16313f64a4952ebfd353bb35c2641ff1d20"},
       "licenses":[{
@@ -1470,7 +1470,7 @@
       "changes":"2025.269.0 106b086f3ea59059096edba38a758c7a7a1f8664\t: Add `canva.run` and `rice-labs.com` to Public Suffix List (#2605)\r\n2025.272.0 ee656422c241bf06086e487a58cd34d5b22efbce\t: Add bolt.host as public suffix (#2608)\r\n2025.272.1 2af0eac8d8a1e954d32ea11991102e8500de4065\t: Add \"leapcell\" (#2609)\r\n2025.272.2 07f088c3601c917bec4a070e439f03944ebb4227\t: Add cloud-ip.cc and abrdns.com (#2586)",
       "date":"2025-09-30T11:07:48.550+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"aeb9d5a7aa947d010b9c519d087aa5672e049dee3862dece0007fba9994020cd"},
       "licenses":[{
@@ -1489,7 +1489,7 @@
       "changes":"2025.274.0 0673151c3d770cbe2bdd0116ca615f24e73d370e\t: util: gTLD data autopull updates for 2025-10-01T15:18:26 UTC (#2614)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.281.0 ee7dec4a99602baaf51879dd8469b6642881a494\t: consolidate my projects into one section (#2616)\r\n2025.286.0 c9eaff77a5670de21bd00afde95ee6a05002f572\t: chore: adds caffeine.xyz to public suffix list (#2615)\r\n2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993\t: Add Canva Code domains. (#2617)",
       "date":"2025-10-13T12:51:24.159+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"55e5f38ba17263b76b44b64c6dfeef6a855d92a06e324ee94e7cd48d6c61ef97"},
       "licenses":[{
@@ -1508,7 +1508,7 @@
       "changes":"2025.286.2 c002d19a8ca969110dd8a3838d972ca293bdc48f\t: Added new Plenit domains by region and remove domains by service (#2621)\n\nCo-authored-by: Javi <javier.nunez@jotelulu.com>\r\n2025.289.0 399792921792cacc483219997697443b49b6976f\t: Add website.one to PSL for hosting independent customer websites as subdomains of website.one. (#2625)\n\nThis domain will in the future be used for hosting independent\nwebsites for customers, where each customer will have a name of the\nform <some-name>.website.one.\r\n2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889\t: Add `needle.run` to Public Suffix List (#2627)",
       "date":"2025-10-24T15:59:26.605+02:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"aed25ede9897201432cc019fa40b4962fcf1bdab34dbb856d8dbd1ad20830292"},
       "licenses":[{
@@ -1527,7 +1527,7 @@
       "changes":"2025.297.1 c280d0b7e29a4c829d37ecedb079cb24abaca222\t: Add bearblog.dev to PRIVATE section (#2620)\r\n2025.298.0 7ca3728d124daa3ee5664fb1667f4ae2fc4c1669\t: util: gTLD data autopull updates for 2025-10-24T15:19:14 UTC (#2630)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nICANN Json removed .dunlop\r\n2025.299.0 30f4f4244cfef423c0150cfab53a5d89bc734f65\t: Update `.bd` in ICANN section (#2623)\n\n* Update public_suffix_list.dat\n\n Update .bd section to enable second-level domain registrations\n\n* Update public_suffix_list.dat\n\nMy previous pull request https://github.com/publicsuffix/list/pull/2623 was failed due to unsorted list. Adding this new request with sorted one and modified _psl TXT.\r\n\r\nOrganization Name:\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nOrganization Website:\r\nhttps://btcl.portal.gov.bd/\r\n\r\nSubmitter:\r\nJoyeeta Sen Rimpee\r\nRegistry Operator, .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nRole-based Contact:\r\ndgm.domain@btcl.gov.bd\r\n\r\nAbuse Contact:\r\nemail: dgm.domain@btcl.gov.bd\r\n\r\nOrganization Overview:\r\nBangladesh Telecommunications Company Limited (BTCL) is the state-owned national telecommunications provider of Bangladesh and the official operator of the country code top-level domain (ccTLD) .bd, delegated by IANA and managed under the authority of the Government of Bangladesh.\r\nBTCL maintains the authoritative DNS infrastructure for .bd and .বাংলা, ensuring operational stability, DNSSEC deployment, and compliance with global Internet governance standards.\r\n\r\nReason for PSL Inclusion\r\n\r\nBTCL has officially enabled second-level domain registrations directly under .bd (e.g., example.bd) in addition to the existing structured third-level domains (e.g., example.com.bd, example.net.bd).\r\n\r\nThis update ensures that modern Internet infrastructure and hosting services\u2014including browsers, certificate authorities, cPanel, Cloudflare, and Let\u2019s Encrypt\u2014correctly recognize second-level .bd domains as registrable and valid.\r\n\r\nThe previous PSL configuration (*.bd) treated all subdomains as public registrable domains, which caused issues with cookie scope, HTTPS certificate validation, and domain recognition across major platforms.\r\nThe updated section below accurately represents the .bd namespace and preserves compatibility with both second-level and structured third-level registrations.\r\n\r\nProposed .bd Section:\r\n\r\n// Bangladesh : https://btcl.gov.bd\r\nbd\r\ncom.bd\r\nnet.bd\r\norg.bd\r\nedu.bd\r\ngov.bd\r\nac.bd\r\nmil.bd\r\ntv.bd\r\nco.bd\r\nai.bd\r\nsch.bd\r\nid.bd\r\nit.bd\r\ninfo.bd\r\n\r\nNumber of users this request is being made to serve:\r\nCurrently serving approximately 50,000 registered domains under .bd, with continuous growth as BTCL introduces direct second-level registration to encourage local digital presence.\r\n\r\nThird-party impact:\r\nThis submission is not intended to circumvent any third-party limits. However, the change will ensure proper functionality for:\r\n\r\nSSL/TLS certificate issuance (Let\u2019s Encrypt, DigiCert)\r\n\r\nHosting providers (cPanel, Plesk, Cloudflare)\r\n\r\nBrowser cookie scope handling (Chrome, Firefox, Safari)\r\n\r\nDuration of registration:\r\nAll listed second-level and third-level zones are registry-controlled and maintained with long-term renewals exceeding 2 years.\r\n\r\nAdditional Acknowledgements\r\n\r\nBTCL confirms:\r\nResponsibility for ongoing maintenance of .bd and its subzones.\r\nOpen communication with PSL maintainers via dgm.domain@btcl.gov.bd.\r\nActive abuse reporting channel publicly listed on btclportal.gov.bd\r\n\r\nSummary\r\n\r\nThis request aligns .bd with other ccTLDs (such as .uk, .in, .jp) that have transitioned to include second-level domain registrations.\r\nIt enhances domain usability, international compatibility, and DNS integrity across Bangladesh\u2019s national domain space.\r\n\r\nSubmitted by:\r\nDeputy General Manager\r\nRegistry Operator \u2013 .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\nEmail: dgm.domain@btcl.gov.bd, joyeetasen06@gmail.com\n\n* Update public_suffix_list.dat\n\nremoved empty line\r\n2025.300.0 b8816d09172f8f9ae8a51b4f8b22b20958291fb1\t: Add directwp.eu (#2600)\r\n2025.300.1 834a6c2e2a17467bb14c1f11c896bbfba9a4dd9e\t: add the ia.ve extension (#2592)\r\n2025.300.2 a20b1aa039dbd307132e61cc9961194cf0175a14\t: Add gitbook.io to the list (#2629)\r\n2025.300.3 95159fc75a06b786e5cc249820b690e494d9f039\t: Add statichost.eu (#2611)\r\n2025.300.4 8515b0cb8b0e2941a37803493c9d68f1c7ceb67e\t: Add reference link to .ve (#2636)\n\nAdded comments and submission information for '.ve' domains.\r\n2025.301.0 edb46e9c5f146e9302eb6f37b0c859b10ca9354c\t: add cloudflare.app to public suffix (#2631)\r\n2025.302.0 8e3b7b7885c7c198a66df3df8c049c066d7c1a6b\t: Add `wasmer.app` to Public Suffix List (#2635)\n\n`wasmer.app` is the eTLD for all apps hosted by Wasmer Edge's\nproduction environment. Each subdomain is its own app.\r\n2025.310.0 8a6908f3823256c5319a38b67ff20e8c1ab2c686\t: add bank.in and fin.in to the public suffix list (#2603)\n\nCo-authored-by: Ambikeshwar Srivastava <sambikeshwar@fortinet.com>\r\n2025.311.0 4a713a8a0606f2c6257aa630c7e1c0cd81306e0c\t: Adding bank.in and fin.in (#2652)\n\nAdded BANK.IN and FIN.IN on 06th of November 2025 by Gaurav Kansal ( GAURAV.KANSAL@NIC.IN)\r\n2025.312.0 9476034f965ca9dcfaf88c337f010e90fdc17795\t: util: gTLD data autopull updates for 2025-11-08T15:16:38 UTC (#2653)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.314.0 66bee43058306ce4ec3fc69b83d32f48ca88c7ce\t: Add Mocha to public suffix list (#2651)\r\n2025.314.1 0fe8347e72fdac046abc658fe9bf0027328fa2b5\t: Update `.no` section (#2648)\n\nRemoved entries for 'bjarkoy.no', 'bjarkøy.no', and 'mosvik.no' from the public suffix list.\r\n2025.314.2 fd029dd331dd5ae0f52495c115b8fece48f65fb4\t: add `figma-gov.site` (#2640)\r\n2025.314.3 27eccb1b6a2e34768f577e915713524e05a51c6e\t: Add Developed Methods LLC to PSL (#2641)\r\n2025.314.4 ac0cca381b7043df7dc4755d9a434ad991302efe\t: Remove Netfy Domains from public suffix list (#2642)\r\n2025.314.5 20d6be8515062d30b385d804c29f5a4f8205be7c\t: add ispmanager.name (#2638)\r\n2025.314.6 9b05e2b87afa0c681fc84688940e871e51d1e3d9\t: Add edu.fj and id.fj to Fiji ccTLD section (#2607)\r\n2025.314.7 c95fd3ae4c0f4ca1e454cbc6a374136f3f5c649a\t: AWS Submissions to the Public Suffix List - Q3 2025 (#2536)\n\n* Add rules for Amazon Relational Database Service\n\n* Add rules for Amazon Managed Workflows for Apache Airflow\n\n* Add rules for AWS Elastic Beanstalk\n\n* Add rules for AWS Lambda Function URLs\r\n2025.315.0 4eb9fbbdea1ba430c5040e7bd6b5ac2748b210be\t: Add tunnelmole.net reverse proxy service (#2646)\r\n2025.315.1 1ecde4048dfda7d3ed99c74b47cf9fccbaa8b985\t: Add de5.net (#2655)\r\n2025.316.0 7fbd910208bc53709cbdb678e136dc40af036190\t: Add co.site (#2633)\r\n2025.318.0 f07e1733675458af3cbd46a4ce3eca90a45680c6\t: Add Umso.co (#2661)\r\n2025.318.1 64ba165cf391818a086139239c8fa223264eebcc\t: Add emergent.cloud and emergent.host (#2662)\r\n2025.321.0 e31cf59c0b3d9de1ecb5001ef329f39b71597749\t: remove `wdh.app` and `hrsn.au` (#2665)\r\n2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48\t: Add prvw.eu (#2658)",
       "date":"2025-11-20T17:19:18.546+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"30b3793949887ef9446800e389075773e997cc5aadac35b7c6d61c5824475571"},
       "licenses":[{
@@ -1546,7 +1546,7 @@
       "changes":"2025.328.0 bf4f2d47e2b6a58eb160df6deba3acb217f7f9a2\t: Add xtooldevice.com (#2613)\r\n2025.328.1 6be64e4d01d9e5dde6afab60154c546e3caecd14\t: add sld ᬩᬮᬶ.id (#2673)\r\n2025.328.2 565e9dc7907cba1b3ae6b6d588120ec54d789806\t: Add grebedoc.dev (#2664)\r\n2025.330.0 d572776986ac2431fe72536339cf23c52d36d9ee\t: Brave Submissions to the Public Suffix List - Q4 2025 (#2668)\r\n2025.330.1 57fe3782c08b97be51672e098c9ccc529538b408\t: Remove `obl.ong` (#2368)\r\n2025.330.2 d74821138fd58ad8caab21d3b91f1a7fa3c09e91\t: Add Microsoft Azure US government cloud service domains (#2660)\n\n* Add US government cloud service domains\r\n2025.330.3 7456e993bf8822a643b3f807234ae2a76f6f6512\t: Add Gadget Software Inc. domains: `gadget.app` and `gadget.host` (#2666)\r\n2025.331.0 d3567de748c61e2de5a3156cc52ef0e0fdc1dc0c\t: Add AgentbaseAI *.auiusercontent.com to public suffix list (#2676)\r\n2025.338.0 f6e59d0fcbf77987d8dff6ba69a7700026a6141b\t: Remove lk3.ru (#1149) (#2682)\r\n2025.338.1 a79ee032efd3a77ed6b107e0be702c4f547d8f29\t: Add new public suffix 'preview.emergentagent.com' (#2681)\r\n2025.338.2 ea600e443a922cd3f1e2f96e1db3f860d0b097ea\t: Add Redpanda Data entries for rdpa.co (#2679)\r\n2025.340.0 24874d0227995dff18964458432da2b987eb4837\t: util: gTLD data autopull updates for 2025-12-06T15:17:26 UTC (#2686)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520\t: Adding co.scot, me.scot, and org.scot (#2683)",
       "date":"2025-12-08T14:51:51.778+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"74c6de09a8f99ec3af903e83f628104ea911979b7d89e1379f63a1a817426cd7"},
       "licenses":[{
@@ -1565,7 +1565,7 @@
       "changes":"2025.350.0 388317f415fdcce0a73433370d7b0ba5f8f3cb36\t: Add sav.case to the Public Suffix List (#2624)\n\nMerging, the sorting and all other aspects of this are fine.\n\n@mukul-sav if you later do a PR to change this to a role account, we're glad to fast-merge it.  Otherwise please request your colleagues to forward your email to your peers in the future should you win the lottery and not continue to work with that company. \n\nPlease say hello and happy holidays to Anthos from Jothan, if you'd be so kind",
       "date":"2025-12-17T10:09:59.550+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"9d78b0c34f7f7643d1d62350db1a04a0c0ab6af772a58ed72b3e9794a085288a"},
       "licenses":[{
@@ -1584,7 +1584,7 @@
       "changes":"2025.351.0 f2d04623b74d787252aa6aa743b7fa498da7a789\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.1 32f4178799a747d18f3a6c99f649edfa0d80e904\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.2 e15afbc8f0a789b28e6ade7b43f3d2e19bdd4860\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.3 3d01fa4aaf7e099837ea9e632fe4e7d2b79b1807\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.4 a82f39e9f9265dc959ee1e58ad55bbeab13bd0d5\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.0 d08780d3147529cb13f07d6eccf38d15a0aedc31\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.1 44bf7aac6858882e64ac20440367fac80486a7ce\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.2 b87eacf9e3f88357d6de5b3627b5060b3a7868e7\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.3 2cd181c0767cfc0990aac74928f366de2849a6f3\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.4 461e4b0fb95f439932707ef36496f5369292b7d8\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.353.0 b07656aaea78f464241f79cbf346c61bc93dde0d\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.353.1 3be833212471408940c0d59e5e59914b3f35f338\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.355.0 59cdd7656e3fd925392c2a24e2a5007d5d6ed6e0\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.355.1 a0814017572883671d2f48e789e2173bb2a1e57d\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.356.0 d3070bf6ac0c27fc1f711f13b3ed21a510c8fe50\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.",
       "date":"2025-12-22T10:47:36.882+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"d75140ec2e9d866d278d224b2838a9ea8ec117e1da6e3963b9a3a8cc97376adf"},
       "licenses":[{
@@ -1603,7 +1603,7 @@
       "changes":"2025.356.1 ff39edc8197bda400b1420b40d40fb5543ad7426\t: Add new public suffix entries for nett.to (#2722)\r\n2025.356.2 0f491e1366180d889b77fb98f51f4b62d1380413\t: Add ae.kg to Public Suffix List (#2711)\r\n2025.362.0 583a1710a5215a1dd9b70001b35577bbdb901391\t: Add gv.uy to public suffix list (#2718)\r\n2025.362.1 1ef6d3bc102c85d12e92be54ec0dad8ee990dd5f\t: Add uk.cc, ec.cc, eu.cc, gu.cc, us.cc to PSL (#2645)",
       "date":"2026-01-05T18:10:01.173+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"25d100199dd39263ee00b2b8a125a6a121905cefc814a7679ed3bbe135748ade"},
       "licenses":[{
@@ -1622,7 +1622,7 @@
       "changes":"2026.7.0 1ae64cea692daa5b6a9aa403631f0397e3433203\t: FIXED #2619 / #2729 (#2732)\n\nRemoved and re-added Hercules entries in the public suffix list.\r\n2026.7.1 53cafd4ef52f8121b892c0f7ccece7f163509eb8\t: Update contact information indevs.in (#2730)\r\n2026.7.2 ea80631703315ae9f16a6d95f38262e2afc4edee\t: Remove perso.sn (#2693)\r\n2026.7.3 5a923762fb9bdf498ec3feda0cbf4075ff3749d8\t: Remove AVStack entries from public_suffix_list.dat (#2688)\n\nRemoved entries related to AVStack Pte. Ltd. from the public suffix list.\r\n2026.7.4 9b4c0b6bcb0fafce75b0040a274bd1a9a3713199\t: Remove TwoDNS entries (#2689)\n\nRemoved entries related to TwoDNS from the public suffix list.\r\n2026.7.5 84ec50da2dfc39528e71ac99740800db687e8c78\t: Remove skygearapp.com (#2691)\r\n2026.7.6 6aad681b718fff8d10285e8e12460ef0aa49ddd2\t: Remove Authentick UG entry (#2692)\r\n2026.7.7 c31f9acf86ab34199f11634fea42b1ff6346f4a6\t: Add deuxfleurs.eu and deuxfleurs.page (#2727)\r\n2026.8.0 2218b3633b8bb5121e127a3f23d8dac809018f77\t: added *.bwcloud-os-instance.de (#2728)\r\n2026.9.0 6b35badef402235289e85f09b29b07c651159b68\t: util: gTLD data autopull updates for 2026-01-08T15:25:34 UTC (#2738) `.TOP` RO change\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.9.1 6e5697a037da7d0a848e269cf9a9429b91817f22\t: Add eliv-api.kr (#2735)",
       "date":"2026-01-09T17:52:29.394+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"23538c19b647afebd949b3dbcac445e9fa8d0c252693742572842a62dcdc952b"},
       "licenses":[{
@@ -1641,7 +1641,7 @@
       "changes":"2026.13.0 3fe97e93dc111b13d36af21dc538f6a24de8c52d\t: Add base44.app and base44-sandbox.com to Wix.com section (#2736)\r\n2026.16.0 944fb53321606f08740f04ef7c386f64df34ff76\t: Add kiloapps.ai, kiloapps.io to PRIVATE section (#2701)",
       "date":"2026-01-19T16:13:18.176+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"8932f171723344c037d0f4a7fe5e4c553880f6f70e3e3e317ea15383c6e3e4e2"},
       "licenses":[{
@@ -1660,7 +1660,7 @@
       "changes":"2026.20.0 d372af084b07ad6f6d26b3d63abeee1738456c09\t: Add spawnbase.app (#2742)",
       "date":"2026-01-22T12:08:48.841+01:00",
       "dependencies":null,
-      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
       "files":null,
       "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"1c49afac15f7e4d9b161be383aaa3f16d3a95af4a28c33fb804145600aace416"},
       "licenses":[{
@@ -1680,7 +1680,7 @@
     "changes":"2026.23.0 f429d72bab7aadaed365fed57afe7bb38906a029\t: Add shiptoday to Public Suffix List (#2753)\r\n2026.23.1 17c84fbc603f0990073b83f5b73e7fed5680da31\t: Add discourse.diy (#2748)\r\n2026.23.2 d090f4ea5c77195d0c82c08cd5c773ea9fb21af6\t: Add `corespeed.app` (#2743)\r\n2026.23.3 2bb8b06cc2e02a81121552f8edccb045f0e3040b\t: Add miren.app and miren.systems (#2749)\r\n2026.25.0 6c40921fc61160568b101aff506d548ba3300ba6\t: AWS Submissions to the Public Suffix List - Q4 2025 (#2656)\r\n2026.29.0 f7f358a9fd6e42b21578dd850e5355e726174e0d\t: Add sol.site (#2746)\r\n2026.29.1 2c58444d6538c6f8d8b8ed7816809938a6ccba2f\t: Add crm.dev subdomains (#2734)\r\n2026.29.2 89871fd9b00edccf2cbbf6d33f3b7f6b2fc99536\t: util: gTLD data autopull updates for 2026-01-29T15:35:05 UTC (#2758)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.29.3 b3b679163072581b2c8afcc8b94c79772fa5c679\t: Add Keenetic KeenDNS domains (#2713)\r\n2026.33.0 0655e33693931345844eb05b97a851d85b9233bd\t: remove 12chars block (#2760)\r\n2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919\t: Add new public suffixes for US Government cloud Azure services (#2700)\n\n* Add new public suffixes for Azure services\n\nAdding usgovtrafficmanager.net and blob.core.usgovcloudapi.net to Public Suffix List\n\n* Add new public suffixes for Azure services",
     "date":"2026-02-03T10:19:59.523+01:00",
     "dependencies":null,
-    "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+    "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
     "files":[
       "",
       ".github",

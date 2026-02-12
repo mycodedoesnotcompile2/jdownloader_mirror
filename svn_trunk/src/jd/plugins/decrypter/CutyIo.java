@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52138 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52289 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,13 +104,17 @@ public class CutyIo extends PluginForDecrypt {
         Form form3 = br.getFormbyProperty("id", "submit-form");
         if (form3 == null) {
             form3 = br.getFormbyActionRegex("(?i).*/go/.*");
+            if (form3 == null) {
+                /* 2026-02-11 */
+                form3 = br.getFormbyProperty("id", "free-submit-form");
+            }
         }
         if (form3 == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
         long passedTimeMillis = 0;
-        if (br.containsHTML("id=\"turnstile-widget\"")) {
+        if (br.containsHTML("id=\"turnstile-widget\"") || CaptchaHelperCrawlerPluginCloudflareTurnstile.containsCloudflareTurnstileClass(form3)) {
             final String tsKey = "0x4AAAAAAABnHbN4cNchLhd_";
             final Browser brc = br.cloneBrowser();
             brc.getPage("https://cdn.cuty.io/js/public/links/last.js?id=f4f3bcae68da87c1b86167fe79d01ae7");
@@ -120,14 +124,14 @@ public class CutyIo extends PluginForDecrypt {
             }
             final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, tsKey).getToken();
             form3.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
-            form3.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
+            // form3.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
             passedTimeMillis = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
         }
-        final boolean skipWaitTime = false;
-        final String waitSecondsStr = br.getRegex("class=\"timer\"[^>]*>(\\d+)</span>").getMatch(0);
+        final boolean skipWaitTime = true;
+        final String waitSecondsStr = br.getRegex("class=\"timer\"[^>]*>(\\d{1,2})</span>").getMatch(0);
         if (waitSecondsStr != null) {
-            logger.info("Skipping wait seconds: " + waitSecondsStr);
             if (skipWaitTime) {
+                logger.info("Skipping wait seconds: " + waitSecondsStr);
             } else {
                 logger.info("Waiting seconds: " + waitSecondsStr);
                 long waitMillis = Long.parseLong(waitSecondsStr) * 1000;
@@ -142,7 +146,32 @@ public class CutyIo extends PluginForDecrypt {
         }
         br.setFollowRedirects(false);
         br.submitForm(form3);
-        final String finallink = br.getRedirectLocation();
+        String finallink = br.getRedirectLocation();
+        if (finallink == null) {
+            /* 2026-02-11: New */
+            Form finalform = br.getFormbyActionRegex(".*/go/.*");
+            if (finalform == null) {
+                finalform = br.getFormbyProperty("id", "submit-form");
+            }
+            if (finalform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final boolean skipWaitTime2 = false;
+            final String waitSecondsStr2 = br.getRegex("class=\"timer\"[^>]*>(\\d{1,2})</span>").getMatch(0);
+            if (waitSecondsStr2 != null) {
+                if (skipWaitTime2) {
+                    logger.info("Skipping wait seconds: " + waitSecondsStr2);
+                } else {
+                    logger.info("Waiting seconds: " + waitSecondsStr2);
+                    long waitMillis = Long.parseLong(waitSecondsStr2) * 1000;
+                    this.sleep(waitMillis, param);
+                }
+            } else {
+                logger.warning("Failed to find wait-time-value before final form");
+            }
+            br.submitForm(finalform);
+            finallink = br.getRedirectLocation();
+        }
         if (finallink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
