@@ -193,6 +193,9 @@ public class DownloadLinkNodeProperties extends AbstractNodeProperties<DownloadL
 
     @Override
     protected void saveHashInfo(HashInfo hashInfo) {
+        if (hashInfo != null && hashInfo.equals(loadHashInfo())) {
+            return;
+        }
         currentLink.setHashInfo(hashInfo);
     }
 

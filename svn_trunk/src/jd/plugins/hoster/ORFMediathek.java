@@ -17,7 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -50,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 51911 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52298 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -227,35 +226,38 @@ public class ORFMediathek extends PluginForHost {
                 link.setFinalFileName(getFormattedVideoFilename(link));
             }
         }
-        if (isSubtitle(link) || isImage(link) || isVideoProgressiveStream(link)) {
-            dllink = link.getStringProperty(PROPERTY_DIRECTURL);
-            if (dllink == null) {
-                /* Invalid item (this should never happen!). */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        if (isHLSPlaylist(link) || isHLSSingleStream(link)) {
+            /* We never check hls links for filesize */
+            return AvailableStatus.TRUE;
+        }
+        if (!isDownload && link.isSizeSet()) {
+            /* Do not check directurl for filesize if filesize has already been set */
+            return AvailableStatus.TRUE;
+        }
+        /* Not a HLS link -> Technically we can get a file size via http headers */
+        dllink = link.getStringProperty(PROPERTY_DIRECTURL);
+        if (dllink == null) {
+            /* Invalid item (this should never happen!). */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        checkUrlForAgeProtection(link, dllink);
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            con = br2.openHeadConnection(dllink);
+            handleConnectionErrors(br2, link, con);
+            this.findAndSetFileHash(link, con);
+            if (con.getCompleteContentLength() > 0) {
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
-            if (!isDownload) {
-                /* Do not check directurl */
-                return AvailableStatus.TRUE;
-            }
-            checkUrlForAgeProtection(link, dllink);
-            URLConnectionAdapter con = null;
+        } finally {
             try {
-                final Browser br2 = br.cloneBrowser();
-                con = br2.openHeadConnection(dllink);
-                handleConnectionErrors(br2, link, con);
-                this.findAndSetFileHash(link, con);
-                if (con.getCompleteContentLength() > 0) {
-                    if (con.isContentDecoded()) {
-                        link.setDownloadSize(con.getCompleteContentLength());
-                    } else {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (final Throwable e) {
-                }
+                con.disconnect();
+            } catch (final Throwable e) {
             }
         }
         return AvailableStatus.TRUE;
@@ -329,7 +331,7 @@ public class ORFMediathek extends PluginForHost {
         /* Hack to force crawler to crawl all items regardless of user configuration. */
         crawler.cfg = null;
         DownloadLink freshItem = null;
-        final ArrayList<DownloadLink> results = crawler.decryptIt(new CryptedLink(sourceurl), null);
+        final List<DownloadLink> results = crawler.decryptIt(new CryptedLink(sourceurl), null);
         link.setProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, System.currentTimeMillis());
         final String thisLinkID = this.getLinkID(link);
         for (final DownloadLink result : results) {
@@ -385,7 +387,7 @@ public class ORFMediathek extends PluginForHost {
             handleConnectionErrors(br, link, dl.getConnection());
             this.findAndSetFileHash(link, dl.getConnection());
             dl.startDownload();
-        } else if ("hls".equals(link.getStringProperty(PROPERTY_DELIVERY)) && dllink.contains("playlist.m3u8")) {
+        } else if (isHLSPlaylist(link)) {
             /* HLS playlist which should contain only one quality (for older items from tvthek.orf.at). */
             checkFFmpeg(link, "Download a HLS Stream");
             br.getPage(dllink);
@@ -396,7 +398,7 @@ public class ORFMediathek extends PluginForHost {
             }
             dl = new HLSDownloader(link, br, best.getDownloadurl());
             dl.startDownload();
-        } else if ("hls".equals(link.getStringProperty(PROPERTY_DELIVERY))) {
+        } else if (isHLSSingleStream(link)) {
             checkFFmpeg(link, "Download a HLS Stream");
             dl = new HLSDownloader(link, br, dllink);
             dl.startDownload();
@@ -426,9 +428,6 @@ public class ORFMediathek extends PluginForHost {
             this.dl = dl;
             dl.setEstimatedDuration(hit.getDuration());
             dl.startDownload();
-        } else if (StringUtils.startsWithCaseInsensitive(dllink, "rtmp")) {
-            /* 2023-11-27: This should never happen */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported protocol rtmp(e)");
         } else {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
@@ -532,6 +531,15 @@ public class ORFMediathek extends PluginForHost {
         }
     }
 
+    private boolean isHLSPlaylist(final DownloadLink link) {
+        final String dllink = link.getStringProperty(PROPERTY_DIRECTURL);
+        return "hls".equals(link.getStringProperty(PROPERTY_DELIVERY)) && StringUtils.containsIgnoreCase(dllink, "playlist.m3u8");
+    }
+
+    private boolean isHLSSingleStream(final DownloadLink link) {
+        return "hls".equals(link.getStringProperty(PROPERTY_DELIVERY));
+    }
+
     protected boolean looksLikeDownloadableContent(final URLConnectionAdapter con, final DownloadLink link) {
         if (super.looksLikeDownloadableContent(con)) {
             return true;
@@ -564,16 +572,8 @@ public class ORFMediathek extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

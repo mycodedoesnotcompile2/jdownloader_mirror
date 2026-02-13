@@ -60,7 +60,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -390,8 +390,6 @@ public class TiktokComCrawler extends PluginForDecrypt {
             }
             result.setProperty(TiktokCom.PROPERTY_ALLOW_HEAD_REQUEST, true);
             result.setProperty(TiktokCom.PROPERTY_AWEME_ITEM_ID, contentID);
-            TiktokCom.setFilename(result);
-            TiktokCom.setDescriptionAndHashtags(result, description);
             if (!StringUtils.isEmpty(username)) {
                 result.setProperty(TiktokCom.PROPERTY_USERNAME, username);
             }
@@ -414,6 +412,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
             if (dateFromHtml != null) {
                 result.setProperty(TiktokCom.PROPERTY_DATE_FROM_WEBSITE, dateFromHtml);
             }
+            TiktokCom.setFilename(result);
+            TiktokCom.setDescriptionAndHashtags(result, description);
             if (packagename == null && (result.getStringProperty(TiktokCom.PROPERTY_TYPE).equals(TiktokCom.TYPE_AUDIO) || result.getStringProperty(TiktokCom.PROPERTY_TYPE).equals(TiktokCom.TYPE_VIDEO))) {
                 final String filename = result.getName();
                 packagename = filename.substring(0, filename.lastIndexOf("."));

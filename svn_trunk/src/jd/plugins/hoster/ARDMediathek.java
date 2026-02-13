@@ -51,8 +51,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 52129 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 52297 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String             dllink                           = null;
     public static final String PROPERTY_CRAWLER_FORCED_FILENAME = "crawler_forced_filename";
@@ -199,7 +201,12 @@ public class ARDMediathek extends PluginForHost {
         }
         final String md5 = getMD5FromEtag(con);
         if (md5 != null) {
-            link.setMD5Hash(md5);
+            /**
+             * not trustworthy as CDN mirror(can't be changed manually) may have a damaged version of the file <br>
+             * Since all items we are downloading with this plugin that have an md5 hash provided are video files, it doesn't matter if they
+             * do not match the given md5 file hash.
+             */
+            link.setHashInfo(HashInfo.newInstanceSafe(md5, TYPE.MD5, false, false));
         }
     }
 

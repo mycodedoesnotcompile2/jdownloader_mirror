@@ -182,6 +182,9 @@ public class CrawledLinkNodeProperties extends AbstractNodeProperties<CrawledLin
 
     @Override
     protected void saveHashInfo(HashInfo hashInfo) {
+        if (hashInfo != null && hashInfo.equals(loadHashInfo())) {
+            return;
+        }
         currentLink.getDownloadLink().setHashInfo(hashInfo);
     }
 

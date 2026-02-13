@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52291 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -146,7 +146,8 @@ public class DatanodesTo extends XFileSharingProBasic {
             }
         }
         if (form != null) {
-            form.put("__dl", "1");
+            /* Add special non-XFS-default key:value pair */
+            form.put("g_captch__a", "1");
         }
         return form;
     }

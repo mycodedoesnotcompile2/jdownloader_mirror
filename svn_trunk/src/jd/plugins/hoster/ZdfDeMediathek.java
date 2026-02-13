@@ -29,18 +29,6 @@ import java.util.Locale;
 import java.util.Scanner;
 import java.util.TimeZone;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
@@ -54,7 +42,21 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 51116 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
+
+@HostPlugin(revision = "$Revision: 52297 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -154,9 +156,13 @@ public class ZdfDeMediathek extends PluginForHost {
                 final URLConnectionAdapter con = basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), null);
                 final String md5 = ARDMediathek.getMD5FromEtag(con);
                 if (md5 != null) {
-                    link.setMD5Hash(md5);
+                    /**
+                     * not trustworthy as CDN mirror(can't be changed manually) may have a damaged version of the file <br>
+                     * Since all items we are downloading with this plugin that have an md5 hash provided are video files, it doesn't matter
+                     * if they do not match the given md5 file hash.
+                     */
+                    link.setHashInfo(HashInfo.newInstanceSafe(md5, TYPE.MD5, false, false));
                 }
-
             }
         }
         return AvailableStatus.TRUE;
@@ -188,8 +194,8 @@ public class ZdfDeMediathek extends PluginForHost {
                 waitMillisUntilVideoIsAvailable = timeUntilLater;
             } else {
                 /**
-                 * This should never happen. Either server time is wrong/offset or user has wrong local OS time. </br> Video should already
-                 * be available -> Wait static wait time
+                 * This should never happen. Either server time is wrong/offset or user has wrong local OS time. </br>
+                 * Video should already be available -> Wait static wait time
                  */
                 waitMillisUntilVideoIsAvailable = 30 * 60 * 1000;
             }

@@ -76,7 +76,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52292 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -205,6 +205,7 @@ public class XHamsterCom extends PluginForHost {
     private final String          PROPERTY_DATE                                             = "date";
     private final String          PROPERTY_TAGS                                             = "tags";
     private final static String   PROPERTY_VIDEOID                                          = "videoid";
+    private final static String   PROPERTY_DEBUG_IS_SET_AS_FAVORITE                         = "debug_is_set_as_favorite";
     private final String          PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN                    = "last_used_free_domain";
     private final String          PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL                        = "premium_login_url";
     /*
@@ -282,13 +283,12 @@ public class XHamsterCom extends PluginForHost {
     private static String getFID(final DownloadLink link) {
         if (link.getPluginPatternMatcher() == null) {
             return null;
+        }
+        final String videoid = link.getStringProperty(PROPERTY_VIDEOID);
+        if (videoid != null) {
+            return videoid;
         } else {
-            final String videoid = link.getStringProperty(PROPERTY_VIDEOID);
-            if (videoid != null) {
-                return videoid;
-            } else {
-                return getFID(link.getPluginPatternMatcher());
-            }
+            return getFID(link.getPluginPatternMatcher());
         }
     }
 
@@ -296,43 +296,59 @@ public class XHamsterCom extends PluginForHost {
         if (url == null) {
             return null;
         }
-        if (url.matches(TYPE_EMBED)) {
-            return new Regex(url, TYPE_EMBED).getMatch(0);
-        } else if (url.matches(TYPE_MOBILE)) {
-            return new Regex(url, "https?://[^/]+/[^/]+/[^/]*?([a-z0-9]+)(/|$|\\?)").getMatch(0);
-        } else if (url.matches(TYPE_MOVIES)) {
-            return new Regex(url, TYPE_MOVIES).getMatch(0);
-        } else if (url.matches(TYPE_MOMENTS)) {
-            return new Regex(url, TYPE_MOMENTS).getMatch(1);
-        } else if (url.matches(TYPE_VIDEOS_3)) {
-            // first we check title-FID
-            return new Regex(url, TYPE_VIDEOS_3).getMatch(1);
-        } else if (url.matches(TYPE_VIDEOS_2)) {
-            // then we check next title-NUMBER FID
-            return new Regex(url, TYPE_VIDEOS_2).getMatch(1);
-        } else if (url.matches(TYPE_VIDEOS)) {
-            // then we check last FID
-            return new Regex(url, TYPE_VIDEOS).getMatch(0);
-        } else {
-            /* This should never happen */
-            return null;
+        String match = null;
+        match = new Regex(url, TYPE_EMBED).getMatch(0);
+        if (match != null) {
+            return match;
         }
+        match = new Regex(url, "https?://[^/]+/[^/]+/[^/]*?([a-z0-9]+)(/|$|\\?)").getMatch(0);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_MOVIES).getMatch(0);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_MOMENTS).getMatch(1);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_VIDEOS_3).getMatch(1);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_VIDEOS_2).getMatch(1);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_VIDEOS).getMatch(0);
+        if (match != null) {
+            return match;
+        }
+        return null;
     }
 
     private static String getUrlTitle(final String url) {
         // order is important, see getFID
-        if (url.matches(TYPE_MOMENTS)) {
-            return new Regex(url, TYPE_MOMENTS).getMatch(0);
-        } else if (url.matches(TYPE_VIDEOS_3)) {
-            return new Regex(url, TYPE_VIDEOS_3).getMatch(0);
-        } else if (url.matches(TYPE_VIDEOS_2)) {
-            return new Regex(url, TYPE_VIDEOS_2).getMatch(0);
-        } else if (url.matches(TYPE_MOVIES)) {
-            return new Regex(url, TYPE_MOVIES).getMatch(1);
-        } else {
-            /* All other linktypes do not contain any title hint --> Return fid */
-            return null;
+        String match = null;
+        match = new Regex(url, TYPE_MOMENTS).getMatch(0);
+        if (match != null) {
+            return match;
         }
+        match = new Regex(url, TYPE_VIDEOS_3).getMatch(0);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_VIDEOS_2).getMatch(0);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_MOVIES).getMatch(1);
+        if (match != null) {
+            return match;
+        }
+        /* All other linktypes do not contain any title hint --> Return null */
+        return null;
     }
 
     private String getFallbackFileTitle(final String url) {
@@ -623,6 +639,61 @@ public class XHamsterCom extends PluginForHost {
             this.basicLinkCheck(brc, request, link, filename, extDefault);
         }
         return AvailableStatus.TRUE;
+    }
+
+    /**
+     * This function can be called at the end of the linkcheck, then every checked video item will be added as favorite for the current
+     * account. <br>
+     * This function is to be used only by developers! <br>
+     * Only call this function if the global browser object is logged in!
+     */
+    private void developer_debug_addVideoToAccountFavorites(final DownloadLink link, final Account account) throws Exception {
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* This should never happen! It will only happen if a developer forgets to remove call after debugging. */
+            logger.warning("This is to be used only by devs!!");
+            return;
+        }
+        if (account == null) {
+            logger.info("Cannot add items to favorites without xhamster account!");
+            return;
+        }
+        if (link.hasProperty(PROPERTY_DEBUG_IS_SET_AS_FAVORITE)) {
+            /* Item has already been set as favorite */
+            return;
+        }
+        /* Developer: Put the id of your personal favorites playlist here */
+        final String uuid = java.util.UUID.randomUUID().toString();
+        final String collection_id = "developerPutYourFavoritesPlaylistIdHere";
+        if (!collection_id.matches("[a-f0-9]{24}")) {
+            /* Developer mistake */
+            throw new IllegalArgumentException("Hardcoded collection_id has invalid format");
+        }
+        String video_id = getFID(link);
+        if (StringUtils.isEmpty(video_id)) {
+            logger.info("video_id is empty");
+            return;
+        }
+        if (!video_id.matches("\\d+")) {
+            /* Try a very lazy way to obtain internal video_id from html code. */
+            video_id = br.getRegex("\"videoId\":(\\d+)").getMatch(0);
+            if (video_id == null) {
+                logger.info("video_id has invalid format -> Cannot set this as favorite, needs to be numbers-only!");
+                return;
+            }
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
+        brc.getHeaders().put("content-type", "text/plain");
+        brc.getHeaders().put("accept", "*/*");
+        brc.postPageRaw("https://xhamster.com/x-api", String.format("[{\"name\":\"favoriteVideosModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":\"%s\",\"modelName\":\"favoriteVideosModel\",\"itemState\":\"changed\",\"collections\":[\"%s\"],\"contentType\":\"videos\",\"contentEntity\":{\"id\":%s}},\"stats\":{\"favoriteSource\":\"thumb\"}}}]", uuid, collection_id, video_id));
+        final List<Object> ressourcelist = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.LIST);
+        final Map<String, Object> extras = (Map<String, Object>) JavaScriptEngineFactory.walkJson(ressourcelist, "{0}/extras");
+        final Boolean result = (Boolean) extras.get("result");
+        if (Boolean.TRUE.equals(result)) {
+            link.setProperty(PROPERTY_DEBUG_IS_SET_AS_FAVORITE, true);
+        } else {
+            logger.warning("Something went wrong -> Item may not have been set as favorite!");
+        }
     }
 
     private boolean isPremiumAccount(final Account account) {

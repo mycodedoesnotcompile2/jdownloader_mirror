@@ -32,6 +32,27 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
+import jd.plugins.hoster.ARDMediathek;
+import jd.plugins.hoster.ZdfDeMediathek;
+import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
+import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -47,26 +68,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.hoster.ARDMediathek;
-import jd.plugins.hoster.ZdfDeMediathek;
-import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
-import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
-
-@DecrypterPlugin(revision = "$Revision: 51886 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -130,7 +132,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         QUALITIES_MAP.put("v15", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() } }));
         /*
          * new String[] { "508k_p9", QUALITY.LOW.name() }
-         *
+         * 
          * new String[] { "808k_p11", QUALITY.HIGH.name() }
          */
         QUALITIES_MAP.put("v17", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() }, new String[] { "6628k_p61", QUALITY.FHD.name() }, new String[] { "6660k_p37", QUALITY.FHD.name() } }));
@@ -1056,8 +1058,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                     final String realQuality = ((String) qualitymap.get("quality")).toLowerCase(Locale.ENGLISH);
                     final ArrayList<Object[]> qualities = new ArrayList<Object[]>();
                     /**
-                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br>
-                     * We want to keep all versions though!
+                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br> We want to keep all
+                     * versions though!
                      */
                     final List<String[]> betterQualities = getBetterQualities(uri);
                     final HashSet<String> optimizedQualityIdentifiers = new HashSet<String>();
@@ -1100,8 +1102,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         final DownloadLink dl = this.createDownloadlinkForHosterplugin(finalDownloadURL);
                         dl.setContentUrl(param.getCryptedUrl());
                         /**
-                         * Usually filesize is only given for the official downloads.</br>
-                         * Only set it here if we haven't touched the original downloadurls!
+                         * Usually filesize is only given for the official downloads.</br> Only set it here if we haven't touched the
+                         * original downloadurls!
                          */
                         if (thisFilesize > 0) {
                             dl.setAvailable(true);
@@ -1116,7 +1118,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                                 }
                                 final String md5 = ARDMediathek.getMD5FromEtag(con);
                                 if (md5 != null) {
-                                    dl.setMD5Hash(md5);
+                                    // not trustworthy as CDN mirror(can't be changed manually) may have a damaged version of the file
+                                    dl.setHashInfo(HashInfo.newInstanceSafe(md5, TYPE.MD5, false, false));
                                 }
                             } else {
                                 dl.setVerifiedFileSize(thisFilesize);
@@ -1521,11 +1524,9 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in zdfmediathek that match the given search term. </br>
-     * This is mostly used as a workaround to find stuff that is hosted on their other website on zdfmediathek instead as zdfmediathek is
-     * providing a fairly stable search function while other websites hosting the same content such as kika.de can be complicated to parse.
-     * </br>
-     * This does not (yet) support pagination!
+     * Searches for videos in zdfmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
+     * hosted on their other website on zdfmediathek instead as zdfmediathek is providing a fairly stable search function while other
+     * websites hosting the same content such as kika.de can be complicated to parse. </br> This does not (yet) support pagination!
      */
     public ArrayList<DownloadLink> crawlZDFMediathekSearchResultsVOD(final String tvChannel, final String searchTerm, final int maxResults, final String externalID) throws Exception {
         if (StringUtils.isEmpty(tvChannel) || StringUtils.isEmpty(searchTerm) || StringUtils.isEmpty(externalID)) {

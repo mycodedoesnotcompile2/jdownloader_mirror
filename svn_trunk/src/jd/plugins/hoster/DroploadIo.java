@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51577 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52294 $", interfaceVersion = 3, names = {}, urls = {})
 public class DroploadIo extends XFileSharingProBasic {
     public DroploadIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class DroploadIo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "dropload.io", "dropload.tv" });
+        ret.add(new String[] { "dropload.io", "dropload.tv", "dropload.pro" });
         return ret;
     }
 
@@ -62,16 +62,17 @@ public class DroploadIo extends XFileSharingProBasic {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL                    = Pattern.compile("/([a-z0-9]{12})$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NORMAL                    = Pattern.compile("/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OFFICIAL_VIDEO_DOWNLOAD   = Pattern.compile("/d/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2 = Pattern.compile("/v/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_EMBED_NEW                 = Pattern.compile("/e/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED_SPECIAL             = Pattern.compile("/g/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_EMBED_OLD                 = Pattern.compile("/embed-([a-z0-9]{12})\\.html", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_NORMAL.pattern() + "|" + PATTERN_OFFICIAL_VIDEO_DOWNLOAD.pattern() + "|" + PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2.pattern() + "|" + PATTERN_EMBED_NEW + "|" + PATTERN_EMBED_NEW + "|" + PATTERN_EMBED_OLD + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_NORMAL.pattern() + "|" + PATTERN_OFFICIAL_VIDEO_DOWNLOAD.pattern() + "|" + PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2.pattern() + "|" + PATTERN_EMBED_NEW + "|" + PATTERN_EMBED_OLD + "|" + PATTERN_EMBED_SPECIAL + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -140,20 +141,17 @@ public class DroploadIo extends XFileSharingProBasic {
         if (url == null) {
             return null;
         }
-        if (new Regex(url, PATTERN_OFFICIAL_VIDEO_DOWNLOAD).patternFind()) {
-            return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
+        URL_TYPE type = super.getURLType(url);
+        if (type != null) {
+            return type;
+        }
+        /* Check for special cases */
+        if (new Regex(url, PATTERN_EMBED_SPECIAL).patternFind()) {
+            return URL_TYPE.EMBED_VIDEO_2;
         } else if (new Regex(url, PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2).patternFind()) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
-        } else if (new Regex(url, PATTERN_EMBED_OLD).patternFind()) {
-            return URL_TYPE.EMBED_VIDEO;
-        } else if (new Regex(url, PATTERN_EMBED_NEW).patternFind()) {
-            return URL_TYPE.EMBED_VIDEO_2;
-        } else if (new Regex(url, PATTERN_NORMAL).patternFind()) {
-            return URL_TYPE.NORMAL;
-        } else {
-            logger.info("Unknown URL_TYPE: " + url);
-            return null;
         }
+        return null;
     }
 
     @Override
@@ -161,6 +159,11 @@ public class DroploadIo extends XFileSharingProBasic {
         if (url == null || type == null) {
             return null;
         }
-        return new Regex(url, "/([a-z0-9]{12})$").getMatch(0);
+        String fuid = super.getFUID(url, type);
+        if (fuid != null) {
+            return fuid;
+        }
+        fuid = new Regex(url, PATTERN_EMBED_SPECIAL).getMatch(0);
+        return fuid;
     }
 }

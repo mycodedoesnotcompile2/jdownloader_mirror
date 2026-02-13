@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 52090 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52292 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -111,7 +111,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         }
         contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
         final boolean isProfileAlbumsOverview = contentURLCleaned.matches("(?i).+/albums/?$");
-        final Pattern pattern_album = Pattern.compile("https?://[^/]+/a/[\\w.]+", Pattern.CASE_INSENSITIVE);
+        final Pattern pattern_album = Pattern.compile("/(album|a)/[\\w.]+", Pattern.CASE_INSENSITIVE);
         /* Always use main domain */
         final String domainInURL = Browser.getHost(contentURLCleaned, true);
         contentURLCleaned = contentURLCleaned.replace(domainInURL, this.getHost());
@@ -224,10 +224,12 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             int numberofNewAlbums = 0;
             for (final String html : htmls) {
                 if (isProfileAlbumsOverview) {
-                    final String url = new Regex(html, pattern_album).getMatch(-1);
+                    String url = new Regex(html, pattern_album).getMatch(-1);
                     if (url == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
+                    /* Convert path to url */
+                    url = br.getURL(url).toExternalForm();
                     if (!dupes.add(url)) {
                         logger.info("Skipping dupe: " + url);
                         continue;
@@ -300,7 +302,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                 logger.info("Stopping because: At least one mandatory pagination param is missing | apiurl=" + apiurl + " | token=" + token + " | seek=" + seek);
                 break pagination;
             }
-            /* Continue to next page */
+            /* Try to continue to next page */
             page++;
             br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");

@@ -22,12 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -54,7 +48,13 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SpankBangCom;
 
-@DecrypterPlugin(revision = "$Revision: 51658 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 2, names = {}, urls = {})
 public class SpankBangComCrawler extends PluginForDecrypt {
     public SpankBangComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -330,7 +330,7 @@ public class SpankBangComCrawler extends PluginForDecrypt {
             }
         }
         if (cfg.getBooleanProperty(SpankBangCom.ALLOW_THUMBNAIL, SpankBangCom.default_ALLOW_THUMBNAIL)) {
-            final String thumbnailURL = br.getRegex("\"thumbnailUrl\"\\s*:\\s*\"(https://[^\"]+)").getMatch(0);
+            final String thumbnailURL = br.getRegex("(?:\"|')(?:thumbnailUrl|cover_image)(?:\"|')\\s*:\\s*(?:\"|')(https://[^\"']+)").getMatch(0);
             if (thumbnailURL != null) {
                 final DownloadLink thumbnail = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnailURL));
                 final String thumbnailExt = Plugin.getFileNameExtensionFromURL(thumbnailURL);

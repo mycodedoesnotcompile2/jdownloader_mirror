@@ -34,6 +34,11 @@ import javax.swing.text.DefaultEditorKit.CopyAction;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.TextAction;
 
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
+import jd.plugins.download.HashInfo;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -67,11 +72,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
-import jd.plugins.download.HashInfo;
-import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperties> extends MigPanel implements ActionListener, GenericConfigEventListener<Boolean> {
     protected final PseudoCombo<BooleanStatus>          autoExtract;
@@ -696,9 +696,12 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
             }
             if (checksum.getParent() != null) {
                 String cs = checksum.getText();
-                HashInfo hashInfo = HashInfo.parse(cs, true, false);
+                HashInfo hashInfo = HashInfo.importFromString(cs);
                 if (hashInfo == null) {
-                    hashInfo = new HashInfo("", HashInfo.TYPE.NONE, true, true);
+                    hashInfo = HashInfo.parse(cs, true, false);
+                    if (hashInfo == null) {
+                        hashInfo = new HashInfo("", HashInfo.TYPE.NONE, true, true);
+                    }
                 }
                 abstractNodes.saveHashInfo(hashInfo);
             }

@@ -115,7 +115,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 52268 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52293 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -998,7 +998,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                     // FIXME: change to 5 before the year 2106
                     long t = 0;
                     for (int i = count - 1; i >= 0; i--) {
-                        t = t * 256 + h[17 + i];
+                        t = t * 256 + (h[17 + i] & 0xff);
                     }
                     return t;
                 }

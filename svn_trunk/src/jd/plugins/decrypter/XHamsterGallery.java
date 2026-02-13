@@ -20,14 +20,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -50,7 +44,12 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 52288 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -299,6 +298,9 @@ public class XHamsterGallery extends PluginForDecrypt {
         }
         final String contenturl = XHamsterCom.getCorrectedURL(param.getCryptedUrl());
         br.getPage(contenturl);
+        if (this.br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName("Favorites - " + favoritesName);
         final ArrayList<DownloadLink> ret = this.crawlPagination(param, fp);
@@ -407,7 +409,7 @@ public class XHamsterGallery extends PluginForDecrypt {
                             urlForOfflineItem = url;
                         } else {
                             /* No URL given but we know how it would look */
-                            urlForOfflineItem = "https://xhamster.com/videos/" + this.toSlug(title) + "-" + video_id;
+                            urlForOfflineItem = "https://xhamster.com/videos/" + OrfAt.toSlug(title) + "-" + video_id;
                         }
                         if (!dupes.add(urlForOfflineItem)) {
                             /* This should never happen */
@@ -520,23 +522,6 @@ public class XHamsterGallery extends PluginForDecrypt {
             logger.info("Looks like some items are missing: " + (maxItems - ret.size()));
         }
         return ret;
-    }
-
-    /* Copy & paste from OrfAt plugin */
-    private String toSlug(final String str) {
-        final String preparedSlug = str.toLowerCase(Locale.ENGLISH).replace("ü", "u").replace("ä", "a").replace("ö", "o");
-        String slug = preparedSlug.replaceAll("[^a-z0-9]", "-");
-        /* Remove double-minus */
-        slug = slug.replaceAll("-{2,}", "-");
-        /* Do not begin with minus */
-        if (slug.startsWith("-")) {
-            slug = slug.substring(1);
-        }
-        /* Do not end with minus */
-        if (slug.endsWith("-")) {
-            slug = slug.substring(0, slug.length() - 1);
-        }
-        return slug;
     }
 
     private ArrayList<DownloadLink> crawlAllShortsOfUserOrCreator(final CryptedLink param) throws IOException, PluginException {

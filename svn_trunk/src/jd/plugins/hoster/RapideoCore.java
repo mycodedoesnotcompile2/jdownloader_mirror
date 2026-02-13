@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50734 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52290 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapideoCore extends PluginForHost {
     public RapideoCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -419,7 +419,7 @@ public abstract class RapideoCore extends PluginForHost {
         if (geoLoginFailure != null) {
             /* 2020-11-02: Login from unusual location -> User has to confirm via URL send by mail and then try again in JD (?!). */
             throw new AccountUnavailableException(geoLoginFailure + "\r\nOnce done, refresh your account in JDownloader.", 5 * 60 * 1000l);
-        } else if (br.containsHTML("<title>\\s*Dostęp zabroniony\\s*</title>")) {
+        } else if (br.containsHTML("<title>\\s*Dostęp zabroniony\\s*</title>") || br.containsHTML("action=\"/unlock/\"")) {
             errorBannedIP(account);
         }
     }
@@ -581,7 +581,7 @@ public abstract class RapideoCore extends PluginForHost {
     }
 
     private final void errorBannedIP(final Account account) throws AccountUnavailableException {
-        throw new AccountUnavailableException("Your IP has been banned", 5 * 60 * 1000l);
+        throw new AccountUnavailableException("Your IP has been banned. Open " + getHost() + " in your browser for more information.", 5 * 60 * 1000l);
     }
 
     private String getDirecturlAPIv1(final DownloadLink link, final Account account) throws Exception {

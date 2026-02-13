@@ -39,12 +39,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 52283 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52290 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
-    private static String agent = null;
-
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -53,12 +50,6 @@ public class RlGalleriesNt extends PluginForDecrypt {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setReadTimeout(3 * 60 * 1000);
-        // br.setCookie(".urlgalleries.net", "popundr", "1");
-        if (agent == null) {
-            agent = UserAgents.stringUserAgent();
-        }
-        br.getHeaders().put("User-Agent", agent);
-        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
         br.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
         br.setFollowRedirects(true);
         return br;
@@ -85,7 +76,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
     }
 
     public static final Pattern PATTERN_GALLERY         = Pattern.compile("/[\\w\\-]+.+");
-    public static final Pattern PATTERN_SINGLE_REDIRECT = Pattern.compile("/d/([0-9]+)/?");
+    public static final Pattern PATTERN_SINGLE_REDIRECT = Pattern.compile("/dl?/([0-9]+)/?");
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
