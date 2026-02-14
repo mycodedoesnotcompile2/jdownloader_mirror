@@ -92,7 +92,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52283 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52299 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2146,14 +2146,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Part of {@link #getFnameViaAbuseLink() getFnameViaAbuseLink} */
     public String regexFilenameAbuse(final Browser br) {
         String filename = null;
-        final String filename_src = br.getRegex("(?i)<b>Filename\\s*:?\\s*<[^\n]+</td>").getMatch(-1);
+        final String filename_src = br.getRegex("<b>Filename\\s*:?\\s*<[^\n]+</td>").getMatch(-1);
         if (filename_src != null) {
             filename = new Regex(filename_src, ">([^>]+)</td>$").getMatch(0);
+            if (filename != null) {
+                return filename;
+            }
         }
-        if (filename == null) {
-            /* 2021-05-12: New XFS style e.g. userupload.net */
-            filename = br.getRegex("(?i)<label>\\s*Filename\\s*</label>\\s*<input[^>]*class=\"form-control form-control-plaintext\"[^>]*value=\"([^\"]+)\"").getMatch(0);
+        /* 2026-02-13: safedock.io */
+        filename = br.getRegex("Filename:\\s*</b>([^<]+)</div>").getMatch(0);
+        if (filename != null) {
+            return filename;
         }
+        /* 2021-05-12: New XFS style e.g. userupload.net */
+        filename = br.getRegex("<label>\\s*Filename\\s*</label>\\s*<input[^>]*class=\"form-control form-control-plaintext\"[^>]*value=\"([^\"]+)\"").getMatch(0);
         return filename;
     }
 
@@ -5698,6 +5704,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             logger.info("Trying to download file via clone workaround");
             getPage(this.getAPIBase() + "/file/clone?key=" + apikey + "&file_code=" + this.getFUIDFromURL(link));
             this.checkErrorsAPI(this.br, link, account);
+            // TODO: Make this use json parser
             fileid_to_download = PluginJSonUtils.getJson(br, "filecode");
             if (StringUtils.isEmpty(fileid_to_download)) {
                 logger.warning("Failed to find new fileid in clone handling");

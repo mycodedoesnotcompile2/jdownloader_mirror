@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 52026 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52301 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -98,36 +98,54 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    public static final Pattern PATTERN_SINGLE_VIDEO           = Pattern.compile("/.*\\?viewkey=([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_EMBED                  = Pattern.compile("/embed/([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_EMBED_PLAYER           = Pattern.compile("/embed_player\\.php\\?id=(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PORNSTAR_VIDEOS_UPLOAD = Pattern.compile("/(pornstar)/([^/]+)/videos/upload", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PORNSTAR_VIDEOS        = Pattern.compile("/(pornstar)/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PORNSTAR_GIFS          = Pattern.compile("/(pornstar)/([^/]+)/gifs(?:/video|/public)?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PORNSTAR_PHOTOS        = Pattern.compile("/(pornstar)/([^/]+)/photos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_MODEL_VIDEOS           = Pattern.compile("/(model)/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_MODEL_GIFS             = Pattern.compile("/(model)/([^/]+)/gifs(?:/video|/public)?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_MODEL_PHOTOS           = Pattern.compile("/(model)/([^/]+)/photos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_VIDEOS            = Pattern.compile("/users/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_VIDEOS_PUBLIC     = Pattern.compile("/users/([^/]+)/videos/public$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_GIFS              = Pattern.compile("/users/([^/]+)/gifs(?:/video|/public|/from_videos)?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_FAVORITES         = Pattern.compile("/users/([^/]+)/videos(?:/favorites)?/?$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_CHANNEL_VIDEOS         = Pattern.compile("/channels/([A-Za-z0-9\\-_]+)(?:/videos)?/?$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PLAYLIST               = Pattern.compile("/playlist/(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SHORTY                 = Pattern.compile("/shorties/([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            String pattern = "https?://(?:www\\.|[a-z]{2}\\.)?" + buildHostsPatternPart(domains) + "/(?:";
-            /* Single video */
-            pattern += ".*\\?viewkey=[a-z0-9]+|";
-            /* Single video embeded */
-            pattern += "embed/[a-z0-9]+|";
-            pattern += "embed_player\\.php\\?id=\\d+|";
-            /* All videos of a pornstar/model */
-            pattern += "(pornstar|model)/[^/]+(/gifs(/video|/public)?|/public|/videos(/premium|/paid|/upload|/public)?|/from_videos|/photos)?.*|";
-            /* All videos of a channel */
-            pattern += "channels/[A-Za-z0-9\\-_]+(?:/videos)?.*|";
-            /* All videos of a user */
-            pattern += "users/[^/]+(?:/gifs(/public|/video|/from_videos)?|/videos(/public)?)?.*|";
-            /* Video playlist */
-            pattern += "playlist/\\d+";
-            pattern += ")";
-            ret.add(pattern);
+            final StringBuilder sb = new StringBuilder();
+            sb.append("https?://(?:www\\.|[a-z]{2}\\.)?" + buildHostsPatternPart(domains));
+            sb.append("/(");
+            sb.append(PATTERN_SINGLE_VIDEO.pattern().substring(1));
+            sb.append("|" + PATTERN_EMBED.pattern().substring(1));
+            sb.append("|" + PATTERN_EMBED_PLAYER.pattern().substring(1));
+            sb.append("|" + PATTERN_SHORTY.pattern().substring(1));
+            sb.append("|" + PATTERN_PORNSTAR_VIDEOS_UPLOAD.pattern().substring(1));
+            sb.append("|" + PATTERN_PORNSTAR_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_PORNSTAR_GIFS.pattern().substring(1));
+            sb.append("|" + PATTERN_PORNSTAR_PHOTOS.pattern().substring(1));
+            sb.append("|" + PATTERN_MODEL_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_MODEL_GIFS.pattern().substring(1));
+            sb.append("|" + PATTERN_MODEL_PHOTOS.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_VIDEOS_PUBLIC.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_GIFS.pattern().substring(1));
+            sb.append("|" + PATTERN_USER_FAVORITES.pattern().substring(1));
+            sb.append("|" + PATTERN_CHANNEL_VIDEOS.pattern().substring(1));
+            sb.append("|" + PATTERN_PLAYLIST.pattern().substring(1));
+            sb.append(")");
+            ret.add(sb.toString());
         }
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_PORNSTAR_VIDEOS_UPLOAD = "(?i)https?://[^/]+/pornstar/([^/]+)/videos/upload.*";
-    private static final String TYPE_PORNSTAR_VIDEOS        = "(?i)https?://[^/]+/pornstar/([^/]+)/videos/?$";
-    private static final String TYPE_MODEL_VIDEOS           = "(?i)https?://[^/]+/model/([^/]+)/videos/?$";
-    private static final String TYPE_USER_FAVORITES         = "(?i)https?://[^/]+/users/([^/]+)/videos(/?|/favorites/?)$";
-    private static final String TYPE_USER_VIDEOS_PUBLIC     = "(?i)https?://[^/]+/users/([^/]+)/videos/public$";
-    private static final String TYPE_CHANNEL_VIDEOS         = "(?i)https?://[^/]+/channels/([^/]+)(/?|/videos/?)$";
-    private PornHubCom          hostplugin                  = null;
+    private PornHubCom hostplugin = null;
 
     private String getCorrectedContentURL(final String url) throws MalformedURLException {
         final String preferredSubdomain = PornHubCom.getPreferredSubdomain(url);
@@ -422,17 +440,17 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             }
         }
         final String galleryname;
-        if (contenturl.matches(TYPE_PORNSTAR_VIDEOS_UPLOAD)) {
+        if (new Regex(contenturl, PATTERN_PORNSTAR_VIDEOS_UPLOAD).patternFind()) {
             galleryname = "Uploads";
-        } else if (contenturl.matches(TYPE_PORNSTAR_VIDEOS)) {
+        } else if (new Regex(contenturl, PATTERN_PORNSTAR_VIDEOS).patternFind()) {
             galleryname = "Upload Videos";
-        } else if (contenturl.matches(TYPE_MODEL_VIDEOS)) {
+        } else if (new Regex(contenturl, PATTERN_MODEL_VIDEOS).patternFind()) {
             galleryname = "Upload Videos";
-        } else if (contenturl.matches(TYPE_USER_FAVORITES)) {
+        } else if (new Regex(contenturl, PATTERN_USER_FAVORITES).patternFind()) {
             galleryname = "Favorites";
-        } else if (contenturl.matches(TYPE_USER_VIDEOS_PUBLIC)) {
+        } else if (new Regex(contenturl, PATTERN_USER_VIDEOS_PUBLIC).patternFind()) {
             galleryname = "Public Videos";
-        } else if (contenturl.matches(TYPE_CHANNEL_VIDEOS)) {
+        } else if (new Regex(contenturl, PATTERN_CHANNEL_VIDEOS).patternFind()) {
             if (!contenturl.endsWith("/videos") && !contenturl.endsWith("/")) {
                 contenturl = contenturl + "/videos";
             }
@@ -847,7 +865,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         }
         final boolean prefer_server_filename = cfg.getBooleanProperty("USE_ORIGINAL_SERVER_FILENAME", false);
         /* Convert embed links to normal links */
-        if (contenturl.matches("(?i).+/embed/[a-z0-9]+")) {
+        if (new Regex(contenturl, PATTERN_EMBED).patternFind()) {
             final String viewkey = PornHubCom.getViewkeyFromURL(contenturl);
             final String newLink = br.getRegex("(https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.(?:com|org)/view_video\\.php\\?viewkey=" + Pattern.quote(viewkey) + ")").getMatch(0);
             if (newLink == null) {
@@ -856,7 +874,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             }
             contenturl = newLink;
             PornHubCom.getPage(br, contenturl);
-        } else if (contenturl.matches("(?i).+/embed_player\\.php\\?id=\\d+")) {
+        } else if (new Regex(contenturl, PATTERN_EMBED_PLAYER).patternFind()) {
             if (br.containsHTML("No htmlCode read") || br.containsHTML("flash/novideo\\.flv")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

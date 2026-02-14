@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 52185 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52301 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -96,8 +96,8 @@ public class PornHubCom extends PluginForHost {
     private static final int                      ACCOUNT_FREE_MAXCHUNKS                             = 0;
     private static final int                      ACCOUNT_FREE_MAXDOWNLOADS                          = 5;
     public static final boolean                   use_download_workarounds                           = true;
-    private static final String                   type_photo                                         = "(?i).+/photo/\\d+";
-    private static final String                   type_gif_webm                                      = "(?i).+/(embed)?gif/\\d+";
+    private static final String                   type_photo                                         = "(?i).+/photo/(\\d+)";
+    private static final String                   type_gif_webm                                      = "(?i).+/(?:embed)?gif/(\\d+)";
     public static final String                    html_privatevideo                                  = "id=\"iconLocked\"";
     public static final String                    html_privateimage                                  = "profile/private-lock\\.png";
     private String                                dlUrl                                              = null;
@@ -1061,13 +1061,17 @@ public class PornHubCom extends PluginForHost {
             site_title = br.getRegex("\"section_title overflow\\-title overflow\\-title\\-width\">([^<>]*?)</h1>").getMatch(0);
             if (site_title == null) {
                 site_title = br.getRegex("<meta property\\s*=\\s*\"og:title\"\\s*content\\s*=\\s*\"(.*?)\"").getMatch(0);
+                if (site_title == null) {
+                    site_title = br.getRegex("\"videoTitle\":\"([^\"]+)").getMatch(0);
+                }
             }
         }
         if (site_title != null) {
             site_title = Encoding.htmlDecode(site_title);
             site_title = site_title.trim();
+            return site_title;
         }
-        return site_title;
+        return null;
     }
 
     @Override
@@ -1693,31 +1697,36 @@ public class PornHubCom extends PluginForHost {
     public static String getViewkeyFromURL(final String url) throws PluginException {
         if (StringUtils.isEmpty(url)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else {
-            final String ret;
-            if (url.matches(type_photo)) {
-                ret = new Regex(url, "photo/([A-Za-z0-9\\-_]+)$").getMatch(0);
-            } else if (url.matches(type_gif_webm)) {
-                ret = new Regex(url, "gif/([A-Za-z0-9\\-_]+)$").getMatch(0);
-            } else if (url.matches("(?i).+/embed/.+")) {
-                ret = new Regex(url, "/embed/([a-z0-9]+)").getMatch(0);
-            } else if (url.matches(".+/video/ph[a-f0-9]+$")) {
-                ret = new Regex(url, "(ph[a-f0-9]+)").getMatch(0);
-            } else if (url.matches(".+/pornhubdecrypted/ph[a-f0-9]+.+")) {
-                ret = new Regex(url, "pornhubdecrypted/(ph[a-f0-9]+)").getMatch(0);
-            } else {
-                ret = new Regex(url, "viewkey=([a-z0-9]+)").getMatch(0);
-            }
-            if (StringUtils.isEmpty(ret) || "null".equals(ret)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                return ret;
-            }
         }
-    }
-
-    private boolean isVideo(final String url) {
-        return url != null && url.contains("viewkey=");
+        String ret = new Regex(url, PornHubComVideoCrawler.PATTERN_SINGLE_VIDEO).getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        ret = new Regex(url, PornHubComVideoCrawler.PATTERN_EMBED).getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        ret = new Regex(url, PornHubComVideoCrawler.PATTERN_SHORTY).getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        ret = new Regex(url, type_photo).getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        ret = new Regex(url, type_gif_webm).getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        ret = new Regex(url, "video/(ph[a-f0-9]+)").getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        ret = new Regex(url, ".+/pornhubdecrypted/(ph[a-f0-9]+).*").getMatch(0);
+        if (!StringUtils.isEmpty(ret)) {
+            return ret;
+        }
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override

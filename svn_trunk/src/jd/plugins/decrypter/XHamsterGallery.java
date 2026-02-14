@@ -23,6 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -44,12 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52300 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -366,6 +366,7 @@ public class XHamsterGallery extends PluginForDecrypt {
                     final Map<String, Object> singlePlaylistComponent = (Map<String, Object>) entries.get("singlePlaylistComponent");
                     final Map<String, Object> pagesCategoryComponent = (Map<String, Object>) entries.get("pagesCategoryComponent");
                     final Map<String, Object> sponsorChannel = (Map<String, Object>) JavaScriptEngineFactory.walkJson(pagesCategoryComponent, "channelLandingInfoProps/sponsorChannel");
+                    final Map<String, Object> channelInfo = (Map<String, Object>) entries.get("channelInfo");
                     if (singlePlaylistComponent != null) {
                         /* Playlist */
                         final Map<String, Object> playlist = (Map<String, Object>) singlePlaylistComponent.get("playlist");
@@ -386,6 +387,12 @@ public class XHamsterGallery extends PluginForDecrypt {
                             maxItems = ((Number) sponsorChannel.get("videoCount")).intValue();
                         }
                         maxItemsPerPage = ((Number) entries.get("perPage")).intValue();
+                    } else if (channelInfo != null) {
+                        /* /creators/ link */
+                        videos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "trendingVideoSectionComponent/videoListProps/videoThumbProps");
+                        maxItemsPerPage = ((Number) entries.get("perPage")).intValue();
+                        final Map<String, Object> creatorInfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "infoComponent/pornstarTop");
+                        maxItems = ((Number) creatorInfo.get("videoCount")).intValue();
                     }
                 } catch (final Exception e) {
                     logger.info("json handling failed with exception");
@@ -450,11 +457,13 @@ public class XHamsterGallery extends PluginForDecrypt {
                     distribute(dl);
                     numberofNewItemsThisPage++;
                 }
+                logger.info("Json handling success: Items this page: " + videos.size());
             }
             /* Crawl links from html (legacy method) */
             final String[] urls = br.getRegex("(/videos/[^<>\"']+)").getColumn(0);
             if (urls != null && urls.length > 0) {
                 for (String url : urls) {
+                    url = br.getURL(url).toExternalForm();
                     if (new Regex(url, ignoreVideo).patternFind()) {
                         continue;
                     } else if (!hostPlugin.canHandle(url)) {
@@ -464,7 +473,6 @@ public class XHamsterGallery extends PluginForDecrypt {
                         /* Skip dupes */
                         continue;
                     }
-                    url = br.getURL(url).toExternalForm();
                     final DownloadLink dl = this.createDownloadlink(url);
                     /* Set temp. name -> Will change once user starts downloading. */
                     final String titleFromURL = url.replaceFirst("/videos/", "").replace("-", " ");
@@ -492,7 +500,7 @@ public class XHamsterGallery extends PluginForDecrypt {
             }
             if (maxItemsPerPage != -1 && effectiveNumberofNewItemsThisPage < maxItemsPerPage) {
                 /* This can happen and is not yet a reason to stop */
-                logger.info("Current page contains less items than a full page | page: " + page + " | Items: " + effectiveNumberofNewItemsThisPage + "/" + maxItemsPerPage);
+                logger.info("Current page contains less items than a full page | page: " + page + " | New items this page: " + effectiveNumberofNewItemsThisPage + "/" + maxItemsPerPage);
             }
             /* Try to continue to next page */
             page++;

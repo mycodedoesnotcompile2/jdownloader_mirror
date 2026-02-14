@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52290 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52299 $", interfaceVersion = 3, names = {}, urls = {})
 public class SafedockIo extends XFileSharingProBasic {
     public SafedockIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -87,6 +88,16 @@ public class SafedockIo extends XFileSharingProBasic {
         } else {
             /* Free(anonymous) and unknown account type */
             return 0;
+        }
+    }
+
+    @Override
+    protected String regExTrafficLeft(final Browser br) {
+        final String traffic = br.getRegex("name=\"premium_traffic_left\"[^>]*>([^<]+)<").getMatch(0);
+        if (traffic != null) {
+            return traffic;
+        } else {
+            return super.regExTrafficLeft(br);
         }
     }
 
