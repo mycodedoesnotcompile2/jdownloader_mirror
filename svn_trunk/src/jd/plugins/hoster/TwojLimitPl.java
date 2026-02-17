@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -29,6 +30,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -36,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51945 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52316 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
 public class TwojLimitPl extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private String                                         Info               = null;
@@ -92,6 +94,9 @@ public class TwojLimitPl extends PluginForHost {
             // Too many login attempts - access has been temporarily blocked
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Access has been temporarily blocked.", 30 * 60 * 1000l);
         }
+        if (br.containsHTML(">\\s*Z powodu zbyt dużej ilości nieprawidłowych logowań dostęp do serwisu został zablokowany\\s*<")) {
+            throw new AccountUnavailableException("Z powodu zbyt dużej ilości nieprawidłowych logowań dostęp do serwisu został zablokowany - IP blocked", TimeUnit.HOURS.toMillis(1));
+        }
     }
 
     /* function returns transfer left */
@@ -108,23 +113,20 @@ public class TwojLimitPl extends PluginForHost {
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         br.setConnectTimeout(60 * 1000);
         br.setReadTimeout(60 * 1000);
-        String hosts;
         login(account);
         final AccountInfo ai = new AccountInfo();
         ai.setTrafficRefill(false);
         ai.setTrafficLeft(getTransferLeft(Info));
         final ArrayList<String> supportedhosts = new ArrayList<String>();
-        hosts = br.getPage("https://www.twojlimit.pl/clipboard.php");
-        if (hosts != null) {
-            String hoster[] = new Regex(hosts, "(.*?)(<br />|$)").getColumn(0);
-            if (hosts != null) {
-                for (String host : hoster) {
-                    if (hosts == null || host.length() == 0) {
-                        continue;
-                    }
-                    supportedhosts.add(host.trim());
-                }
-            }
+        br.getPage("https://www." + getHost() + "/clipboard.php");
+        this.handleErrors(br);
+        final String html = br.getRequest().getHtmlCode();
+        if (html.contains("<html")) {
+            throw new AccountUnavailableException("Invalid API response", 5 * 60 * 1000);
+        }
+        final String hoster[] = new Regex(html, "(.*?)(<br />|$)").getColumn(0);
+        for (final String host : hoster) {
+            supportedhosts.add(host.trim());
         }
         if (expired) {
             ai.setExpired(true);

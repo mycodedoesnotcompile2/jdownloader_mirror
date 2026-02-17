@@ -62,7 +62,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.RedditComCrawler;
 
-@HostPlugin(revision = "$Revision: 52068 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52317 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,26 +164,36 @@ public class RedditCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        final String pluginMatcher = link.getPluginPatternMatcher();
-        if (pluginMatcher == null) {
+        final String contenturl = link.getPluginPatternMatcher();
+        if (contenturl == null) {
             return null;
         }
-        if (pluginMatcher.matches(RedditComCrawler.PATTERN_SELFHOSTED_IMAGE)) {
-            return new Regex(pluginMatcher, RedditComCrawler.PATTERN_SELFHOSTED_IMAGE).getMatch(0);
-        } else if (pluginMatcher.matches(RedditComCrawler.PATTERN_SELFHOSTED_VIDEO)) {
-            return new Regex(pluginMatcher, RedditComCrawler.PATTERN_SELFHOSTED_VIDEO).getMatch(0);
-        } else if (pluginMatcher.matches(PATTERN_TEXT)) {
-            return new Regex(pluginMatcher, PATTERN_TEXT).getMatch(0);
-        } else {
-            /* Unsupported pattern -> This should never happen! */
-            return null;
+        String fid = new Regex(contenturl, RedditComCrawler.PATTERN_SELFHOSTED_IMAGE).getMatch(0);
+        if (fid != null) {
+            return fid;
         }
+        fid = new Regex(contenturl, RedditComCrawler.PATTERN_SELFHOSTED_VIDEO).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(contenturl, PATTERN_TEXT).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        /* Unsupported pattern -> This should never happen! */
+        return null;
     }
 
     @Override
     public String getPluginContentURL(final DownloadLink link) {
-        final String pluginMatcher = link != null ? link.getPluginPatternMatcher() : null;
-        if (pluginMatcher != null && pluginMatcher.matches(RedditComCrawler.PATTERN_SELFHOSTED_VIDEO) && PluginJsonConfig.get(RedditConfig.class).isVideoUseDirecturlAsContentURL()) {
+        if (link == null) {
+            return super.getPluginContentURL(link);
+        }
+        final String url = link.getPluginPatternMatcher();
+        if (url == null) {
+            return super.getPluginContentURL(link);
+        }
+        if (PluginJsonConfig.get(RedditConfig.class).isVideoUseDirecturlAsContentURL() && new Regex(url, RedditComCrawler.PATTERN_SELFHOSTED_VIDEO).patternFind()) {
             final String lastUsedVideoDirecturl = link.getStringProperty(PROPERTY_DIRECTURL_LAST_USED);
             if (lastUsedVideoDirecturl != null) {
                 /* Video has been checked- or fully/partially downloaded before -> Return direct link to stream */

@@ -22,6 +22,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -48,13 +54,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SpankBangCom;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52320 $", interfaceVersion = 2, names = {}, urls = {})
 public class SpankBangComCrawler extends PluginForDecrypt {
     public SpankBangComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -249,7 +249,10 @@ public class SpankBangComCrawler extends PluginForDecrypt {
         }
         final LinkedHashMap<String, String> foundQualities = findQualities(this.br, currenturl);
         if (foundQualities == null || foundQualities.size() == 0 || title == null) {
-            throw new DecrypterException("Decrypter broken for link: " + currenturl);
+            if (SpankBangCom.isAgeVerificationRequired(br)) {
+                throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         title = Encoding.htmlDecode(title).trim();
         final FilePackage fp = FilePackage.getInstance();
@@ -372,10 +375,10 @@ public class SpankBangComCrawler extends PluginForDecrypt {
     }
 
     private String findVideoID(final Browser br) {
-        return br.getRegex("\"embedUrl\"\\s*:\\s*\"https?://[^/]+/([a-z0-9]+)/embed").getMatch(0);
+        return br.getRegex("\"https?://[^/]+/([a-z0-9]+)/embed/?\"").getMatch(0);
     }
 
-    private void checkErrors(final Browser br) throws PluginException {
+    private void checkErrors(final Browser br) throws PluginException, DecrypterRetryException {
         if (isOffline(this.br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -386,8 +389,31 @@ public class SpankBangComCrawler extends PluginForDecrypt {
         final String[] knownQualities = new String[] { "4k", "1080p", "720p", "480p", "320p", "240p" };
         // final String fid = getFid(source_url);
         /* 2021-06-10: API no longer required/available */
-        final boolean useAPI = false;
-        if (useAPI) {
+        /* 2021-06-10 */
+        final String js = br.getRegex("var stream_data = (\\{.*?\\})").getMatch(0);
+        if (js != null) {
+            try {
+                final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(js);
+                for (final String q : knownQualities) {
+                    final Object qO = entries.get(q);
+                    if (qO == null) {
+                        continue;
+                    }
+                    final List<Object> temp = (List<Object>) qO;
+                    if (temp.isEmpty()) {
+                        continue;
+                    }
+                    final String directlink = (String) temp.get(0);
+                    if (StringUtils.isEmpty(directlink)) {
+                        continue;
+                    }
+                    foundQualities.put(q, directlink);
+                }
+            } catch (final Exception ignore) {
+                ignore.printStackTrace();
+            }
+        }
+        if (foundQualities.isEmpty()) {
             final String dataStreamKey = br.getRegex("data-streamkey\\s*=\\s*\"(.*?)\"").getMatch(0);
             if (dataStreamKey == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -447,28 +473,6 @@ public class SpankBangComCrawler extends PluginForDecrypt {
                 }
             }
         } else {
-            /* 2021-06-10 */
-            final String js = br.getRegex("var stream_data = (\\{.*?\\})").getMatch(0);
-            try {
-                final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(js);
-                for (final String q : knownQualities) {
-                    final Object qO = entries.get(q);
-                    if (qO == null) {
-                        continue;
-                    }
-                    final List<Object> temp = (List<Object>) qO;
-                    if (temp.isEmpty()) {
-                        continue;
-                    }
-                    final String directlink = (String) temp.get(0);
-                    if (StringUtils.isEmpty(directlink)) {
-                        continue;
-                    }
-                    foundQualities.put(q, directlink);
-                }
-            } catch (final Exception ignore) {
-                ignore.printStackTrace();
-            }
         }
         return foundQualities;
     }

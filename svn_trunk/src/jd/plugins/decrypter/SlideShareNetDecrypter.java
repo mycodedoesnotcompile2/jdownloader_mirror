@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -34,10 +35,38 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 52238 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:\\w+)\\.)?slideshare\\.net/(slideshow/[a-z0-9\\-]+/\\d+|[a-z0-9\\-_]+/[a-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 52316 $", interfaceVersion = 3, names = {}, urls = {})
 public class SlideShareNetDecrypter extends PluginForDecrypt {
     public SlideShareNetDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "slideshare.net" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:(?:\\w+)\\.)?" + buildHostsPatternPart(domains) + "/(slideshow/[a-z0-9\\-]+/\\d+|(?!category/)[a-z0-9\\-_]+/[a-z0-9\\-_]+)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {

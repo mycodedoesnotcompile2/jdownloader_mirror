@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 52301 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52311 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -98,8 +98,9 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    public static final Pattern PATTERN_SINGLE_VIDEO           = Pattern.compile("/.*\\?viewkey=([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern PATTERN_EMBED                  = Pattern.compile("/embed/([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SINGLE_VIDEO           = Pattern.compile("/.*\\?viewkey=((ph)?[a-f0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SHORTY                 = Pattern.compile("/shorties/([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_EMBED                  = Pattern.compile("/embed/((ph)?[a-f0-9]+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_EMBED_PLAYER           = Pattern.compile("/embed_player\\.php\\?id=(\\d+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PORNSTAR_VIDEOS_UPLOAD = Pattern.compile("/(pornstar)/([^/]+)/videos/upload", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PORNSTAR_VIDEOS        = Pattern.compile("/(pornstar)/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
@@ -114,7 +115,6 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     public static final Pattern PATTERN_USER_FAVORITES         = Pattern.compile("/users/([^/]+)/videos(?:/favorites)?/?$", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_CHANNEL_VIDEOS         = Pattern.compile("/channels/([A-Za-z0-9\\-_]+)(?:/videos)?/?$", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PLAYLIST               = Pattern.compile("/playlist/(\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern PATTERN_SHORTY                 = Pattern.compile("/shorties/([a-f0-9]+)", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();

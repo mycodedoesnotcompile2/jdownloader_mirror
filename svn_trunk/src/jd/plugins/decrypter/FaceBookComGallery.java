@@ -55,7 +55,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FaceBookComVideos;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52312 $", interfaceVersion = 3, names = {}, urls = {})
 public class FaceBookComGallery extends PluginForDecrypt {
     public FaceBookComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -364,47 +364,24 @@ public class FaceBookComGallery extends PluginForDecrypt {
             final List<DownloadLink> results = entry.getValue();
             final Map<String, Object> videoExtraInfoMap = this.findVideoExtraInfoMap(parsedJsons, contentIDOfSingleDesiredVideo);
             final Map<String, Object> videoExtraInfoMap2 = this.findVideoExtraInfoMap2(parsedJsons, contentIDOfSingleDesiredVideo);
+            Map<String, Object> videoExtraInfoMap3 = null;
+            String videoTitle = null;
+            String uploaderName = null;
+            String uploaderNameFromURL = null;
+            String publishDateFormatted = null;
             addExtraInfo1: if (titleHTML != null || videoExtraInfoMap != null) {
-                boolean updatedMetadata = false;
-                String videoTitleFromExtraMap = null;
-                String uploaderNameFromMap = null;
                 if (videoExtraInfoMap != null) {
                     final Map<String, Object> titlemap = (Map<String, Object>) videoExtraInfoMap.get("title");
-                    videoTitleFromExtraMap = (String) titlemap.get("text");
-                    if (videoTitleFromExtraMap != null) {
-                        videoTitleFromExtraMap = videoTitleFromExtraMap.trim();
-                    }
+                    videoTitle = (String) titlemap.get("text");
                     final Map<String, Object> ownermap = (Map<String, Object>) videoExtraInfoMap.get("owner");
                     if (ownermap != null) {
-                        uploaderNameFromMap = (String) ownermap.get("name");
-                        if (uploaderNameFromMap != null) {
-                            uploaderNameFromMap = uploaderNameFromMap.trim();
-                        }
+                        uploaderName = (String) ownermap.get("name");
                     }
-                }
-                for (final DownloadLink result : results) {
-                    final String preFetchedTitle = result.getStringProperty(FaceBookComVideos.PROPERTY_TITLE);
-                    if (preFetchedTitle == null) {
-                        if (!StringUtils.isEmpty(videoTitleFromExtraMap)) {
-                            result.setProperty(FaceBookComVideos.PROPERTY_TITLE, videoTitleFromExtraMap);
-                        } else {
-                            result.setProperty(FaceBookComVideos.PROPERTY_TITLE, titleHTML);
-                        }
-                        updatedMetadata = true;
-                    }
-                    final String preFetchedUploaderName = result.getStringProperty(FaceBookComVideos.PROPERTY_UPLOADER);
-                    if (preFetchedUploaderName == null && !StringUtils.isEmpty(uploaderNameFromMap)) {
-                        result.setProperty(FaceBookComVideos.PROPERTY_UPLOADER, uploaderNameFromMap);
-                        updatedMetadata = true;
-                    }
-                }
-                if (updatedMetadata) {
-                    logger.info("Successfully updated video metadata");
                 }
             }
-            addExtraInfo2: if (true) {
+            addExtraInfo2: {
                 if (videoExtraInfoMap2 == null) {
-                    logger.warning("videoExtraInfoMap2: invalid result");
+                    logger.warning("videoExtraInfoMap2: no result");
                     break addExtraInfo2;
                 }
                 final String trackingJson = (String) videoExtraInfoMap2.get("tracking");
@@ -415,10 +392,56 @@ public class FaceBookComGallery extends PluginForDecrypt {
                         logger.warning("videoExtraInfoMap2: Failed to find publish_time");
                         break addExtraInfo2;
                     }
-                    final String publishDateFormatted = getFormattedPublishTime(publish_time.longValue());
-                    for (final DownloadLink result : results) {
-                        result.setProperty(FaceBookComVideos.PROPERTY_DATE_FORMATTED, publishDateFormatted);
+                    publishDateFormatted = getFormattedPublishTime(publish_time.longValue());
+                }
+            }
+            addExtraInfo3: {
+                if (uploaderName != null && uploaderNameFromURL != null) {
+                    /* No need to look for this extra information. */
+                    break;
+                }
+                videoExtraInfoMap3 = this.findVideoExtraInfoMap3(parsedJsons, contentIDOfSingleDesiredVideo);
+                if (videoExtraInfoMap3 == null) {
+                    logger.warning("videoExtraInfoMap3: no result");
+                    break addExtraInfo3;
+                }
+                final Map<String, Object> video_owner = (Map<String, Object>) videoExtraInfoMap3.get("video_owner");
+                if (uploaderName == null) {
+                    uploaderName = (String) video_owner.get("name");
+                }
+                if (uploaderNameFromURL == null) {
+                    final String url = (String) video_owner.get("url");
+                    if (url != null) {
+                        uploaderNameFromURL = new Regex(url, "https?://[^/]+/([^/]+)$").getMatch(0);
                     }
+                }
+            }
+            if (uploaderName != null) {
+                uploaderName = uploaderName.trim();
+            }
+            if (videoTitle != null) {
+                videoTitle = videoTitle.trim();
+            }
+            /* Set extra information */
+            for (final DownloadLink result : results) {
+                final String preFetchedTitle = result.getStringProperty(FaceBookComVideos.PROPERTY_TITLE);
+                if (preFetchedTitle == null) {
+                    if (!StringUtils.isEmpty(videoTitle)) {
+                        result.setProperty(FaceBookComVideos.PROPERTY_TITLE, videoTitle);
+                    } else {
+                        result.setProperty(FaceBookComVideos.PROPERTY_TITLE, titleHTML);
+                    }
+                }
+                final String preFetchedUploaderName = result.getStringProperty(FaceBookComVideos.PROPERTY_UPLOADER);
+                if (preFetchedUploaderName == null && !StringUtils.isEmpty(uploaderName)) {
+                    result.setProperty(FaceBookComVideos.PROPERTY_UPLOADER, uploaderName);
+                }
+                final String preFetchedUploaderNameFromURL = result.getStringProperty(FaceBookComVideos.PROPERTY_UPLOADER_URL);
+                if (uploaderNameFromURL != null && StringUtils.isEmpty(preFetchedUploaderNameFromURL)) {
+                    result.setProperty(FaceBookComVideos.PROPERTY_UPLOADER_URL, uploaderNameFromURL);
+                }
+                if (publishDateFormatted != null) {
+                    result.setProperty(FaceBookComVideos.PROPERTY_DATE_FORMATTED, publishDateFormatted);
                 }
             }
             if (videoPackages.size() == 1 && titleHTML != null) {
@@ -567,7 +590,11 @@ public class FaceBookComGallery extends PluginForDecrypt {
                     skippedLivestreams++;
                     break isVideo;
                 }
-                final Map<String, Object> video_owner = (Map<String, Object>) map.get("video_owner");
+                Map<String, Object> video_owner = (Map<String, Object>) map.get("video_owner");
+                if (video_owner == null) {
+                    /* 2026-02-16; For reels */
+                    video_owner = (Map<String, Object>) map.get("owner");
+                }
                 final String videoContentURL = (String) map.get("permalink_url");
                 final String thumbnailDirectURL = (String) JavaScriptEngineFactory.walkJson(map, "preferred_thumbnail/image/uri");
                 final DownloadLink video = new DownloadLink(this.hosterplugin, this.getHost(), videoContentURL, true);
@@ -779,6 +806,55 @@ public class FaceBookComGallery extends PluginForDecrypt {
             for (final Object arrayo : array) {
                 if (arrayo instanceof List || arrayo instanceof Map) {
                     final Object res = findVideoExtraInfoMapRecursive2(arrayo, videoid);
+                    if (res != null) {
+                        return res;
+                    }
+                }
+            }
+            return null;
+        } else {
+            return null;
+        }
+    }
+
+    private Map<String, Object> findVideoExtraInfoMap3(final List<Object> parsedJsons, final String videoid) {
+        for (final Object parsedJsonO : parsedJsons) {
+            final Object mapO = findVideoExtraInfoMapRecursive3(parsedJsonO, videoid);
+            if (mapO != null) {
+                return (Map<String, Object>) mapO;
+            }
+        }
+        return null;
+    }
+
+    /* 2026-02-16 */
+    private Object findVideoExtraInfoMapRecursive3(final Object o, final String videoid) {
+        if (videoid == null) {
+            return null;
+        }
+        if (o instanceof Map) {
+            final Map<String, Object> entrymap = (Map<String, Object>) o;
+            final String shareable_url = (String) entrymap.get("shareable_url");
+            final Object video_owner = entrymap.get("video_owner");
+            if (shareable_url != null && shareable_url.contains(videoid) && video_owner != null) {
+                return entrymap;
+            }
+            for (final Map.Entry<String, Object> entry : entrymap.entrySet()) {
+                // final String key = entry.getKey();
+                final Object value = entry.getValue();
+                if (value instanceof List || value instanceof Map) {
+                    final Object ret = findVideoExtraInfoMapRecursive3(value, videoid);
+                    if (ret != null) {
+                        return ret;
+                    }
+                }
+            }
+            return null;
+        } else if (o instanceof List) {
+            final List<Object> array = (List) o;
+            for (final Object arrayo : array) {
+                if (arrayo instanceof List || arrayo instanceof Map) {
+                    final Object res = findVideoExtraInfoMapRecursive3(arrayo, videoid);
                     if (res != null) {
                         return res;
                     }

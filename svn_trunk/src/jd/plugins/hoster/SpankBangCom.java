@@ -37,6 +37,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -46,13 +47,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SpankBangComCrawler;
 
-@HostPlugin(revision = "$Revision: 48480 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52320 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { SpankBangComCrawler.class })
 public class SpankBangCom extends PluginForHost {
     public SpankBangCom(PluginWrapper wrapper) {
         super(wrapper);
         this.setConfigElements();
-        this.enablePremium("https://www.spankbang.com/");
+        this.enablePremium("https://www." + getHost());
     }
 
     @Override
@@ -107,7 +108,6 @@ public class SpankBangCom extends PluginForHost {
     public static final boolean default_ALLOW_4k        = true;
     public static final boolean default_ALLOW_THUMBNAIL = true;
     private String              dllink                  = null;
-    private boolean             server_issues           = false;
     public static final String  PROPERTY_TITLE          = "title";
     public static final String  PROPERTY_UPLOADER       = "uploader";
     public static final String  PROPERTY_QUALITY        = "quality";
@@ -141,39 +141,36 @@ public class SpankBangCom extends PluginForHost {
         if (account != null) {
             this.login(account, false);
         }
-        server_issues = false;
         br.setFollowRedirects(true);
         br.getHeaders().put("Accept-Language", "en-US,en;q=0.5");
         setFilename(link);
         dllink = link.getStringProperty(PROPERTY_DIRECTLINK);
         if (isValidURL(br, link, dllink)) {
             return AvailableStatus.TRUE;
-        } else {
-            final String mainlink = link.getStringProperty(PROPERTY_MAINLINK);
-            final String quality = link.getStringProperty(PROPERTY_QUALITY);
-            if (mainlink == null || quality == null) {
-                /* Missing property - this should not happen! */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            br.getPage(mainlink);
-            if (SpankBangComCrawler.isOffline(this.br)) {
-                /* Main videolink offline --> Offline */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            setFilename(link);
-            /* Main videolink online --> Refresh directlink ... */
-            final LinkedHashMap<String, String> foundQualities = SpankBangComCrawler.findQualities(this.br, mainlink);
-            if (foundQualities != null) {
-                dllink = foundQualities.get(quality);
-            }
-            if (dllink != null) {
-                if (isValidURL(br, link, dllink)) {
-                    link.setProperty(PROPERTY_DIRECTLINK, dllink);
-                    return AvailableStatus.TRUE;
-                } else {
-                    /* Link is still online but our directlink does not work for whatever reason ... */
-                    server_issues = true;
-                }
+        }
+        final String mainlink = link.getStringProperty(PROPERTY_MAINLINK);
+        final String quality = link.getStringProperty(PROPERTY_QUALITY);
+        if (mainlink == null || quality == null) {
+            /* Missing property - this should not happen! */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        br.getPage(mainlink);
+        if (SpankBangComCrawler.isOffline(this.br)) {
+            /* Main videolink offline --> Offline */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        setFilename(link);
+        /* Main videolink online --> Refresh directlink ... */
+        final LinkedHashMap<String, String> foundQualities = SpankBangComCrawler.findQualities(this.br, mainlink);
+        if (foundQualities != null) {
+            dllink = foundQualities.get(quality);
+        }
+        if (dllink != null) {
+            if (isValidURL(br, link, dllink)) {
+                link.setProperty(PROPERTY_DIRECTLINK, dllink);
+                return AvailableStatus.TRUE;
+            } else {
+                dllink = null;
             }
         }
         return AvailableStatus.UNCHECKED;
@@ -229,9 +226,10 @@ public class SpankBangCom extends PluginForHost {
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link, account);
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
-        } else if (dllink == null) {
+        if (dllink == null) {
+            if (isAgeVerificationRequired(br)) {
+                throw new AccountRequiredException("Age verification required");
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (dllink.contains("m3u8")) {
@@ -348,12 +346,16 @@ public class SpankBangCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return false;
+    }
+
+    public static final boolean isAgeVerificationRequired(final Browser br) {
+        return br.containsHTML(">\\s*Your country requires age verification") || br.containsHTML("id=\"av-verification\"");
     }
 
     @Override
@@ -376,15 +378,7 @@ public class SpankBangCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

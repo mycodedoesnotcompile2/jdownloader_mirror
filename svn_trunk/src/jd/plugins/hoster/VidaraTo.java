@@ -28,7 +28,6 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -39,8 +38,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 @HostPlugin(revision = "$Revision: 52320 $", interfaceVersion = 3, names = {}, urls = {})
-public class StreamupWs extends PluginForHost {
-    public StreamupWs(PluginWrapper wrapper) {
+public class VidaraTo extends PluginForHost {
+    public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -58,13 +57,13 @@ public class StreamupWs extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost();
+        return "https://" + getHost() + "/tos";
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamup.ws", "streamup.cc", "strmup.to" });
+        ret.add(new String[] { "vidara.to", "streamix.so", "streamix.so", "stmix.io" });
         return ret;
     }
 
@@ -80,7 +79,7 @@ public class StreamupWs extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:v/)?([A-Za-z0-9]{13})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:e|v)/([A-Za-z0-9]{13})");
         }
         return ret.toArray(new String[0]);
     }
@@ -113,25 +112,22 @@ public class StreamupWs extends PluginForHost {
         return 0;
     }
 
+    private String hls_master = null;
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        final String extDefault = ".mp4";
+        this.hls_master = null;
         final String fid = this.getFID(link);
         this.setBrowserExclusive();
-        /* That referer is not needed for all links but for some */
-        br.getHeaders().put("Referer", "https://" + getHost() + "/v/" + fid);
-        br.getPage("https://" + getHost() + "/" + fid);
+        br.getPage("https://" + getHost() + "/api/stream?filecode=" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getRequest().getHtmlCode().length() <= 100) {
-            /* Blank page = Invalid fileID e.g. /p4y0aJ9mXM666 */
+            /* {"error":"Video not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("<title>([^<]+)</title>").getMatch(0);
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(this.correctOrApplyFileNameExtension(filename, extDefault, null));
-        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        String filename = entries.get("title").toString();
+        link.setName(this.correctOrApplyFileNameExtension(filename, ".mp4", null));
+        this.hls_master = entries.get("streaming_url").toString();
         return AvailableStatus.TRUE;
     }
 
@@ -142,19 +138,10 @@ public class StreamupWs extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        String hlsMaster = br.getRegex("streaming_url:\\s*\"(https?://[^\"]+)").getMatch(0);
-        if (hlsMaster == null) {
-            final Browser brc = br.cloneBrowser();
-            brc.getPage("/ajax/stream?filecode=" + getFID(link));
-            final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            hlsMaster = (String) response.get("streaming_url");
-        }
-        if (StringUtils.isEmpty(hlsMaster)) {
+        if (StringUtils.isEmpty(this.hls_master)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.getHeaders().put("Origin", "https://" + br.getHost(true));
-        br.getHeaders().put("Referer", "https://" + br.getHost(true) + "/");
-        br.getPage(hlsMaster);
+        br.getPage(this.hls_master);
         final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
         if (hlsbest == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
