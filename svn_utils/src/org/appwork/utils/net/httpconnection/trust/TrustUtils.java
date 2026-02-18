@@ -226,4 +226,48 @@ public class TrustUtils {
             throw new CertificateException("Failed to load certificates from PEM url:" + url, e);
         }
     }
+
+    /** Extended Key Usage OID for TLS server authentication (id-kp-serverAuth). */
+    public static final String EKU_SERVER_AUTH         = "1.3.6.1.5.5.7.3.1";
+    /** Key Usage bit index: keyCertSign (CA may sign certs). */
+    public static final int    KEY_USAGE_KEY_CERT_SIGN = 5;
+    /** Key Usage bit index: cRLSign (CA may sign CRLs). */
+    public static final int    KEY_USAGE_CRL_SIGN      = 6;
+
+    /**
+     * Returns true if the certificate is a CA that is acceptable as a trust anchor for verifying SSL server certificates (e.g. in an
+     * HttpClient). Only CA certificates are accepted; end-entity certificates are rejected. Per RFC 5280, a cert is a CA iff Basic
+     * Constraints has cA=true, which in Java is {@code getBasicConstraints() >= 0} (negative means not a CA). If the Extended Key Usage
+     * extension is present, it must contain serverAuth (RFC 5280: when EKU is absent, the cert may be used for any purpose). If a Key Usage
+     * extension is present, keyCertSign and/or cRLSign must be set.
+     *
+     * @param cert
+     *            certificate to check (e.g. from a Windows or JRE root store)
+     * @return true if the cert is a CA usable as trust anchor for SSL server verification
+     */
+    public static boolean isAcceptableCaTrustAnchorForSsl(final X509Certificate cert) {
+        if (cert == null) {
+            return false;
+        }
+        try {
+            // Only CAs: getBasicConstraints() >= 0 means cA=true (RFC 5280); < 0 means end-entity, reject
+            if (cert.getBasicConstraints() < 0) {
+                return false;
+            }
+            final List<String> eku = cert.getExtendedKeyUsage();
+            if (eku != null && !eku.isEmpty() && !eku.contains(EKU_SERVER_AUTH)) {
+                return false;
+            }
+            final boolean[] keyUsage = cert.getKeyUsage();
+            // RFC 5280, 4.2.1.3: if keyUsage extension is absent, the key may be used for any purpose; accept
+            if (keyUsage == null) {
+                return true;
+            }
+            boolean hasKeyCertSign = keyUsage.length > KEY_USAGE_KEY_CERT_SIGN && keyUsage[KEY_USAGE_KEY_CERT_SIGN];
+            boolean hasCrlSign = keyUsage.length > KEY_USAGE_CRL_SIGN && keyUsage[KEY_USAGE_CRL_SIGN];
+            return hasKeyCertSign || hasCrlSign;
+        } catch (final Exception ignored) {
+            return false;
+        }
+    }
 }

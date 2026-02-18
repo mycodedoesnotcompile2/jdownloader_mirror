@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -48,13 +48,15 @@ import org.appwork.utils.net.LimitedInputStream;
  */
 public class AWFCInputStream extends InputStream {
     private final InputStream  is;
-    private LimitedInputStream lis          = null;
-    private MessageDigest      md           = null;
-    private boolean            headerRead   = false;
-    private AWFCEntryOptions   currentEntry = null;
-    private final byte[]       skipBuffer   = new byte[32767];
+    private LimitedInputStream lis                  = null;
+    private MessageDigest      md                   = null;
+    private boolean            headerRead           = false;
+    private AWFCEntryOptions   currentEntry         = null;
+    private final byte[]       skipBuffer           = new byte[32767];
     private AWFCUtils          utils;
-    private int                version      = -1;
+    private int                version              = -1;
+    /** When true, payload is skipped without hash verification (faster content-only reads). */
+    private boolean            skipHashVerification = false;
 
     public AWFCInputStream(final InputStream is) {
         this.is = is;
@@ -100,10 +102,24 @@ public class AWFCInputStream extends InputStream {
         }
     }
 
+    /**
+     * When true, entry payload is skipped without computing/verifying hash (faster when only paths/sizes are needed). Must be set before
+     * reading entries.
+     */
+    public void setSkipHashVerification(final boolean skipHashVerification) {
+        this.skipHashVerification = skipHashVerification;
+    }
+
+    public boolean isSkipHashVerification() {
+        return this.skipHashVerification;
+    }
+
     protected LimitedInputStream getLimitedInputStream(final AWFCEntryOptions entry) throws IOException {
         if (entry != null) {
             final MessageDigest md;
-            if (this.md != null) {
+            if (this.isSkipHashVerification()) {
+                md = null;
+            } else if (this.md != null) {
                 this.md.reset();
                 md = this.md;
             } else {

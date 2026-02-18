@@ -26,7 +26,7 @@ import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49562 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52325 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilangelWickedCom extends EvilangelCore {
     public EvilangelWickedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,14 +67,6 @@ public class EvilangelWickedCom extends EvilangelCore {
     @Override
     protected boolean allowCookieLoginOnly() {
         return true;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

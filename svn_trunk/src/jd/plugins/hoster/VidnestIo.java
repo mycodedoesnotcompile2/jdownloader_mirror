@@ -22,12 +22,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52063 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52324 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidnestIo extends XFileSharingProBasic {
     public VidnestIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -123,5 +124,15 @@ public class VidnestIo extends XFileSharingProBasic {
             return true;
         }
         return super.isOffline(link, br);
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        String filename = new Regex(html, "colspan=2>Download ([^<]+)</th>").getMatch(0);
+        if (filename != null) {
+            fileInfo[0] = filename;
+        }
+        return fileInfo;
     }
 }

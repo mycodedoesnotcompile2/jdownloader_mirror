@@ -66,7 +66,7 @@ import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsCertUtils;
 import org.appwork.utils.os.WindowsCertUtils.CertListEntry;
-import org.appwork.utils.os.WindowsCertUtils.KeyStore;
+import org.appwork.utils.os.WindowsCertUtils.TargetKeyStore;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
@@ -95,17 +95,17 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         try {
             setupProxyServers();
             createTestCertificates();
-            List<CertListEntry> list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, org.appwork.utils.net.httpconnection.tests.SSLTrustProviderTestBase.APP_WORK_AW_TEST_CA, null, null);
+            List<CertListEntry> list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, org.appwork.utils.net.httpconnection.tests.SSLTrustProviderTestBase.APP_WORK_AW_TEST_CA, null, null);
             for (CertListEntry c : list) {
-                removeCertificateWithAutoConfirm(c.thumbprint, KeyStore.CURRENT_USER);
+                removeCertificateWithAutoConfirm(c.thumbprint, TargetKeyStore.CURRENT_USER);
             }
-            boolean isInUserStore = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.KeyStore.CURRENT_USER);
-            boolean isInLocalSystem = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.KeyStore.LOCAL_MACHINE);
+            boolean isInUserStore = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+            boolean isInLocalSystem = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.LOCAL_MACHINE);
             assertFalse(isInLocalSystem);
             if (isInUserStore) {
                 LogV3.info("Removing existing certificate from user store (with auto-confirm)");
-                removeCertificateWithAutoConfirm(caCertificateFingerPrint, WindowsCertUtils.KeyStore.CURRENT_USER);
-                assertFalse(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.KeyStore.CURRENT_USER));
+                removeCertificateWithAutoConfirm(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+                assertFalse(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER));
             }
             // Test various certificate scenarios over all connection variants
             for (final HTTPProxy proxy : getConnectionVariants()) {
@@ -304,8 +304,8 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
                 testProviderWithServer(url, null, true, "Null Provider", proxy);
             }
             LogV3.info("Installing certificate to user store (with auto-confirm)");
-            installCertificateWithAutoConfirm(caCertificate, WindowsCertUtils.KeyStore.CURRENT_USER);
-            assertTrue(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.KeyStore.CURRENT_USER));
+            installCertificateWithAutoConfirm(caCertificate, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+            assertTrue(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER));
             final WindowsTrustProvider windowsProvider = WindowsTrustProvider.getInstance();
             windowsProvider.reload();
             for (final HTTPProxy proxy : getConnectionVariants()) {
@@ -319,8 +319,8 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         } finally {
             server.stop();
             LogV3.info("Removing certificate from user store (with auto-confirm)");
-            removeCertificateWithAutoConfirm(caCertificateFingerPrint, org.appwork.utils.os.WindowsCertUtils.KeyStore.CURRENT_USER);
-            assertFalse(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.KeyStore.CURRENT_USER));
+            removeCertificateWithAutoConfirm(caCertificateFingerPrint, org.appwork.utils.os.WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+            assertFalse(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER));
         }
     }
 
@@ -443,7 +443,7 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
     /**
      * Test-only helper: Installs certificate with auto-confirmation of Windows dialog.
      */
-    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.KeyStore target) throws Exception {
+    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.TargetKeyStore target) throws Exception {
         // Start auto-confirmation in background
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override
@@ -467,7 +467,7 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
     /**
      * Test-only helper: Removes certificate with auto-confirmation of Windows dialog.
      */
-    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.KeyStore target) throws Exception {
+    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.TargetKeyStore target) throws Exception {
         // Start auto-confirmation in background
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override

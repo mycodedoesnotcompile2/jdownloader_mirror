@@ -964,4 +964,20 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             is.close();
         }
     }
+
+    /**
+     * @return
+     */
+    public static File getWorkspace() {
+        File here = Application.getResource("");
+        while (here != null) {
+            if (new File(here, ".metadata").isDirectory() && new File(here, ".metadata/.plugins").isDirectory()) {
+                if (new File(here, "AppWorkUtils/src").isDirectory()) {
+                    return here;
+                }
+            }
+            here = here.getParentFile();
+        }
+        throw new WTFException("Workspace not found. Check if " + Application.getResource("") + " is within the workspace");
+    }
 }

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -101,6 +101,8 @@ public abstract class AbstractLogger implements LogInterface {
             } else if ("debugger".equals(es.getMethodName())) {
                 return true;
             } else if ("breakIf".equals(es.getMethodName())) {
+                return true;
+            } else if ("exceptionToLog".equals(es.getMethodName())) {
                 return true;
             } else if ("TRIGGER_BUILD_ERROR".equals(es.getMethodName())) {
                 return true;

@@ -44,7 +44,7 @@ import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCerti
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsCertUtils;
 import org.appwork.utils.os.WindowsCertUtils.CertListEntry;
-import org.appwork.utils.os.WindowsCertUtils.KeyStore;
+import org.appwork.utils.os.WindowsCertUtils.TargetKeyStore;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
@@ -139,19 +139,19 @@ public class WindowsCertUtilsTest extends AWTest {
      */
     private void cleanupExistingTestCertificates() throws Exception {
         LogV3.info("Cleaning up any existing test certificates...");
-        List<CertListEntry> list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, TEST_CA_NAME, null, null);
+        List<CertListEntry> list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, TEST_CA_NAME, null, null);
         for (CertListEntry c : list) {
             LogV3.info("Removing existing certificate: " + c.thumbprint);
-            removeCertificateWithAutoConfirm(c.thumbprint, KeyStore.CURRENT_USER);
+            removeCertificateWithAutoConfirm(c.thumbprint, TargetKeyStore.CURRENT_USER);
         }
         // Also check by friendly name
-        list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, null, null, TEST_FRIENDLY_NAME);
+        list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, null, null, TEST_FRIENDLY_NAME);
         for (CertListEntry c : list) {
             LogV3.info("Removing existing certificate by friendly name: " + c.thumbprint);
-            removeCertificateWithAutoConfirm(c.thumbprint, KeyStore.CURRENT_USER);
+            removeCertificateWithAutoConfirm(c.thumbprint, TargetKeyStore.CURRENT_USER);
         }
         // Verify cleanup
-        boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
+        boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, TargetKeyStore.CURRENT_USER);
         assertFalse(isInstalled, "Certificate should not be installed before test");
         LogV3.info("Cleanup completed");
     }
@@ -162,12 +162,12 @@ public class WindowsCertUtilsTest extends AWTest {
     private void testInstallCertificate() throws Exception {
         LogV3.info("Test: Installing certificate with friendly name...");
         // Verify certificate is not installed
-        boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
+        boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, TargetKeyStore.CURRENT_USER);
         assertFalse(isInstalled, "Certificate should not be installed before installation");
         // Install certificate with friendly name
-        installCertificateWithAutoConfirm(caCertificate, KeyStore.CURRENT_USER, TEST_FRIENDLY_NAME);
+        installCertificateWithAutoConfirm(caCertificate, TargetKeyStore.CURRENT_USER, TEST_FRIENDLY_NAME);
         // Verify installation
-        isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
+        isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, TargetKeyStore.CURRENT_USER);
         assertTrue(isInstalled, "Certificate should be installed after installation");
         LogV3.info("Certificate installation test passed");
     }
@@ -178,7 +178,7 @@ public class WindowsCertUtilsTest extends AWTest {
     private void testListCertificates() throws Exception {
         LogV3.info("Test: Listing certificates and verifying friendly name...");
         // List by thumbprint
-        List<CertListEntry> list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, TEST_CA_NAME, null, null);
+        List<CertListEntry> list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, TEST_CA_NAME, null, null);
         assertTrue(list.size() > 0, "Should find at least one certificate");
         boolean found = false;
         for (CertListEntry entry : list) {
@@ -191,7 +191,7 @@ public class WindowsCertUtilsTest extends AWTest {
         }
         assertTrue(found, "Should find the installed certificate");
         // List by friendly name
-        list = WindowsCertUtils.listCertificates(KeyStore.CURRENT_USER, null, null, TEST_FRIENDLY_NAME);
+        list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, null, null, TEST_FRIENDLY_NAME);
         assertTrue(list.size() > 0, "Should find certificate by friendly name");
         found = false;
         for (CertListEntry entry : list) {
@@ -210,13 +210,13 @@ public class WindowsCertUtilsTest extends AWTest {
     private void testUninstallCertificate() throws Exception {
         LogV3.info("Test: Uninstalling certificate...");
         // Verify certificate is installed
-        boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
+        boolean isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, TargetKeyStore.CURRENT_USER);
         assertTrue(isInstalled, "Certificate should be installed before uninstallation");
         // Uninstall certificate
-        boolean removed = removeCertificateWithAutoConfirm(caCertificateFingerPrint, KeyStore.CURRENT_USER);
+        boolean removed = removeCertificateWithAutoConfirm(caCertificateFingerPrint, TargetKeyStore.CURRENT_USER);
         assertTrue(removed, "Certificate should be removed");
         // Verify uninstallation
-        isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, KeyStore.CURRENT_USER);
+        isInstalled = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, TargetKeyStore.CURRENT_USER);
         assertFalse(isInstalled, "Certificate should not be installed after uninstallation");
         LogV3.info("Certificate uninstallation test passed");
     }
@@ -300,7 +300,7 @@ public class WindowsCertUtilsTest extends AWTest {
     /**
      * Test-only helper: Installs certificate with auto-confirmation of Windows dialog.
      */
-    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.KeyStore target, final String friendlyName) throws Exception {
+    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.TargetKeyStore target, final String friendlyName) throws Exception {
         // Start auto-confirmation in background
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override
@@ -324,7 +324,7 @@ public class WindowsCertUtilsTest extends AWTest {
     /**
      * Test-only helper: Removes certificate with auto-confirmation of Windows dialog.
      */
-    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.KeyStore target) throws Exception {
+    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.TargetKeyStore target) throws Exception {
         // Start auto-confirmation in background
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override

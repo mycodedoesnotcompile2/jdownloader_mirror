@@ -18,22 +18,18 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
 import org.jdownloader.plugins.components.config.EvilangelCoreConfigEvilangel;
 
 import jd.PluginWrapper;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49562 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52325 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilAngelCom extends EvilangelCore {
     public EvilAngelCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(this.getPremiumRegisterLink());
     }
-
-    private static final String URL_MOVIE = "https?://members\\.[^/]+/[a-z]{2}/video/(?:[A-Za-z0-9\\-_]+/)?([A-Za-z0-9\\-_]+)/(\\d+)";
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -52,33 +48,12 @@ public class EvilAngelCom extends EvilangelCore {
     }
 
     public static String[] getAnnotationUrls() {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://members\\." + buildHostsPatternPart(domains) + "/[a-z]{2}/video/(?:[A-Za-z0-9\\-_]+/)?([A-Za-z0-9\\-_]+)/(\\d+)");
-        }
-        return ret.toArray(new String[0]);
-    }
-
-    @Override
-    protected String getURLTitle(final DownloadLink link) {
-        if (link.getPluginPatternMatcher().matches(URL_MOVIE)) {
-            return new Regex(link.getPluginPatternMatcher(), URL_MOVIE).getMatch(0);
-        } else {
-            return super.getURLTitle(link);
-        }
+        return EvilangelCore.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     protected boolean allowCookieLoginOnly() {
         return true;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

@@ -34,25 +34,34 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.os;
 
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.TreeSet;
 
-import org.appwork.jna.windows.interfaces.Crypt32Ext;
+import org.appwork.utils.Hash;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.formatter.HexFormatter;
 
 import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
 import com.sun.jna.WString;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinCrypt;
+import com.sun.jna.platform.win32.WinCrypt.CERT_CONTEXT;
+import com.sun.jna.platform.win32.WinCrypt.DATA_BLOB;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
 
@@ -62,7 +71,7 @@ import com.sun.jna.ptr.IntByReference;
  *
  */
 public class WindowsCertUtils {
-    public enum KeyStore {
+    public enum TargetKeyStore {
         CURRENT_USER,
         /* requires admin */
         LOCAL_MACHINE
@@ -71,12 +80,12 @@ public class WindowsCertUtils {
     static byte[] getCertSha1Thumbprint(final Pointer certContext) {
         final IntByReference size = new IntByReference(0);
         // First call to get required size
-        final boolean okSize = Crypt32Ext.INSTANCE.CertGetCertificateContextProperty(certContext, Crypt32Ext.CERT_SHA1_HASH_PROP_ID, null, size);
+        final boolean okSize = WindowsCertUtilsCrypt.INSTANCE.CertGetCertificateContextProperty(certContext, WindowsCertUtilsCrypt.CERT_SHA1_HASH_PROP_ID, null, size);
         if (!okSize || size.getValue() <= 0) {
             return null;
         }
         final byte[] buf = new byte[size.getValue()];
-        final boolean okData = Crypt32Ext.INSTANCE.CertGetCertificateContextProperty(certContext, Crypt32Ext.CERT_SHA1_HASH_PROP_ID, buf, size);
+        final boolean okData = WindowsCertUtilsCrypt.INSTANCE.CertGetCertificateContextProperty(certContext, WindowsCertUtilsCrypt.CERT_SHA1_HASH_PROP_ID, buf, size);
         if (!okData) {
             return null;
         }
@@ -130,22 +139,22 @@ public class WindowsCertUtils {
      * @throws Win32Exception
      *             if the store cannot be opened
      */
-    static HANDLE openStore(final WindowsCertUtils.KeyStore target, final boolean readOnly) {
+    static HANDLE openStore(final WindowsCertUtils.TargetKeyStore target, final boolean readOnly) {
         // Select physical registry location (HKCU or HKLM)
-        final int locationFlag = (target == WindowsCertUtils.KeyStore.LOCAL_MACHINE) ? WinCrypt.CERT_SYSTEM_STORE_LOCAL_MACHINE : WinCrypt.CERT_SYSTEM_STORE_CURRENT_USER;
-        int flags = locationFlag | WinCrypt.CERT_STORE_OPEN_EXISTING_FLAG;
+        final int locationFlag = (target == WindowsCertUtils.TargetKeyStore.LOCAL_MACHINE) ? WindowsCertUtilsCrypt.CERT_SYSTEM_STORE_LOCAL_MACHINE : WindowsCertUtilsCrypt.CERT_SYSTEM_STORE_CURRENT_USER;
+        int flags = locationFlag | WindowsCertUtilsCrypt.CERT_STORE_OPEN_EXISTING_FLAG;
         if (readOnly) {
-            flags |= WinCrypt.CERT_STORE_READONLY_FLAG;
+            flags |= WindowsCertUtilsCrypt.CERT_STORE_READONLY_FLAG;
         }
         // CERT_STORE_PROV_SYSTEM_REGISTRY opens a physical store only
-        final HANDLE store = Crypt32Ext.INSTANCE.CertOpenStore(WinCrypt.CERT_STORE_PROV_SYSTEM_REGISTRY, 0, null, flags, new WString("Root"));
+        final HANDLE store = WindowsCertUtilsCrypt.INSTANCE.CertOpenStore(WindowsCertUtilsCrypt.CERT_STORE_PROV_SYSTEM_REGISTRY, 0, null, flags, new WString("Root"));
         if (store == null || Pointer.nativeValue(store.getPointer()) == 0) {
             throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
         }
         return store;
     }
 
-    public static boolean isCertificateInstalled(final String thumbprintHex, final WindowsCertUtils.KeyStore target) {
+    public static boolean isCertificateInstalled(final String thumbprintHex, final WindowsCertUtils.TargetKeyStore target) {
         final byte[] wanted = parseThumbprintHex(thumbprintHex);
         if (wanted == null || wanted.length == 0) {
             return false;
@@ -154,7 +163,7 @@ public class WindowsCertUtils {
         Pointer ctx = null;
         try {
             while (true) {
-                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
                 if (ctx == null || Pointer.nativeValue(ctx) == 0) {
                     break;
                 }
@@ -166,9 +175,9 @@ public class WindowsCertUtils {
             return false;
         } finally {
             if (ctx != null && Pointer.nativeValue(ctx) != 0) {
-                Crypt32Ext.INSTANCE.CertFreeCertificateContext(ctx);
+                WindowsCertUtilsCrypt.INSTANCE.CertFreeCertificateContext(ctx);
             }
-            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
         }
     }
 
@@ -178,7 +187,7 @@ public class WindowsCertUtils {
      * @throws Exception
      *             if Windows store open/add fails.
      */
-    public static void installCertificate(final X509Certificate certificate, final WindowsCertUtils.KeyStore target, final String friendlyName) throws Exception {
+    public static void installCertificate(final X509Certificate certificate, final WindowsCertUtils.TargetKeyStore target, final String friendlyName) throws Exception {
         if (certificate == null) {
             return;
         }
@@ -187,7 +196,7 @@ public class WindowsCertUtils {
         final com.sun.jna.ptr.PointerByReference pAdded = new com.sun.jna.ptr.PointerByReference();
         Pointer addedCtx = null;
         try {
-            final boolean ok = Crypt32Ext.INSTANCE.CertAddEncodedCertificateToStore(store, WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, der, der.length, Crypt32Ext.CERT_STORE_ADD_ALWAYS, pAdded);
+            final boolean ok = WindowsCertUtilsCrypt.INSTANCE.CertAddEncodedCertificateToStore(store, WindowsCertUtilsCrypt.X509_ASN_ENCODING | WindowsCertUtilsCrypt.PKCS_7_ASN_ENCODING, der, der.length, WindowsCertUtilsCrypt.CERT_STORE_ADD_ALWAYS, pAdded);
             if (!ok) {
                 throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
             }
@@ -199,9 +208,9 @@ public class WindowsCertUtils {
                 try {
                     // CERT_FRIENDLY_NAME_PROP_ID expects pvData to point to a CRYPT_DATA_BLOB (cbData + pbData), not raw string
                     final byte[] utf16le = (friendlyName + "\0").getBytes(StandardCharsets.UTF_16LE);
-                    final WinCrypt.DATA_BLOB blob = new WinCrypt.DATA_BLOB(utf16le);
+                    final DATA_BLOB blob = new WinCrypt.DATA_BLOB(utf16le);
                     blob.write();
-                    final boolean okProp = Crypt32Ext.INSTANCE.CertSetCertificateContextProperty(addedCtx, Crypt32Ext.CERT_FRIENDLY_NAME_PROP_ID, 0, blob.getPointer());
+                    final boolean okProp = WindowsCertUtilsCrypt.INSTANCE.CertSetCertificateContextProperty(addedCtx, WindowsCertUtilsCrypt.CERT_FRIENDLY_NAME_PROP_ID, 0, blob.getPointer());
                     if (!okProp) {
                         LogV3.warning("Failed to set friendly name: " + Kernel32.INSTANCE.GetLastError());
                     }
@@ -212,37 +221,37 @@ public class WindowsCertUtils {
         } finally {
             // CertAdd... returned a context we must free
             if (addedCtx != null && Pointer.nativeValue(addedCtx) != 0) {
-                Crypt32Ext.INSTANCE.CertFreeCertificateContext(addedCtx);
+                WindowsCertUtilsCrypt.INSTANCE.CertFreeCertificateContext(addedCtx);
             }
-            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
         }
     }
 
     static String getName(final Pointer certContext, final boolean issuer) {
-        final int flags = issuer ? Crypt32Ext.CERT_NAME_ISSUER_FLAG : 0;
-        final int type = Crypt32Ext.CERT_NAME_SIMPLE_DISPLAY_TYPE; // "CN ..." style
-        final int len = Crypt32Ext.INSTANCE.CertGetNameStringW(certContext, type, flags, null, null, 0);
+        final int flags = issuer ? WindowsCertUtilsCrypt.CERT_NAME_ISSUER_FLAG : 0;
+        final int type = WindowsCertUtilsCrypt.CERT_NAME_SIMPLE_DISPLAY_TYPE; // "CN ..." style
+        final int len = WindowsCertUtilsCrypt.INSTANCE.CertGetNameStringW(certContext, type, flags, null, null, 0);
         if (len <= 1) {
             return "";
         }
         final char[] buf = new char[len];
-        Crypt32Ext.INSTANCE.CertGetNameStringW(certContext, type, flags, null, buf, buf.length);
+        WindowsCertUtilsCrypt.INSTANCE.CertGetNameStringW(certContext, type, flags, null, buf, buf.length);
         final String s = new String(buf);
         final int nul = s.indexOf('\0');
         return (nul >= 0) ? s.substring(0, nul) : s;
     }
 
-    public static int removeCertificatesByIssuedToOrBy(final KeyStore target, final String issuedToContains, final String issuedByContains) {
+    public static int removeCertificatesByIssuedToOrBy(final TargetKeyStore target, final String issuedToContains, final String issuedByContains) {
         final HANDLE store = openStore(target, false);
         Pointer ctx = null;
         int removed = 0;
         try {
             while (true) {
-                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
                 if (ctx == null || Pointer.nativeValue(ctx) == 0) {
                     break;
                 }
-                final Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                final Pointer dup = WindowsCertUtilsCrypt.INSTANCE.CertDuplicateCertificateContext(ctx);
                 try {
                     final String subject = getName(dup, false); // issued to
                     final String issuer = getName(dup, true); // issued by
@@ -250,7 +259,7 @@ public class WindowsCertUtils {
                     final boolean matchIssuer = issuedByContains != null && !issuedByContains.isEmpty() && issuer.toLowerCase().contains(issuedByContains.toLowerCase());
                     if (matchSubject || matchIssuer) {
                         // NOTE: CertDeleteCertificateFromStore frees the context on success.
-                        final boolean ok = Crypt32Ext.INSTANCE.CertDeleteCertificateFromStore(ctx);
+                        final boolean ok = WindowsCertUtilsCrypt.INSTANCE.CertDeleteCertificateFromStore(ctx);
                         ctx = null; // prevent use-after-free
                         if (!ok) {
                             throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
@@ -259,12 +268,12 @@ public class WindowsCertUtils {
                     }
                 } finally {
                     if (dup != null && Pointer.nativeValue(dup) != 0) {
-                        Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                        WindowsCertUtilsCrypt.INSTANCE.CertFreeCertificateContext(dup);
                     }
                 }
             }
         } finally {
-            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
         }
         return removed;
     }
@@ -273,12 +282,12 @@ public class WindowsCertUtils {
     static String getFriendlyName(final Pointer certContext) {
         final IntByReference cb = new IntByReference(0);
         // Query size (includes terminating NUL, UTF-16LE)
-        final boolean okSize = Crypt32Ext.INSTANCE.CertGetCertificateContextProperty(certContext, Crypt32Ext.CERT_FRIENDLY_NAME_PROP_ID, null, cb);
+        final boolean okSize = WindowsCertUtilsCrypt.INSTANCE.CertGetCertificateContextProperty(certContext, WindowsCertUtilsCrypt.CERT_FRIENDLY_NAME_PROP_ID, null, cb);
         if (!okSize || cb.getValue() <= 2) {
             return "";
         }
         final byte[] buf = new byte[cb.getValue()];
-        final boolean okData = Crypt32Ext.INSTANCE.CertGetCertificateContextProperty(certContext, Crypt32Ext.CERT_FRIENDLY_NAME_PROP_ID, buf, cb);
+        final boolean okData = WindowsCertUtilsCrypt.INSTANCE.CertGetCertificateContextProperty(certContext, WindowsCertUtilsCrypt.CERT_FRIENDLY_NAME_PROP_ID, buf, cb);
         if (!okData) {
             return "";
         }
@@ -327,17 +336,17 @@ public class WindowsCertUtils {
     }
 
     // LIST: returns matching certificates (safe: returns empty if no filters provided)
-    public static List<CertListEntry> listCertificates(final KeyStore target, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
+    public static List<CertListEntry> listCertificates(final TargetKeyStore target, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
         final List<CertListEntry> ret = new ArrayList<CertListEntry>();
         final HANDLE store = openStore(target, true);
         Pointer ctx = null;
         try {
             while (true) {
-                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
                 if (ctx == null || Pointer.nativeValue(ctx) == 0) {
                     break;
                 }
-                final Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                final Pointer dup = WindowsCertUtilsCrypt.INSTANCE.CertDuplicateCertificateContext(ctx);
                 try {
                     final String subject = getName(dup, false);
                     final String issuer = getName(dup, true);
@@ -349,29 +358,29 @@ public class WindowsCertUtils {
                     }
                 } finally {
                     if (dup != null && Pointer.nativeValue(dup) != 0) {
-                        Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                        WindowsCertUtilsCrypt.INSTANCE.CertFreeCertificateContext(dup);
                     }
                 }
             }
         } finally {
-            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
         }
         return ret;
     }
 
     // REMOVE: deletes matching certificates; returns count removed (safe: removes 0 if no filters provided)
-    public static int removeCertificates(final KeyStore target, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
+    public static int removeCertificates(final TargetKeyStore target, final String issuedToContains, final String issuedByContains, final String friendlyNameContains) {
         final HANDLE store = openStore(target, false);
         Pointer ctx = null;
         int removed = 0;
         try {
             while (true) {
-                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
                 if (ctx == null || Pointer.nativeValue(ctx) == 0) {
                     break;
                 }
                 // Duplicate to read properties safely before deletion
-                final Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                final Pointer dup = WindowsCertUtilsCrypt.INSTANCE.CertDuplicateCertificateContext(ctx);
                 boolean doDelete = false;
                 try {
                     final String subject = getName(dup, false);
@@ -383,12 +392,12 @@ public class WindowsCertUtils {
                     }
                 } finally {
                     if (dup != null && Pointer.nativeValue(dup) != 0) {
-                        Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                        WindowsCertUtilsCrypt.INSTANCE.CertFreeCertificateContext(dup);
                     }
                 }
                 if (doDelete) {
                     // CertDeleteCertificateFromStore frees ctx on success
-                    final boolean ok = Crypt32Ext.INSTANCE.CertDeleteCertificateFromStore(ctx);
+                    final boolean ok = WindowsCertUtilsCrypt.INSTANCE.CertDeleteCertificateFromStore(ctx);
                     ctx = null; // prevent use-after-free
                     if (!ok) {
                         throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
@@ -397,19 +406,19 @@ public class WindowsCertUtils {
                 }
             }
         } finally {
-            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
         }
         return removed;
     }
 
     static String getCertDisplayName(final Pointer certContext) {
         // First call: get required length (incl. null-terminator)
-        int len = Crypt32Ext.INSTANCE.CertGetNameStringW(certContext, Crypt32Ext.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, null, null, 0);
+        int len = WindowsCertUtilsCrypt.INSTANCE.CertGetNameStringW(certContext, WindowsCertUtilsCrypt.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, null, null, 0);
         if (len <= 1) {
             return "<unknown>";
         }
         char[] buf = new char[len];
-        Crypt32Ext.INSTANCE.CertGetNameStringW(certContext, Crypt32Ext.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, null, buf, buf.length);
+        WindowsCertUtilsCrypt.INSTANCE.CertGetNameStringW(certContext, WindowsCertUtilsCrypt.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, null, buf, buf.length);
         String s = new String(buf);
         int nul = s.indexOf('\0');
         return (nul >= 0) ? s.substring(0, nul) : s;
@@ -424,7 +433,7 @@ public class WindowsCertUtils {
      * @throws Exception
      *             if store operations fail.
      */
-    public static boolean removeCertificate(final String thumbprintHex, final WindowsCertUtils.KeyStore target) throws Exception {
+    public static boolean removeCertificate(final String thumbprintHex, final WindowsCertUtils.TargetKeyStore target) throws Exception {
         final byte[] wanted = parseThumbprintHex(thumbprintHex);
         if (wanted == null || wanted.length == 0) {
             return false;
@@ -434,7 +443,7 @@ public class WindowsCertUtils {
         try {
             while (true) {
                 // frees ctx (previous)
-                ctx = Crypt32Ext.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
                 if (ctx == null || Pointer.nativeValue(ctx) == 0) {
                     break;
                 }
@@ -443,18 +452,18 @@ public class WindowsCertUtils {
                     // CertDeleteCertificateFromStore frees the context on success.
                     // Duplicate for safe logging / property access
                     {
-                        Pointer dup = Crypt32Ext.INSTANCE.CertDuplicateCertificateContext(ctx);
+                        Pointer dup = WindowsCertUtilsCrypt.INSTANCE.CertDuplicateCertificateContext(ctx);
                         try {
                             final String certName = getCertDisplayName(dup);
                             LogV3.info("Deleting certificate from " + target + ": " + certName);
                         } finally {
                             if (dup != null && Pointer.nativeValue(dup) != 0) {
-                                Crypt32Ext.INSTANCE.CertFreeCertificateContext(dup);
+                                WindowsCertUtilsCrypt.INSTANCE.CertFreeCertificateContext(dup);
                             }
                         }
                     }
                     // freed ctx in any case
-                    final boolean deleted = Crypt32Ext.INSTANCE.CertDeleteCertificateFromStore(ctx);
+                    final boolean deleted = WindowsCertUtilsCrypt.INSTANCE.CertDeleteCertificateFromStore(ctx);
                     ctx = null; // Do not touch original after delete call
                     if (!deleted) {
                         int rc = Kernel32.INSTANCE.GetLastError();
@@ -468,8 +477,145 @@ public class WindowsCertUtils {
             }
             return false;
         } finally {
-            Crypt32Ext.INSTANCE.CertCloseStore(store, 0);
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
         }
+    }
+
+    /**
+     * Reads the Windows "Root" store (Trusted Root Certification Authorities) and returns all certificates as X509Certificate instances.
+     * Opens the <b>logical</b> store (CERT_STORE_PROV_SYSTEM). Callers can filter by intended purpose (e.g. SSL) using
+     * {@link org.appwork.utils.net.httpconnection.trust.TrustUtils#isAcceptableCaTrustAnchorForSsl}.
+     *
+     * @return List of X509Certificate, or null on error / non-Windows; empty list if no certs
+     */
+    public static List<X509Certificate> getRootStoreCertificates() {
+        final String os = System.getProperty("os.name", "");
+        if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
+            return null;
+        }
+        final int flags = WindowsCertUtilsCrypt.CERT_SYSTEM_STORE_CURRENT_USER | WindowsCertUtilsCrypt.CERT_STORE_OPEN_EXISTING_FLAG | WindowsCertUtilsCrypt.CERT_STORE_READONLY_FLAG;
+        final HANDLE store = WindowsCertUtilsCrypt.INSTANCE.CertOpenStore(WindowsCertUtilsCrypt.CERT_STORE_PROV_SYSTEM, 0, null, flags, new WString("Root"));
+        if (store == null || Pointer.nativeValue(store.getPointer()) == 0) {
+            return null;
+        }
+        final List<X509Certificate> certs = new ArrayList<X509Certificate>();
+        Pointer ctx = null;
+        try {
+            CertificateFactory cf;
+            try {
+                cf = CertificateFactory.getInstance("X.509");
+            } catch (final CertificateException e) {
+                return certs;
+            }
+            while (true) {
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                if (ctx == null || Pointer.nativeValue(ctx) == 0) {
+                    break;
+                }
+                try {
+                    final CERT_CONTEXT certCtx = Structure.newInstance(CERT_CONTEXT.class, ctx);
+                    certCtx.read();
+                    if (certCtx.pbCertEncoded != null && certCtx.cbCertEncoded > 0) {
+                        final byte[] der = certCtx.pbCertEncoded.getByteArray(0, certCtx.cbCertEncoded);
+                        final Certificate c = cf.generateCertificate(new ByteArrayInputStream(der));
+                        if (c instanceof X509Certificate) {
+                            certs.add((X509Certificate) c);
+                        }
+                    }
+                } catch (final Throwable t) {
+                    LogV3.warning("Skip cert in Root store: " + t.getMessage());
+                }
+            }
+        } finally {
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
+        }
+        return certs;
+    }
+
+    /**
+     * Reads the Windows "Root" store (Trusted Root Certification Authorities) and returns all certificates as SHA-256 fingerprints (hex,
+     * lowercase). Opens the <b>logical</b> store (CERT_STORE_PROV_SYSTEM), i.e. the merged view of Current User and Local Machine – all roots
+     * that Windows trusts for the current user (including Windows Update), without admin rights. Windows only; requires JNA/crypt32.
+     *
+     * @return Set of SHA-256 fingerprints (lowercase hex), or null on error / non-Windows
+     */
+    public static Set<String> getRootStoreFingerprintsSha256() {
+        final List<X509Certificate> certs = getRootStoreCertificates();
+        if (certs == null || certs.isEmpty()) {
+            return null;
+        }
+        final Set<String> fingerprints = new TreeSet<String>();
+        for (final X509Certificate c : certs) {
+            try {
+                final String fp = Hash.getSHA256(c.getEncoded());
+                if (fp != null) {
+                    fingerprints.add(fp.toLowerCase(Locale.ROOT));
+                }
+            } catch (final CertificateEncodingException ignored) {
+            }
+        }
+        return fingerprints.isEmpty() ? null : fingerprints;
+    }
+
+    /**
+     * Reads a serialized store file (.sst), e.g. from certutil -generateSSTFromWU, via the Windows Crypto API and returns all certificates
+     * therein as X509Certificate instances. Allows evaluating the Windows Update root store without certutil -exportPFX.
+     * Windows only; requires JNA/crypt32; the file must exist and be readable.
+     * <p>
+     * <b>Note:</b> The SST from {@code certutil -generateSSTFromWU} contains the <i>full</i> Windows Update root catalog (all roots
+     * that WU can deploy), typically 500+. The local "Root" store ({@link #getRootStoreCertificates()}) contains only the roots
+     * actually installed on this machine (often ~150–200). So SST count is usually much higher than the local store.
+     *
+     * @param sstFile
+     *            .sst file (e.g. from certutil -generateSSTFromWU roots.sst)
+     * @return List of X509Certificate, or null on error / non-Windows / invalid file; empty list if no certs
+     */
+    public static List<X509Certificate> getRootStoreCertificatesFromSstFile(final java.io.File sstFile) {
+        final String os = System.getProperty("os.name", "");
+        if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
+            return null;
+        }
+        if (sstFile == null || !sstFile.isFile() || !sstFile.canRead()) {
+            return null;
+        }
+        final String path = sstFile.getAbsolutePath();
+        final int flags = WindowsCertUtilsCrypt.CERT_STORE_OPEN_EXISTING_FLAG | WindowsCertUtilsCrypt.CERT_STORE_READONLY_FLAG;
+        final HANDLE store = WindowsCertUtilsCrypt.INSTANCE.CertOpenStore(WindowsCertUtilsCrypt.CERT_STORE_PROV_FILENAME, 0, null, flags, new WString(path));
+        if (store == null || Pointer.nativeValue(store.getPointer()) == 0) {
+            return null;
+        }
+        final List<X509Certificate> certs = new ArrayList<X509Certificate>();
+        Pointer ctx = null;
+        try {
+            final CertificateFactory cf;
+            try {
+                cf = CertificateFactory.getInstance("X.509");
+            } catch (final CertificateException e) {
+                return certs;
+            }
+            while (true) {
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                if (ctx == null || Pointer.nativeValue(ctx) == 0) {
+                    break;
+                }
+                try {
+                    final CERT_CONTEXT certCtx = Structure.newInstance(CERT_CONTEXT.class, ctx);
+                    certCtx.read();
+                    if (certCtx.pbCertEncoded != null && certCtx.cbCertEncoded > 0) {
+                        final byte[] der = certCtx.pbCertEncoded.getByteArray(0, certCtx.cbCertEncoded);
+                        final Certificate c = cf.generateCertificate(new ByteArrayInputStream(der));
+                        if (c instanceof X509Certificate) {
+                            certs.add((X509Certificate) c);
+                        }
+                    }
+                } catch (final Throwable t) {
+                    LogV3.warning("Skip cert in SST store: " + t.getMessage());
+                }
+            }
+        } finally {
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
+        }
+        return certs;
     }
 
     public static String getCertificateFingerprint(Certificate cert) throws NoSuchAlgorithmException, CertificateEncodingException {

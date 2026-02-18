@@ -94,8 +94,8 @@ public class JNAWindowsTrustProviderTest extends AWTest {
             final String thumbprint = WindowsCertUtils.getCertificateFingerprint(caCert);
             final String url = "https://localhost:" + serverPort + "/test/echo?message=" + URLEncoder.encode("JNATrustOK", "UTF-8");
             try {
-                installCertificateWithAutoConfirm(caCert, WindowsCertUtils.KeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME_JNA);
-                assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be in Windows store after install");
+                installCertificateWithAutoConfirm(caCert, WindowsCertUtils.TargetKeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME_JNA);
+                assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER), "CA should be in Windows store after install");
                 HttpClient client = new HttpClient();
                 client.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
                 client.setReadTimeout((int) TimeUnit.SECONDS.toMillis(10));
@@ -106,8 +106,8 @@ public class JNAWindowsTrustProviderTest extends AWTest {
                 assertTrue(ctx.getResponseString() != null && ctx.getResponseString().contains("JNATrustOK"), "Response should contain message");
                 assertTrustResultContainsCa(ctx, thumbprint, "after first install");
                 LogV3.info("JNAWindowsTrustProviderTest: request with CA installed passed");
-                removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER);
-                assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be removed from Windows store");
+                removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+                assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER), "CA should be removed from Windows store");
                 // Request must fail when server CA is NOT in Windows store (proof that we use live store)
                 client = new HttpClient();
                 client.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
@@ -125,8 +125,8 @@ public class JNAWindowsTrustProviderTest extends AWTest {
                     LogV3.info("JNAWindowsTrustProviderTest: request without CA correctly failed with exception: " + e.getMessage());
                 }
                 assertTrue(requestFailedWithoutCA, "Request MUST fail when server CA is not in Windows store (JNAWindowsTrustProvider must reject untrusted chain)");
-                installCertificateWithAutoConfirm(caCert, WindowsCertUtils.KeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME_JNA);
-                assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be in Windows store after re-install");
+                installCertificateWithAutoConfirm(caCert, WindowsCertUtils.TargetKeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME_JNA);
+                assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER), "CA should be in Windows store after re-install");
                 client = new HttpClient();
                 client.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
                 client.setReadTimeout((int) TimeUnit.SECONDS.toMillis(10));
@@ -139,8 +139,8 @@ public class JNAWindowsTrustProviderTest extends AWTest {
                 LogV3.info("JNAWindowsTrustProviderTest passed (install → success, remove → fail, re-install → success, no reload)");
             } finally {
                 try {
-                    removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER);
-                    assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be removed from Windows store after test");
+                    removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+                    assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER), "CA should be removed from Windows store after test");
                 } catch (final Throwable e) {
                     LogV3.log(e);
                 }
@@ -227,7 +227,7 @@ public class JNAWindowsTrustProviderTest extends AWTest {
         return found[0];
     }
 
-    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.KeyStore target, final String friendlyName) throws Exception {
+    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.TargetKeyStore target, final String friendlyName) throws Exception {
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -247,7 +247,7 @@ public class JNAWindowsTrustProviderTest extends AWTest {
         }
     }
 
-    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.KeyStore target) throws Exception {
+    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.TargetKeyStore target) throws Exception {
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override
             public void run() {

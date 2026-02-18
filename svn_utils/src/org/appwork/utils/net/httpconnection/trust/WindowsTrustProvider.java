@@ -10,6 +10,7 @@ package org.appwork.utils.net.httpconnection.trust;
 
 import java.security.KeyStore;
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 
 import javax.net.ssl.SSLException;
@@ -17,6 +18,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -57,9 +59,20 @@ public class WindowsTrustProvider extends AbstractTrustProvider {
         for (final String alias : new ArrayList<String>(java.util.Collections.list(source.aliases()))) {
             if (source.isCertificateEntry(alias)) {
                 final Certificate cert = source.getCertificate(alias);
-                if (cert != null) {
-                    target.setCertificateEntry(prefix + alias, cert);
-                    count++;
+                if (cert == null) {
+                    DebugMode.debugger();
+                    continue;
+                }
+                if (cert instanceof X509Certificate) {
+                    boolean isAcceptableCa = TrustUtils.isAcceptableCaTrustAnchorForSsl((X509Certificate) cert);
+                    if (isAcceptableCa) {
+                        target.setCertificateEntry(prefix + alias, cert);
+                        count++;
+                    } else {
+                        // DebugMode.debugger();
+                    }
+                } else {
+                    DebugMode.debugger();
                 }
             }
         }

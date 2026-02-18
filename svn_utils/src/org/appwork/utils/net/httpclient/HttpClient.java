@@ -622,12 +622,18 @@ public class HttpClient {
     protected void checkResponseCode(final RequestContext context) throws InvalidResponseCode {
         final HashSet<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
         if (allowedResponseCodes != null) {
-            if (allowedResponseCodes.contains(-1)) {
+            if (allowedResponseCodes.contains(context.getConnection().getResponseCode())) {
+                return;
+            }
+            if (allowedResponseCodes.contains(-1) && context.getConnection().getResponseCode() != HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
+                // if we want to allow 999, allowedResponseCodes MUSt explicitly contain it. -1 does not allow 999 but all others
                 // allow all
                 return;
-            } else if (!allowedResponseCodes.contains(context.getConnection().getResponseCode())) {
-                throw new InvalidResponseCode(context);
             }
+            if (context.getConnection().getResponseCode() == HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
+                throw new InvalidHttpResponseException(context);
+            }
+            throw new InvalidResponseCode(context);
         }
     }
 

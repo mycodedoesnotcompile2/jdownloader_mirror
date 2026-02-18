@@ -92,7 +92,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52309 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52324 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -5037,7 +5037,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
                 }
                 if (userCookies != null) {
-                    br.setCookies(getMainPage(), userCookies);
+                    this.setCookies(br, userCookies);
                     if (!validateCookies) {
                         /* Trust cookies without check */
                         return false;
@@ -5077,7 +5077,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     }
                     return true;
                 } else if (cookies != null) {
-                    br.setCookies(getMainPage(), cookies);
+                    this.setCookies(br, cookies);
                     if (!validateCookies) {
                         /* Trust cookies without check */
                         return false;
@@ -5192,6 +5192,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    /* Set cookies on all known domains */
+    private void setCookies(final Browser br, final Cookies cookies) {
+        br.setCookies(cookies);
+        for (final String domain : siteSupportedNames()) {
+            br.setCookies(domain, cookies);
+        }
+    }
+
     protected String twoFactorMessage = null;
 
     @Override
@@ -5269,8 +5277,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /** Sets given cookies and checks if we can login with them. */
     protected boolean verifyCookies(final Account account, final Cookies cookies) throws Exception {
-        br.setCookies(getMainPage(), cookies);
-        br.setCookies(cookies);
+        this.setCookies(br, cookies);
         getPage(getMainPage() + getRelativeAccountInfoURL());
         if (isLoggedin(this.br)) {
             logger.info("Cookie login successful");

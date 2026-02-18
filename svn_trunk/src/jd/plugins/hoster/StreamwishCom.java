@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52081 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52324 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,7 @@ public class StreamwishCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com", "ultpreplayer.com", "recordplay.biz", "hgplaycdn.com", "hailindihg.com", "auvexiug.com", "davioad.com", "habetar.com", "hglink.to", "kravaxxa.com", "zuvioeb.com", "tryzendm.com", "yuguaab.com", "xenolyzb.com", "guxhag.com", "guxhag.hg", "dumbalag.com", "haxloppd.com" });
+        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com", "ultpreplayer.com", "recordplay.biz", "hgplaycdn.com", "hailindihg.com", "auvexiug.com", "davioad.com", "habetar.com", "hglink.to", "kravaxxa.com", "zuvioeb.com", "tryzendm.com", "yuguaab.com", "xenolyzb.com", "guxhag.com", "guxhag.hg", "dumbalag.com", "haxloppd.com", "medixiru.com", "hgcloud.to", "audinifer.com", "vibuxer.com", "hanerix.com", "masukestin.com" });
         /** Tags for developers: streamwish, awish, sexbjcam.com */
         /**
          * Related links for developers: <br>
@@ -74,7 +74,7 @@ public class StreamwishCom extends XFileSharingProBasic {
      * - Works in browser - reCaptchaV3 works in browser (seems like website owner has not configured all domains he owns in his reCaptcha
      * config)
      */
-    private static final String INTERNAL_DOWNLOAD_DOMAIN = "habetar.com";
+    private static final String INTERNAL_DOWNLOAD_DOMAIN = "vibuxer.com";
 
     @Override
     protected List<String> getDeadDomains() {
@@ -85,6 +85,8 @@ public class StreamwishCom extends XFileSharingProBasic {
         deadDomains.add("wishembed.pro"); // 2024-08-02
         deadDomains.add("vidcloud.top"); // 2024-08-02
         deadDomains.add("gdplry.online"); // 2024-08-02
+        deadDomains.add("hgcloud.to"); // 2026-02-17
+        deadDomains.add("habetar.com"); // 2026-02-17
         return deadDomains;
     }
 

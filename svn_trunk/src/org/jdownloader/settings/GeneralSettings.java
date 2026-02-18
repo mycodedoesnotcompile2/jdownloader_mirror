@@ -41,6 +41,7 @@ public interface GeneralSettings extends ConfigInterface {
         public String getDefaultValue(KeyHandler<String> keyHandler) {
             if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_VISTA)) {
                 try {
+                    // https://learn.microsoft.com/de-de/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath
                     final String ret = com.sun.jna.platform.win32.Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Downloads);
                     if (CrossSystem.isAbsolutePath(ret) && new File(ret).isDirectory()) {
                         return ret;

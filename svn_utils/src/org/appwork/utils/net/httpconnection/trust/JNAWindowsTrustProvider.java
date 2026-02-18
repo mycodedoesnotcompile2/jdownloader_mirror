@@ -26,13 +26,12 @@ import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.TrustResult.TrustType;
 import org.appwork.utils.os.CrossSystem;
 
-import org.appwork.jna.windows.interfaces.Crypt32Ext;
-
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.Crypt32;
+import com.sun.jna.platform.win32.WTypes.LPSTR;
 import com.sun.jna.platform.win32.WinCrypt;
 import com.sun.jna.platform.win32.WinCrypt.CERT_CHAIN_CONTEXT;
 import com.sun.jna.platform.win32.WinCrypt.CERT_CHAIN_ELEMENT;
@@ -43,7 +42,6 @@ import com.sun.jna.platform.win32.WinCrypt.CERT_CONTEXT;
 import com.sun.jna.platform.win32.WinCrypt.CERT_SIMPLE_CHAIN;
 import com.sun.jna.platform.win32.WinCrypt.HCERTCHAINENGINE;
 import com.sun.jna.platform.win32.WinCrypt.HCERTSTORE;
-import com.sun.jna.platform.win32.WTypes.LPSTR;
 import com.sun.jna.ptr.PointerByReference;
 
 /**
@@ -52,8 +50,8 @@ import com.sun.jna.ptr.PointerByReference;
  * validate call uses the current state of the Windows ROOT store (user + machine).
  * <p>
  * Implements {@link TrustProviderInterface} directly (no {@link AbstractTrustProvider} / TrustManager delegate): the SSL stack uses
- * {@link org.appwork.utils.net.httpconnection.trust.bridge.TrustBridge}, which calls {@link #checkServerTrusted} / {@link #checkClientTrusted}
- * on this provider.
+ * {@link org.appwork.utils.net.httpconnection.trust.bridge.TrustBridge}, which calls {@link #checkServerTrusted} /
+ * {@link #checkClientTrusted} on this provider.
  * </p>
  * <p>
  * Requires JNA and runs only on Windows. Uses the same trust semantics as {@link WindowsTrustProvider} but without caching a KeyStore
@@ -67,7 +65,8 @@ import com.sun.jna.ptr.PointerByReference;
  * <ol>
  * <li>Convert the Java leaf certificate (chain[0]) into a Windows CERT_CONTEXT via CertCreateCertificateContext.</li>
  * <li>Optionally provide intermediate certs in a temporary in-memory store so the chain builder can use them.</li>
- * <li>Call CertGetCertificateChain with the default engine (null = current user + local machine ROOT). Windows builds the chain from leaf to a trusted root.</li>
+ * <li>Call CertGetCertificateChain with the default engine (null = current user + local machine ROOT). Windows builds the chain from leaf
+ * to a trusted root.</li>
  * <li>Call CertVerifyCertificateChainPolicy with policy CERT_CHAIN_POLICY_SSL to apply SSL-specific checks (e.g. usage, revocation).</li>
  * <li>If policyStatus.dwError is 0, the chain is trusted; otherwise we return an untrusted result.</li>
  * </ol>
@@ -78,31 +77,32 @@ import com.sun.jna.ptr.PointerByReference;
  * <h3>Welche CA wurde für die Validierung verwendet?</h3>
  * <p>
  * Die Windows-API liefert die gebaute Kette inkl. der vertrauenswürdigen Root-CA. In <code>CERT_CHAIN_CONTEXT</code> gilt:
- * <code>rgpChain[0]</code> ist die erste „simple chain“ (vom Endzertifikat bis zur Root); das <b>letzte Element</b> dieser Kette
- * ist die Root-CA, gegen die erfolgreich validiert wurde. Jedes Element ist ein <code>CERT_CHAIN_ELEMENT</code> mit
- * <code>pCertContext</code> (CERT_CONTEXT mit <code>pbCertEncoded</code> / <code>cbCertEncoded</code>).
+ * <code>rgpChain[0]</code> ist die erste „simple chain“ (vom Endzertifikat bis zur Root); das <b>letzte Element</b> dieser Kette ist die
+ * Root-CA, gegen die erfolgreich validiert wurde. Jedes Element ist ein <code>CERT_CHAIN_ELEMENT</code> mit <code>pCertContext</code>
+ * (CERT_CONTEXT mit <code>pbCertEncoded</code> / <code>cbCertEncoded</code>).
  * </p>
  * <p>
- * Über JNA: <code>chainContext.getRgpChain()[0]</code> liefert die erste Kette, das letzte Element darin enthält die Root.
- * Aus dessen <code>pCertContext</code> kann man die DER-Bytes lesen und per <code>CertificateFactory.generateCertificate()</code>
- * ein <code>X509Certificate</code> erzeugen. Diese Klasse liefert die Root derzeit nicht mit (z. B. in TrustResult); bei Bedarf
- * kann vor dem Freigeben des <code>CERT_CHAIN_CONTEXT</code> die Root ausgelesen und zurückgegeben werden.
+ * Über JNA: <code>chainContext.getRgpChain()[0]</code> liefert die erste Kette, das letzte Element darin enthält die Root. Aus dessen
+ * <code>pCertContext</code> kann man die DER-Bytes lesen und per <code>CertificateFactory.generateCertificate()</code> ein
+ * <code>X509Certificate</code> erzeugen. Diese Klasse liefert die Root derzeit nicht mit (z. B. in TrustResult); bei Bedarf kann vor dem
+ * Freigeben des <code>CERT_CHAIN_CONTEXT</code> die Root ausgelesen und zurückgegeben werden.
  * </p>
  */
 public class JNAWindowsTrustProvider implements TrustProviderInterface {
-
-    /** Policy OID for SSL chain verification: in wincrypt.h this is (LPCSTR)4, i.e. pointer value 4. */
+    /**
+     * Windows policy for SSL/TLS server certificate chain verification. Passed to CertVerifyCertificateChainPolicy();
+     * ensures the chain is valid for server authentication (usage, revocation, trusted root). Value 4 = (LPCSTR)4 in wincrypt.h.
+     */
     private static final int                     CERT_CHAIN_POLICY_SSL = 4;
     private static final int                     CERT_STORE_ADD_ALWAYS = 4;
     private static final JNAWindowsTrustProvider INSTANCE              = new JNAWindowsTrustProvider();
-
-    protected JNAWindowsTrustResult latestTrustResult = null;
+    protected JNAWindowsTrustResult              latestTrustResult     = null;
 
     public static JNAWindowsTrustProvider getInstance() {
         return INSTANCE;
     }
 
-    private JNAWindowsTrustProvider() {
+    public JNAWindowsTrustProvider() {
     }
 
     @Override
@@ -174,25 +174,25 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
     }
 
     /**
-     * Validates the certificate chain using the Windows Crypto API (crypt32.dll) via JNA. Uses the current Windows ROOT store
-     * (user + machine); no snapshot, so store changes are visible immediately.
+     * Validates the certificate chain using the Windows Crypto API (crypt32.dll) via JNA. Uses the current Windows ROOT store (user +
+     * machine); no snapshot, so store changes are visible immediately.
      *
      * <h4>JNA / Windows API flow</h4>
      * <ol>
-     * <li><b>CertCreateCertificateContext</b> (Crypt32Ext): Builds a Windows CERT_CONTEXT from the leaf cert's DER bytes. The context is
-     *     not stored anywhere; it is only used as input for the chain builder. Must be freed with CertFreeCertificateContext.</li>
-     * <li><b>openMemoryStoreAndAddIntermediates</b>: Optionally creates an in-memory store (CERT_STORE_PROV_MEMORY) and adds
-     *     chain[1..n-1] so CertGetCertificateChain can resolve the full chain. If this fails or is skipped, Windows may still build the
-     *     chain using AIA or only the leaf (and fail if the root is not in ROOT).</li>
+     * <li><b>CertCreateCertificateContext</b> ({@link WindowsCertChainCrypt32Api}): Builds a Windows CERT_CONTEXT from the leaf cert's DER bytes. The context is
+     * not stored anywhere; it is only used as input for the chain builder. Must be freed with CertFreeCertificateContext.</li>
+     * <li><b>openMemoryStoreAndAddIntermediates</b>: Optionally creates an in-memory store (CERT_STORE_PROV_MEMORY) and adds chain[1..n-1]
+     * so CertGetCertificateChain can resolve the full chain. If this fails or is skipped, Windows may still build the chain using AIA or
+     * only the leaf (and fail if the root is not in ROOT).</li>
      * <li><b>CertGetCertificateChain</b> (Crypt32): Builds a chain from the leaf to a trusted root. We pass hChainEngine=null (default
-     *     engine = HCCE_CURRENT_USER, which uses the current user's and local machine's ROOT stores), pTime=null (current time),
-     *     hAdditionalStore=our memory store with intermediates if any. The result is a CERT_CHAIN_CONTEXT; must be freed with
-     *     CertFreeCertificateChain.</li>
-     * <li><b>CertVerifyCertificateChainPolicy</b> (Crypt32): Applies the SSL policy (CERT_CHAIN_POLICY_SSL = (LPCSTR)4) to the chain.
-     *     We pass CERT_CHAIN_POLICY_PARA and CERT_CHAIN_POLICY_STATUS with cbSize set (required by the API). On return, policyStatus.dwError
-     *     is 0 if the chain is valid for SSL; otherwise it contains the error code (e.g. untrusted root, revoked, wrong usage).</li>
+     * engine = HCCE_CURRENT_USER, which uses the current user's and local machine's ROOT stores), pTime=null (current time),
+     * hAdditionalStore=our memory store with intermediates if any. The result is a CERT_CHAIN_CONTEXT; must be freed with
+     * CertFreeCertificateChain.</li>
+     * <li><b>CertVerifyCertificateChainPolicy</b> (Crypt32): Applies the SSL policy (CERT_CHAIN_POLICY_SSL = (LPCSTR)4) to the chain. We
+     * pass CERT_CHAIN_POLICY_PARA and CERT_CHAIN_POLICY_STATUS with cbSize set (required by the API). On return, policyStatus.dwError is 0
+     * if the chain is valid for SSL; otherwise it contains the error code (e.g. untrusted root, revoked, wrong usage).</li>
      * <li><b>Cleanup</b>: In finally we free the cert context, the chain context, and the optional additional store so that no native
-     *     handles leak.</li>
+     * handles leak.</li>
      * </ol>
      * <p>
      * <b>Welche CA wurde verwendet?</b> Die gebaute Kette (CERT_CHAIN_CONTEXT) enthält die Root-CA: erste Simple-Chain
@@ -215,7 +215,7 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
             byte[] leafEncoded = chain[0].getEncoded();
             Memory buf = new Memory(leafEncoded.length);
             buf.write(0, leafEncoded, 0, leafEncoded.length);
-            pCertContext = Crypt32Ext.INSTANCE.CertCreateCertificateContext(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, buf, leafEncoded.length);
+            pCertContext = WindowsCertChainCrypt32Api.INSTANCE.CertCreateCertificateContext(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, buf, leafEncoded.length);
             if (pCertContext == null || pCertContext.getPointer() == null) {
                 throw new CertificateException("CertCreateCertificateContext failed: " + com.sun.jna.Native.getLastError());
             }
@@ -232,7 +232,7 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
             }
             CERT_CHAIN_CONTEXT chainContext = Structure.newInstance(CERT_CHAIN_CONTEXT.class, ppChainContext.getValue());
             chainContext.read();
-            // 4) SSL policy verification (CERT_CHAIN_POLICY_SSL); policyStatus.dwError == 0 means trusted
+            // 4) SSL policy verification: CERT_CHAIN_POLICY_SSL validates the chain for server auth (usage, revocation, trusted root)
             CERT_CHAIN_POLICY_PARA policyPara = new CERT_CHAIN_POLICY_PARA();
             policyPara.cbSize = policyPara.size();
             policyPara.write();
@@ -267,10 +267,11 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
     }
 
     /**
-     * Reads the trusted root certificate from the first simple chain (last element) of the Windows-built
-     * CERT_CHAIN_CONTEXT. The DER bytes are copied so the result is valid after the chain context is freed.
+     * Reads the trusted root certificate from the first simple chain (last element) of the Windows-built CERT_CHAIN_CONTEXT. The DER bytes
+     * are copied so the result is valid after the chain context is freed.
      *
-     * @param chainContext the chain context after successful policy verification
+     * @param chainContext
+     *            the chain context after successful policy verification
      * @return the root X509Certificate, or null if the structure cannot be read or parsing fails
      */
     private static X509Certificate extractTrustedRootFromChain(final CERT_CHAIN_CONTEXT chainContext) {
@@ -305,16 +306,16 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
 
     /**
      * Optionally opens a Windows in-memory certificate store and adds the intermediate certificates (chain[1..n-1]) so that
-     * CertGetCertificateChain can use them when building the chain. If the store cannot be opened (e.g. MEMORY provider not
-     * available in this JNA version) or chain has only one cert, returns null; validation then relies on the leaf only and
-     * Windows ROOT (and possibly AIA).
+     * CertGetCertificateChain can use them when building the chain. If the store cannot be opened (e.g. MEMORY provider not available in
+     * this JNA version) or chain has only one cert, returns null; validation then relies on the leaf only and Windows ROOT (and possibly
+     * AIA).
      *
      * <h4>JNA / Windows API</h4>
      * <ul>
-     * <li><b>CertOpenStore</b> (Crypt32): Opens a store with provider CERT_STORE_PROV_MEMORY (name "Memory"). No persistent storage;
-     *     certs are only in process memory. pvPara is null.</li>
-     * <li><b>CertAddEncodedCertificateToStore</b> (Crypt32Ext): Adds each intermediate's DER bytes to the store with
-     *     CERT_STORE_ADD_ALWAYS so duplicates do not cause errors. ppCertContext is null (we don't need the created context back).</li>
+     * <li><b>CertOpenStore</b> (Crypt32): Opens a store with provider CERT_STORE_PROV_MEMORY (name "Memory"). No persistent storage; certs
+     * are only in process memory. pvPara is null.</li>
+     * <li><b>CertAddEncodedCertificateToStore</b> ({@link WindowsCertChainCrypt32Api}): Adds each intermediate's DER bytes to the store with CERT_STORE_ADD_ALWAYS
+     * so duplicates do not cause errors. ppCertContext is null (we don't need the created context back).</li>
      * </ul>
      * <p>
      * The caller must call CertCloseStore(hStore, 0) when done (done in validateChainViaWindows finally).
@@ -334,7 +335,7 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
                 byte[] encoded = chain[i].getEncoded();
                 Memory buf = new Memory(encoded.length);
                 buf.write(0, encoded, 0, encoded.length);
-                Crypt32Ext.INSTANCE.CertAddEncodedCertificateToStore(hStore, WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, buf, encoded.length, CERT_STORE_ADD_ALWAYS, null);
+                WindowsCertChainCrypt32Api.INSTANCE.CertAddEncodedCertificateToStore(hStore, WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, buf, encoded.length, CERT_STORE_ADD_ALWAYS, null);
             }
             return hStore;
         } catch (Throwable t) {

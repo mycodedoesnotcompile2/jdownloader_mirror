@@ -122,7 +122,11 @@ public class HTTPConstants {
          */
         SERVERERROR_SERVICE_UNAVAILABLE(503, "Service Unavailable"),
         GATEWAY_TIMEOUT(504, "Gateway Time-out"),
-        WEB_SERVER_DOWN(521, "Cloudflare, Web server is down");
+        WEB_SERVER_DOWN(521, "Cloudflare, Web server is down"),
+        /**
+         * seems like the server did not answer with valid HTTP(s)
+         */
+        X_INVALID_HTTP_RESPONSE(999, "INVALID HTTP Response");
 
         /**
          * @param responseCode

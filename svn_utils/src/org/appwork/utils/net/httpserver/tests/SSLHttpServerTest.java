@@ -813,8 +813,8 @@ public class SSLHttpServerTest extends AWTest {
         final X509Certificate caCert = this.certificateResult.getCaCertificate();
         final String thumbprint = WindowsCertUtils.getCertificateFingerprint(caCert);
         try {
-            installCertificateWithAutoConfirm(caCert, WindowsCertUtils.KeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME);
-            assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be in Windows store after install");
+            installCertificateWithAutoConfirm(caCert, WindowsCertUtils.TargetKeyStore.CURRENT_USER, WINDOWS_TEST_CA_FRIENDLY_NAME);
+            assertTrue(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER), "CA should be in Windows store after install");
             WindowsTrustProvider.getInstance().reload();
             final HttpClient client = new HttpClient();
             client.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5));
@@ -828,8 +828,8 @@ public class SSLHttpServerTest extends AWTest {
             LogV3.info("TrustWindowsProvider at server test passed");
         } finally {
             try {
-                removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER);
-                assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.KeyStore.CURRENT_USER), "CA should be removed from Windows store after uninstall");
+                removeCertificateWithAutoConfirm(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+                assertFalse(WindowsCertUtils.isCertificateInstalled(thumbprint, WindowsCertUtils.TargetKeyStore.CURRENT_USER), "CA should be removed from Windows store after uninstall");
                 WindowsTrustProvider.getInstance().reload();
             } catch (final Throwable e) {
                 LogV3.log(e);
@@ -910,7 +910,7 @@ public class SSLHttpServerTest extends AWTest {
     /**
      * Test-only helper: Installs certificate with auto-confirmation of Windows dialog.
      */
-    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.KeyStore target, final String friendlyName) throws Exception {
+    private static void installCertificateWithAutoConfirm(final X509Certificate certificate, final WindowsCertUtils.TargetKeyStore target, final String friendlyName) throws Exception {
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -933,7 +933,7 @@ public class SSLHttpServerTest extends AWTest {
     /**
      * Test-only helper: Removes certificate with auto-confirmation of Windows dialog.
      */
-    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.KeyStore target) throws Exception {
+    private static boolean removeCertificateWithAutoConfirm(final String thumbprintHex, final WindowsCertUtils.TargetKeyStore target) throws Exception {
         final Thread confirmationThread = new Thread(new Runnable() {
             @Override
             public void run() {
