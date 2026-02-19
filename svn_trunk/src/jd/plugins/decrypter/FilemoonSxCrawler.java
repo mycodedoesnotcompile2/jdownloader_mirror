@@ -38,7 +38,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BysejikuarCom;
 
-@DecrypterPlugin(revision = "$Revision: 52324 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52335 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +46,7 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "filemoon.sx", "bysejikuar.com", "bysedikamoum.com", "byse.sx", "byseraguci.com", "bysezejataos.com", "filemoon.to", "filemoon.eu", "filemooon.link", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com" });
+        ret.add(new String[] { "filemoon.sx", "bysejikuar.com", "bysedikamoum.com", "byse.sx", "byseraguci.com", "bysezejataos.com", "filemoon.to", "filemoon.eu", "filemooon.link", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com", "bysekoze.com", "bysesayeveum.com" });
         return ret;
     }
 

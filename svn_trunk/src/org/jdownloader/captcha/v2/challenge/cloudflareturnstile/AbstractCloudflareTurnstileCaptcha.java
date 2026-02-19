@@ -100,29 +100,28 @@ public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
             return siteKey;
         } else if (source == null) {
             return null;
-        } else {
-            String findNextSiteKeySource = source;
-            final HashSet<String> siteKeys = new HashSet<String>();
-            while (StringUtils.isNotEmpty(findNextSiteKeySource)) {
-                final String siteKey = findNextSiteKey(findNextSiteKeySource);
-                if (siteKey != null) {
-                    siteKeys.add(siteKey);
-                    findNextSiteKeySource = findNextSiteKeySource.replace(siteKey, "");
-                } else {
-                    break;
-                }
-            }
-            synchronized (INVALID_SITE_KEYS) {
-                logger.info("Auto siteKeys unfiltered:" + siteKeys);
-                final Set<String> invalidSiteKeys = INVALID_SITE_KEYS.get(getPlugin().getHost());
-                if (invalidSiteKeys != null) {
-                    siteKeys.removeAll(invalidSiteKeys);
-                }
-                logger.info("Auto siteKeys filtered:" + siteKeys);
-            }
-            siteKey = findCorrectSiteKeys(source, br, siteKeys);
-            return siteKey;
         }
+        String findNextSiteKeySource = source;
+        final HashSet<String> siteKeys = new HashSet<String>();
+        while (StringUtils.isNotEmpty(findNextSiteKeySource)) {
+            final String siteKey = findNextSiteKey(findNextSiteKeySource);
+            if (siteKey != null) {
+                siteKeys.add(siteKey);
+                findNextSiteKeySource = findNextSiteKeySource.replace(siteKey, "");
+            } else {
+                break;
+            }
+        }
+        synchronized (INVALID_SITE_KEYS) {
+            logger.info("Auto siteKeys unfiltered:" + siteKeys);
+            final Set<String> invalidSiteKeys = INVALID_SITE_KEYS.get(getPlugin().getHost());
+            if (invalidSiteKeys != null) {
+                siteKeys.removeAll(invalidSiteKeys);
+            }
+            logger.info("Auto siteKeys filtered:" + siteKeys);
+        }
+        siteKey = findCorrectSiteKeys(source, br, siteKeys);
+        return siteKey;
     }
 
     protected String findCorrectSiteKeys(final String source, final Browser br, Set<String> siteKeys) {
@@ -172,7 +171,7 @@ public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
             final Form forms[] = Form.getForms(source);
             if (forms != null) {
                 for (final Form form : forms) {
-                    final String siteKey = new Regex(form.getHtmlCode(), "data-sitekey\\s*=\\s*('|\")\\s*(" + apiKeyRegex + ")\\s*\\1").getMatch(1);
+                    final String siteKey = new Regex(form.getHtmlCode(), "data-sitekey\\s*=\\s*('|\")?\\s*(" + apiKeyRegex + ")").getMatch(1);
                     if (siteKey != null) {
                         return siteKey;
                     }

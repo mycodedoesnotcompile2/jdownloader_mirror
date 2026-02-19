@@ -44,7 +44,7 @@ import org.appwork.utils.net.httpconnection.NativeHTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.TrustResult;
-import org.appwork.utils.net.httpconnection.trust.TrustAllProvider;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.jdownloader.net.AutoBCSSLSocketStreamFactory;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
 
@@ -80,7 +80,7 @@ public class BCSSLSocketStreamFactoryAWTest extends AWTest {
                 return bcFactory;
             }
         };
-        conn.setTrustProvider(TrustAllProvider.getInstance());
+        conn.setTrustProvider(AllTrustProvider.getInstance());
         conn.setConnectTimeout(10000);
         conn.setReadTimeout(10000);
         conn.connect();
@@ -118,7 +118,7 @@ public class BCSSLSocketStreamFactoryAWTest extends AWTest {
                 return options;
             }
         };
-        conn.setTrustProvider(TrustAllProvider.getInstance());
+        conn.setTrustProvider(AllTrustProvider.getInstance());
         conn.setConnectTimeout(10000);
         conn.setReadTimeout(10000);
         conn.connect();
@@ -144,7 +144,7 @@ public class BCSSLSocketStreamFactoryAWTest extends AWTest {
         try {
             NativeHTTPConnectionImpl.setDefaultSSLSocketStreamFactory(new AutoBCSSLSocketStreamFactory());
             final HTTPConnection conn = new NativeHTTPConnectionImpl(new URL(HTTPS_TEST_URL), null);
-            conn.setTrustProvider(TrustAllProvider.getInstance());
+            conn.setTrustProvider(AllTrustProvider.getInstance());
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             conn.connect();

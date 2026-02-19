@@ -59,6 +59,7 @@ import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.JNAWindowsTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustLinuxProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.WindowsTrustProvider;
@@ -150,6 +151,11 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         {
             final RequestContext jreOk = new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get(url);
             assertTrue(jreOk.getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
+            assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
+        }
+        {
+            final RequestContext jreOk = new HttpClient().proxy(proxy).trust(new JNAWindowsTrustProvider()).get(url);
+            assertTrue(jreOk.getTrustResult().getTrustProvider() instanceof JNAWindowsTrustProvider);
             assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
         }
         {

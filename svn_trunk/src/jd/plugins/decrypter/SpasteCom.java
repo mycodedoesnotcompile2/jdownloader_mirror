@@ -39,7 +39,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = { "spaste.com", "binbucks.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)", "https?://(?:www\\.)?(?:binbucks\\.com|binb\\.me)/(?:shrinker/)?[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52335 $", interfaceVersion = 3, names = { "spaste.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)" })
 public class SpasteCom extends antiDDoSForDecrypt {
     public SpasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,10 +97,6 @@ public class SpasteCom extends antiDDoSForDecrypt {
             }
             if (zz > 4) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-            }
-            if (StringUtils.equalsIgnoreCase(form.getAction(), "bj/site")) {
-                /* 2021-11-09: Workaround for binbucks.com */
-                form.setAction(br.getURL());
             }
             final InputField fieldOpen = form.getInputField("open");
             if (fieldOpen != null && fieldOpen.getValue() == null) {

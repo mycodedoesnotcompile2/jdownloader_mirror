@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -55,14 +54,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52324 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52328 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static final String          API_BASE     = "https://cooldebrid.com/api/v1";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
     private static final boolean         resume       = true;
     private static final int             maxchunks    = -10;
-    private final boolean                use_api      = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
+    /* 2026-02-18: Use API */
+    private static final boolean         use_api      = true;
 
     @SuppressWarnings("deprecation")
     public CooldebridCom(PluginWrapper wrapper) {
@@ -98,7 +98,7 @@ public class CooldebridCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+        if (use_api) {
             return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
         } else {
             return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
@@ -118,7 +118,7 @@ public class CooldebridCom extends PluginForHost {
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         if (!attemptStoredDownloadurlDownload(link)) {
             final String dllink;
-            if (this.use_api) {
+            if (use_api) {
                 dllink = this.generateDirectlinkAPI(link, account);
             } else {
                 dllink = this.generateDirectlinkWebsite(link, account);
@@ -171,7 +171,11 @@ public class CooldebridCom extends PluginForHost {
         postdata.put("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
         br.postPageRaw(API_BASE + "/link/unlock", JSonStorage.serializeToJson(postdata));
         final Map<String, Object> resp = handleAPIErrors(account, link);
-        final String dllink = resp.get("unlocked_url").toString();
+        String dllink = resp.get("download_url").toString();
+        if (StringUtils.isEmpty(dllink)) {
+            /* This field was used in older/first API version */
+            dllink = resp.get("unlocked_url").toString();
+        }
         return dllink;
     }
 
@@ -412,35 +416,34 @@ public class CooldebridCom extends PluginForHost {
             logger.info("Setting zero traffic left because max daily links limit has been reached");
             ai.setTrafficLeft(0);
         }
+        final boolean isPremium = !ai.isExpired();
         ai.setStatus(user.get("plan") + " | " + "Daily links left: " + linksPerDayLeft + "/" + linksPerDayMax);
         /* Get list of supported hosts with their individual limits */
-        br.getPage(API_BASE + "/hosts/status");
-        final Map<String, Object> hosts_status = handleAPIErrors(account, null);
-        final Map<String, Object> hosts_status_hosts = (Map<String, Object>) hosts_status.get("hosts");
         br.getPage(API_BASE + "/user/hosts");
         final Map<String, Object> user_hosts = handleAPIErrors(account, null);
-        final List<Map<String, Object>> hosts_and_limits = (List<Map<String, Object>>) user_hosts.get("hosts");
+        final List<Map<String, Object>> host_infos = (List<Map<String, Object>>) user_hosts.get("hosts");
         final List<MultiHostHost> supportedHosts = new ArrayList<MultiHostHost>();
-        for (final Map<String, Object> host_and_limits : hosts_and_limits) {
-            final String domain = host_and_limits.get("host").toString();
+        for (final Map<String, Object> host_info : host_infos) {
+            final String domain = host_info.get("host").toString();
             final MultiHostHost mhost = new MultiHostHost(domain);
-            final long links_remaining_count = ((Number) host_and_limits.get("remaining_count")).longValue();
-            final long links_daily_limit_count = ((Number) host_and_limits.get("daily_limit_count")).longValue();
+            final long links_remaining_count = ((Number) host_info.get("remaining_count")).longValue();
+            final long links_daily_limit_count = ((Number) host_info.get("daily_limit_count")).longValue();
             if (links_remaining_count != -1 && links_daily_limit_count != -1) {
                 mhost.setLinksLeftAndMax(links_remaining_count, links_daily_limit_count);
             }
-            final long daily_limit_mb = ((Number) host_and_limits.get("daily_limit_mb")).longValue();
-            final long remaining_mb = ((Number) host_and_limits.get("remaining_mb")).longValue();
+            final long daily_limit_mb = ((Number) host_info.get("daily_limit_mb")).longValue();
+            final long remaining_mb = ((Number) host_info.get("remaining_mb")).longValue();
             if (remaining_mb != -1 && daily_limit_mb != -1) {
                 mhost.setTrafficLeftAndMax(remaining_mb * 1024 * 1024, daily_limit_mb * 1024 * 1024);
             }
-            final String status = (String) hosts_status_hosts.get(domain);
+            final String status = host_info.get("status").toString();
             if ("degraded".equalsIgnoreCase(status)) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (!isPremium && Boolean.TRUE.equals(host_info.get("premium_only"))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
             }
             supportedHosts.add(mhost);
         }
-        // TODO: Detect expired/free accounts
         ai.setMultiHostSupportV2(this, supportedHosts);
         account.setConcurrentUsePossible(true);
         return ai;

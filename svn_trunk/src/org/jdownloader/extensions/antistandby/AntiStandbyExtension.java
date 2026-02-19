@@ -16,6 +16,7 @@
 package org.jdownloader.extensions.antistandby;
 
 import java.awt.Dialog.ModalityType;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -29,6 +30,7 @@ import org.appwork.shutdown.ShutdownVetoListener;
 import org.appwork.uio.ExceptionDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.dialog.ExceptionDialog;
@@ -37,6 +39,8 @@ import org.jdownloader.extensions.ExtensionConfigPanel;
 import org.jdownloader.extensions.StartException;
 import org.jdownloader.extensions.StopException;
 import org.jdownloader.extensions.antistandby.translate.AntistandbyTranslation;
+import org.jdownloader.extensions.extraction.ExtractionExtension;
+import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 
@@ -58,6 +62,9 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
     }
 
     public boolean isLinuxRunnable() {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && CrossSystem.isLinux()) {
+            return false;
+        }
         return false;
     }
 
@@ -97,22 +104,25 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
     }
 
     protected boolean requiresAntiStandby() {
-        return requiresAntiStandby(getSettings().getMode());
+        return requiresAntiStandby(getSettings().getCondition());
     }
 
-    protected boolean requiresAntiStandby(final Mode mode) {
-        switch (mode) {
-        case RUNNING:
-            return true;
-        case CRAWLING:
-            return LinkCollector.getInstance().isCollecting();
-        case DOWNLOADING:
-            return DownloadWatchDog.getInstance().getStateMachine().isState(DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.STOPPING_STATE);
-        case DOWNLOADINGDORCRAWLING:
-            return requiresAntiStandby(Mode.CRAWLING) || requiresAntiStandby(Mode.DOWNLOADING);
-        default:
+    protected boolean requiresAntiStandby(final Set<Condition> condition) {
+        if (condition == null) {
             return false;
+        } else if (condition.contains(Condition.RUNNING)) {
+            return true;
+        } else if (condition.contains(Condition.CRAWLING) && LinkCollector.getInstance().isCollecting()) {
+            return true;
+        } else if (condition.contains(Condition.DOWNLOADING) && DownloadWatchDog.getInstance().getStateMachine().isState(DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.STOPPING_STATE)) {
+            return true;
+        } else if (condition.contains(Condition.EXTRACTING)) {
+            final ExtractionExtension extension = ArchiveValidator.EXTENSION;
+            if (extension != null && !extension.getJobQueue().isEmpty()) {
+                return true;
+            }
         }
+        return false;
     }
 
     @Override
@@ -165,15 +175,6 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
                     return new AntistandbyConfigPanel(AntiStandbyExtension.this);
                 }
             }.getReturnValue();
-        }
-    }
-
-    public Mode getMode() {
-        final Mode ret = getSettings().getMode();
-        if (ret == null) {
-            return Mode.DOWNLOADING;
-        } else {
-            return ret;
         }
     }
 

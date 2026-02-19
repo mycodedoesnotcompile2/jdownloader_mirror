@@ -27,6 +27,7 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.locale._AWU;
+import org.appwork.utils.reflection.CompiledType;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.gui.IconKey;
@@ -340,8 +341,18 @@ public class AdvancedConfigEntry {
         } else {
             ret = gen.toString();
         }
+        ret = ret.replaceAll("[a-z0-9\\.]+\\.([^\\.]+)(<|\\{|,|$)", "$1$2");// remove package names
+        final CompiledType ct = CompiledType.create(gen);
+        if (ct.isContainer()) {
+            final CompiledType cot = ct.getComponentType();
+            if (cot != null && cot.isEnum(true)) {
+                ret += "\r\nvalid values for '" + cot.raw.getSimpleName() + "' are\r\n" + Arrays.toString(cot.raw.getEnumConstants());
+            }
+        } else if (ct.isEnum(true)) {
+            ret += "\r\nvalid values for '" + ct.raw.getSimpleName() + "' are\r\n" + Arrays.toString(ct.raw.getEnumConstants());
+        }
         if (v != null) {
-            ret += " [" + v + "]";
+            ret += "\r\n [" + v + "]";
         }
         return ret;
     }

@@ -31,23 +31,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -76,7 +59,24 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52292 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52327 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -108,11 +108,9 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br>
-         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
-         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br>
-         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
+         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -685,7 +683,7 @@ public class XHamsterCom extends PluginForHost {
         brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
         brc.getHeaders().put("content-type", "text/plain");
         brc.getHeaders().put("accept", "*/*");
-        brc.postPageRaw("https://xhamster.com/x-api", String.format("[{\"name\":\"favoriteVideosModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":\"%s\",\"modelName\":\"favoriteVideosModel\",\"itemState\":\"changed\",\"collections\":[\"%s\"],\"contentType\":\"videos\",\"contentEntity\":{\"id\":%s}},\"stats\":{\"favoriteSource\":\"thumb\"}}}]", uuid, collection_id, video_id));
+        brc.postPageRaw("https://xhamster.com/x-api", String.format("[{\"name\":\"favoriteVideosModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":%s,\"modelName\":\"favoriteVideosModel\",\"itemState\":\"changed\",\"collections\":[%s],\"contentType\":\"videos\",\"contentEntity\":{\"id\":%s}},\"stats\":{\"favoriteSource\":\"thumb\"}}}]", encodeToJSON(uuid), encodeToJSON(collection_id), encodeToJSON(video_id)));
         final List<Object> ressourcelist = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.LIST);
         final Map<String, Object> extras = (Map<String, Object>) JavaScriptEngineFactory.walkJson(ressourcelist, "{0}/extras");
         final Boolean result = (Boolean) extras.get("result");
@@ -694,6 +692,18 @@ public class XHamsterCom extends PluginForHost {
         } else {
             logger.warning("Something went wrong -> Item may not have been set as favorite!");
         }
+    }
+
+    private static String encodeToJSON(Object value) {
+        final String ret;
+        if (value == null) {
+            ret = "null";
+        } else if (value instanceof String) {
+            ret = JSonStorage.toString(value);
+        } else {
+            ret = JSonStorage.toString(value);
+        }
+        return ret;
     }
 
     private boolean isPremiumAccount(final Account account) {
@@ -1500,7 +1510,7 @@ public class XHamsterCom extends PluginForHost {
                     }
                     final Browser brc = br.cloneBrowser();
                     /* 2020-09-03: Browser sends crypted password but uncrypted password seems to work fine too */
-                    final String json = String.format("[{\"name\":\"entityUnlockModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":\"c280e6b4-d696-479c-bb7d-eb0627d36fb1\",\"modelName\":\"entityUnlockModel\",\"itemState\":\"changed\",\"password\":\"%s\",\"entityModel\":\"videoModel\",\"entityID\":%s}}}]", passCode, videoID);
+                    final String json = String.format("[{\"name\":\"entityUnlockModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":\"c280e6b4-d696-479c-bb7d-eb0627d36fb1\",\"modelName\":\"entityUnlockModel\",\"itemState\":\"changed\",\"password\":%s,\"entityModel\":\"videoModel\",\"entityID\":%s}}}]", encodeToJSON(passCode), encodeToJSON(videoID));
                     brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
                     brc.getHeaders().put("content-type", "text/plain");
                     brc.getHeaders().put("accept", "*/*");
@@ -1721,9 +1731,9 @@ public class XHamsterCom extends PluginForHost {
         }
         final String siteKey = PluginJSonUtils.getJson(br, "recaptchaKey");
         final String id = createID();
-        final String requestdataFormat = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":\"%s\",\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"trusted\":true,\"username\":\"%s\",\"password\":\"%s\",\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"g-recaptcha-response\":\"%s\"}}]";
-        final String requestdataFormatCaptcha = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":\"%s\",\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"username\":\"%s\",\"password\":\"%s\",\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"trusted\":true,\"g-recaptcha-response\":\"%s\"}}]";
-        String requestData = String.format(requestdataFormat, id, account.getUser(), account.getPass(), "");
+        final String requestdataFormat = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":%s,\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"trusted\":true,\"username\":%s,\"password\":%s,\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"g-recaptcha-response\":%s}}]";
+        final String requestdataFormatCaptcha = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":%s,\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"username\":%s,\"password\":%s,\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"trusted\":true,\"g-recaptcha-response\":%s}}]";
+        String requestData = String.format(requestdataFormat, encodeToJSON(id), encodeToJSON(account.getUser()), encodeToJSON(account.getPass()), encodeToJSON(""));
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         brc.postPageRaw("/x-api", requestData);
@@ -1737,7 +1747,7 @@ public class XHamsterCom extends PluginForHost {
                 /* Old */
                 recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc, siteKey).getToken();
             }
-            requestData = String.format(requestdataFormatCaptcha, id, account.getUser(), account.getPass(), recaptchaV2Response);
+            requestData = String.format(requestdataFormatCaptcha, encodeToJSON(id), encodeToJSON(account.getUser()), encodeToJSON(account.getPass()), encodeToJSON(recaptchaV2Response));
             /* TODO: Fix this */
             brc.postPageRaw("/x-api", requestData);
         }
@@ -1903,7 +1913,7 @@ public class XHamsterCom extends PluginForHost {
          * {"promo_id":"","video_id":null,"studio_id":null,"producer_id":null,"orientation":"straight","ml_page":"main_page",
          * "ml_page_value_id":null,"ml_page_value":null,"ml_page_number":null}
          */
-        brc.postPageRaw("/api/auth/signin", String.format("{\"login\":\"%s\",\"password\":\"%s\",\"rememberMe\":\"1\",\"recaptcha\":\"%s\",\"trackingParamsBag\":\"eyJwcm9tb19pZCI6IiIsInZpZGVvX2lkIjpudWxsLCJzdHVkaW9faWQiOm51bGwsInByb2R1Y2VyX2lkIjpudWxsLCJvcmllbnRhdGlvbiI6InN0cmFpZ2h0IiwibWxfcGFnZSI6Im1haW5fcGFnZSIsIm1sX3BhZ2VfdmFsdWVfaWQiOm51bGwsIm1sX3BhZ2VfdmFsdWUiOm51bGwsIm1sX3BhZ2VfbnVtYmVyIjpudWxsfQ==\"}", PluginJSonUtils.escape(account.getUser()), PluginJSonUtils.escape(account.getPass()), recaptchaV2Response));
+        brc.postPageRaw("/api/auth/signin", String.format("{\"login\":%s,\"password\":%s,\"rememberMe\":\"1\",\"recaptcha\":%s,\"trackingParamsBag\":\"eyJwcm9tb19pZCI6IiIsInZpZGVvX2lkIjpudWxsLCJzdHVkaW9faWQiOm51bGwsInByb2R1Y2VyX2lkIjpudWxsLCJvcmllbnRhdGlvbiI6InN0cmFpZ2h0IiwibWxfcGFnZSI6Im1haW5fcGFnZSIsIm1sX3BhZ2VfdmFsdWVfaWQiOm51bGwsIm1sX3BhZ2VfdmFsdWUiOm51bGwsIm1sX3BhZ2VfbnVtYmVyIjpudWxsfQ==\"}", encodeToJSON(account.getUser()), encodeToJSON(account.getPass()), encodeToJSON(recaptchaV2Response)));
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         /* e.g. error response: { "errors": { "_global": [ "Invalid credentials" ] }, "userId": null, "hasGoldSubscription": false} */
         final Object errorsO = entries.get("errors");
@@ -1978,10 +1988,9 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
-             * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
+             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
+             * user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

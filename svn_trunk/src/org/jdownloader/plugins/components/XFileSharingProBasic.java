@@ -92,7 +92,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52324 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52336 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -167,20 +167,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /* Used variables */
-    protected WeakHashMap<Request, String[]>  correctedBrowserRequestMap                                  = new WeakHashMap<Request, String[]>();
+    protected WeakHashMap<Request, String[]>  correctedBrowserRequestMap                               = new WeakHashMap<Request, String[]>();
     /* Don't touch the following! */
-    private static Map<String, AtomicInteger> freeRunning                                                 = new HashMap<String, AtomicInteger>();
-    protected static final String             PROPERTY_ACCOUNT_apikey                                     = "apikey";
-    private static final String               PROPERTY_PLUGIN_api_domain_with_protocol                    = "apidomain";
-    private long                              timestampAbuseAvailablecheckLastFailure                     = -1;
-    private int                               numberofContinuousFailuresAbuseAvailablecheckLastFailure    = 0;
-    private long                              timestampAltAvailablecheckLastFailure                       = -1;
-    private int                               numberofContinuousFailuresAltAvailablecheckLastFailure      = 0;
-    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING             = "ALT_AVAILABLECHECK_LAST_WORKING";
-    public static final String                PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL                    = "last_working_payment_url";
-    protected static final String             PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE = "allow_api_download_attempt_in_website_mode";
-    private String                            videoStreamDownloadurl                                      = null;
-    private boolean                           hasCheckedEmbedHandling                                     = false;
+    private static Map<String, AtomicInteger> freeRunning                                              = new HashMap<String, AtomicInteger>();
+    protected static final String             PROPERTY_ACCOUNT_apikey                                  = "apikey";
+    private static final String               PROPERTY_PLUGIN_api_domain_with_protocol                 = "apidomain";
+    private long                              timestampAbuseAvailablecheckLastFailure                  = -1;
+    private int                               numberofContinuousFailuresAbuseAvailablecheckLastFailure = 0;
+    private long                              timestampAltAvailablecheckLastFailure                    = -1;
+    private int                               numberofContinuousFailuresAltAvailablecheckLastFailure   = 0;
+    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING          = "ALT_AVAILABLECHECK_LAST_WORKING";
+    public static final String                PROPERTY_PLUGIN_LAST_WORKING_PAYMENT_URL                 = "last_working_payment_url";
+    private String                            videoStreamDownloadurl                                   = null;
+    private boolean                           hasCheckedEmbedHandling                                  = false;
 
     public static enum URL_TYPE {
         EMBED_VIDEO,
@@ -558,16 +557,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return false;
     }
 
+    protected static WeakHashMap<Account, Boolean> API_DOWNLOAD_IF_KEY_IS_AVAILABLE = new WeakHashMap<Account, Boolean>();
+
     protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
         if (account == null) {
             return false;
         }
         /* Allow download via API if API key is available && download via API is allowed. */
         final boolean apikey_is_available = this.getAPIKeyFromAccount(account) != null;
-        if (apikey_is_available && account.hasProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE)) {
-            return true;
-        } else {
+        if (!apikey_is_available) {
             return false;
+        }
+        synchronized (API_DOWNLOAD_IF_KEY_IS_AVAILABLE) {
+            return !Boolean.FALSE.equals(API_DOWNLOAD_IF_KEY_IS_AVAILABLE.get(account));
         }
     }
 
@@ -1061,27 +1063,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-    try {
-        /* Check if response is plaintext and contains any known error messages. */
-        final byte[] probe = urlConnection.peek(32);
-        if (probe.length > 0) {
-            final String probeContext = new String(probe, "UTF-8");
-            final Request clone = urlConnection.getRequest().cloneRequest();
-            clone.setHtmlCode(probeContext);
-            final Browser br = createNewBrowserInstance();
-            br.setRequest(clone);
-            try {
-                // TODO: extract the html checks into own method to avoid Browser instance
-                checkServerErrors(br, getDownloadLink(), null);
-            } catch (PluginException e) {
-                logger.log(e);
-                return false;
+        try {
+            /* Check if response is plaintext and contains any known error messages. */
+            final byte[] probe = urlConnection.peek(32);
+            if (probe.length > 0) {
+                final String probeContext = new String(probe, "UTF-8");
+                final Request clone = urlConnection.getRequest().cloneRequest();
+                clone.setHtmlCode(probeContext);
+                final Browser br = createNewBrowserInstance();
+                br.setRequest(clone);
+                try {
+                    // TODO: extract the html checks into own method to avoid Browser instance
+                    checkServerErrors(br, getDownloadLink(), null);
+                } catch (PluginException e) {
+                    logger.log(e);
+                    return false;
+                }
             }
+        } catch (IOException e) {
+            logger.log(e);
         }
-    } catch (IOException e) {
-        logger.log(e);
-    }
-    return true;
+        return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -4435,7 +4437,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 } else {
                     statusText = account.getType().toString();
                 }
-                ai.setStatus("[API] | DLs: " + account.hasProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE) + " | " + statusText);
+                ai.setStatus("[API] | DLs: " + allowAPIDownloadIfApikeyIsAvailable(null, account) + " | " + statusText);
             }
             return ai;
         }
@@ -5492,6 +5494,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             String directlinkFromAPI = null;
             try {
                 directlinkFromAPI = this.getDllinkAPI(link, account);
+                synchronized (API_DOWNLOAD_IF_KEY_IS_AVAILABLE) {
+                    API_DOWNLOAD_IF_KEY_IS_AVAILABLE.put(account, Boolean.TRUE);
+                }
+            } catch (APIUnavailableException e) {
+                logger.log(e);
+                synchronized (API_DOWNLOAD_IF_KEY_IS_AVAILABLE) {
+                    API_DOWNLOAD_IF_KEY_IS_AVAILABLE.put(account, Boolean.FALSE);
+                }
+                break tryAPIDownload;
             } catch (final InterruptedException ie) {
                 throw ie;
             } catch (final Throwable e) {
@@ -5858,15 +5869,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             getPage(br, this.getAPIBase() + "/account/info?key=" + apikey);
             final Map<String, Object> entries = this.checkErrorsAPI(br, null, account);
-            final boolean loginAPICheckIfDownloadsAreAllowed = true;
-            if (loginAPICheckIfDownloadsAreAllowed) {
+            final boolean checkIfAPIDownloadsAreAllowed;
+            synchronized (API_DOWNLOAD_IF_KEY_IS_AVAILABLE) {
+                checkIfAPIDownloadsAreAllowed = API_DOWNLOAD_IF_KEY_IS_AVAILABLE.get(account) == null;
+            }
+            if (checkIfAPIDownloadsAreAllowed) {
                 /**
                  * Find out whether or not we can download via API with this account. <br>
                  * Depending on the account-type and/or XFS API config, login via API may be successful but downloading via API is not
                  * possible. <br>
                  * We want to determine this here so later we can decide whether we want to try downloads via API.
                  */
-                boolean apiDownloadsPossible = false;
+                Boolean apiDownloadsPossible = null;
                 try {
                     final Browser brc = br.cloneBrowser();
                     getPage(brc, this.getAPIBase() + "/file/direct_link?key=" + apikey + "&file_code=");
@@ -5878,16 +5892,21 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     final String msg = (String) result.get("msg");
                     if (StringUtils.equalsIgnoreCase(msg, "uploading") && "200".equals(StringUtils.valueOfOrNull(result.get("status")))) {
                         /* 2024-05-27: */
-                        apiDownloadsPossible = true;
+                        apiDownloadsPossible = Boolean.TRUE;
+                    } else {
+                        apiDownloadsPossible = Boolean.FALSE;
                     }
-                } catch (final PluginException ple) {
-                    if (ple.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
+                } catch (APIUnavailableException e) {
+                    logger.log(e);
+                    apiDownloadsPossible = Boolean.FALSE;
+                } catch (final PluginException e) {
+                    logger.log(e);
+                    if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
                         /**
-                         * Typically this happens when downloads are not possible via API: {"msg":"This function not allowed in
-                         * API","server_time":"2023-11-30 15:53:27","status":403} <br>
+                         * Typically this happens when downloads are not possible via API: <br>
                          */
                         /* {"server_time":"2023-11-30 15:53:33","status":404,"msg":"no file"} */
-                        apiDownloadsPossible = true;
+                        apiDownloadsPossible = Boolean.TRUE;
                     }
                 } catch (final InterruptedException e) {
                     throw e;
@@ -5896,10 +5915,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     logger.info("Exception occured API download check");
                 } finally {
                     logger.info("API download status: " + apiDownloadsPossible);
-                    if (apiDownloadsPossible) {
-                        account.setProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE, true);
-                    } else {
-                        account.removeProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE);
+                    if (apiDownloadsPossible != null) {
+                        synchronized (API_DOWNLOAD_IF_KEY_IS_AVAILABLE) {
+                            API_DOWNLOAD_IF_KEY_IS_AVAILABLE.put(account, apiDownloadsPossible);
+                        }
                     }
                 }
             }
@@ -6077,6 +6096,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    public static class APIUnavailableException extends AccountUnavailableException {
+
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+
+        public APIUnavailableException() {
+            super("API does not allow download | Contact support of this website", 5 * 60 * 1000l);
+        }
+    }
+
     /**
      * Can be executed after API calls to check for- and handle errors. <br>
      * Example good API response: {"msg":"OK","server_time":"2020-05-25 13:09:37","status":200,"result":[{"...
@@ -6106,24 +6137,23 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return entries;
         }
         final String errormsg = (String) entries.get("msg");
+        if (status == 403 && ("Not enabled".equalsIgnoreCase(errormsg) || "This function not allowed in API".equalsIgnoreCase(errormsg) || "Wrong auth".equalsIgnoreCase(errormsg))) {
+            // {"status":403,"server_time":"2026-02-17 15:01:04","msg":"Not enabled"}
+            // {"msg":"This function not allowed in API","server_time":"2023-11-30 15:53:27","status":403}
+            // {"msg":"Wrong auth","server_time":"2024-11-28 12:03:07","status":403}
+            // api method not enabled
+            throw new APIUnavailableException();
+        }
         /**
          * TODO: Maybe first check for errormessage based on text, then handle statuscode. <br>
          * One statuscode can be returned with different errormessages!
          */
         /* First check for specific error messages */
         if (errormsg != null) {
-            /* TODO: Check for more error messages e.g. {"msg":"Wrong auth","server_time":"2024-11-28 12:03:07","status":403} */
-            if (errormsg.equalsIgnoreCase("This function not allowed in API")) {
-                /* API does not allow user to download so basically we can't use it -> Temp disable account. */
-                throw new AccountUnavailableException("API does not allow download | Contact support of this website", 5 * 60 * 1000l);
-            } else if (errormsg.equalsIgnoreCase("Wrong auth")) {
-                /* API does not allow user to download so basically we can't use it -> Temp disable account. */
-                throw new AccountInvalidException(errormsg);
-            }
+            /* TODO: Check for more error messages e.g. */
             if (errormsg.equalsIgnoreCase("no file")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (link == null) {
+            } else if (link == null) {
                 /* Error happened during account login */
                 throw new AccountInvalidException(errormsg);
             }

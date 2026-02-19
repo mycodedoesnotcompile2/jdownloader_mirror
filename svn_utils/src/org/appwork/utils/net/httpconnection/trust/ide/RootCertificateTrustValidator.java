@@ -17,64 +17,83 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.security.KeyStore;
-import java.security.cert.CertPath;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.testframework.AWTest;
 import org.appwork.utils.Hash;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.httpconnection.TrustResult;
-import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
-import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
 import org.appwork.utils.os.WindowsCertUtils;
 
 /**
- * Validiert Root-Zertifikate gegen mehrere Trust-Provider (JRE, OS, Mozilla/CCADB, CT Sycamore, Apple, Google Chrome, Android, Cisco TRS,
- * optional Microsoft Windows Update bzw. Microsoft CCADB). Ausgabe: pro Zertifikat eine Liste der Provider, die es als vertrauenswürdige
- * Root-CA akzeptieren.
+ * Validates root certificates against multiple trust providers (JRE, OS, Mozilla/CCADB, CT Sycamore, Apple, Google Chrome, Android,
+ * optionally Microsoft Windows Update or Microsoft CCADB). Output: per certificate, the list of providers that accept it as a trusted root
+ * CA.
  * <p>
- * Apple Root Store: Siehe <a href="https://support.apple.com/en-us/103272">Available root certificates for Apple operating systems</a>;
- * Fingerprints werden aus der veröffentlichten HTML-Liste (z. B. iOS/macOS Root Store) geparst.
+ * Apple Root Store: See <a href="https://support.apple.com/en-us/103272">Available root certificates for Apple operating systems</a>;
+ * fingerprints are parsed from the published HTML list (e.g. iOS/macOS Root Store).
  * <p>
- * Microsoft (Windows Update): Root-Store als PFX laden, erzeugt mit certutil (nur Windows):<br>
+ * Microsoft (Windows Update): Load root store as PFX, created with certutil (Windows only):<br>
  * {@code certutil -generateSSTFromWU roots.sst}<br>
- * {@code certutil -dump roots.sst} (optional, zur Kontrolle)<br>
+ * {@code certutil -dump roots.sst} (optional, for verification)<br>
  * {@code certutil -exportPFX roots.sst roots.pfx}<br>
- * Dann {@link #addMicrosoftRootStoreFromPfx(File) addMicrosoftRootStoreFromPfx}(new File("roots.pfx")) oder
- * {@link #addTrustStoreFromPfx(String, File, char[]) addTrustStoreFromPfx}("Microsoft (Windows Update)", roots.pfx, null). Alternativ
- * {@link #addMicrosoftRootStoreViaCertutil()} bzw. {@link #addMicrosoftRootStoreViaCertutil(File)}: führt certutil automatisch aus und
- * liest die erzeugte PFX ein (nur unter Windows). Zusätzlich: {@link #enableMicrosoftCCADB()} lädt die Microsoft-Liste aus dem CCADB-CSV
- * (plattformunabhängig).
+ * To enable the Microsoft (Windows Update) store call {@link #enableMicrosoftWindowsUpdate()} or
+ * {@link #enableMicrosoftWindowsUpdate(File)} (tries PFX, then certutil, then Windows API). Alternatively use
+ * {@link #addMicrosoftRootStoreFromPfx(File)}, {@link #addMicrosoftRootStoreViaCertutil()}, or
+ * {@link #addMicrosoftRootStoreFromWindowsAPI()} directly. {@link #enableMicrosoftCCADB()} loads the Microsoft list from the CCADB CSV
+ * (cross-platform).
  * <p>
- * Android Root Store: {@link #enableAndroidRootStore()} lädt google/roots.pem von Android Googlesource. Cisco Trusted Root Store (TRS):
- * {@link #enableCiscoTRS()} lädt das Intersect-P7B (Java 9+ für PKCS7). Mozilla Included Roots (Websites):
- * {@link #enableMozillaIncludedRootsPem()} lädt die PEM von CCADB (TrustBitsInclude=Websites).
+ * Android Root Store: {@link #enableAndroidRootStore()} loads google/roots.pem from Android Googlesource. Mozilla Included Roots
+ * (Websites): {@link #enableMozillaIncludedRootsPem()} loads the PEM from CCADB (TrustBitsInclude=Websites). Mozilla NSS certdata (trust
+ * bits): {@link #enableMozillaCertdata()} loads certdata.txt and uses CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR for TLS/Websites.
  * <p>
- * Kompilieren nach bin-cursor (nur diese Klasse, Rest aus Eclipse bin):<br>
+ * <b>Certificate sources vs. fingerprint-only:</b> Apple and Google Chrome supply only SHA-256 fingerprints (from HTML/root_store.certs);
+ * they do not supply certificate bytes. The actual certificates used as candidates and written to the output PEM come only from stores that
+ * provide full certs: Android (PEM), Sycamore CT (get-roots), Mozilla (PEM), and Microsoft (PFX/certutil/Windows API). Apple and Chrome are
+ * used only during validation to mark which of those candidates they would accept; they never contribute cert objects.
+ * <p>
+ * <b>EKU (Extended Key Usage) and validity:</b> Only roots suitable for TLS server authentication are included. Where the source provides
+ * that information it is enforced: <b>Microsoft CCADB</b> CSV uses columns "Microsoft Status" (Included), "Microsoft EKUs" (must contain
+ * "Server Authentication"), "Valid To [GMT]" (not expired). <b>Mozilla certdata</b> uses CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR.
+ * <b>Mozilla Included Roots PEM</b> is pre-filtered by CCADB (Websites). For sources that supply full certificates (Android, Sycamore,
+ * Mozilla PEM, Microsoft PFX/API) EKU is enforced via {@link TrustUtils#isAcceptableCaTrustAnchorForSsl} (CA + serverAuth when EKU
+ * present). <b>Expired</b> certificates (notAfter before start of today GMT) are excluded everywhere via
+ * {@link #filterOutExpiredCertificates}.
+ * <p>
+ * Compile to bin-cursor (this class only, rest from Eclipse bin):<br>
  * javac -source 1.6 -target 1.6 -encoding UTF-8 -cp "bin;libs/*;dev_libs/*" -d bin-cursor
  * src/org/appwork/utils/net/httpconnection/trust/RootCertificateTrustValidator.java
  * <p>
- * Ausführen (ohne Eingabe-PEM; Kandidaten kommen aus den Stores, Ausgabe = Schnittmenge aller aktivierten Stores):<br>
- * java ... RootCertificateTrustValidator [ausgabe.pem] [roots.pfx]
+ * Run (no input PEM; candidates come from stores, output = intersection of all enabled stores):<br>
+ * java ... RootCertificateTrustValidator [output.pem] [roots.pfx]
+ * <p>
+ * Optional: {@code -DRootCertificateTrustValidator.fillMissingFromCrtsh=true} fills candidates that exist only in Apple/Chrome
+ * (fingerprint-only stores) by loading the cert from <a href="https://crt.sh/">crt.sh</a> by SHA-256; the downloaded cert is verified by
+ * fingerprint before use (max 200 fetches).
  */
 public final class RootCertificateTrustValidator {
-    /** Ergebnis pro Zertifikat: Fingerprint, Subject und die Namen der Provider, die es akzeptieren. */
+    /** Result per certificate: fingerprint, subject, and the names of providers that accept it. */
     public static final class CertTrustResult {
         private final String       fingerprintSha256;
         private final String       subject;
@@ -104,11 +123,11 @@ public final class RootCertificateTrustValidator {
         }
     }
 
-    /** Einzelner Trust-Check: Name + Provider oder Fingerprint-Set (für CT/Mozilla-URL). */
+    /** Single trust check: name + provider or fingerprint set (for CT/Mozilla URL). */
     private static final class ProviderCheck {
         final String                 name;
         final TrustProviderInterface provider;
-        final Set<String>            fingerprintSet; // wenn nicht null, wird nur Fingerprint-Abgleich gemacht
+        final Set<String>            fingerprintSet; // if not null, only fingerprint comparison is done
 
         ProviderCheck(final String name, final TrustProviderInterface provider) {
             this.name = name;
@@ -125,17 +144,17 @@ public final class RootCertificateTrustValidator {
 
     private static final String       AUTH_TYPE                       = "RSA";
     private final List<ProviderCheck> checks                          = new ArrayList<ProviderCheck>();
-    /** Cache für Sycamore-CT-Roots (Fingerprints). */
+    /** Cache for Sycamore CT roots (fingerprints). */
     private static final String       SYCAMORE_GET_ROOTS_URL          = "https://log.sycamore.ct.letsencrypt.org/2025h2d/ct/v1/get-roots";
     private static Set<String>        sycamoreRootFingerprintsCache;
     private static final Object       SYCAMORE_LOCK                   = new Object();
     /**
-     * Apple Root Store – veröffentlichte Liste (z. B. iOS 18 / macOS 15). Siehe https://support.apple.com/en-us/103272
+     * Apple Root Store – published list (e.g. iOS 18 / macOS 15). See https://support.apple.com/en-us/103272
      */
     private static final String       APPLE_ROOT_STORE_URL            = "https://support.apple.com/en-us/126047";
     private static Set<String>        appleRootFingerprintsCache;
     private static final Object       APPLE_LOCK                      = new Object();
-    /** Google Chrome Root Store (Chromium). root_store.certs enthält Zeilen "# <sha256>" pro Zertifikat. */
+    /** Google Chrome Root Store (Chromium). root_store.certs contains lines "# <sha256>" per certificate. */
     private static final String       GOOGLE_CHROME_ROOT_STORE_URL    = "https://raw.githubusercontent.com/chromium/chromium/main/net/data/ssl/chrome_root_store/root_store.certs";
     private static Set<String>        googleChromeRootFingerprintsCache;
     private static final Object       GOOGLE_CHROME_LOCK              = new Object();
@@ -146,65 +165,45 @@ public final class RootCertificateTrustValidator {
     private static final String       ANDROID_ROOTS_PEM_URL           = "https://android.googlesource.com/platform/system/ca-certificates/+/66ef0b3293faacd95d21ba2d05c4187f0a7e8175/google/roots.pem?format=TEXT";
     private static Set<String>        androidRootFingerprintsCache;
     private static final Object       ANDROID_LOCK                    = new Object();
-    /** Cisco Trusted Root Store (TRS), Intersect-Bundle für öffentliches Internet (P7B). */
-    private static final String       CISCO_TRS_P7B_URL               = "https://www.cisco.com/security/pki/trs/current/ios/ios.p7b";
-    private static Set<String>        ciscoTRSFingerprintsCache;
-    private static final Object       CISCO_TRS_LOCK                  = new Object();
-    /** Microsoft Trusted Root Program – CCADB-Report (CSV mit SHA-256-Fingerprints). */
+    /** Microsoft Trusted Root Program – CCADB report (CSV with SHA-256 fingerprints). */
     private static final String       MICROSOFT_CCADB_CSV_URL         = "https://ccadb.my.salesforce-sites.com/microsoft/IncludedCACertificateReportForMSFTCSV";
     private static Set<String>        microsoftCCADBFingerprintsCache;
+    private static Set<String>        microsoftCCADBDisabledFingerprintsCache;
     private static final Object       MICROSOFT_CCADB_LOCK            = new Object();
     /** Mozilla Included Roots PEM (CCADB, TrustBitsInclude=Websites). */
     private static final String       MOZILLA_INCLUDED_ROOTS_PEM_URL  = "https://ccadb.my.salesforce-sites.com/mozilla/IncludedRootsPEMTxt?TrustBitsInclude=Websites";
     private static Set<String>        mozillaIncludedRootsPemFingerprintsCache;
     private static final Object       MOZILLA_INCLUDED_ROOTS_PEM_LOCK = new Object();
+    /** Mozilla NSS certdata.txt (CKA_TRUST_SERVER_AUTH etc.). */
+    private static final String       MOZILLA_CERTDATA_URL            = "https://hg.mozilla.org/projects/nss/raw-file/tip/lib/ckfw/builtins/certdata.txt";
+    private static Set<String>        mozillaCertdataFingerprintsCache;
+    private static final Object       MOZILLA_CERTDATA_LOCK           = new Object();
+    /** crt.sh: search by SHA-256 fingerprint (returns HTML); download cert by id (returns PEM). */
+    private static final String       CRTSH_QUERY_URL                 = "https://crt.sh/?q=";
+    private static final String       CRTSH_DOWNLOAD_URL              = "https://crt.sh/?d=";
 
     /**
-     * Erstellt einen Validator mit JRE-, OS- und CCADB-Provider (für Validierungsberichte gegen alle Quellen).
+     * Creates a validator. With {@code includeJreOsCcadb == false}, JRE, OS and Mozilla (CCADB) are not added; only stores enabled via
+     * {@code enable...} are used (e.g. for intersection-only output).
      */
     public RootCertificateTrustValidator() {
-        this(true);
     }
 
     /**
-     * Erstellt einen Validator. Mit {@code includeJreOsCcadb == false} werden JRE, OS und Mozilla (CCADB) nicht hinzugefügt; dann zählen
-     * nur die per {@code enable...} aktivierten Stores (z. B. für reine Schnittmengen-Ausgabe).
-     */
-    public RootCertificateTrustValidator(final boolean includeJreOsCcadb) {
-        if (includeJreOsCcadb) {
-            try {
-                checks.add(new ProviderCheck("JRE", CurrentJRETrustProvider.getInstance()));
-            } catch (final Exception e) {
-                // skip
-            }
-            try {
-                checks.add(new ProviderCheck("OS", TrustUtils.getOSProvider()));
-            } catch (final Exception e) {
-                // skip
-            }
-            try {
-                checks.add(new ProviderCheck("Mozilla (CCADB)", new CCADBTrustProvider()));
-            } catch (final Exception e) {
-                // skip
-            }
-        }
-    }
-
-    /**
-     * Fügt eine Trust-Quelle aus einer PFX-/Keystore-Datei hinzu (z. B. Microsoft Roots von certutil). Alle Zertifikate aus dem Keystore
-     * werden gelesen; deren SHA-256-Fingerprints werden mit den zu prüfenden Zertifikaten abgeglichen.
+     * Adds a trust source from a PFX/keystore file (e.g. Microsoft roots from certutil). All certificates from the keystore are read; their
+     * SHA-256 fingerprints are matched against the certificates to be validated.
      *
      * @param providerName
-     *            Anzeigename der Quelle (z. B. "Microsoft (Windows Update)")
+     *            Display name of the source (e.g. "Microsoft (Windows Update)")
      * @param pfxFile
-     *            PFX- oder Keystore-Datei (PKCS12, ggf. JKS)
+     *            PFX or keystore file (PKCS12, or JKS)
      * @param password
-     *            Keystore-Passwort; null oder leer für kein Passwort (typisch bei certutil -exportPFX)
-     * @return true wenn mindestens ein Zertifikat geladen wurde, sonst false
+     *            Keystore password; null or empty for no password (typical for certutil -exportPFX)
+     * @return true if at least one certificate was loaded, false otherwise
      */
     /**
-     * Lädt alle X509-Zertifikate aus einer PFX-Datei (Certificate-Entries und Zertifikate aus Key-Entry-Ketten). certutil-exportierte PFX
-     * enthalten die Roots oft nur in Key-Entries.
+     * Loads all X509 certificates from a PFX file (certificate entries and certificates from key-entry chains). certutil-exported PFX often
+     * contains roots only in key entries.
      */
     private static X509Certificate[] loadAllCertificatesFromPfx(final File pfxFile, final char[] password) throws Exception {
         final KeyStore ks = KeyStore.getInstance("PKCS12");
@@ -307,6 +306,9 @@ public final class RootCertificateTrustValidator {
                 if (!TrustUtils.isAcceptableCaTrustAnchorForSsl(certs[i])) {
                     continue;
                 }
+                if (isCertificateExpired(certs[i])) {
+                    continue;
+                }
                 try {
                     final String fp = Hash.getSHA256(certs[i].getEncoded());
                     if (fp != null) {
@@ -347,6 +349,9 @@ public final class RootCertificateTrustValidator {
                 if (!TrustUtils.isAcceptableCaTrustAnchorForSsl(c)) {
                     continue;
                 }
+                if (isCertificateExpired(c)) {
+                    continue;
+                }
                 try {
                     final String fp = Hash.getSHA256(c.getEncoded());
                     if (fp != null) {
@@ -372,9 +377,9 @@ public final class RootCertificateTrustValidator {
      * Windows Crypto API (CertOpenStore with CERT_STORE_PROV_FILENAME). No certutil -exportPFX required. On failure (e.g. JNA not
      * available), falls back to certutil -exportPFX and reading the PFX. Windows only.
      * <p>
-     * The SST contains the <i>full</i> WU root catalog (all roots Microsoft can deploy via Windows Update), so the count is typically
-     * much higher (e.g. 500+) than the local "Root" store ({@link #addMicrosoftRootStoreFromWindowsAPI()}), which only has the roots
-     * actually installed on this machine (e.g. ~177).
+     * The SST contains the <i>full</i> WU root catalog (all roots Microsoft can deploy via Windows Update), so the count is typically much
+     * higher (e.g. 500+) than the local "Root" store ({@link #addMicrosoftRootStoreFromWindowsAPI()}), which only has the roots actually
+     * installed on this machine (e.g. ~177).
      *
      * @param workDir
      *            Directory for roots.sst; null = temporary directory
@@ -413,6 +418,9 @@ public final class RootCertificateTrustValidator {
                     if (!TrustUtils.isAcceptableCaTrustAnchorForSsl(c)) {
                         continue;
                     }
+                    if (isCertificateExpired(c)) {
+                        continue;
+                    }
                     try {
                         final String fp = Hash.getSHA256(c.getEncoded());
                         if (fp != null) {
@@ -449,8 +457,42 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Führt einen externen Befehl im angegebenen Arbeitsverzeichnis aus und gibt den Exit-Code zurück. Stdout und Stderr werden gelesen,
-     * damit der Prozess nicht blockiert; Stderr wird bei Nicht-Null auf System.err ausgegeben.
+     * Enables validation against the Microsoft Root Store (Windows Update). Tries to load the store in order: from the given PFX file (if
+     * non-null and existing), then from default {@code roots.pfx} in the current directory, then via certutil (SST from Windows Update),
+     * then from the local Windows Root store (Windows API). Stops at the first successful source and adds one check named "Microsoft
+     * (Windows Update)". Call this to enable the Microsoft WU store; do not call it to leave it disabled.
+     *
+     * @param optionalPfxFile
+     *            Optional PFX file (e.g. from 2nd command-line arg); may be null
+     * @return true if the store was loaded and added, false otherwise
+     */
+    public boolean enableMicrosoftWindowsUpdate(final File optionalPfxFile) {
+        if (optionalPfxFile != null && optionalPfxFile.isFile() && addMicrosoftRootStoreFromPfx(optionalPfxFile)) {
+            return true;
+        }
+        final File defaultPfx = new File(System.getProperty("user.dir", ""), "roots.pfx");
+        if (defaultPfx.isFile() && addMicrosoftRootStoreFromPfx(defaultPfx)) {
+            return true;
+        }
+        if (addMicrosoftRootStoreViaCertutil()) {
+            return true;
+        }
+        if (addMicrosoftRootStoreFromWindowsAPI()) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Same as {@link #enableMicrosoftWindowsUpdate(File)} with null (tries default roots.pfx, then certutil, then Windows API).
+     */
+    public boolean enableMicrosoftWindowsUpdate() {
+        return enableMicrosoftWindowsUpdate(null);
+    }
+
+    /**
+     * Runs an external command in the given working directory and returns the exit code. Stdout and stderr are read so the process does not
+     * block; stderr is printed to System.err when non-null.
      */
     private static int runProcess(final String[] cmd, final File workDir) {
         Process proc = null;
@@ -529,8 +571,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Aktiviert den Abgleich gegen den Google Chrome Root Store (Chromium). Fingerprints werden aus root_store.certs geladen. Funktioniert
-     * plattformunabhängig.
+     * Enables validation against the Google Chrome Root Store (Chromium). Fingerprints are loaded from root_store.certs. Works
+     * cross-platform.
      */
     public void enableGoogleChromeRootStore() {
         final Set<String> set = loadGoogleChromeRootFingerprints();
@@ -540,7 +582,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die SHA-256-Fingerprints aus der Chromium root_store.certs (Zeilen "# <64 hex chars>").
+     * Loads SHA-256 fingerprints from Chromium root_store.certs (lines "# <64 hex chars>").
      */
     public static Set<String> loadGoogleChromeRootFingerprints() {
         synchronized (GOOGLE_CHROME_LOCK) {
@@ -569,8 +611,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Aktiviert den Abgleich gegen die veröffentlichte Apple Root-Store-Liste (SHA-256-Fingerprints aus
-     * https://support.apple.com/en-us/103272). Funktioniert plattformunabhängig (nicht nur unter macOS).
+     * Enables validation against the published Apple Root Store list (SHA-256 fingerprints from https://support.apple.com/en-us/103272).
+     * Works cross-platform (not only on macOS).
      */
     public void enableAppleRootStore() {
         final Set<String> set = loadAppleRootFingerprints();
@@ -580,8 +622,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die SHA-256-Fingerprints aus der Apple Support-HTML-Seite (Tabellen-Spalte "Fingerprint (SHA-256)"). Format in der Tabelle: "D7
-     * A7 A0 FB 5D 7E ..." (32 Bytes, Leerzeichen getrennt).
+     * Loads SHA-256 fingerprints from the Apple Support HTML page (table column "Fingerprint (SHA-256)"). Table format: "D7 A7 A0 FB 5D 7E
+     * ..." (32 bytes, space-separated).
      */
     public static Set<String> loadAppleRootFingerprints() {
         synchronized (APPLE_LOCK) {
@@ -595,7 +637,7 @@ public final class RootCertificateTrustValidator {
             if (html == null) {
                 return fingerprints;
             }
-            // Apple: "Fingerprint (SHA-256)"-Spalte enthält 32 Hex-Bytes mit Leerzeichen: "D7 A7 A0 FB ..."
+            // Apple: "Fingerprint (SHA-256)" column contains 32 hex bytes with spaces: "D7 A7 A0 FB ..."
             final Pattern p = Pattern.compile("[0-9A-Fa-f]{2}(?:\\s+[0-9A-Fa-f]{2}){31}");
             final Matcher m = p.matcher(html);
             while (m.find()) {
@@ -615,8 +657,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Aktiviert den Abgleich gegen den Certificate-Transparency-Log Sycamore (Let's Encrypt). Roots, die in diesem Log vorkommen, gelten
-     * als "CT (Sycamore)".
+     * Enables validation against the Certificate Transparency log Sycamore (Let's Encrypt). Roots present in this log are treated as "CT
+     * (Sycamore)".
      */
     public void enableSycamoreCT() {
         final Set<String> set = loadSycamoreRootFingerprints();
@@ -626,7 +668,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die Root-Fingerprints aus dem Sycamore-CT-Log (get-roots API).
+     * Loads root fingerprints from the Sycamore CT log (get-roots API).
      */
     public static Set<String> loadSycamoreRootFingerprints() {
         synchronized (SYCAMORE_LOCK) {
@@ -674,8 +716,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Aktiviert den Abgleich gegen den Android Root Store (google/roots.pem aus platform/system/ca-certificates). Plattformunabhängig; lädt
-     * über Android Googlesource (format=TEXT = Base64).
+     * Enables validation against the Android Root Store (google/roots.pem from platform/system/ca-certificates). Cross-platform; loads via
+     * Android Googlesource (format=TEXT = Base64).
      */
     public void enableAndroidRootStore() {
         final Set<String> set = loadAndroidRootFingerprints();
@@ -685,7 +727,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die SHA-256-Fingerprints aus der Android roots.pem (Base64-kodiert von Googlesource, entpackt zu PEM).
+     * Loads SHA-256 fingerprints from the Android roots.pem (Base64-encoded from Googlesource, decoded to PEM).
      */
     public static Set<String> loadAndroidRootFingerprints() {
         synchronized (ANDROID_LOCK) {
@@ -726,7 +768,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die Root-Zertifikate aus der Android roots.pem (für Kandidaten-Union ohne Eingabe-PEM).
+     * Loads root certificates from the Android roots.pem (for candidate union when no input PEM is used).
      */
     public static X509Certificate[] loadAndroidRootCertificates() {
         try {
@@ -746,111 +788,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Activates validation against the Cisco Trusted Root Store (TRS), Intersect bundle (public internet). P7B is parsed via
-     * X.509 {@link CertificateFactory} and {@link CertPath} with encoding "PKCS7" (standard in Java SE).
-     */
-    public void enableCiscoTRS() {
-        final Set<String> set = loadCiscoTRSFingerprints();
-        if (set != null && !set.isEmpty()) {
-            checks.add(new ProviderCheck("Cisco (TRS)", set));
-        }
-    }
-
-    /**
-     * Lädt die SHA-256-Fingerprints aus dem Cisco TRS P7B (ios.p7b).
-     */
-    public static Set<String> loadCiscoTRSFingerprints() {
-        synchronized (CISCO_TRS_LOCK) {
-            if (ciscoTRSFingerprintsCache != null) {
-                return ciscoTRSFingerprintsCache;
-            }
-        }
-        final Set<String> fingerprints = new TreeSet<String>();
-        try {
-            final byte[] p7b = readUrlToBytes(CISCO_TRS_P7B_URL);
-            System.err.println("[Cisco TRS] p7b: " + (p7b == null ? "null" : p7b.length + " bytes"));
-            if (p7b == null || p7b.length == 0) {
-                return fingerprints;
-            }
-            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            java.util.Collection<? extends Certificate> coll = null;
-            try {
-                coll = cf.generateCertificates(new ByteArrayInputStream(p7b));
-            } catch (final Exception e1) {
-                System.err.println("[Cisco TRS] generateCertificates failed: " + e1.getMessage());
-            }
-            if (coll == null || coll.isEmpty()) {
-                try {
-                    final CertPath path = cf.generateCertPath(new ByteArrayInputStream(p7b), "PKCS7");
-                    coll = path.getCertificates();
-                } catch (final Exception e2) {
-                    System.err.println("[Cisco TRS] generateCertPath(PKCS7) failed: " + e2.getMessage());
-                }
-            }
-            if (coll == null) {
-                coll = Collections.emptyList();
-            }
-            System.err.println("[Cisco TRS] parsed " + coll.size() + " certs");
-            for (final Certificate c : coll) {
-                if (c instanceof X509Certificate) {
-                    try {
-                        final String fp = Hash.getSHA256(c.getEncoded());
-                        if (fp != null) {
-                            fingerprints.add(fp.toLowerCase(Locale.ROOT));
-                        }
-                    } catch (final CertificateEncodingException ignored) {
-                    }
-                }
-            }
-        } catch (final Exception e) {
-            System.err.println("[Cisco TRS] error: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-        }
-        System.err.println("[Cisco TRS] fingerprints: " + fingerprints.size());
-        synchronized (CISCO_TRS_LOCK) {
-            ciscoTRSFingerprintsCache = fingerprints;
-        }
-        return fingerprints;
-    }
-
-    /**
-     * Loads root certificates from the Cisco TRS P7B (for candidate union). Uses X.509 factory and CertPath "PKCS7" encoding.
-     */
-    public static X509Certificate[] loadCiscoTRSCertificates() {
-        try {
-            final byte[] p7b = readUrlToBytes(CISCO_TRS_P7B_URL);
-            if (p7b == null || p7b.length == 0) {
-                return new X509Certificate[0];
-            }
-            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            java.util.Collection<? extends Certificate> coll = null;
-            try {
-                coll = cf.generateCertificates(new ByteArrayInputStream(p7b));
-            } catch (final Exception ignored) {
-            }
-            if (coll == null || coll.isEmpty()) {
-                try {
-                    final CertPath path = cf.generateCertPath(new ByteArrayInputStream(p7b), "PKCS7");
-                    coll = path.getCertificates();
-                } catch (final Exception ignored) {
-                }
-            }
-            if (coll == null) {
-                coll = Collections.emptyList();
-            }
-            final List<X509Certificate> list = new ArrayList<X509Certificate>();
-            for (final Certificate c : coll) {
-                if (c instanceof X509Certificate) {
-                    list.add((X509Certificate) c);
-                }
-            }
-            return list.toArray(new X509Certificate[list.size()]);
-        } catch (final Exception e) {
-            return new X509Certificate[0];
-        }
-    }
-
-    /**
-     * Lädt die Root-Zertifikate aus dem Sycamore-CT get-roots (für Kandidaten-Union).
+     * Loads root certificates from the Sycamore CT get-roots API (for candidate union).
      */
     public static X509Certificate[] loadSycamoreRootCertificates() {
         final List<X509Certificate> list = new ArrayList<X509Certificate>();
@@ -884,7 +822,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt alle X509-Zertifikate aus einer PFX-Datei (z. B. Microsoft roots.pfx). Passwort null = kein Passwort.
+     * Loads all X509 certificates from a PFX file (e.g. Microsoft roots.pfx). Password null = no password.
      */
     public static X509Certificate[] loadCertificatesFromPfx(final File pfxFile, final char[] password) {
         if (pfxFile == null || !pfxFile.isFile()) {
@@ -898,8 +836,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Aktiviert den Abgleich gegen die Microsoft-Trusted-Root-Liste aus dem CCADB-CSV-Report (plattformunabhängig, ohne certutil/PFX).
-     * Ergänzt oder ersetzt die Microsoft-Quelle aus PFX/certutil.
+     * Enables validation against the Microsoft Trusted Root list from the CCADB CSV report (cross-platform, no certutil/PFX). Complements
+     * or replaces the Microsoft source from PFX/certutil.
      */
     public void enableMicrosoftCCADB() {
         final Set<String> set = loadMicrosoftCCADBFingerprints();
@@ -909,8 +847,66 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die SHA-256-Fingerprints aus dem CCADB Microsoft Included CA Certificate Report (CSV). Erwartet eine Spalte "SHA-256
-     * Fingerprint" (oder ähnlich); Fingerprints mit Doppelpunkten werden normalisiert.
+     * Parses a CSV line respecting double-quoted fields (fields may contain commas). Escaped quote "" inside a quoted field becomes one ".
+     *
+     * @param line
+     *            one line of CSV
+     * @return list of field values (unquoted, trimmed)
+     */
+    private static List<String> parseCsvLine(final String line) {
+        final List<String> out = new ArrayList<String>();
+        if (line == null) {
+            return out;
+        }
+        int i = 0;
+        while (i < line.length()) {
+            if (line.charAt(i) == '"') {
+                final StringBuilder sb = new StringBuilder();
+                i++;
+                while (i < line.length()) {
+                    if (line.charAt(i) == '"') {
+                        i++;
+                        if (i < line.length() && line.charAt(i) == '"') {
+                            sb.append('"');
+                            i++;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        sb.append(line.charAt(i));
+                        i++;
+                    }
+                }
+                out.add(sb.toString().trim());
+                while (i < line.length() && line.charAt(i) == ',') {
+                    i++;
+                }
+            } else {
+                int start = i;
+                while (i < line.length() && line.charAt(i) != ',') {
+                    i++;
+                }
+                out.add(line.substring(start, i).trim());
+                if (i < line.length()) {
+                    i++;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Date format used in Microsoft CCADB CSV "Valid To [GMT]" column (e.g. "2025 Jul 23"). */
+    private static final String MICROSOFT_CCADB_VALID_TO_FORMAT = "yyyy MMM dd";
+
+    /**
+     * Loads SHA-256 fingerprints from the CCADB Microsoft Included CA Certificate Report (CSV). Only rows that are currently trusted for
+     * TLS server authentication are included:
+     * <ul>
+     * <li><b>Microsoft Status</b> must be "Included" (not "Disabled"). The report lists both; "Disabled" means Microsoft has removed or
+     * restricted the root (e.g. distrust, policy change), so only "Included" roots are accepted.</li>
+     * <li><b>Microsoft EKUs</b> must contain "Server Authentication" (website/TLS use).</li>
+     * <li><b>Valid To [GMT]</b> must be today or in the future (expired roots are excluded).</li>
+     * </ul>
      */
     public static Set<String> loadMicrosoftCCADBFingerprints() {
         synchronized (MICROSOFT_CCADB_LOCK) {
@@ -925,31 +921,67 @@ public final class RootCertificateTrustValidator {
                 return fingerprints;
             }
             final String[] lines = csv.split("\\r?\\n");
-            int fpColumnIndex = -1;
-            for (int i = 0; i < lines.length; i++) {
-                final String line = lines[i];
-                if (i == 0) {
-                    final String[] headers = line.split(",");
-                    for (int j = 0; j < headers.length; j++) {
-                        final String h = headers[j].replace("\"", "").trim();
-                        if (h != null && (h.equals("SHA-256 Fingerprint") || h.equals("SHA256 Fingerprint") || h.toLowerCase(Locale.ROOT).contains("sha-256") && h.toLowerCase(Locale.ROOT).contains("fingerprint"))) {
-                            fpColumnIndex = j;
-                            break;
+            if (lines.length < 2) {
+                return fingerprints;
+            }
+            final List<String> header = parseCsvLine(lines[0]);
+            int statusIdx = -1;
+            int fpIdx = -1;
+            int ekusIdx = -1;
+            int validToIdx = -1;
+            for (int j = 0; j < header.size(); j++) {
+                final String h = header.get(j);
+                if ("Microsoft Status".equals(h)) {
+                    statusIdx = j;
+                } else if ("SHA-256 Fingerprint".equals(h) || "SHA256 Fingerprint".equals(h) || (h != null && h.toLowerCase(Locale.ROOT).contains("sha-256") && h.toLowerCase(Locale.ROOT).contains("fingerprint"))) {
+                    fpIdx = j;
+                } else if ("Microsoft EKUs".equals(h)) {
+                    ekusIdx = j;
+                } else if ("Valid To [GMT]".equals(h)) {
+                    validToIdx = j;
+                }
+            }
+            if (fpIdx < 0) {
+                return fingerprints;
+            }
+            final SimpleDateFormat df = new SimpleDateFormat(MICROSOFT_CCADB_VALID_TO_FORMAT, Locale.ROOT);
+            df.setTimeZone(TimeZone.getTimeZone("GMT"));
+            final Calendar now = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+            now.set(Calendar.HOUR_OF_DAY, 0);
+            now.set(Calendar.MINUTE, 0);
+            now.set(Calendar.SECOND, 0);
+            now.set(Calendar.MILLISECOND, 0);
+            final long todayStart = now.getTimeInMillis();
+            for (int i = 1; i < lines.length; i++) {
+                final List<String> cols = parseCsvLine(lines[i]);
+                if (cols.size() <= fpIdx) {
+                    continue;
+                }
+                if (statusIdx >= 0 && statusIdx < cols.size()) {
+                    final String status = cols.get(statusIdx).trim();
+                    if (!"Included".equalsIgnoreCase(status)) {
+                        continue;
+                    }
+                }
+                if (ekusIdx >= 0 && ekusIdx < cols.size()) {
+                    final String ekus = cols.get(ekusIdx);
+                    if (ekus == null || !ekus.contains("Server Authentication")) {
+                        continue;
+                    }
+                }
+                if (validToIdx >= 0 && validToIdx < cols.size()) {
+                    final String validToStr = cols.get(validToIdx).trim();
+                    if (validToStr.length() > 0) {
+                        try {
+                            final Date validTo = df.parse(validToStr);
+                            if (validTo != null && validTo.getTime() < todayStart) {
+                                continue;
+                            }
+                        } catch (final Exception ignored) {
                         }
                     }
-                    if (fpColumnIndex < 0) {
-                        break;
-                    }
-                    continue;
                 }
-                if (fpColumnIndex < 0) {
-                    break;
-                }
-                final String[] cols = line.split(",");
-                if (cols.length <= fpColumnIndex) {
-                    continue;
-                }
-                String fp = cols[fpColumnIndex].replace("\"", "").replaceAll("[^0-9a-fA-F]", "").trim();
+                final String fp = cols.get(fpIdx).replaceAll("[^0-9a-fA-F]", "").trim();
                 if (fp.length() == 64) {
                     fingerprints.add(fp.toLowerCase(Locale.ROOT));
                 }
@@ -964,8 +996,64 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Aktiviert den Abgleich gegen die Mozilla Included Roots (PEM von CCADB, TrustBitsInclude=Websites). Plattformunabhängig; lädt PEM
-     * direkt von der CCADB-URL.
+     * Loads SHA-256 fingerprints of roots that are explicitly <b>Disabled</b> in the CCADB Microsoft report (Microsoft Status = "Disabled").
+     * Used for the rejected/disabled output (appwork-merged-cadb-rejected.*.pem). No EKU or Valid To filter so all disabled roots are included.
+     */
+    public static Set<String> loadMicrosoftCCADBDisabledFingerprints() {
+        synchronized (MICROSOFT_CCADB_LOCK) {
+            if (microsoftCCADBDisabledFingerprintsCache != null) {
+                return microsoftCCADBDisabledFingerprintsCache;
+            }
+        }
+        final Set<String> fingerprints = new TreeSet<String>();
+        try {
+            final String csv = readUrlToString(MICROSOFT_CCADB_CSV_URL);
+            if (csv == null || csv.length() == 0) {
+                return fingerprints;
+            }
+            final String[] lines = csv.split("\\r?\\n");
+            if (lines.length < 2) {
+                return fingerprints;
+            }
+            final List<String> header = parseCsvLine(lines[0]);
+            int statusIdx = -1;
+            int fpIdx = -1;
+            for (int j = 0; j < header.size(); j++) {
+                final String h = header.get(j);
+                if ("Microsoft Status".equals(h)) {
+                    statusIdx = j;
+                } else if ("SHA-256 Fingerprint".equals(h) || "SHA256 Fingerprint".equals(h) || (h != null && h.toLowerCase(Locale.ROOT).contains("sha-256") && h.toLowerCase(Locale.ROOT).contains("fingerprint"))) {
+                    fpIdx = j;
+                }
+            }
+            if (fpIdx < 0 || statusIdx < 0) {
+                return fingerprints;
+            }
+            for (int i = 1; i < lines.length; i++) {
+                final List<String> cols = parseCsvLine(lines[i]);
+                if (cols.size() <= fpIdx || cols.size() <= statusIdx) {
+                    continue;
+                }
+                if (!"Disabled".equalsIgnoreCase(cols.get(statusIdx).trim())) {
+                    continue;
+                }
+                final String fp = cols.get(fpIdx).replaceAll("[^0-9a-fA-F]", "").trim();
+                if (fp.length() == 64) {
+                    fingerprints.add(fp.toLowerCase(Locale.ROOT));
+                }
+            }
+        } catch (final Exception e) {
+            // return empty set on error
+        }
+        synchronized (MICROSOFT_CCADB_LOCK) {
+            microsoftCCADBDisabledFingerprintsCache = fingerprints;
+        }
+        return fingerprints;
+    }
+
+    /**
+     * Enables validation against the Mozilla Included Roots (PEM from CCADB, TrustBitsInclude=Websites). Cross-platform; loads PEM directly
+     * from the CCADB URL.
      */
     public void enableMozillaIncludedRootsPem() {
         final Set<String> set = loadMozillaIncludedRootsPemFingerprints();
@@ -975,7 +1063,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die SHA-256-Fingerprints aus der Mozilla Included Roots PEM (CCADB, Websites).
+     * Loads SHA-256 fingerprints from the Mozilla Included Roots PEM (CCADB, Websites).
      */
     public static Set<String> loadMozillaIncludedRootsPemFingerprints() {
         synchronized (MOZILLA_INCLUDED_ROOTS_PEM_LOCK) {
@@ -1012,7 +1100,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Lädt die Zertifikate aus der Mozilla Included Roots PEM (für Kandidaten-Union).
+     * Loads certificates from the Mozilla Included Roots PEM (for candidate union).
      */
     public static X509Certificate[] loadMozillaIncludedRootsPemCertificates() {
         try {
@@ -1022,6 +1110,93 @@ public final class RootCertificateTrustValidator {
             }
             final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(new ByteArrayInputStream(pem.getBytes("UTF-8")));
             return certs != null ? certs : new X509Certificate[0];
+        } catch (final Exception e) {
+            return new X509Certificate[0];
+        }
+    }
+
+    /**
+     * Enables validation against the Mozilla NSS certdata.txt store. Uses trust bits: only roots with CKA_TRUST_SERVER_AUTH =
+     * CKT_NSS_TRUSTED_DELEGATOR are considered trusted for TLS/Websites (same semantics as the Included Roots PEM, but from the
+     * authoritative NSS certdata source).
+     */
+    public void enableMozillaCertdata() {
+        final Set<String> set = loadMozillaCertdataFingerprints();
+        if (set != null && !set.isEmpty()) {
+            checks.add(new ProviderCheck("Mozilla (certdata)", set));
+        }
+    }
+
+    /**
+     * Loads SHA-256 fingerprints from Mozilla certdata.txt (roots with CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR).
+     */
+    public static Set<String> loadMozillaCertdataFingerprints() {
+        synchronized (MOZILLA_CERTDATA_LOCK) {
+            if (mozillaCertdataFingerprintsCache != null) {
+                return mozillaCertdataFingerprintsCache;
+            }
+        }
+        Set<String> fingerprints = new TreeSet<String>();
+        try {
+            final InputStream is = new URL(MOZILLA_CERTDATA_URL).openStream();
+            try {
+                fingerprints = MozillaCertdataParser.getTrustedForServerAuthFingerprints(is);
+            } finally {
+                is.close();
+            }
+        } catch (final Exception e) {
+            // return empty set on error
+        }
+        synchronized (MOZILLA_CERTDATA_LOCK) {
+            mozillaCertdataFingerprintsCache = fingerprints;
+        }
+        return fingerprints;
+    }
+
+    /**
+     * Loads certificates from Mozilla certdata.txt (trusted for server auth only) for candidate union.
+     */
+    public static X509Certificate[] loadMozillaCertdataCertificates() {
+        try {
+            final InputStream is = new URL(MOZILLA_CERTDATA_URL).openStream();
+            try {
+                return MozillaCertdataParser.getTrustedForServerAuthCertificates(is);
+            } finally {
+                is.close();
+            }
+        } catch (final Exception e) {
+            return new X509Certificate[0];
+        }
+    }
+
+    /**
+     * Loads SHA-256 fingerprints of roots explicitly distrusted for server auth (CKA_TRUST_SERVER_AUTH = CKT_NSS_NOT_TRUSTED) from
+     * Mozilla certdata.txt. Used for appwork-merged-cadb-rejected.*.pem.
+     */
+    public static Set<String> loadMozillaCertdataDistrustedFingerprints() {
+        try {
+            final InputStream is = new URL(MOZILLA_CERTDATA_URL).openStream();
+            try {
+                return MozillaCertdataParser.getExplicitlyDistrustedForServerAuthFingerprints(is);
+            } finally {
+                is.close();
+            }
+        } catch (final Exception e) {
+            return new TreeSet<String>();
+        }
+    }
+
+    /**
+     * Loads certificates explicitly distrusted for server auth from Mozilla certdata.txt (for rejected PEM output).
+     */
+    public static X509Certificate[] loadMozillaCertdataDistrustedCertificates() {
+        try {
+            final InputStream is = new URL(MOZILLA_CERTDATA_URL).openStream();
+            try {
+                return MozillaCertdataParser.getExplicitlyDistrustedForServerAuthCertificates(is);
+            } finally {
+                is.close();
+            }
         } catch (final Exception e) {
             return new X509Certificate[0];
         }
@@ -1051,7 +1226,7 @@ public final class RootCertificateTrustValidator {
         }
     }
 
-    /** Liest eine URL binär ein (z. B. für P7B). */
+    /** Reads a URL as binary (e.g. for P7B). */
     private static byte[] readUrlToBytes(final String urlString) {
         InputStream is = null;
         try {
@@ -1077,11 +1252,11 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Validiert alle Zertifikate aus dem PEM-Stream und gibt pro Zertifikat die Liste der Trust-Provider zurück, die es akzeptieren.
+     * Validates all certificates from the PEM stream and returns per certificate the list of trust providers that accept it.
      *
      * @param pemStream
-     *            PEM mit einem oder mehreren Zertifikaten
-     * @return Liste der Ergebnisse (ein Eintrag pro Zertifikat)
+     *            PEM with one or more certificates
+     * @return list of results (one entry per certificate)
      */
     public List<CertTrustResult> validateFromPEM(final InputStream pemStream) throws CertificateException, java.io.IOException {
         final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(pemStream);
@@ -1089,11 +1264,11 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Validiert die übergebenen Zertifikate gegen alle konfigurierten Trust-Provider.
+     * Validates the given certificates against all configured trust providers.
      *
      * @param certs
-     *            Zertifikate (typisch Root-CAs)
-     * @return Liste der Ergebnisse (ein Eintrag pro Zertifikat)
+     *            certificates (typically root CAs)
+     * @return list of results (one entry per certificate)
      */
     public List<CertTrustResult> validate(final X509Certificate[] certs) {
         if (certs == null || certs.length == 0) {
@@ -1107,7 +1282,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Validiert ein einzelnes Zertifikat.
+     * Validates a single certificate.
      */
     public CertTrustResult validateOne(final X509Certificate cert) {
         String fingerprint = null;
@@ -1133,18 +1308,18 @@ public final class RootCertificateTrustValidator {
                     acceptedBy.add(check.name);
                 }
             } catch (final Exception ignored) {
-                // nicht vertrauenswürdig bei diesem Provider
+                // not trusted by this provider
             }
         }
         return new CertTrustResult(fpLower, subject, acceptedBy);
     }
 
-    /** Provider-Namen, die für den Konsens nicht zählen (nur lokale/System-Stores). */
+    /** Provider names that do not count for consensus (local/system stores only). */
     private static final Set<String> EXCLUDED_FOR_CONSENSUS = new TreeSet<String>(java.util.Arrays.asList(new String[] { "JRE", "OS" }));
 
     /**
-     * Gibt die Namen aller Trust-Provider zurück, die für den „Konsens“ zählen (alle außer JRE und OS). Ein Zertifikat gilt als „von allen
-     * akzeptiert“, wenn es von jedem dieser Provider akzeptiert wird.
+     * Returns the names of all trust providers that count for "consensus" (all except JRE and OS). A certificate is considered "accepted by
+     * all" if it is accepted by each of these providers.
      */
     public List<String> getConsensusProviderNames() {
         final List<String> names = new ArrayList<String>();
@@ -1157,7 +1332,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Gibt die Anzahl der CAs pro Store zurück. Keys = Store-Name, Value = Anzahl (oder -1 wenn nicht ermittelbar, z. B. bei JRE/OS).
+     * Returns the number of CAs per store. Keys = store name, Value = count (or -1 if not determinable, e.g. for JRE/OS).
      */
     public Map<String, Integer> getStoreSizes() {
         final Map<String, Integer> out = new LinkedHashMap<String, Integer>();
@@ -1172,13 +1347,13 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Filtert die Zertifikate auf solche, die von allen Konsens-Providern (alle außer JRE, OS) akzeptiert werden.
+     * Filters certificates to those accepted by all consensus providers (all except JRE, OS).
      *
      * @param certs
-     *            Eingabe-Zertifikate (Reihenfolge wie bei validate())
+     *            input certificates (same order as for validate())
      * @param results
-     *            zugehörige Validierungsergebnisse
-     * @return Liste der Zertifikate, die von allen Konsens-Providern akzeptiert werden
+     *            corresponding validation results
+     * @return list of certificates accepted by all consensus providers
      */
     public List<X509Certificate> getCertsAcceptedByAllConsensusProviders(final X509Certificate[] certs, final List<CertTrustResult> results) {
         if (certs == null || results == null || certs.length != results.size()) {
@@ -1215,12 +1390,53 @@ public final class RootCertificateTrustValidator {
         return accepted;
     }
 
+    /**
+     * Returns certificates from {@code rejectedCerts} that appear in at least {@code minProviders} of the disabled fingerprint sets (used for
+     * appwork-merged-cadb-rejected.k.pem).
+     */
+    public static List<X509Certificate> getCertsRejectedByAtLeastKProviders(final List<X509Certificate> rejectedCerts, final List<Set<String>> disabledFingerprintSets, final int minProviders) {
+        if (rejectedCerts == null || disabledFingerprintSets == null || minProviders < 1) {
+            return Collections.emptyList();
+        }
+        final List<X509Certificate> out = new ArrayList<X509Certificate>();
+        for (final X509Certificate cert : rejectedCerts) {
+            try {
+                final String fp = Hash.getSHA256(cert.getEncoded());
+                if (fp == null) {
+                    continue;
+                }
+                final String fpLower = fp.toLowerCase(Locale.ROOT);
+                int count = 0;
+                for (int i = 0; i < disabledFingerprintSets.size(); i++) {
+                    if (disabledFingerprintSets.get(i) != null && disabledFingerprintSets.get(i).contains(fpLower)) {
+                        count++;
+                    }
+                }
+                if (count >= minProviders) {
+                    out.add(cert);
+                }
+            } catch (final CertificateEncodingException ignored) {
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Returns certificates that are in every disabled fingerprint set (rejected by all providers that have a disabled list).
+     */
+    public static List<X509Certificate> getCertsRejectedByAllDisabledProviders(final List<X509Certificate> rejectedCerts, final List<Set<String>> disabledFingerprintSets) {
+        if (disabledFingerprintSets == null || disabledFingerprintSets.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return getCertsRejectedByAtLeastKProviders(rejectedCerts, disabledFingerprintSets, disabledFingerprintSets.size());
+    }
+
     private static final String PEM_HEADER      = "-----BEGIN CERTIFICATE-----";
     private static final String PEM_FOOTER      = "-----END CERTIFICATE-----";
     private static final int    PEM_LINE_LENGTH = 64;
 
     /**
-     * Schreibt die Zertifikate im PEM-Format (Base64, 64 Zeichen pro Zeile).
+     * Writes the certificates in PEM format (Base64, 64 characters per line).
      */
     public static void writePEM(final List<X509Certificate> certs, final OutputStream out) throws IOException, CertificateEncodingException {
         if (certs == null) {
@@ -1240,7 +1456,7 @@ public final class RootCertificateTrustValidator {
 
     /**
      * Keeps only certificates that are acceptable as CA trust anchors for TLS web server verification (see
-     * {@link TrustUtils#isAcceptableCaTrustAnchorForSsl}).
+     * {@link TrustUtils#isAcceptableCaTrustAnchorForSsl}). EKU: when present, must contain serverAuth (enforced there).
      */
     public static X509Certificate[] filterToTlsServerAuthOnly(final X509Certificate[] certs) {
         if (certs == null || certs.length == 0) {
@@ -1255,8 +1471,122 @@ public final class RootCertificateTrustValidator {
         return list.toArray(new X509Certificate[list.size()]);
     }
 
+    /** Start of today in GMT (00:00:00.000) for expiry checks. Certs valid until this date are still considered valid. */
+    private static long getTodayStartGmt() {
+        final Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+
     /**
-     * Bildet die Vereinigung mehrerer Zertifikats-Arrays und dedupliziert anhand SHA-256-Fingerprint.
+     * Returns true if the certificate is expired (notAfter before start of today GMT). Null notAfter is treated as not expired.
+     */
+    private static boolean isCertificateExpired(final X509Certificate cert) {
+        if (cert == null) {
+            return true;
+        }
+        try {
+            final Date notAfter = cert.getNotAfter();
+            return notAfter != null && notAfter.getTime() < getTodayStartGmt();
+        } catch (final Exception e) {
+            return true;
+        }
+    }
+
+    /**
+     * Removes expired certificates (notAfter before start of today GMT). Applied globally so no source contributes expired roots to the
+     * candidate set or store fingerprint sets.
+     */
+    public static X509Certificate[] filterOutExpiredCertificates(final X509Certificate[] certs) {
+        if (certs == null || certs.length == 0) {
+            return certs;
+        }
+        final List<X509Certificate> list = new ArrayList<X509Certificate>();
+        for (final X509Certificate c : certs) {
+            if (!isCertificateExpired(c)) {
+                list.add(c);
+            }
+        }
+        return list.toArray(new X509Certificate[list.size()]);
+    }
+
+    /**
+     * Loads a single certificate from crt.sh by SHA-256 fingerprint. Fetches the search page, parses the certificate id, downloads PEM via
+     * ?d=id, verifies the cert's SHA-256 matches the requested fingerprint, and returns the cert. Returns null if not found, parse error,
+     * or fingerprint mismatch.
+     *
+     * @param sha256Hex
+     *            64 hex characters (lower or upper case), no colons
+     * @return the certificate, or null
+     */
+    public static X509Certificate loadCertificateFromCrtshByFingerprint(final String sha256Hex) {
+        if (sha256Hex == null || sha256Hex.length() != 64 || !sha256Hex.matches("[0-9a-fA-F]{64}")) {
+            return null;
+        }
+        final String normalized = sha256Hex.toLowerCase(Locale.ROOT).replaceAll(":", "");
+        final String html = readUrlToString(CRTSH_QUERY_URL + normalized);
+        if (html == null || html.isEmpty() || html.toLowerCase(Locale.ROOT).contains("no records found") || html.toLowerCase(Locale.ROOT).contains("0 results")) {
+            return null;
+        }
+        final Matcher idMatcher = Pattern.compile("\\?id=(\\d+)").matcher(html);
+        if (!idMatcher.find()) {
+            return null;
+        }
+        final String id = idMatcher.group(1);
+        final String pem = readUrlToString(CRTSH_DOWNLOAD_URL + id);
+        if (pem == null || !pem.contains("-----BEGIN CERTIFICATE-----")) {
+            return null;
+        }
+        try {
+            final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(new ByteArrayInputStream(pem.getBytes("UTF-8")));
+            if (certs == null || certs.length == 0) {
+                return null;
+            }
+            final X509Certificate cert = certs[0];
+            final String actualFp = Hash.getSHA256(cert.getEncoded());
+            if (actualFp == null || !actualFp.toLowerCase(Locale.ROOT).equals(normalized)) {
+                return null;
+            }
+            return cert;
+        } catch (final Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Loads certificates from crt.sh for the given fingerprints. Each cert is verified by SHA-256 before inclusion. Stops after
+     * {@code maxToLoad} successful loads to limit network use (use Integer.MAX_VALUE for no limit).
+     *
+     * @param fingerprints
+     *            set of SHA-256 hex strings (64 chars, no colons)
+     * @param maxToLoad
+     *            maximum number of certs to fetch from crt.sh
+     * @return array of certificates successfully loaded and verified (may be empty)
+     */
+    public static X509Certificate[] loadCertificatesFromCrtshByFingerprints(final Set<String> fingerprints, final int maxToLoad) {
+        if (fingerprints == null || fingerprints.isEmpty() || maxToLoad <= 0) {
+            return new X509Certificate[0];
+        }
+        final List<X509Certificate> list = new ArrayList<X509Certificate>();
+        int loaded = 0;
+        for (final String fp : fingerprints) {
+            if (loaded >= maxToLoad) {
+                break;
+            }
+            final X509Certificate cert = loadCertificateFromCrtshByFingerprint(fp);
+            if (cert != null) {
+                list.add(cert);
+                loaded++;
+            }
+        }
+        return list.toArray(new X509Certificate[list.size()]);
+    }
+
+    /**
+     * Builds the union of multiple certificate arrays and deduplicates by SHA-256 fingerprint.
      */
     public static X509Certificate[] unionByFingerprint(final X509Certificate[]... certArrays) {
         final Set<String> seen = new TreeSet<String>();
@@ -1277,6 +1607,58 @@ public final class RootCertificateTrustValidator {
             }
         }
         return list.toArray(new X509Certificate[list.size()]);
+    }
+
+    /**
+     * Prints to the console for each CA that is not accepted by all consensus stores: which stores have it (present in) and in which stores
+     * it is missing. Helps identify which store provides a CA that is missing from the intersection.
+     *
+     * @param results
+     *            validation results (one per candidate cert)
+     * @param consensusStoreNames
+     *            store names that define "all must accept" (e.g. from getConsensusProviderNames())
+     */
+    public static void printMissingCaReport(final List<CertTrustResult> results, final List<String> consensusStoreNames) {
+        if (results == null || consensusStoreNames == null || consensusStoreNames.isEmpty()) {
+            return;
+        }
+        System.out.println("--- CAs not in all stores: which store has / misses the CA ---");
+        int missingCount = 0;
+        for (final CertTrustResult r : results) {
+            final List<String> acceptedBy = r.getAcceptedByProviders();
+            if (acceptedBy.containsAll(consensusStoreNames)) {
+                continue;
+            }
+            missingCount++;
+            final List<String> missingIn = new ArrayList<String>();
+            for (final String storeName : consensusStoreNames) {
+                if (!acceptedBy.contains(storeName)) {
+                    missingIn.add(storeName);
+                }
+            }
+            final String subject = r.getSubject().length() > 70 ? r.getSubject().substring(0, 67) + "..." : r.getSubject();
+            System.out.println("CA: " + subject);
+            System.out.println("  SHA-256: " + r.getFingerprintSha256());
+            System.out.println("  Present in: " + (acceptedBy.isEmpty() ? "(none)" : join(acceptedBy, ", ")));
+            System.out.println("  Missing in: " + (missingIn.isEmpty() ? "(none)" : join(missingIn, ", ")));
+            System.out.println();
+        }
+        if (missingCount == 0) {
+            System.out.println("(all candidate CAs are in every store)");
+        } else {
+            System.out.println("Total CAs missing in at least one store: " + missingCount);
+        }
+    }
+
+    private static String join(final List<String> list, final String sep) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) {
+                sb.append(sep);
+            }
+            sb.append(list.get(i));
+        }
+        return sb.toString();
     }
 
     /**
@@ -1347,7 +1729,7 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Gibt eine lesbare Übersicht aller Ergebnisse aus (z.B. für Konsole).
+     * Returns a readable overview of all results (e.g. for console).
      */
     public static String formatResults(final List<CertTrustResult> results) {
         final StringBuilder sb = new StringBuilder();
@@ -1364,25 +1746,30 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Hauptmethode: Keine Eingabe-PEM. Lädt Kandidaten aus den verlinkten Stores (Android, Cisco, Sycamore, ggf. Microsoft PFX), ermittelt
-     * die Schnittmenge aller per {@code enable...} aktivierten Stores und schreibt nur diese CAs in die Ausgabe-PEM. JRE-, OS- und
-     * CCADB-Provider werden nicht verwendet.
+     * Main entry: No input PEM. Loads candidates from the linked stores (Android, Sycamore, optionally Microsoft PFX), computes the
+     * intersection of all stores enabled via {@code enable...}, and writes only those CAs to the output PEM. JRE, OS and CCADB providers
+     * are not used.
      * <p>
-     * Aufruf: java ... RootCertificateTrustValidator [ausgabe.pem] [roots.pfx]
+     * Invocation: java ... RootCertificateTrustValidator [output.pem] [roots.pfx]
      * <ul>
-     * <li>1. Argument: Ausgabe-PEM (Default: accepted_by_all.pem)</li>
-     * <li>2. Argument: optional Microsoft roots.pfx; otherwise on Windows: certutil (SST from WU, read via API), then local Root store</li>
+     * <li>1st argument: optional output PEM path; if omitted, files are written to the same directory as {@code common-ca-database.pem}
+     * (ccadb package) with base name {@value #DEFAULT_MERGED_PEM_BASENAME}</li>
+     * <li>2nd argument: optional Microsoft roots.pfx; otherwise on Windows: certutil (SST from WU, read via API), then local Root
+     * store</li>
      * </ul>
      */
+    private static final String DEFAULT_MERGED_PEM_BASENAME       = "appwork-merged-cadb";
+    private static final String DEFAULT_MERGED_PEM_REJECTED_BASE = "appwork-merged-cadb-rejected";
+
     public static void main(final String[] args) {
-        final RootCertificateTrustValidator validator = new RootCertificateTrustValidator(false);
-        validator.enableSycamoreCT();
+        final RootCertificateTrustValidator validator = new RootCertificateTrustValidator();
+        // validator.enableSycamoreCT();
         validator.enableAppleRootStore();
         validator.enableGoogleChromeRootStore();
         validator.enableAndroidRootStore();
-        validator.enableCiscoTRS();
-        // validator.enableMicrosoftCCADB();
+        validator.enableMicrosoftCCADB();
         validator.enableMozillaIncludedRootsPem();
+        validator.enableMozillaCertdata();
         File msPfx = null;
         if (args != null && args.length >= 2 && args[1] != null && !args[1].isEmpty()) {
             msPfx = new File(args[1]);
@@ -1393,19 +1780,15 @@ public final class RootCertificateTrustValidator {
                 msPfx = defaultPfx;
             }
         }
-        if (msPfx != null && msPfx.isFile() && validator.addMicrosoftRootStoreFromPfx(msPfx)) {
-            System.err.println("Microsoft (Windows Update) roots loaded from: " + msPfx.getPath());
-        } else if (validator.addMicrosoftRootStoreViaCertutil()) {
-            System.err.println("Microsoft (Windows Update) roots loaded via certutil (SST from WU). SST = full WU catalog (often 500+); local Root store = installed only (e.g. ~177).");
-        } else if (validator.addMicrosoftRootStoreFromWindowsAPI()) {
-            System.err.println("Microsoft (Windows Update) roots loaded from local Windows Root store (installed roots only).");
+        if (validator.enableMicrosoftWindowsUpdate(msPfx)) {
+            System.err.println("Microsoft (Windows Update) roots loaded.");
         } else {
-            System.err.println("Microsoft (Windows Update): not loaded (no PFX, certutil+SST or local store succeeded).");
+            System.err.println("Microsoft (Windows Update): not loaded (omit enableMicrosoftWindowsUpdate() to disable).");
         }
         final Map<String, Integer> storeSizes = validator.getStoreSizes();
         System.out.println("Filter: only CAs acceptable for TLS server auth (TrustUtils.isAcceptableCaTrustAnchorForSsl). CAs for code signing, email, etc. only are excluded.");
-        // Order and full list of all stores (including when not loaded, e.g. Cisco TRS, Microsoft WU)
-        final String[] storeOrder = new String[] { "CT (Sycamore)", "Apple (Root Store)", "Google (Chrome)", "Android (Root Store)", "Cisco (TRS)", "Microsoft (CCADB)", "Mozilla (Included Roots PEM)", "Microsoft (Windows Update)" };
+        // Order and full list of all stores (including when not loaded, e.g. Microsoft WU)
+        final String[] storeOrder = new String[] { "CT (Sycamore)", "Apple (Root Store)", "Google (Chrome)", "Android (Root Store)", "Microsoft (CCADB)", "Mozilla (Included Roots PEM)", "Mozilla (certdata)", "Microsoft (Windows Update)" };
         System.out.println("CAs per store:");
         for (final String name : storeOrder) {
             final Integer n = storeSizes.get(name);
@@ -1429,25 +1812,57 @@ public final class RootCertificateTrustValidator {
                 System.out.println("  " + name + ": " + (n >= 0 ? n : "(n/a)"));
             }
         }
+        // Only these stores supply full certificates; Apple and Google Chrome supply fingerprints only (used later in validate()).
         final X509Certificate[] androidCerts = loadAndroidRootCertificates();
-        final X509Certificate[] ciscoCerts = loadCiscoTRSCertificates();
         final X509Certificate[] sycamoreCerts = loadSycamoreRootCertificates();
         final X509Certificate[] mozillaCerts = loadMozillaIncludedRootsPemCertificates();
         X509Certificate[] msCerts = new X509Certificate[0];
         if (msPfx != null && msPfx.isFile()) {
             msCerts = loadCertificatesFromPfx(msPfx, null);
         }
-        X509Certificate[] candidates = unionByFingerprint(androidCerts, ciscoCerts, sycamoreCerts, mozillaCerts, msCerts);
+        X509Certificate[] candidates = unionByFingerprint(androidCerts, sycamoreCerts, mozillaCerts, msCerts);
         if (candidates.length == 0) {
             System.err.println("No candidate certificates loaded from stores.");
             System.exit(1);
         }
+        // Optional: fill certs that exist only in Apple/Chrome (fingerprint-only) from crt.sh; verify fingerprint after download.
+        if (true) {
+            final Set<String> haveFp = new TreeSet<String>();
+            for (int i = 0; i < candidates.length; i++) {
+                try {
+                    final String fp = Hash.getSHA256(candidates[i].getEncoded());
+                    if (fp != null) {
+                        haveFp.add(fp.toLowerCase(Locale.ROOT));
+                    }
+                } catch (final CertificateEncodingException ignored) {
+                }
+            }
+            final Set<String> apple = loadAppleRootFingerprints();
+            final Set<String> chrome = loadGoogleChromeRootFingerprints();
+            final Set<String> missing = new TreeSet<String>();
+            if (apple != null) {
+                missing.addAll(apple);
+            }
+            if (chrome != null) {
+                missing.addAll(chrome);
+            }
+            missing.removeAll(haveFp);
+            final int maxFill = 200;
+            final X509Certificate[] fromCrtsh = loadCertificatesFromCrtshByFingerprints(missing, maxFill);
+            if (fromCrtsh.length > 0) {
+                candidates = unionByFingerprint(candidates, fromCrtsh);
+                System.out.println("Filled " + fromCrtsh.length + " missing cert(s) from crt.sh (fingerprint verified); total candidates: " + candidates.length);
+            }
+        }
         final int unionCount = candidates.length;
         System.out.println("Candidate certificates (union from stores): " + unionCount);
         candidates = filterToTlsServerAuthOnly(candidates);
-        System.out.println("Candidate certificates (filtered by TrustUtils.isAcceptableCaTrustAnchorForSsl): " + candidates.length + (unionCount > candidates.length ? " (filtered out " + (unionCount - candidates.length) + " CAs)" : ""));
+        final int afterEku = candidates.length;
+        System.out.println("Candidate certificates (filtered by TrustUtils.isAcceptableCaTrustAnchorForSsl, EKU serverAuth): " + afterEku + (unionCount > afterEku ? " (filtered out " + (unionCount - afterEku) + " CAs)" : ""));
+        candidates = filterOutExpiredCertificates(candidates);
+        System.out.println("Candidate certificates (after excluding expired): " + candidates.length + (afterEku > candidates.length ? " (filtered out " + (afterEku - candidates.length) + " expired)" : ""));
         if (candidates.length == 0) {
-            System.err.println("No candidates left after filtering (TrustUtils.isAcceptableCaTrustAnchorForSsl: CA + serverAuth + keyCertSign/cRLSign).");
+            System.err.println("No candidates left after filtering (CA + serverAuth EKU + keyCertSign/cRLSign + not expired).");
             System.exit(1);
         }
         final List<CertTrustResult> results = validator.validate(candidates);
@@ -1466,27 +1881,29 @@ public final class RootCertificateTrustValidator {
         final List<X509Certificate> acceptedByAll = validator.getCertsAcceptedByAllConsensusProviders(candidates, results);
         System.out.println("Stores (all must accept): " + storeNames);
         System.out.println("CAs in all stores (intersection): " + acceptedByAll.size() + " — only roots present in every store; different store policies explain a small number.");
+        printMissingCaReport(results, storeNames);
         printIntersectionCountsByCombination(results, storeNames);
-        final String outPath = (args != null && args.length > 0 && args[0] != null && !args[0].isEmpty()) ? args[0] : "accepted_by_all.pem";
-        final File outFile = new File(outPath);
-        try {
-            final FileOutputStream fos = new FileOutputStream(outFile);
-            try {
-                writePEM(acceptedByAll, fos);
-            } finally {
-                fos.close();
-            }
-            System.out.println("PEM written to: " + outFile.getAbsolutePath());
-        } catch (final Exception e) {
-            System.err.println("Failed to write PEM: " + e.getMessage());
-            e.printStackTrace();
+        final File outDir;
+        final String baseName;
+        outDir = new File(AWTest.getWorkspace(), "AppWorkutils/src/org/appwork/utils/net/httpconnection/trust/ccadb");
+        baseName = DEFAULT_MERGED_PEM_BASENAME;
+        final File outFile = new File(outDir, baseName + ".pem");
+        if (!outDir.isDirectory() && !outDir.mkdirs()) {
+            System.err.println("Failed to create output directory: " + outDir.getAbsolutePath());
             System.exit(1);
         }
-        final String basePath = outPath.endsWith(".pem") ? outPath.substring(0, outPath.length() - 4) : outPath;
         final int numStores = storeNames.size();
+        for (File f : outDir.listFiles()) {
+            if (f.getName().startsWith(baseName)) {
+                f.delete();
+            }
+        }
         for (int k = 1; k <= numStores; k++) {
             final List<X509Certificate> atLeastK = getCertsAcceptedByAtLeastKProviders(candidates, results, k);
-            final File kFile = new File(basePath + "." + k + ".pem");
+            if (atLeastK.size() == 0) {
+                continue;
+            }
+            final File kFile = new File(outDir, baseName + "." + k + ".pem");
             try {
                 final FileOutputStream fos = new FileOutputStream(kFile);
                 try {

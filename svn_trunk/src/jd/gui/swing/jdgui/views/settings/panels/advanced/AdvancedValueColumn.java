@@ -218,7 +218,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                     object.setValue(newValue);
                     AdvancedValueColumn.this.getModel().getTable().repaint();
                 } catch (Throwable e) {
-                    Dialog.getInstance().showErrorDialog("'" + value + "' is not a valid '" + object.getTypeString() + "'");
+                    Dialog.getInstance().showErrorDialog("'" + value + "'\r\nis not a valid\r\n" + object.getTypeString());
                 }
             }
         };

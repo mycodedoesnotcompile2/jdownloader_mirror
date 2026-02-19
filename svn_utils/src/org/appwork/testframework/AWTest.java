@@ -80,6 +80,7 @@ import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.UniqueAlltimeID;
+import org.appwork.utils.ide.IDEUtils;
 import org.appwork.utils.net.LineParsingOutputStream;
 import org.appwork.utils.net.NoClosingInputStream;
 import org.appwork.utils.reflection.CompiledType;
@@ -969,6 +970,9 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @return
      */
     public static File getWorkspace() {
+        if (!Application.isJared(null)) {
+            return IDEUtils.getWorkSpace();
+        }
         File here = Application.getResource("");
         while (here != null) {
             if (new File(here, ".metadata").isDirectory() && new File(here, ".metadata/.plugins").isDirectory()) {

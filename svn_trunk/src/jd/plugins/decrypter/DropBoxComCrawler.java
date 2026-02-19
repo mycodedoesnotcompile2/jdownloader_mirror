@@ -59,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 51844 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 52331 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +104,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
          */
         final Browser dummy_login_browser = createNewBrowserInstance();
         final boolean canLoginViaAPI = DropboxCom.setAPILoginHeaders(dummy_login_browser, account);
-        final boolean urlCanBeCrawledViaAPI = !param.toString().contains("disallow_crawl_via_api=true") && !param.toString().matches(DropboxCom.TYPE_SC_GALLERY);
+        final boolean urlCanBeCrawledViaAPI = !param.toString().contains("disallow_crawl_via_api=true") && !param.getCryptedUrl().matches(DropboxCom.TYPE_SC_GALLERY);
         final boolean canUseAPI = canLoginViaAPI && urlCanBeCrawledViaAPI;
         if (canUseAPI && DropboxCom.useAPI()) {
             br = dummy_login_browser;
@@ -200,8 +200,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         } else if (br.getHttpConnection().getResponseCode() == 429) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 460) {
-            logger.info("Restricted Content: This file is no longer available. For additional information contact Dropbox Support.");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Restricted Content: This file is no longer available. For additional information contact Dropbox Support.");
         } else if (br.getHttpConnection().getResponseCode() == 509) {
             /**
              * Temporarily unavailable link --> Rare case </br>
@@ -258,31 +257,27 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             this.sleep(waitSeconds * 1000, param);
             br.getPage(contentURL);
         }
-        final String edison_page_name = br.getRegex("edison_page_name(?:=|:)([\\w\\-]+)").getMatch(0);
-        final String dws_page_name = br.getRegex("dws_page_name=([\\w\\-]+)").getMatch(0);
-        /**
-         * Other possible values: <br>
-         * scl_oboe_file -> Single file <br>
-         * scl_oboe_folder -> Folder
-         */
-        if (StringUtils.equals(edison_page_name, "shared_link_deleted")) {
+        if (isOfflineWebsite(br)) {
             /* Item was deleted */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.equals(edison_page_name, "shared_link_generic_error")) {
-            /* Item was abused. */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.equals(edison_page_name, "shared_link_disabled")) {
-            /* 2025-11-18: This link has been deleted */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.equals(dws_page_name, "files_shared_content_link_login_page")) {
-            /* Login required to access item. */
-            throw new AccountRequiredException();
-        } else if (br.containsHTML("invitation-claimed-access-request-container")) {
+        }
+        if (br.containsHTML("invitation-claimed-access-request-container")) {
             /* User is logged in but has no access to this folder item */
             throw new AccountRequiredException();
         }
+        /**
+         * Known possible values: <br>
+         * scl_oboe_file -> Single file <br>
+         * scl_oboe_folder -> Folder
+         */
+        final String dws_page_name = br.getRegex("dws_page_name=([\\w\\-]+)").getMatch(0);
+        if (StringUtils.equals(dws_page_name, "files_shared_content_link_login_page")) {
+            /* Login required to access item. */
+            throw new AccountRequiredException();
+        }
+        final String edison_page_name = regex_edison_page_name(br);
         if (StringUtils.equals(edison_page_name, "scl_oboe_file")) {
-            /* Nothing has been found before -> Assume that we got a single file. */
+            /* Looks like we got a single file */
             final DownloadLink singleFile = createSingleFileDownloadLink(br.getURL());
             setDownloadPasswordProperties(singleFile, passCode, passwordCookieValue);
             if (cfg.isEnableFastLinkcheckForSingleFiles()) {
@@ -420,6 +415,8 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                      * DMCA deleted item -> We're not yet parsing HTML of previous age correctly thus we'll run into error 400 here.
                      */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (brc.getHttpConnection().getResponseCode() == 403) {
+                    throw new AccountRequiredException();
                 } else if (brc.getHttpConnection().getResponseCode() == 404) {
                     /* Deleted item. */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -579,6 +576,52 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
+    }
+
+    public static boolean isOfflineWebsite(final Browser br) {
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            /* Error 403 -> File is offline. */
+            return true;
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        }
+        final String edison_page_name = regex_edison_page_name(br);
+        /**
+         * Other possible values: <br>
+         * scl_oboe_file -> Single file <br>
+         * scl_oboe_folder -> Folder
+         */
+        if (StringUtils.equals(edison_page_name, "shared_link_deleted")) {
+            /* Item was deleted */
+            return true;
+        } else if (StringUtils.equals(edison_page_name, "shared_link_generic_error")) {
+            /* Item was abused. */
+            return true;
+        } else if (StringUtils.equals(edison_page_name, "shared_link_disabled")) {
+            /* 2025-11-18: This link has been deleted */
+            return true;
+        }
+        final String[] edison_prefetch_items = br.getRegex("Edison\\.registerStreamedPrefetch\\(([^\\)]+)\\)").getColumn(0);
+        if (edison_prefetch_items != null && edison_prefetch_items.length > 0) {
+            for (String edison_prefetch_item : edison_prefetch_items) {
+                edison_prefetch_item = edison_prefetch_item.replace(" ", "");
+                edison_prefetch_item = edison_prefetch_item.replace(",false", "");
+                edison_prefetch_item = edison_prefetch_item.replace(",true", "");
+                edison_prefetch_item = edison_prefetch_item.replace("\"", "");
+                final String[] b64_strings = edison_prefetch_item.split(",");
+                for (final String b64_string : b64_strings) {
+                    final String str = Encoding.Base64Decode(b64_string);
+                    if (StringUtils.containsIgnoreCase(str, "shared_link_deleted")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    public static String regex_edison_page_name(final Browser br) {
+        return br.getRegex("edison_page_name(?:=|:)([\\w\\-]+)").getMatch(0);
     }
 
     private ArrayList<DownloadLink> crawlViaAPI(final CryptedLink param) throws Exception {

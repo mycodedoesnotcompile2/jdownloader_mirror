@@ -37,10 +37,7 @@ package org.appwork.utils.net.httpconnection.trust.ccadb;
 import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
@@ -50,6 +47,8 @@ import org.appwork.utils.net.httpconnection.trust.TrustUtils;
  *
  */
 public final class CCADBTrustProvider extends CustomTrustProvider {
+    private static final String ONLY_CAS_ACCEPTED_BY_AT_LEAST = "3";
+
     /**
      * https://www.ccadb.org/resources *
      */
@@ -58,18 +57,7 @@ public final class CCADBTrustProvider extends CustomTrustProvider {
     }
 
     private static X509Certificate[] loadCCADB() throws CertificateException, IOException {
-        final X509Certificate[] loaded = TrustUtils.loadCertificatesFromPEM(CCADBTrustProvider.class.getResourceAsStream("common-ca-database.pem"));
-        final List<X509Certificate> accepted = new ArrayList<X509Certificate>(loaded.length);
-        for (final X509Certificate cert : loaded) {
-            if (TrustUtils.isAcceptableCaTrustAnchorForSsl(cert)) {
-                accepted.add(cert);
-            }
-        }
-        final int rejected = loaded.length - accepted.size();
-        if (rejected > 0) {
-            LogV3.info(CCADBTrustProvider.class.getSimpleName() + ": rejected " + rejected + " certificate(s) (not acceptable as CA trust anchor for SSL); accepted " + accepted.size());
-        }
-        return accepted.toArray(new X509Certificate[accepted.size()]);
+        return TrustUtils.loadCertificatesFromPEM(CCADBTrustProvider.class.getResourceAsStream("appwork-merged-cadb." + ONLY_CAS_ACCEPTED_BY_AT_LEAST + ".pem"));
     }
 
     @Override

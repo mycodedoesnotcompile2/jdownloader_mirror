@@ -20,12 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -37,7 +31,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52320 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52326 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidaraTo extends PluginForHost {
     public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class VidaraTo extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidara.to", "streamix.so", "streamix.so", "stmix.io" });
+        ret.add(new String[] { "vidara.to", "vidara.so", "streamix.so", "streamix.so", "stmix.io" });
         return ret;
     }
 
@@ -125,8 +125,16 @@ public class VidaraTo extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        String filename = entries.get("title").toString();
-        link.setName(this.correctOrApplyFileNameExtension(filename, ".mp4", null));
+        if (link.getFinalFileName() == null) {
+            String filename = entries.get("title").toString();
+            if (StringUtils.isEmpty(filename)) {
+                final Browser brc = createNewBrowserInstance();
+                brc.getPage(link.getPluginPatternMatcher());
+                filename = brc.getRegex("<title>\\s*(.*?)\\s*<").getMatch(0);
+                filename = StringUtils.firstNotEmpty(filename, fid);
+            }
+            link.setFinalFileName(this.correctOrApplyFileNameExtension(filename, ".mp4", null));
+        }
         this.hls_master = entries.get("streaming_url").toString();
         return AvailableStatus.TRUE;
     }

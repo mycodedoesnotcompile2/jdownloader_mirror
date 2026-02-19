@@ -1,18 +1,22 @@
 package org.jdownloader.extensions.antistandby;
 
+import java.util.Set;
+
 import jd.plugins.ExtensionConfigInterface;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 
 public interface AntiStandbyConfig extends ExtensionConfigInterface {
 
     @AboutConfig
-    @DefaultEnumValue("DOWNLOADING")
-    public Mode getMode();
+    @DefaultEnumArrayValue({ "RUNNING" })
+    @DefaultOnNull
+    public Set<Condition> getCondition();
 
-    public void setMode(Mode mode);
+    public void setCondition(Set<Condition> mode);
 
     @AboutConfig
     @DefaultBooleanValue(false)
