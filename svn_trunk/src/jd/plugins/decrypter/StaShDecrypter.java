@@ -19,6 +19,7 @@ import java.util.ArrayList;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.URLConnectionAdapter;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -26,7 +27,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51281 $", interfaceVersion = 2, names = { "sta.sh" }, urls = { "https?://(?:www\\.)?sta\\.sh/(zip/)?[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52341 $", interfaceVersion = 2, names = { "sta.sh" }, urls = { "https?://(?:www\\.)?sta\\.sh/(zip/)?[a-z0-9]+" })
 public class StaShDecrypter extends PluginForDecrypt {
     public StaShDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -35,7 +36,19 @@ public class StaShDecrypter extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
-        br.getPage(contenturl);
+        /* Allow for any direct-URLs added by user. */
+        final URLConnectionAdapter con = br.openGetConnection(contenturl);
+        if (this.looksLikeDownloadableContent(con)) {
+            try {
+                con.disconnect();
+            } catch (final Throwable ignore) {
+            }
+            final DownloadLink direct = getCrawler().createDirectHTTPDownloadLink(con.getRequest(), con);
+            ret.add(direct.getDownloadLink());
+            return ret;
+        } else {
+            br.followConnection();
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

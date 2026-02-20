@@ -25,6 +25,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
@@ -42,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52345 $", interfaceVersion = 2, names = {}, urls = {})
 public class UpfilesIo extends PluginForHost {
     public UpfilesIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -63,12 +64,12 @@ public class UpfilesIo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "upfiles.com", "upfiles.app", "upfiles.io", "upfiles.download", "upfilesurls.com", "nexnoo.com", "upfion.com" });
+        ret.add(new String[] { "upfiles.com", "upfiles.app", "upfiles.io", "upfiles.download", "upfilesurls.com", "nexnoo.com", "upfion.com", "upfilesgo.com" });
         return ret;
     }
 
     private final List<String> getDeadDomains() {
-        return Arrays.asList(new String[] { "upfiles.io", "upfiles.app" });
+        return Arrays.asList(new String[] { "upfiles.io", "upfiles.app", "upfilesurls.com" });
     }
 
     public static String[] getAnnotationNames() {
@@ -102,6 +103,7 @@ public class UpfilesIo extends PluginForHost {
         final String domain;
         final String domainFromURL = Browser.getHost(link.getPluginPatternMatcher());
         if (getDeadDomains().contains(domainFromURL)) {
+            /* Domain in link is known to be dead -> Use current main domain */
             domain = this.getHost();
         } else {
             domain = domainFromURL;
@@ -233,27 +235,37 @@ public class UpfilesIo extends PluginForHost {
         // }
         /* The following part is basically a form of SiteTemplate.MightyScript_AdLinkFly */
         final UrlQuery query2 = new UrlQuery();
-        final String captchaType = PluginJSonUtils.getJson(br, "captcha_type");
-        if (captchaType != null) {
+        final String json = br.getRegex("var app_vars = (\\{.*?\\});").getMatch(0);
+        final Map<String, Object> appvars = restoreFromString(json, TypeRef.MAP);
+        final String captchaType = (String) appvars.get("captchatype");
+        if (captchaType != null || Boolean.TRUE.equals(appvars.get("captcha_download"))) {
             final boolean allowCaptchaDuringLinkcheck = false;
             if (methodname == MethodName.requestFileInformation && !allowCaptchaDuringLinkcheck) {
                 /* Do not ask user for captcha during availablecheck */
                 return null;
             }
-            if (captchaType.equalsIgnoreCase("recaptcha_v2_checkbox")) {
-                final String reCaptchaSiteKey = PluginJSonUtils.getJson(br, "recaptcha_v2_checkbox_site_key");
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSiteKey).getToken();
-                query2.add("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            final String turnstile_site_key = (String) appvars.get("turnstile_site_key");
+            if (turnstile_site_key != null) {
+                /* 2026-02-19: New */
+                final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstile_site_key).getToken();
+                query2.appendEncoded("cf-turnstile-response", cfTurnstileResponse);
             } else {
-                final String hcaptchaSiteKey = PluginJSonUtils.getJson(br, "hcaptcha_checkbox_site_key");
-                final String hcaptchaToken = new CaptchaHelperHostPluginHCaptcha(this, br, hcaptchaSiteKey).getToken();
-                query2.add("g-recaptcha-response", Encoding.urlEncode(hcaptchaToken));
-                query2.add("h-captcha-response", Encoding.urlEncode(hcaptchaToken));
+                /* Old handling */
+                if (captchaType.equalsIgnoreCase("recaptcha_v2_checkbox")) {
+                    final String reCaptchaSiteKey = PluginJSonUtils.getJson(br, "recaptcha_v2_checkbox_site_key");
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSiteKey).getToken();
+                    query2.appendEncoded("g-recaptcha-response", recaptchaV2Response);
+                } else {
+                    final String hcaptchaSiteKey = PluginJSonUtils.getJson(br, "hcaptcha_checkbox_site_key");
+                    final String hcaptchaToken = new CaptchaHelperHostPluginHCaptcha(this, br, hcaptchaSiteKey).getToken();
+                    query2.appendEncoded("g-recaptcha-response", hcaptchaToken);
+                    query2.appendEncoded("h-captcha-response", hcaptchaToken);
+                }
             }
         }
-        query2.add("_token", csrfToken);
+        query2.appendEncoded("_token", csrfToken);
         // query2.add("view_form_data", view_form_data);
-        query2.add("action", "captcha");
+        query2.appendEncoded("action", "captcha");
         br.postPage(br.getURL(), query2);
         final String view_form_data = br.getRegex("view_form_data\" value=\"([^\"]+)\"").getMatch(0);
         if (view_form_data == null) {
@@ -267,15 +279,17 @@ public class UpfilesIo extends PluginForHost {
             Thread.sleep(waitSeconds * 1001l);
         }
         final UrlQuery query3 = new UrlQuery();
-        query3.add("_token", csrfToken);
-        query3.add("view_form_data", view_form_data);
+        query3.appendEncoded("_token", csrfToken);
+        query3.appendEncoded("view_form_data", view_form_data);
         br.postPage("/file/go", query3);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         return entries.get("url").toString();
     }
 
     private void checkErrors(final Browser br) throws PluginException {
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "403 File is currently inaccessible");
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
     }

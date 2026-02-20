@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -54,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52328 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52342 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static final String          API_BASE     = "https://cooldebrid.com/api/v1";
@@ -71,14 +72,16 @@ public class CooldebridCom extends PluginForHost {
     }
 
     @Override
-    public String getAGBLink() {
-        return WEBSITE_BASE + "/tos";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader " + this.getVersion());
         br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public String getAGBLink() {
+        return WEBSITE_BASE + "/tos";
     }
 
     @Override
@@ -218,7 +221,6 @@ public class CooldebridCom extends PluginForHost {
 
     private void loginWebsite(final Account account, final boolean validateLogins) throws Exception {
         synchronized (account) {
-            prepBR(this.br);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
                 logger.info("Trying to re-use cookies");

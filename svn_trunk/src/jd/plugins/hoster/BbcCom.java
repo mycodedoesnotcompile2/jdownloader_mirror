@@ -39,7 +39,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BbcComDecrypter;
 import jd.plugins.decrypter.BbcComiPlayerCrawler;
 
-@HostPlugin(revision = "$Revision: 50762 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52339 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcCom extends PluginForHost {
     public BbcCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -331,16 +331,8 @@ public class BbcCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 
     @Override

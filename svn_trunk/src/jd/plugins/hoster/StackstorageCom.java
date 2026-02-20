@@ -19,7 +19,6 @@ import org.appwork.utils.encoding.URLEncode;
 
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.plugins.DownloadLink;
@@ -29,15 +28,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50140 $", interfaceVersion = 2, names = { "stackstorage.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52341 $", interfaceVersion = 2, names = { "stackstorage.com" }, urls = { "" })
 public class StackstorageCom extends PluginForHost {
     public StackstorageCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    public static final String PROPERTY_SUBDOMAIN  = "stackstorage_subdomain";
+    public static final String PROPERTY_FOLDER_ID  = "folder_id";
     public static final String PROPERTY_SHARETOKEN = "stackstorage_sharetoken";
     public static final String PROPERTY_CSRFTOKEN  = "stackstorage_csrftoken";
-    // public static final String PROPERTY_FILE_ID = "fileid";
+    public static final String PROPERTY_FILE_ID    = "fileid";
     public static final String PROPERTY_FILENAME   = "stackstorage_filename";
 
     @Override
@@ -56,7 +57,7 @@ public class StackstorageCom extends PluginForHost {
     }
 
     private String getFileID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return link.getStringProperty(PROPERTY_FILE_ID);
     }
 
     @Override
@@ -79,8 +80,8 @@ public class StackstorageCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String subdomain = new Regex(link.getContainerUrl(), "(?i)https?://([a-z0-9]+)\\.").getMatch(0);
-        final String folderid = new Regex(link.getContainerUrl(), "(?i)/s/([A-Za-z0-9]+)").getMatch(0);
+        final String subdomain = link.getStringProperty(PROPERTY_SUBDOMAIN, this.getHost());
+        final String folderid = link.getStringProperty(PROPERTY_FOLDER_ID);
         // TODO: 2023-11-20: Add handling to refresh csrftoken and sharetoken
         final String sharetoken = link.getStringProperty(PROPERTY_SHARETOKEN);
         final String csrftoken = link.getStringProperty(PROPERTY_CSRFTOKEN);
