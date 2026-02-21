@@ -20,22 +20,14 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -63,7 +55,17 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FlickrComCrawler;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 51787 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52356 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,6 +87,32 @@ public class FlickrCom extends PluginForHost {
         return "https://www." + getHost() + "/help/terms";
     }
 
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "flickr.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/photos/([^/]+)/(\\d+)(/in/album-(\\d+)|/in/gallery-(\\d+@N\\d+)-(\\d+))?");
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
     /* Settings */
     private static final String SETTING_FAST_LINKCHECK                   = "FAST_LINKCHECK";
     private static final String SETTING_SELECTED_PHOTO_QUALITY           = "SELECTED_PHOTO_QUALITY";
@@ -101,15 +129,16 @@ public class FlickrCom extends PluginForHost {
     public static final String  PROPERTY_USERNAME_URL                    = "username_url";
     public static final String  PROPERTY_REAL_NAME                       = "real_name";
     public static final String  PROPERTY_CONTENT_ID                      = "content_id";
-    public static final String  PROPERTY_SET_ID                          = "set_id";                                                                        // set/album
-    public static final String  PROPERTY_GALLERY_ID                      = "gallery_id";                                                                    // gallery
-    // id
-    public static final String  PROPERTY_DATE                            = "dateadded";                                                                     // timestamp
+    public static final String  PROPERTY_SET_ID                          = "set_id";
+    public static final String  PROPERTY_GALLERY_ID                      = "gallery_id";
+    public static final String  PROPERTY_DATE                            = "dateadded";                       // timestamp
     /* pre-formatted string */
     public static final String  PROPERTY_DATE_TAKEN                      = "date_taken";
     public static final String  PROPERTY_TITLE                           = "title";
     public static final String  PROPERTY_ORDER_ID                        = "order_id";
     public static final String  PROPERTY_MEDIA_TYPE                      = "media";
+    public static final String  MEDIA_TYPE_IMAGE                         = "photo";
+    public static final String  MEDIA_TYPE_VIDEO                         = "video";
     private static final String PROPERTY_SETTING_PREFER_SERVER_FILENAME  = "prefer_server_filename";
     private static final String SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED = "wait_minutes_on_error_ip_blocked";
     public static final String  PROPERTY_QUALITY                         = "quality";
@@ -118,13 +147,10 @@ public class FlickrCom extends PluginForHost {
     public static final String  PROPERTY_DIRECTURL                       = "directurl_%s";
     public static final String  PROPERTY_ACCOUNT_CSRF                    = "csrf";
     public static final String  PROPERTY_ACCOUNT_USERNAME_INTERNAL       = "username_internal";
-    private static final String TYPE_PHOTO                               = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)$";
-    private static final String TYPE_PHOTO_AS_PART_OF_SET                = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)/in/album-(\\d+)/?$";
-    private static final String TYPE_PHOTO_AS_PART_OF_GALLERY            = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)/in/gallery-(\\d+@N\\d+)-(\\d+)/?$";
 
-    /** Max 2000 requests per hour. */
     @Override
     public void init() {
+        /** Max 2000 requests per hour. */
         try {
             Browser.setBurstRequestIntervalLimitGlobal(this.getHost(), 3000, 20, 1900);
         } catch (final Throwable t) {
@@ -150,22 +176,40 @@ public class FlickrCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
+        String fid = link.getStringProperty(PROPERTY_CONTENT_ID);
+        if (fid != null) {
+            return fid;
+        }
+        fid = getFIDFromURL(link);
+        return fid;
     }
 
-    private String getUsername(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    private String getFIDFromURL(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(1);
+    }
+
+    private String getUsernameFromURL(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(0);
+    }
+
+    private String getSetIDFromURL(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(2);
+    }
+
+    private String getGalleryIDFromURL(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(4);
     }
 
     private String getPhotoURLWithoutAlbumOrGalleryInfo(final DownloadLink link) throws PluginException {
-        final String ret = new Regex(link.getPluginPatternMatcher(), "(?i)(https?://[^/]+/photos/[^<>\"/]+/\\d+)").getMatch(0);
-        if (ret == null) {
+        final String username = this.getUsernameFromURL(link);
+        final String fid = this.getFID(link);
+        if (username == null || fid == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else {
-            return ret;
         }
+        return "https://www.flickr.com/photos/" + username + "/" + fid;
     }
 
+    @Override
     public boolean isProxyRotationEnabledForLinkChecker() {
         return false;
     }
@@ -181,36 +225,42 @@ public class FlickrCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        final Account aa = AccountController.getInstance().getValidAccount(this.getHost());
-        return requestFileInformation(link, aa, false);
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        return requestFileInformation(link, account);
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        correctDownloadLink(link);
-        if (!link.isNameSet()) {
-            /* Set fallback name */
-            if (isVideo(link)) {
-                link.setName(this.getFID(link) + ".mp4");
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        if (isVideo(link)) {
+            return this.getFID(link) + ".mp4";
+        } else {
+            return this.getFID(link);
+        }
+    }
+
+    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        /* Set some properties needed for custom filenames/Packagizer! */
+        if (!link.hasProperty(PROPERTY_USERNAME_URL)) {
+            final String usernameFromURL = this.getUsernameFromURL(link);
+            /* Determine which type of username is inside the URL. */
+            if (FlickrComCrawler.looksLikeInternalUsername(usernameFromURL)) {
+                link.setProperty(PROPERTY_USERNAME_INTERNAL, usernameFromURL);
             } else {
-                link.setName(this.getFID(link));
+                link.setProperty(PROPERTY_USERNAME, usernameFromURL);
+            }
+            link.setProperty(PROPERTY_USERNAME_URL, usernameFromURL);
+        }
+        if (!link.hasProperty(PROPERTY_SET_ID)) {
+            final String setID = this.getSetIDFromURL(link);
+            if (setID != null) {
+                link.setProperty(PROPERTY_SET_ID, setID);
             }
         }
-        /* Set some properties needed for custom filenames/Packagizer! */
-        final String usernameFromURL = this.getUsername(link);
-        /* Determine which type of username is inside the URL. */
-        if (FlickrComCrawler.looksLikeInternalUsername(usernameFromURL)) {
-            link.setProperty(PROPERTY_USERNAME_INTERNAL, usernameFromURL);
-        } else {
-            link.setProperty(PROPERTY_USERNAME, usernameFromURL);
-        }
-        link.setProperty(PROPERTY_USERNAME_URL, usernameFromURL);
-        final String setID = new Regex(link.getPluginPatternMatcher(), TYPE_PHOTO_AS_PART_OF_SET).getMatch(2);
-        if (setID != null) {
-            link.setProperty(PROPERTY_SET_ID, setID);
-        }
-        final String galleryID = new Regex(link.getPluginPatternMatcher(), TYPE_PHOTO_AS_PART_OF_GALLERY).getMatch(3);
-        if (galleryID != null) {
-            link.setProperty(PROPERTY_GALLERY_ID, galleryID);
+        if (!link.hasProperty(PROPERTY_GALLERY_ID)) {
+            final String galleryID = this.getGalleryIDFromURL(link);
+            if (galleryID != null) {
+                link.setProperty(PROPERTY_GALLERY_ID, galleryID);
+            }
         }
         /* Picture direct-URLs are static --> Rely on them. */
         final String storedDirecturl = getStoredDirecturl(link);
@@ -233,14 +283,17 @@ public class FlickrCom extends PluginForHost {
         } else {
             availablecheckWebsite(link, account);
         }
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment();
+        final boolean isVideo = isVideo(link);
         final String directurl;
-        if (isVideo(link) && (isDownload || !this.getPluginConfig().getBooleanProperty(SETTING_FAST_LINKCHECK, default_SETTING_FAST_LINKCHECK))) {
+        // directurl is fresh, either via availablecheckAPI(photos) or getVideoDownloadurlAPI(videos)
+        if (isVideo && (isDownload || !this.getPluginConfig().getBooleanProperty(SETTING_FAST_LINKCHECK, default_SETTING_FAST_LINKCHECK))) {
             directurl = getVideoDownloadurlAPI(link, account);
         } else {
             directurl = getStoredDirecturl(link);
         }
         setFilename(link);
-        if (!StringUtils.isEmpty(directurl) && !isDownload && allowDirecturlCheckForFilesize(link)) {
+        if (!StringUtils.isEmpty(directurl) && !isDownload && link.getVerifiedFileSize() <= 0) {
             checkDirecturl(link, directurl);
         }
         return AvailableStatus.TRUE;
@@ -248,16 +301,15 @@ public class FlickrCom extends PluginForHost {
 
     /** Sets filename according to user preferences. */
     public static void setFilename(final DownloadLink link) throws ParseException {
-        final String directurl = getStoredDirecturl(link);
-        String filenameURL = null;
-        if (directurl != null && !isVideo(link)) {
-            filenameURL = new Regex(directurl, "(?i)https?://live\\.staticflickr\\.com/\\d+/([^/]+)").getMatch(0);
+        if (userPrefersServerFilenames() && !isVideo(link)) {
+            final String directurl = getStoredDirecturl(link);
+            final String filenameURL = Plugin.extractFileNameFromURL(directurl);
+            if (filenameURL != null) {
+                link.setFinalFileName(filenameURL);
+                return;
+            }
         }
-        if (userPrefersServerFilenames() && filenameURL != null) {
-            link.setFinalFileName(filenameURL);
-        } else {
-            link.setFinalFileName(getFormattedFilename(link));
-        }
+        link.setFinalFileName(getFormattedFilename(link));
     }
 
     /** Checks single video/photo via website and sets required DownloadLink properties. */
@@ -270,14 +322,14 @@ public class FlickrCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("div class=\"Four04Case\">")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*This member is no longer active on Flickr")) {
+        } else if (br.containsHTML(">\\s*This member is no longer active on Flickr")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("class=\"Problem\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 403) {
             /* This can also happen when user is logged in --> This then probably means that that is private content. */
             throw new AccountRequiredException();
-        } else if (br.getURL().contains("login.yahoo.com/config")) {
+        } else if (StringUtils.containsIgnoreCase(br.getURL(), "login.yahoo.com/config")) {
             throw new AccountRequiredException();
         }
         /* Collect metadata (needed for custom filenames) */
@@ -315,13 +367,15 @@ public class FlickrCom extends PluginForHost {
                 link.setProperty(PROPERTY_DATE, Long.parseLong(uploadedDate) * 1000);
             }
         }
-        link.setProperty(PROPERTY_CONTENT_ID, getFID(link));
+        if (!link.hasProperty(PROPERTY_CONTENT_ID)) {
+            link.setProperty(PROPERTY_CONTENT_ID, getFIDFromURL(link));
+        }
         if (!link.hasProperty(PROPERTY_MEDIA_TYPE)) {
             /* Fallback */
             if (br.containsHTML("class=\"videoplayer main\\-photo\"")) {
-                link.setProperty(PROPERTY_MEDIA_TYPE, "video");
+                link.setProperty(PROPERTY_MEDIA_TYPE, MEDIA_TYPE_VIDEO);
             } else {
-                link.setProperty(PROPERTY_MEDIA_TYPE, "photo");
+                link.setProperty(PROPERTY_MEDIA_TYPE, MEDIA_TYPE_IMAGE);
             }
         }
         final PhotoQuality preferredPhotoQuality = getPreferredPhotoQuality(link);
@@ -426,12 +480,12 @@ public class FlickrCom extends PluginForHost {
             /*
              * Fast way to get finallink via site as we always try to access the "o" (original) quality. Page might be redirected!
              */
-            br.getPage("/photos/" + getUsername(link) + "/" + getFID(link) + "/sizes/o");
+            br.getPage("/photos/" + getUsernameFromURL(link) + "/" + getFID(link) + "/sizes/o");
             /* Special case: Check if user prefers to download original quality */
             String directurl = null;
             if (preferredPhotoQuality == PhotoQuality.QO) {
                 if (br.getURL().contains("sizes/o")) { // Not redirected
-                    directurl = br.getRegex("<a href=\"([^<>\"]+)\">\\s*(Dieses Foto im Originalformat|Download the Original)").getMatch(0);
+                    directurl = br.getRegex("<a href=\"([^\"]+)\">\\s*(Dieses Foto im Originalformat|Download the Original)").getMatch(0);
                 }
             }
             if (directurl != null) {
@@ -501,7 +555,7 @@ public class FlickrCom extends PluginForHost {
         query.add("method", "flickr.photos.getInfo");
         query.add("photo_id", this.getFID(link));
         br.getPage(FlickrComCrawler.API_BASE + "services/rest?" + query.toString());
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /*
          * Compared to the website, this API will return offline status for private files too while website would return error 403. We don't
          * care about it as it#s an edge case anyways!
@@ -536,7 +590,7 @@ public class FlickrCom extends PluginForHost {
         query.add("hermesClient", "1");
         query.add("nojsoncallback", "1");
         apibr.getPage(FlickrComCrawler.API_BASE + "services/rest?" + query.toString());
-        Map<String, Object> entries = restoreFromString(apibr.toString(), TypeRef.MAP);
+        Map<String, Object> entries = restoreFromString(apibr.getRequest().getHtmlCode(), TypeRef.MAP);
         /*
          * 2021-09-09: Found 2 video types so far: "700" and "iphone_wifi" --> Both are equal in filesize. If more are available,
          * implementing a quality selection for videos could make sense.
@@ -560,6 +614,7 @@ public class FlickrCom extends PluginForHost {
             if (qualityName.equalsIgnoreCase("iphone_wifi")) {
                 continue;
             } else if (StringUtils.isEmpty(url)) {
+                /* Skip invalid items */
                 continue;
             }
             if (bestQualityURL == null) {
@@ -593,11 +648,9 @@ public class FlickrCom extends PluginForHost {
     /** Returns API parameters "extras" containing the needed extra properties for images/videos. */
     public static final String getApiParamExtras() {
         /**
-         * needs_interstitial = show 18+ content </br>
-         * media = include media-type (video/photo) </br>
-         * datecreate = get create-date of groups </br>
-         * date_taken = date_taken of photos </br>
-         * date_activity = timestamp of the last activity of a group (given via "dateactivity/_content") </br>
+         * needs_interstitial = show 18+ content </br> media = include media-type (video/photo) </br> datecreate = get create-date of groups
+         * </br> date_taken = date_taken of photos </br> date_activity = timestamp of the last activity of a group (given via
+         * "dateactivity/_content") </br>
          */
         String extras = "date_activity%2Cdatecreate%2Cdate_taken%2Cdate_upload%2Cdescription%2Cowner_name%2Cpath_alias%2Crealname%2Cneeds_interstitial%2Cmedia";
         final String[] allPhotoQualities = getPhotoQualityStringsDescending();
@@ -646,7 +699,7 @@ public class FlickrCom extends PluginForHost {
         final String media = (String) photo.get("media");
         // final String originalformat = (String) photo.get("originalformat");
         final String extension;
-        if (media.equalsIgnoreCase("video")) {
+        if (media.equalsIgnoreCase(MEDIA_TYPE_VIDEO)) {
             extension = ".mp4";
             final String secret = (String) photo.get("secret");
             if (!StringUtils.isEmpty(secret)) {
@@ -773,7 +826,7 @@ public class FlickrCom extends PluginForHost {
         return decodedValue.trim();
     }
 
-    private boolean checkDirecturl(final DownloadLink link, final String directurl) throws IOException, PluginException {
+    private boolean checkDirecturl(final DownloadLink link, final String directurl) throws Exception {
         URLConnectionAdapter con = null;
         try {
             final Browser brc = br.cloneBrowser();
@@ -784,6 +837,12 @@ public class FlickrCom extends PluginForHost {
                 link.setVerifiedFileSize(con.getCompleteContentLength());
             }
             return true;
+        } catch (Exception e) {
+            if (getStoredDirecturl(link) == null) {
+                logger.log(e);
+                return false;
+            }
+            throw e;
         } finally {
             try {
                 con.disconnect();
@@ -802,13 +861,15 @@ public class FlickrCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (!this.looksLikeDownloadableContent(con)) {
+            br.followConnection(true);
             if (con.getResponseCode() == 429) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Error 429 too many requests", 5 * 60 * 1000l);
-            }
-            br.followConnection(true);
-            if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Request forbidden by administrative rules")) {
+            } else if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Request forbidden by administrative rules")) {
                 final int minutesWait = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED, default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED);
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Your IP was banned by flickr.com", minutesWait * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Error 403: Your IP was banned by flickr.com", minutesWait * 60 * 1000l);
+            } else if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Invalid signature")) {
+                link.removeProperty(getDirecturlProperty(link));
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 403: Invalid signature: outdated direct-link?", 15 * 60 * 1000l);
             }
             errorBrokenFile(link);
             /* This code should never be reached */
@@ -817,24 +878,16 @@ public class FlickrCom extends PluginForHost {
     }
 
     public static boolean isVideo(final DownloadLink link) {
-        if (StringUtils.equals(link.getStringProperty(PROPERTY_MEDIA_TYPE), "video")) {
+        if (StringUtils.equals(link.getStringProperty(PROPERTY_MEDIA_TYPE), MEDIA_TYPE_VIDEO)) {
             return true;
         } else {
-            return false;
-        }
-    }
-
-    private boolean allowDirecturlCheckForFilesize(final DownloadLink link) {
-        if (isVideo(link)) {
-            return true;
-        } else {
-            /* 2021-09-17: Content-Length header not always given for images. */
             return false;
         }
     }
 
     public static String getStoredDirecturl(final DownloadLink link) {
-        return link.getStringProperty(getDirecturlProperty(link));
+        final String url = link.getStringProperty(getDirecturlProperty(link));
+        return url;
     }
 
     public static String getDirecturlProperty(final DownloadLink link) {
@@ -856,22 +909,13 @@ public class FlickrCom extends PluginForHost {
     }
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
-        String directurl = getStoredDirecturl(link);
-        if (directurl == null) {
-            requestFileInformation(link, account, true);
-            directurl = getStoredDirecturl(link);
-            if (StringUtils.isEmpty(directurl)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+        requestFileInformation(link, account);
+        final String directurl = getStoredDirecturl(link);
+        if (StringUtils.isEmpty(directurl)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, isResumeable(link, account), getMaxChunks(link));
         this.handleConnectionErrors(br, dl.getConnection());
-        if (!looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            errorBrokenFile(link);
-            /* This code should never be reached */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         dl.startDownload();
     }
 
@@ -913,7 +957,7 @@ public class FlickrCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -1285,7 +1329,7 @@ public class FlickrCom extends PluginForHost {
 
     @Override
     public String getDescription() {
-        return "JDownloader's flickr.com Plugin helps downloading media from flickr. Here you can define custom filenames.";
+        return "JDownloader's flickr.com Plugin helps downloading media from flickr. You can customize the filenames.";
     }
 
     private void setConfigElements() {
@@ -1341,14 +1385,6 @@ public class FlickrCom extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_EMPTY_TAG_STRING, "Char which will be used for empty tags (e.g. missing data):").setDefaultValue(defaultCustomStringForEmptyTags).setEnabledCondidtion(preferServerFilenames, false));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED, "Minutes to wait on error 'IP banned'", 1, 15, 1).setDefaultValue(default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED));
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 
     @Override

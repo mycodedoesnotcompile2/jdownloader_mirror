@@ -16,18 +16,11 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -48,7 +41,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51525 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+
+@HostPlugin(revision = "$Revision: 52354 $", interfaceVersion = 3, names = {}, urls = {})
 public class WrzutaNet extends PluginForHost {
     public WrzutaNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -327,8 +328,8 @@ public class WrzutaNet extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> userinfo = loginAndGetDirectDownloadlink(account, null);
+        final AccountInfo ai = new AccountInfo();
         final String premium_date_expire = (String) userinfo.get("premium_date_expire");
         if (premium_date_expire != null) {
             /* Premium account or expired premium account */
@@ -339,7 +340,8 @@ public class WrzutaNet extends PluginForHost {
         }
         final String transfer_leftStr = (String) userinfo.get("transfer_left");
         if (transfer_leftStr != null) {
-            ai.setTrafficLeft(SizeFormatter.getSize(transfer_leftStr));
+            // has group separator, for example "1,169.9 GB"
+            ai.setTrafficLeft(SizeFormatter.getSize(DecimalFormat.getInstance(Locale.UK), transfer_leftStr, true, false));
         } else {
             ai.setUnlimitedTraffic();
         }

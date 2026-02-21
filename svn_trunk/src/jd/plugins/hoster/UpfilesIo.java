@@ -41,9 +41,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52345 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52351 $", interfaceVersion = 2, names = {}, urls = {})
 public class UpfilesIo extends PluginForHost {
     public UpfilesIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -224,9 +223,9 @@ public class UpfilesIo extends PluginForHost {
     private String getDownloadFileUrl(final DownloadLink link, final MethodName methodname) throws Exception {
         final String csrfToken = br.getRegex("csrf-token\" content=\"([^\"]+)\"").getMatch(0);
         final UrlQuery query = new UrlQuery();
-        query.add("_token", csrfToken);
-        query.add("ccp", "1");
-        query.add("action", "continue");
+        query.appendEncoded("_token", csrfToken);
+        query.appendEncoded("ccp", "1");
+        query.appendEncoded("action", "continue");
         br.postPage(br.getURL(), query);
         // final Regex fileInfo = br.getRegex("<h3>\\s*Download\\s*:\\s*([^<]+) \\(([^\\)]+)\\)\\s*</h3>");
         // if (fileInfo.matches()) {
@@ -252,12 +251,10 @@ public class UpfilesIo extends PluginForHost {
             } else {
                 /* Old handling */
                 if (captchaType.equalsIgnoreCase("recaptcha_v2_checkbox")) {
-                    final String reCaptchaSiteKey = PluginJSonUtils.getJson(br, "recaptcha_v2_checkbox_site_key");
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSiteKey).getToken();
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, appvars.get("recaptcha_v2_checkbox_site_key").toString()).getToken();
                     query2.appendEncoded("g-recaptcha-response", recaptchaV2Response);
                 } else {
-                    final String hcaptchaSiteKey = PluginJSonUtils.getJson(br, "hcaptcha_checkbox_site_key");
-                    final String hcaptchaToken = new CaptchaHelperHostPluginHCaptcha(this, br, hcaptchaSiteKey).getToken();
+                    final String hcaptchaToken = new CaptchaHelperHostPluginHCaptcha(this, br, appvars.get("hcaptcha_checkbox_site_key").toString()).getToken();
                     query2.appendEncoded("g-recaptcha-response", hcaptchaToken);
                     query2.appendEncoded("h-captcha-response", hcaptchaToken);
                 }

@@ -79,6 +79,10 @@ public class HashInfo {
         return trustworthy;
     }
 
+    public HashInfo clone(final boolean isTrustWorthy, final boolean isForced) {
+        return new HashInfo(getHash(), getType(), isTrustWorthy, isForced);
+    }
+
     public boolean isForced() {
         return forced;
     }

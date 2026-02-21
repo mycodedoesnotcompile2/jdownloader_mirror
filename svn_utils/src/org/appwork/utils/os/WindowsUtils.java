@@ -57,8 +57,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -83,6 +85,12 @@ import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.UniqueAlltimeID;
+import org.appwork.utils.os.windows.jna.HandleScanExEntry32;
+import org.appwork.utils.os.windows.jna.HandleScanExEntry64;
+import org.appwork.utils.os.windows.jna.HandleScanLegacyEntry32;
+import org.appwork.utils.os.windows.jna.HandleScanLegacyEntry64;
+import org.appwork.utils.os.windows.jna.Kernel32VolumePath;
+import org.appwork.utils.os.windows.jna.NtDllForHandleScan;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
 import org.appwork.utils.processes.ProcessBuilderFactory;
@@ -122,7 +130,6 @@ import com.sun.jna.platform.win32.WinNT.SECURITY_IMPERSONATION_LEVEL;
 import com.sun.jna.platform.win32.WinNT.SID_NAME_USE;
 import com.sun.jna.platform.win32.WinNT.TOKEN_ELEVATION;
 import com.sun.jna.platform.win32.WinUser;
-import com.sun.jna.platform.win32.Wtsapi32;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.LongByReference;
 import com.sun.jna.ptr.PointerByReference;
@@ -1552,6 +1559,128 @@ public class WindowsUtils {
         }
     }
 
+    /** File access: read data (files) or list directory (directories). */
+    public static final int FILE_READ_DATA        = 0x0001;
+    /** File access: write data (files) or add file (directories). */
+    public static final int FILE_WRITE_DATA       = 0x0002;
+    /** File access: append data (files) or add subdirectory (directories). */
+    public static final int FILE_APPEND_DATA      = 0x0004;
+    /** File access: read extended attributes. */
+    public static final int FILE_READ_EA          = 0x0008;
+    /** File access: write extended attributes. */
+    public static final int FILE_WRITE_EA         = 0x0010;
+    /** File access: execute (files) or traverse (directories). */
+    public static final int FILE_EXECUTE          = 0x0020;
+    /** File access: delete child (directories only). */
+    public static final int FILE_DELETE_CHILD     = 0x0040;
+    /** File access: read attributes. */
+    public static final int FILE_READ_ATTRIBUTES  = 0x0080;
+    /** File access: write attributes. */
+    public static final int FILE_WRITE_ATTRIBUTES = 0x0100;
+    /** Standard access: delete object. */
+    public static final int ACCESS_DELETE         = 0x00010000;
+    /** Standard access: read security descriptor. */
+    public static final int READ_CONTROL          = 0x00020000;
+    /** Standard access: write DACL. */
+    public static final int WRITE_DAC             = 0x00040000;
+    /** Standard access: write owner. */
+    public static final int WRITE_OWNER           = 0x00080000;
+    /** Standard access: synchronize. */
+    public static final int ACCESS_SYNCHRONIZE    = 0x00100000;
+
+    /**
+     * Information about a single handle of a process (from NtQuerySystemInformation handle scan). For file handles, {@link #getPath()} may
+     * contain the resolved path.
+     */
+    public static class HandleInfo {
+        private final int    handleValue;
+        private final int    objectTypeNumber;
+        private final int    grantedAccess;
+        private final String path;
+
+        public HandleInfo(int handleValue, int objectTypeNumber, int grantedAccess, String path) {
+            this.handleValue = handleValue;
+            this.objectTypeNumber = objectTypeNumber;
+            this.grantedAccess = grantedAccess;
+            this.path = path;
+        }
+
+        public int getHandleValue() {
+            return handleValue;
+        }
+
+        public int getObjectTypeNumber() {
+            return objectTypeNumber;
+        }
+
+        /**
+         * Returns the granted access mask for this handle. For file handles, check flags like {@link WindowsUtils#FILE_READ_DATA},
+         * {@link WindowsUtils#FILE_WRITE_DATA}, etc.
+         */
+        public int getGrantedAccess() {
+            return grantedAccess;
+        }
+
+        /** Resolved path for file handles; null for other types or if resolution failed. */
+        public String getPath() {
+            return path;
+        }
+
+        /** Returns true if the handle has read access (FILE_READ_DATA). */
+        public boolean canRead() {
+            return (grantedAccess & FILE_READ_DATA) != 0;
+        }
+
+        /** Returns true if the handle has write access (FILE_WRITE_DATA). */
+        public boolean canWrite() {
+            return (grantedAccess & FILE_WRITE_DATA) != 0;
+        }
+
+        /** Returns true if the handle has append access (FILE_APPEND_DATA). */
+        public boolean canAppend() {
+            return (grantedAccess & FILE_APPEND_DATA) != 0;
+        }
+
+        /** Returns true if the handle has execute access (FILE_EXECUTE). */
+        public boolean canExecute() {
+            return (grantedAccess & FILE_EXECUTE) != 0;
+        }
+
+        /** Returns true if the handle has delete access. */
+        public boolean canDelete() {
+            return (grantedAccess & ACCESS_DELETE) != 0;
+        }
+
+        /** Returns a human-readable string of the access flags. */
+        public String getAccessString() {
+            StringBuilder sb = new StringBuilder();
+            if (canRead()) {
+                sb.append("R");
+            }
+            if (canWrite()) {
+                sb.append("W");
+            }
+            if (canAppend()) {
+                sb.append("A");
+            }
+            if (canExecute()) {
+                sb.append("X");
+            }
+            if (canDelete()) {
+                sb.append("D");
+            }
+            if ((grantedAccess & ACCESS_SYNCHRONIZE) != 0) {
+                sb.append("S");
+            }
+            return sb.length() > 0 ? sb.toString() : "-";
+        }
+
+        @Override
+        public String toString() {
+            return String.format(Locale.ROOT, "HandleInfo{handle=0x%X, type=%d, access=0x%X (%s), path=%s}", handleValue, objectTypeNumber, grantedAccess, getAccessString(), path != null ? "'" + path + "'" : "null");
+        }
+    }
+
     private static final int                  CCH_RM_SESSION_KEY    = 32;
     /** All possible permissions */
     public static final Set<AccessPermission> PERMISSIONSET_FULL    = EnumSet.allOf(AccessPermission.class);
@@ -1573,7 +1702,7 @@ public class WindowsUtils {
         PERMISSIONSET_MODIFY = EnumSet.copyOf(temp);
     }
 
-    public static List<LockInfo> getLocksOnPath(File filePath) {
+    public static List<LockInfo> getLocksOnPath(File filePath) throws Win32Exception {
         IntByReference session = new IntByReference();
         char[] sessionKey = new char[CCH_RM_SESSION_KEY + 1];
         List<LockInfo> result = new ArrayList<LockInfo>();
@@ -1655,6 +1784,630 @@ public class WindowsUtils {
             }
             throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
         }
+        return result;
+    }
+
+    /** Object type number for File handles (NtQuerySystemInformation); may vary by Windows version. */
+    /** Windows kernel object type: File (0x28 = 40 decimal). */
+    private static final int OBJECT_TYPE_FILE        = 40;
+    /** PROCESS_DUP_HANDLE for DuplicateHandle (no admin required for own process). */
+    private static final int PROCESS_DUP_HANDLE      = 0x0040;
+    /** Max path length for GetFinalPathNameByHandleW buffer. */
+    private static final int MAX_PATH_CHARS          = 32768;
+    /** Handle array offset in SystemHandleInformation buffer (after count). From {@link NtDllForHandleScan}. */
+    private static final int HANDLES_ARRAY_OFFSET    = com.sun.jna.Native.POINTER_SIZE == 8 ? 8 : 4;
+    /** Handle array offset in SystemExtendedHandleInformation buffer (after count + reserved). */
+    private static final int HANDLES_EX_ARRAY_OFFSET = com.sun.jna.Native.POINTER_SIZE == 8 ? 16 : 8;
+
+    /**
+     * Finds processes that have open handles on the given path by scanning all process handles via NtQuerySystemInformation (no
+     * RestartManager). Use when {@link #getLocksOnPath(File)} is insufficient or RestartManager is not desired.
+     * <p>
+     * <b>Performance and memory:</b> Windows does not provide an API to enumerate handles of a single process only. The only supported
+     * approach is NtQuerySystemInformation(SystemHandleInformation/SystemExtendedHandleInformation), which returns the entire system handle
+     * table (one large buffer, typically several MB). For a more lightweight "who has this file?" check, use {@link #getLocksOnPath(File)}
+     * (Restart Manager) first; only fall back to this handle scan when Restart Manager is unavailable or insufficient. Use
+     * {@link #getLocksOnPathViaHandleScan(File, int) getLocksOnPathViaHandleScan(filePath, maxHandles)} to stop after finding enough
+     * processes and avoid unnecessary path resolution.
+     * <p>
+     * Requires sufficient privileges to open other processes with PROCESS_DUP_HANDLE and to call NtQuerySystemInformation. May miss
+     * processes that cannot be opened (e.g. protected/system). Uses the same {@link LockInfo} result type; appName is derived from process
+     * image path where possible, applicationType is always RmUnknownApp.
+     *
+     * @param filePath
+     *            file or directory path to check (absolute path used)
+     * @return list of LockInfo for processes that have a handle on this path (may be empty)
+     */
+    public static List<LockInfo> getLocksOnPathViaHandleScan(File filePath) {
+        return getLocksOnPathViaHandleScan(filePath, 0);
+    }
+
+    /**
+     * Like {@link #getLocksOnPathViaHandleScan(File)} but stops once at least {@code maxHandles} processes have been found.
+     *
+     * @param filePath
+     *            file or directory path to check (absolute path used)
+     * @param maxHandles
+     *            maximum number of processes to return; 0 or negative means no limit
+     * @return list of LockInfo for processes that have a handle on this path (size at most maxHandles if maxHandles &gt; 0)
+     */
+    /**
+     * LRU cache for process handles during handle scanning. Avoids repeated OpenProcess/CloseProcess calls when handles from the same
+     * process appear non-consecutively in the system handle table. Limited size to avoid holding too many process handles open.
+     */
+    private static final int PROCESS_HANDLE_CACHE_SIZE = 16;
+
+    public static List<LockInfo> getLocksOnPathViaHandleScan(File filePath, int maxHandles) {
+        if (!CrossSystem.isWindows()) {
+            return Collections.emptyList();
+        }
+        final String targetPath = normalizePathForCompare(filePath.getAbsolutePath());
+        final List<LockInfo> result = new ArrayList<LockInfo>();
+        final int stopAt = maxHandles > 0 ? maxHandles : Integer.MAX_VALUE;
+        final Set<Integer> foundPids = new HashSet<Integer>();
+        final Set<Integer> failedPids = new HashSet<Integer>();
+        // LRU cache: pid -> process handle (insertion order, oldest first)
+        // for me, handles come sorted by pids - but this is not guaranteeed
+        final LinkedHashMap<Integer, HANDLE> processCache = new LinkedHashMap<Integer, HANDLE>(PROCESS_HANDLE_CACHE_SIZE, 0.75f, true) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Integer, HANDLE> eldest) {
+                if (size() > PROCESS_HANDLE_CACHE_SIZE) {
+                    closeHandleSafe(eldest.getValue());
+                    return true;
+                }
+                return false;
+            }
+        };
+        try {
+            scanAllSystemHandles(new HandleEntryConsumer() {
+                @Override
+                public boolean accept(int pid, int handleVal, int objectType, int grantedAccess) {
+                    if (result.size() >= stopAt) {
+                        return false;
+                    }
+                    if (objectType != OBJECT_TYPE_FILE) {
+                        return true;
+                    }
+                    Integer pidKey = Integer.valueOf(pid);
+                    if (foundPids.contains(pidKey) || failedPids.contains(pidKey)) {
+                        return true;
+                    }
+                    // Get or open process handle from cache
+                    HANDLE hProcess = processCache.get(pidKey);
+                    if (hProcess == null) {
+                        hProcess = openProcessForHandleDup(pid);
+                        if (hProcess == null) {
+                            failedPids.add(pidKey);
+                            return true;
+                        }
+                        processCache.put(pidKey, hProcess);
+                    }
+                    String path = resolvePathWithProcessHandle(hProcess, handleVal);
+                    if (path != null && pathMatches(targetPath, path)) {
+                        foundPids.add(pidKey);
+                        try {
+                            String appName = getProcessImageName(hProcess);
+                            int sessionId = getProcessSessionId(pid);
+                            result.add(new LockInfo(pid, appName != null ? appName : "", "", LockInfo.ApplicationType.RmUnknownApp.getValue(), sessionId));
+                        } catch (Exception e) {
+                            LogV3.exception(WindowsUtils.class, e);
+                        }
+                    }
+                    return result.size() < stopAt;
+                }
+            });
+        } finally {
+            // Close all cached process handles
+            for (HANDLE h : processCache.values()) {
+                closeHandleSafe(h);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * If path starts with a volume GUID (e.g. "\\?\Volume{guid}\" or "Volume{guid}\"), resolves it to a drive letter (e.g. "C:\") via
+     * GetVolumePathNamesForVolumeNameW and returns the path with that prefix. Otherwise returns path unchanged. The "\\?\" prefix is the
+     * Windows long-path form returned by GetFinalPathNameByHandleW.
+     */
+    private static String resolveVolumeGuidToDriveLetter(String path) {
+        if (path == null) {
+            return path;
+        }
+        int volumeStart = path.startsWith("\\\\?\\") ? 4 : (path.startsWith("Volume{") ? 0 : -1);
+        if (volumeStart < 0 || path.indexOf("Volume{", volumeStart) != volumeStart) {
+            return path;
+        }
+        int endPrefix = path.indexOf("}\\");
+        if (endPrefix < 0) {
+            return path;
+        }
+        String volumePrefix = path.substring(0, endPrefix + 2);
+        String volumeNameForApi = volumePrefix.startsWith("\\\\?\\") ? volumePrefix : "\\\\?\\" + volumePrefix;
+        char[] volumeNameChars = (volumeNameForApi + "\0").toCharArray();
+        IntByReference returnLength = new IntByReference();
+        char[] pathNamesBuf = new char[512];
+        if (!Kernel32VolumePath.INSTANCE.GetVolumePathNamesForVolumeNameW(volumeNameChars, pathNamesBuf, pathNamesBuf.length, returnLength)) {
+            int err = Kernel32.INSTANCE.GetLastError();
+            if (err == 122 /* ERROR_MORE_DATA */ && returnLength.getValue() > 0 && returnLength.getValue() <= 4096) {
+                pathNamesBuf = new char[returnLength.getValue()];
+                if (!Kernel32VolumePath.INSTANCE.GetVolumePathNamesForVolumeNameW(volumeNameChars, pathNamesBuf, pathNamesBuf.length, returnLength)) {
+                    return path;
+                }
+            } else {
+                return path;
+            }
+        }
+        int n = 0;
+        while (n < pathNamesBuf.length && pathNamesBuf[n] != 0) {
+            n++;
+        }
+        if (n == 0) {
+            return path;
+        }
+        String mountPoint = new String(pathNamesBuf, 0, n).replace('/', '\\').trim();
+        if (mountPoint.isEmpty()) {
+            return path;
+        }
+        if (!mountPoint.endsWith("\\")) {
+            mountPoint = mountPoint + "\\";
+        }
+        return mountPoint + path.substring(volumePrefix.length());
+    }
+
+    private static String normalizePathForCompare(String path) {
+        if (path == null) {
+            return null;
+        }
+        String s = path.replace('/', '\\').trim();
+        if (s.startsWith("\\\\?\\")) {
+            s = s.substring(4);
+        }
+        if (s.startsWith("\\??\\")) {
+            s = s.substring(4);
+        }
+        return s;
+    }
+
+    private static boolean pathMatches(String targetNormalized, String handlePathNormalized) {
+        if (targetNormalized == null || handlePathNormalized == null) {
+            return false;
+        }
+        if (targetNormalized.equalsIgnoreCase(handlePathNormalized)) {
+            return true;
+        }
+        if (handlePathNormalized.toLowerCase(Locale.ROOT).startsWith(targetNormalized.toLowerCase(Locale.ROOT))) {
+            String rest = handlePathNormalized.substring(targetNormalized.length());
+            if (rest.startsWith("\\") || rest.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String getProcessImageName(int pid) {
+        HANDLE h = null;
+        try {
+            h = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (h == null || Pointer.nativeValue(h.getPointer()) == 0) {
+                return null;
+            }
+            return getProcessImageName(h);
+        } finally {
+            if (h != null && Pointer.nativeValue(h.getPointer()) != 0) {
+                Kernel32.INSTANCE.CloseHandle(h);
+            }
+        }
+    }
+
+    /**
+     * Gets the process image name using an already-opened process handle. Requires PROCESS_QUERY_LIMITED_INFORMATION access.
+     */
+    private static String getProcessImageName(HANDLE hProcess) {
+        if (hProcess == null || Pointer.nativeValue(hProcess.getPointer()) == 0) {
+            return null;
+        }
+        char[] buf = new char[WinBase.MAX_PATH];
+        IntByReference size = new IntByReference(buf.length);
+        if (!WindowsUtilsKernel32.INSTANCE.QueryFullProcessImageNameW(hProcess, 0, buf, size)) {
+            return null;
+        }
+        String path = new String(buf, 0, size.getValue()).trim();
+        int last = path.replace('/', '\\').lastIndexOf('\\');
+        return last >= 0 ? path.substring(last + 1) : path;
+    }
+
+    private static int getProcessSessionId(int pid) {
+        IntByReference ref = new IntByReference();
+        if (Kernel32Ext.INSTANCE.ProcessIdToSessionId(pid, ref)) {
+            return ref.getValue();
+        }
+        return 0;
+    }
+
+    /**
+     * Resolves the path for a file handle using an already-opened process handle. This is the efficient variant that avoids repeated
+     * OpenProcess/CloseProcess calls when processing multiple handles from the same process.
+     *
+     * @param hProcess
+     *            already-opened process handle with PROCESS_DUP_HANDLE access
+     * @param handleVal
+     *            handle value to resolve
+     * @return normalized path or null if resolution fails (non-file handle, pipe, device, etc.)
+     */
+    private static String resolvePathWithProcessHandle(HANDLE hProcess, int handleVal) {
+        HANDLE hDup = null;
+        try {
+            HANDLE hSource = new HANDLE(Pointer.createConstant(handleVal));
+            HANDLEByReference phDup = new HANDLEByReference();
+            if (!Kernel32.INSTANCE.DuplicateHandle(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, FILE_READ_ATTRIBUTES, false, 0)) {
+                if (!Kernel32.INSTANCE.DuplicateHandle(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, 0, false,
+                        0x00000002 /* DUPLICATE_SAME_ACCESS */)) {
+                    int ntStatus = NtDllForHandleScan.INSTANCE.NtDuplicateObject(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, FILE_READ_ATTRIBUTES, 0, 0);
+                    if (ntStatus != NtDllForHandleScan.STATUS_SUCCESS) {
+                        ntStatus = NtDllForHandleScan.INSTANCE.NtDuplicateObject(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, 0, 0, NtDllForHandleScan.DUPLICATE_SAME_ACCESS);
+                    }
+                    if (ntStatus != NtDllForHandleScan.STATUS_SUCCESS) {
+                        return null;
+                    }
+                }
+                hDup = phDup.getValue();
+            } else {
+                hDup = phDup.getValue();
+            }
+            if (hDup == null || Pointer.nativeValue(hDup.getPointer()) == 0) {
+                return null;
+            }
+            int fileType = Kernel32Ext.INSTANCE.GetFileType(hDup);
+            if (fileType != Kernel32Ext.FILE_TYPE_DISK) {
+                return null;
+            }
+            char[] pathBuf = new char[MAX_PATH_CHARS];
+            int len = WindowsUtilsKernel32.INSTANCE.GetFinalPathNameByHandleW(hDup, pathBuf, pathBuf.length, WindowsUtilsKernel32.VOLUME_NAME_DOS);
+            if (len <= 0 || len >= pathBuf.length) {
+                return null;
+            }
+            String rawPath = new String(pathBuf, 0, len).trim();
+            String withDrive = rawPath.indexOf("Volume{") >= 0 ? resolveVolumeGuidToDriveLetter(rawPath) : rawPath;
+            return normalizePathForCompare(withDrive);
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (hDup != null && Pointer.nativeValue(hDup.getPointer()) != 0) {
+                Kernel32.INSTANCE.CloseHandle(hDup);
+            }
+        }
+    }
+
+    /**
+     * Opens a process for handle duplication and querying process info.
+     *
+     * @return process handle or null if failed
+     */
+    private static HANDLE openProcessForHandleDup(int pid) {
+        HANDLE h = Kernel32.INSTANCE.OpenProcess(PROCESS_DUP_HANDLE | WinNT.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (h == null || Pointer.nativeValue(h.getPointer()) == 0) {
+            return null;
+        }
+        return h;
+    }
+
+    /**
+     * Closes a handle if non-null and valid.
+     */
+    private static void closeHandleSafe(HANDLE h) {
+        if (h != null && Pointer.nativeValue(h.getPointer()) != 0) {
+            Kernel32.INSTANCE.CloseHandle(h);
+        }
+    }
+
+    /**
+     * Lists all handles of the given process by scanning system handles via NtQuerySystemInformation. Path resolution is attempted for
+     * every handle (GetFinalPathNameByHandle); success indicates a file/directory handle, so file handles are found even if ObjectTypeIndex
+     * differs. Handles with resolved path are reported as type 28 (File); others keep the reported type with path null.
+     * <p>
+     * No admin required for the current process (own PID): NtQuerySystemInformation and OpenProcess(PROCESS_DUP_HANDLE) on the calling
+     * process work without elevation. For other user processes the same applies on current Windows; if NtQuerySystemInformation returns
+     * ACCESS_DENIED (0xC0000003), the caller may need to run elevated.
+     * <p>
+     * If the process cannot be opened (e.g. pid=4 System, GetLastError=ACCESS_DENIED), an empty list is returned immediately without
+     * scanning; enable fine logging to see which pid/handle is being resolved if GetFinalPathNameByHandleW appears to hang.
+     *
+     * @param pid
+     *            process ID (current process is supported)
+     * @return list of HandleInfo; empty if not Windows or on error
+     */
+    /** Minimum buffer size for NtQuerySystemInformation (handle list). */
+    private static final int LIST_HANDLES_MIN_BUFFER = 64 * 1024;
+    /**
+     * Maximum buffer size for NtQuerySystemInformation (handle list). Kept low to avoid OutOfMemoryError in test/small-heap environments.
+     */
+    private static final int LIST_HANDLES_MAX_BUFFER = 50 * 1024 * 1024;
+
+    /**
+     * Consumer for handle entries during system-wide handle scan. Return true to continue iteration, false to stop.
+     */
+    private static interface HandleEntryConsumer {
+        boolean accept(int pid, int handleVal, int objectType, int grantedAccess);
+    }
+
+    /**
+     * Scans all system handles via NtQuerySystemInformation (Extended then Legacy fallback) and calls the consumer for each handle entry.
+     * The consumer can filter by PID and return false to stop early.
+     * <p>
+     * There is no Windows API to get handles of a single process only; the full system handle table must be queried (see
+     * LIST_HANDLES_MAX_BUFFER). Memory usage is therefore determined by the number of handles in the system, not by the number of processes
+     * of interest.
+     *
+     * @param consumer
+     *            called for each (pid, handleVal, objectType); return false to stop iteration early
+     *            <p>
+     *            Exceptions during entry read or inside the consumer (e.g. handle closed during iteration, process exited) are caught and
+     *            logged; the scan continues with the next handle and is not aborted.
+     */
+    private static void scanAllSystemHandles(HandleEntryConsumer consumer) {
+        if (!CrossSystem.isWindows()) {
+            return;
+        }
+        IntByReference returnLength = new IntByReference();
+        final boolean is64 = com.sun.jna.Native.POINTER_SIZE == 8;
+        final int maxBuffer = LIST_HANDLES_MAX_BUFFER;
+        Memory buffer = null;
+        boolean useExtended = false;
+        try {
+            int bufferSize = LIST_HANDLES_MIN_BUFFER;
+            while (bufferSize <= maxBuffer) {
+                try {
+                    if (buffer != null) {
+                        buffer.close();
+                        buffer = null;
+                    }
+                    buffer = new Memory(bufferSize);
+                } catch (OutOfMemoryError e) {
+                    LogV3.warning("scanAllSystemHandles: OutOfMemoryError allocating " + bufferSize + " bytes");
+                    if (bufferSize <= LIST_HANDLES_MIN_BUFFER) {
+                        if (buffer != null) {
+                            try {
+                                buffer.close();
+                            } catch (Throwable t) {
+                                /* ignore */
+                            }
+                            buffer = null;
+                        }
+                        return;
+                    }
+                    bufferSize = Math.max(LIST_HANDLES_MIN_BUFFER, bufferSize / 2);
+                    continue;
+                }
+                returnLength.setValue(0);
+                int status = NtDllForHandleScan.INSTANCE.NtQuerySystemInformation(NtDllForHandleScan.SystemExtendedHandleInformation, buffer, bufferSize, returnLength);
+                if (status == NtDllForHandleScan.STATUS_SUCCESS) {
+                    useExtended = true;
+                    break;
+                }
+                if (status == NtDllForHandleScan.STATUS_INFO_LENGTH_MISMATCH || status == NtDllForHandleScan.STATUS_NO_MEMORY) {
+                    int required = returnLength.getValue();
+                    // Already at maxBuffer and still failing - give up on extended API
+                    if (bufferSize >= maxBuffer) {
+                        LogV3.info("scanAllSystemHandles: extended API needs " + required + " bytes but maxBuffer is " + maxBuffer + ", falling back to legacy");
+                        if (buffer != null) {
+                            try {
+                                buffer.close();
+                            } catch (Throwable t) {
+                                /* ignore */
+                            }
+                            buffer = null;
+                        }
+                        break;
+                    }
+                    if (required > 0 && required <= maxBuffer) {
+                        bufferSize = required;
+                    } else {
+                        bufferSize = Math.min(bufferSize * 2, maxBuffer);
+                    }
+                    continue;
+                }
+                if (buffer != null) {
+                    try {
+                        buffer.close();
+                    } catch (Throwable t) {
+                        /* ignore */
+                    }
+                    buffer = null;
+                }
+                break;
+            }
+            if (!useExtended) {
+                bufferSize = LIST_HANDLES_MIN_BUFFER;
+                while (bufferSize <= maxBuffer) {
+                    try {
+                        if (buffer != null) {
+                            buffer.close();
+                            buffer = null;
+                        }
+                        buffer = new Memory(bufferSize);
+                    } catch (OutOfMemoryError e) {
+                        LogV3.warning("scanAllSystemHandles: OutOfMemoryError allocating " + bufferSize + " bytes (legacy)");
+                        if (bufferSize <= LIST_HANDLES_MIN_BUFFER) {
+                            return;
+                        }
+                        bufferSize = Math.max(LIST_HANDLES_MIN_BUFFER, bufferSize / 2);
+                        continue;
+                    }
+                    returnLength.setValue(0);
+                    int status = NtDllForHandleScan.INSTANCE.NtQuerySystemInformation(NtDllForHandleScan.SystemHandleInformation, buffer, bufferSize, returnLength);
+                    if (status == NtDllForHandleScan.STATUS_SUCCESS) {
+                        break;
+                    }
+                    if (status == NtDllForHandleScan.STATUS_INFO_LENGTH_MISMATCH || status == NtDllForHandleScan.STATUS_NO_MEMORY) {
+                        int required = returnLength.getValue();
+                        // Already at maxBuffer and still failing - give up
+                        if (bufferSize >= maxBuffer) {
+                            LogV3.info("scanAllSystemHandles (legacy): needs " + required + " bytes but maxBuffer is " + maxBuffer + ", giving up");
+                            return;
+                        }
+                        if (required > 0 && required <= maxBuffer) {
+                            bufferSize = required;
+                        } else {
+                            bufferSize = Math.min(bufferSize * 2, maxBuffer);
+                        }
+                        continue;
+                    }
+                    LogV3.warning("scanAllSystemHandles: NtQuerySystemInformation failed, status=0x" + Integer.toHexString(status));
+                    return;
+                }
+            }
+            if (buffer == null || buffer.size() > maxBuffer) {
+                LogV3.info("scanAllSystemHandles: buffer is null or too large, returning");
+                return;
+            }
+            int bufSize = (int) buffer.size();
+            int handleCount;
+            int entrySize;
+            int arrayOffset;
+            if (useExtended) {
+                long countLong = is64 ? buffer.getLong(0) : (buffer.getInt(0) & 0xFFFFFFFFL);
+                handleCount = countLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) countLong;
+                entrySize = is64 ? new HandleScanExEntry64().size() : new HandleScanExEntry32().size();
+                arrayOffset = HANDLES_EX_ARRAY_OFFSET;
+            } else {
+                handleCount = buffer.getInt(0);
+                entrySize = is64 ? new HandleScanLegacyEntry64().size() : new HandleScanLegacyEntry32().size();
+                arrayOffset = HANDLES_ARRAY_OFFSET;
+            }
+            LogV3.info("scanAllSystemHandles: useExtended=" + useExtended + ", is64=" + is64 + ", handleCount=" + handleCount + ", entrySize=" + entrySize + ", bufSize=" + bufSize);
+            LogV3.info("scanAllSystemHandles: POINTER_SIZE=" + com.sun.jna.Native.POINTER_SIZE + ", Ex64.size=" + new HandleScanExEntry64().size() + ", Ex32.size=" + new HandleScanExEntry32().size());
+            for (int i = 0; i < handleCount; i++) {
+                int offset = arrayOffset + i * entrySize;
+                if (offset + entrySize > bufSize) {
+                    break;
+                }
+                int entryPid;
+                int handleVal;
+                int objectType;
+                int grantedAccess;
+                try {
+                    if (useExtended) {
+                        if (is64) {
+                            HandleScanExEntry64 entry64 = new HandleScanExEntry64(buffer.share(offset));
+                            entry64.read();
+                            entryPid = entry64.getProcessId();
+                            handleVal = entry64.getHandleValue();
+                            objectType = entry64.getObjectTypeNumber();
+                            grantedAccess = entry64.GrantedAccess;
+                        } else {
+                            HandleScanExEntry32 entry32 = new HandleScanExEntry32(buffer.share(offset));
+                            entry32.read();
+                            entryPid = entry32.getProcessId();
+                            handleVal = entry32.getHandleValue();
+                            objectType = entry32.getObjectTypeNumber();
+                            grantedAccess = entry32.GrantedAccess;
+                        }
+                    } else {
+                        if (is64) {
+                            HandleScanLegacyEntry64 entry64 = new HandleScanLegacyEntry64(buffer.share(offset));
+                            entry64.read();
+                            entryPid = entry64.getProcessId();
+                            handleVal = entry64.getHandleValue();
+                            objectType = entry64.getObjectTypeNumber();
+                            grantedAccess = entry64.GrantedAccess;
+                        } else {
+                            HandleScanLegacyEntry32 entry32 = new HandleScanLegacyEntry32(buffer.share(offset));
+                            entry32.read();
+                            entryPid = entry32.getProcessId();
+                            handleVal = entry32.getHandleValue();
+                            objectType = entry32.getObjectTypeNumber();
+                            grantedAccess = entry32.GrantedAccess;
+                        }
+                    }
+                } catch (Exception e) {
+                    LogV3.exception(WindowsUtils.class, e);
+                    continue;
+                }
+                try {
+                    if (!consumer.accept(entryPid, handleVal, objectType, grantedAccess)) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    LogV3.exception(WindowsUtils.class, e);
+                }
+            }
+        } catch (Exception e) {
+            LogV3.exception(WindowsUtils.class, e);
+        } finally {
+            if (buffer != null) {
+                try {
+                    buffer.close();
+                } catch (Throwable t) {
+                    /* ignore */
+                }
+            }
+        }
+    }
+
+    public static List<HandleInfo> listHandlesForProcess(int pid) {
+        if (!CrossSystem.isWindows()) {
+            return Collections.emptyList();
+        }
+        // Phase 1: Collect all handles for this PID (handleVal, objectType, grantedAccess)
+        final List<int[]> collectedHandles = new ArrayList<int[]>();
+        final int targetPid = pid;
+        final int targetPid16 = pid & 0xFFFF;
+        final int[] debugCounters = new int[2]; // [0]=total, [1]=matched
+        final StringBuilder debugTypes = new StringBuilder();
+        final StringBuilder debugPids = new StringBuilder();
+        scanAllSystemHandles(new HandleEntryConsumer() {
+            @Override
+            public boolean accept(int entryPid, int handleVal, int objectType, int grantedAccess) {
+                debugCounters[0]++;
+                if (debugPids.length() < 100 && debugCounters[0] <= 20) {
+                    debugPids.append(entryPid).append(",");
+                }
+                if (entryPid == targetPid || entryPid == targetPid16) {
+                    debugCounters[1]++;
+                    collectedHandles.add(new int[] { handleVal, objectType, grantedAccess });
+                    if (debugTypes.length() < 200) {
+                        debugTypes.append(objectType).append(",");
+                    }
+                }
+                return true;
+            }
+        });
+        LogV3.info("listHandlesForProcess: first 20 PIDs in handle table: " + debugPids);
+        LogV3.info("listHandlesForProcess: first object types for PID " + targetPid + ": " + debugTypes);
+        LogV3.info("listHandlesForProcess: scanned " + debugCounters[0] + " handles total, " + debugCounters[1] + " matched PID " + targetPid);
+        if (collectedHandles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // Phase 2: Open process once, resolve all file handles, close
+        HANDLE hProcess = openProcessForHandleDup(pid);
+        if (hProcess == null) {
+            int err = Kernel32.INSTANCE.GetLastError();
+            String name = getProcessImageName(pid);
+            LogV3.info("listHandlesForProcess: cannot open process pid=" + pid + " (GetLastError=" + err + (err == 5 ? "=ACCESS_DENIED" : "") + (name != null ? ", " + name : "") + "), returning empty list");
+            return Collections.emptyList();
+        }
+        final List<HandleInfo> result = new ArrayList<HandleInfo>();
+        int fileTypeCount = 0;
+        try {
+            for (int[] entry : collectedHandles) {
+                int handleVal = entry[0];
+                int objectType = entry[1];
+                int grantedAccess = entry[2];
+                if (objectType == OBJECT_TYPE_FILE) {
+                    fileTypeCount++;
+                    String path = resolvePathWithProcessHandle(hProcess, handleVal);
+                    result.add(new HandleInfo(handleVal, OBJECT_TYPE_FILE, grantedAccess, path));
+                } else {
+                    result.add(new HandleInfo(handleVal, objectType, grantedAccess, null));
+                }
+            }
+        } finally {
+            closeHandleSafe(hProcess);
+        }
+        LogV3.info("listHandlesForProcess: " + collectedHandles.size() + " handles collected, " + fileTypeCount + " are FILE type (0x" + Integer.toHexString(OBJECT_TYPE_FILE) + ")");
         return result;
     }
 
@@ -1780,21 +2533,6 @@ public class WindowsUtils {
         } finally {
             // cleanup
             Kernel32.INSTANCE.CloseHandle(handle);
-        }
-    }
-
-    private static String querySessionInfo(int sessionId, int infoClass) {
-        final PointerByReference ppBuffer = new PointerByReference();
-        final IntByReference pBytesReturned = new IntByReference();
-        final boolean ok = Wtsapi32.INSTANCE.WTSQuerySessionInformation(Wtsapi32.WTS_CURRENT_SERVER_HANDLE, sessionId, infoClass, ppBuffer, pBytesReturned);
-        if (!ok) {
-            return null;
-        }
-        final Pointer p = ppBuffer.getValue();
-        try {
-            return p.getWideString(0);
-        } finally {
-            Wtsapi32.INSTANCE.WTSFreeMemory(p);
         }
     }
 

@@ -7,7 +7,6 @@
  *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
- *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -32,45 +31,38 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpconnection.trust.ccadb;
+package org.appwork.testframework;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-
-import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.TrustUtils;
+import java.io.Serializable;
 
 /**
- * @author daniel
- * @date Feb 5, 2026
+ * Interface for tasks that can be executed in a different JRE version via {@link TestJREProvider#runInJRE(org.appwork.utils.JavaVersion, JRETestTask)}.
+ * <p>
+ * The task must be Serializable because it will be serialized and passed to a child process running the target JRE.
+ * <p>
+ * <b>Important:</b> All fields in implementing classes must also be Serializable. Avoid capturing non-serializable objects in anonymous
+ * classes or lambdas.
+ * <p>
+ * Example usage:
  *
+ * <pre>
+ * TestJREProvider.runInJRE(JavaVersion.JVM_11_0, new JRETestTask() {
+ *     &#64;Override
+ *     public void run() throws Exception {
+ *         System.out.println("Running in Java " + System.getProperty("java.version"));
+ *     }
+ * });
+ * </pre>
+ *
+ * @author Thomas
+ * @date 20.02.2026
  */
-public final class CCADBTrustProvider extends CustomTrustProvider {
-    private static final String ONLY_CAS_ACCEPTED_BY_AT_LEAST = "3";
-
+public interface JRETestTask extends Serializable {
     /**
-     * https://www.ccadb.org/resources *
+     * The code to execute in the target JRE.
+     *
+     * @throws Exception
+     *             If an error occurs during execution
      */
-    public CCADBTrustProvider() throws IOException, CertificateException {
-        super(CCADBTrustProvider.class.getSimpleName(), loadCCADB());
-    }
-
-    private static X509Certificate[] loadCCADB() throws CertificateException, IOException {
-        InputStream pemStream = null;
-        try {
-            pemStream = CCADBTrustProvider.class.getResourceAsStream("appwork-merged-cadb.3-no-rejected.pem");
-            return TrustUtils.loadCertificatesFromPEM(pemStream);
-        } finally {
-            if (pemStream != null) {
-                pemStream.close();
-            }
-        }
-    }
-
-    @Override
-    public String getId() {
-        return getClass().getSimpleName();
-    }
+    void run() throws Exception;
 }

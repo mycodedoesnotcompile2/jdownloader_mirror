@@ -94,13 +94,19 @@ public class TrustLinuxProvider extends AbstractTrustProvider {
             final KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
             ks.load(null, null);
             final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            try (InputStream is = new FileInputStream(caFile)) {
+            InputStream is = null;
+            try {
+                is = new FileInputStream(caFile);
                 final Collection<? extends Certificate> certs = cf.generateCertificates(is);
                 int i = 0;
                 for (final Certificate cert : certs) {
                     if (cert instanceof X509Certificate) {
                         ks.setCertificateEntry("linux-ca-" + (i++), cert);
                     }
+                }
+            } finally {
+                if (is != null) {
+                    is.close();
                 }
             }
             if (ks.size() == 0) {

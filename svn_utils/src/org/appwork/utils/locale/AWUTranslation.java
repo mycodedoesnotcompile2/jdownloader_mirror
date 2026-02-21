@@ -607,4 +607,7 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Add", "Hinzufügen" })
     String lit_add();
+
+    @Default(lngs = { "en", "de" }, values = { "Retry", "Erneut versuchen" })
+    String lit_retry();
 }

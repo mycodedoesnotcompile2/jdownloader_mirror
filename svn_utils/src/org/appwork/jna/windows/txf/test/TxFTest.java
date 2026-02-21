@@ -15,7 +15,6 @@ import com.sun.jna.platform.win32.WinDef.DWORDByReference;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 
 public class TxFTest {
-
     public static void main(String[] args) throws Exception {
         File file = new File("E:\\Test.txt");
         File file2 = new File("C:\\Users\\daniel\\Downloads\\Test.txt");

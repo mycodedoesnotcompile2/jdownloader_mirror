@@ -60,7 +60,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52319 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52356 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -773,6 +773,9 @@ public class TiktokComCrawler extends PluginForDecrypt {
                             best_play_addr = play_addr;
                         }
                     }
+                }
+                if (best_play_addr == null && videomap.get("PlayAddrStruct") != null) {
+                    best_play_addr = (Map<String, Object>) videomap.get("PlayAddrStruct");
                 }
                 if (best_play_addr != null) {
                     final String url = (String) JavaScriptEngineFactory.walkJson(best_play_addr, "UrlList/{0}");

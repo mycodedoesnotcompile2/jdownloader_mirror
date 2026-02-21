@@ -11,7 +11,6 @@ package org.appwork.utils.net.httpconnection.trust.ide;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,26 +24,36 @@ import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.Hash;
+import org.appwork.utils.IO;
 import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
+import org.appwork.utils.net.httpconnection.trust.ccadb.tests.CCADBCertificateVerificationTest;
 import org.appwork.utils.os.WindowsCertUtils;
+import org.appwork.storage.flexijson.FlexiJSonArray;
+import org.appwork.storage.flexijson.FlexiJSonObject;
+import org.appwork.storage.flexijson.FlexiJSonValue;
+import org.appwork.storage.flexijson.KeyValueElement;
+import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 
 /**
  * Validates root certificates against multiple trust providers (JRE, OS, Mozilla/CCADB, CT Sycamore, Apple, Google Chrome, Android,
@@ -54,12 +63,10 @@ import org.appwork.utils.os.WindowsCertUtils;
  * Apple Root Store: See <a href="https://support.apple.com/en-us/103272">Available root certificates for Apple operating systems</a>;
  * fingerprints are parsed from the published HTML list (e.g. iOS/macOS Root Store).
  * <p>
- * Microsoft (Windows Update): Load root store as PFX, created with certutil (Windows only):<br>
+ * Microsoft (Windows Update): SST from certutil, read via JNA (Windows only):<br>
  * {@code certutil -generateSSTFromWU roots.sst}<br>
- * {@code certutil -dump roots.sst} (optional, for verification)<br>
- * {@code certutil -exportPFX roots.sst roots.pfx}<br>
- * To enable the Microsoft (Windows Update) store call {@link #enableMicrosoftWindowsUpdate()} or
- * {@link #enableMicrosoftWindowsUpdate(File)} (tries PFX, then certutil, then Windows API). Alternatively use
+ * SST is read via Windows Crypto API (no PFX). To enable the Microsoft (Windows Update) store call {@link #enableMicrosoftWindowsUpdate()}
+ * or {@link #enableMicrosoftWindowsUpdate(File)} (certutil SST then Windows API). Alternatively use
  * {@link #addMicrosoftRootStoreFromPfx(File)}, {@link #addMicrosoftRootStoreViaCertutil()}, or
  * {@link #addMicrosoftRootStoreFromWindowsAPI()} directly. {@link #enableMicrosoftCCADB()} loads the Microsoft list from the CCADB CSV
  * (cross-platform).
@@ -70,14 +77,14 @@ import org.appwork.utils.os.WindowsCertUtils;
  * <p>
  * <b>Certificate sources vs. fingerprint-only:</b> Apple and Google Chrome supply only SHA-256 fingerprints (from HTML/root_store.certs);
  * they do not supply certificate bytes. The actual certificates used as candidates and written to the output PEM come only from stores that
- * provide full certs: Android (PEM), Sycamore CT (get-roots), Mozilla (PEM), and Microsoft (PFX/certutil/Windows API). Apple and Chrome are
- * used only during validation to mark which of those candidates they would accept; they never contribute cert objects.
+ * provide full certs: Android (PEM), Sycamore CT (get-roots), Mozilla (PEM), and Microsoft (certutil SST + JNA / Windows API). Apple and
+ * Chrome are used only during validation to mark which of those candidates they would accept; they never contribute cert objects.
  * <p>
  * <b>EKU (Extended Key Usage) and validity:</b> Only roots suitable for TLS server authentication are included. Where the source provides
  * that information it is enforced: <b>Microsoft CCADB</b> CSV uses columns "Microsoft Status" (Included), "Microsoft EKUs" (must contain
  * "Server Authentication"), "Valid To [GMT]" (not expired). <b>Mozilla certdata</b> uses CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR.
  * <b>Mozilla Included Roots PEM</b> is pre-filtered by CCADB (Websites). For sources that supply full certificates (Android, Sycamore,
- * Mozilla PEM, Microsoft PFX/API) EKU is enforced via {@link TrustUtils#isAcceptableCaTrustAnchorForSsl} (CA + serverAuth when EKU
+ * Mozilla PEM, Microsoft certutil/JNA/API) EKU is enforced via {@link TrustUtils#isAcceptableCaTrustAnchorForSsl} (CA + serverAuth when EKU
  * present). <b>Expired</b> certificates (notAfter before start of today GMT) are excluded everywhere via
  * {@link #filterOutExpiredCertificates}.
  * <p>
@@ -86,11 +93,19 @@ import org.appwork.utils.os.WindowsCertUtils;
  * src/org/appwork/utils/net/httpconnection/trust/RootCertificateTrustValidator.java
  * <p>
  * Run (no input PEM; candidates come from stores, output = intersection of all enabled stores):<br>
- * java ... RootCertificateTrustValidator [output.pem] [roots.pfx]
+ * java ... RootCertificateTrustValidator [output.pem]
  * <p>
  * Optional: {@code -DRootCertificateTrustValidator.fillMissingFromCrtsh=true} fills candidates that exist only in Apple/Chrome
  * (fingerprint-only stores) by loading the cert from <a href="https://crt.sh/">crt.sh</a> by SHA-256; the downloaded cert is verified by
  * fingerprint before use (max 200 fetches).
+ * <p>
+ * <b>Reference: zmap/rootfetch</b> (https://github.com/zmap/rootfetch) – Python scripts to fetch root stores from Apple, Microsoft,
+ * Mozilla NSS, Java (keytool), Android (git), and Google CT (get-roots). Comparison: we use <i>Mozilla</i> certdata from hg.mozilla.org (NSS
+ * tip), same idea; <i>Microsoft</i> we use certutil/SST and Disallowed store, they use authroot.stl + per-cert .crt from
+ * download.windowsupdate.com; <i>Apple</i> we use support.apple.com lists, they use opensource.apple.com tarballs; <i>Android</i> we use
+ * googlesource roots.pem (pinned rev), they clone git and use latest stable tag; <i>CT</i> we use Sycamore and Google Pilot as separate providers (RFC 6962 get-roots); they use multiple Google CT logs and a union. Useful URLs from rootfetch: Microsoft
+ * authroot.stl = {@code http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authroot.stl} (alternative to SST);
+ * Google CT get-roots e.g. {@code https://ct.googleapis.com/pilot/ct/v1/get-roots}.
  */
 public final class RootCertificateTrustValidator {
     /** Result per certificate: fingerprint, subject, and the names of providers that accept it. */
@@ -142,20 +157,54 @@ public final class RootCertificateTrustValidator {
         }
     }
 
+    /** Reason why a certificate is in a rejected/disabled list. Used in rejected JSON as array of enum names per fingerprint. */
+    public enum RejectionReason {
+        MICROSOFT_DISABLED_CCADB,
+        MOZILLA_DISTRUSTED,
+        APPLE_BLOCKED_CONSTRAINED,
+        CHROME_BLOCKLIST,
+        CRTSH_REVOKED,
+        MICROSOFT_DISALLOWED_STORE
+    }
+
     private static final String       AUTH_TYPE                       = "RSA";
     private final List<ProviderCheck> checks                          = new ArrayList<ProviderCheck>();
-    /** Cache for Sycamore CT roots (fingerprints). */
+    /** CT get-roots URLs (RFC 6962); see rootfetch ct.py. */
     private static final String       SYCAMORE_GET_ROOTS_URL          = "https://log.sycamore.ct.letsencrypt.org/2025h2d/ct/v1/get-roots";
+    private static final String       GOOGLE_CT_PILOT_GET_ROOTS_URL  = "https://ct.googleapis.com/pilot/ct/v1/get-roots";
     private static Set<String>        sycamoreRootFingerprintsCache;
     private static final Object       SYCAMORE_LOCK                   = new Object();
+    private static Set<String>        googlePilotRootFingerprintsCache;
+    private static final Object       GOOGLE_PILOT_LOCK               = new Object();
     /**
-     * Apple Root Store – published list (e.g. iOS 18 / macOS 15). See https://support.apple.com/en-us/103272
+     * Apple Root Store from opensource tarball (certificates/roots as DER). List of tags from GitHub API; latest tag used for download.
+     * See https://github.com/apple-oss-distributions/security_certificates
      */
-    private static final String       APPLE_ROOT_STORE_URL            = "https://support.apple.com/en-us/126047";
+    private static final String       APPLE_TARBALL_TAGS_API          = "https://api.github.com/repos/apple-oss-distributions/security_certificates/tags";
+    private static final String       APPLE_TARBALL_ARCHIVE_BASE     = "https://github.com/apple-oss-distributions/security_certificates/archive/refs/tags/";
     private static Set<String>        appleRootFingerprintsCache;
     private static final Object       APPLE_LOCK                      = new Object();
+    /**
+     * Apple CA certificates with additional constraints (blocked or constrained for TLS/S/MIME/etc.). See
+     * https://support.apple.com/en-us/103255
+     */
+    private static final String       APPLE_RESTRICTED_URL            = "https://support.apple.com/en-us/103255";
+    private static Set<String>        appleRestrictedFingerprintsCache;
+    private static final Object       APPLE_RESTRICTED_LOCK           = new Object();
+    /**
+     * Chromium net/data/ssl tree at main (latest). See
+     * https://chromium.googlesource.com/chromium/src/+/main/net/data/ssl
+     * Used so all Chromium SSL data URLs point to the same revision; change this to pin a commit or use another branch.
+     */
+    private static final String       CHROMIUM_SSL_DATA_BASE_URL      = "https://raw.githubusercontent.com/chromium/chromium/main/net/data/ssl";
+    /**
+     * Chromium/Chrome certificate blocklist (compromised/misissued certs). README lists .pem filenames = cert SHA-256.
+     */
+    private static final String       CHROMIUM_BLOCKLIST_README_URL   = CHROMIUM_SSL_DATA_BASE_URL + "/blocklist/README.md";
+    private static Set<String>        chromiumBlocklistFingerprintsCache;
+    private static final Object       CHROMIUM_BLOCKLIST_LOCK         = new Object();
     /** Google Chrome Root Store (Chromium). root_store.certs contains lines "# <sha256>" per certificate. */
-    private static final String       GOOGLE_CHROME_ROOT_STORE_URL    = "https://raw.githubusercontent.com/chromium/chromium/main/net/data/ssl/chrome_root_store/root_store.certs";
+    private static final String       GOOGLE_CHROME_ROOT_STORE_URL    = CHROMIUM_SSL_DATA_BASE_URL + "/chrome_root_store/root_store.certs";
     private static Set<String>        googleChromeRootFingerprintsCache;
     private static final Object       GOOGLE_CHROME_LOCK              = new Object();
     /**
@@ -170,6 +219,11 @@ public final class RootCertificateTrustValidator {
     private static Set<String>        microsoftCCADBFingerprintsCache;
     private static Set<String>        microsoftCCADBDisabledFingerprintsCache;
     private static final Object       MICROSOFT_CCADB_LOCK            = new Object();
+    /** Microsoft AuthRoot from authroot.stl (CTL) + per-cert .crt; cross-platform. See rootfetch microsoft.py. */
+    private static final String       MICROSOFT_AUTHROOT_STL_URL     = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authroot.stl";
+    private static final String       MICROSOFT_AUTHROOT_CRT_BASE    = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/";
+    private static Set<String>        microsoftAuthRootStlFingerprintsCache;
+    private static final Object       MICROSOFT_AUTHROOT_STL_LOCK     = new Object();
     /** Mozilla Included Roots PEM (CCADB, TrustBitsInclude=Websites). */
     private static final String       MOZILLA_INCLUDED_ROOTS_PEM_URL  = "https://ccadb.my.salesforce-sites.com/mozilla/IncludedRootsPEMTxt?TrustBitsInclude=Websites";
     private static Set<String>        mozillaIncludedRootsPemFingerprintsCache;
@@ -181,6 +235,10 @@ public final class RootCertificateTrustValidator {
     /** crt.sh: search by SHA-256 fingerprint (returns HTML); download cert by id (returns PEM). */
     private static final String       CRTSH_QUERY_URL                 = "https://crt.sh/?q=";
     private static final String       CRTSH_DOWNLOAD_URL              = "https://crt.sh/?d=";
+    /** Retry crt.sh requests for up to 5 minutes before giving up. */
+    private static final long         CRTSH_RETRY_TIMEOUT_MS          = 5L * 60 * 1000;
+    /** Delay between retries (ms). */
+    private static final long         CRTSH_RETRY_DELAY_MS            = 5000;
 
     /**
      * Creates a validator. With {@code includeJreOsCcadb == false}, JRE, OS and Mozilla (CCADB) are not added; only stores enabled via
@@ -207,12 +265,8 @@ public final class RootCertificateTrustValidator {
      */
     private static X509Certificate[] loadAllCertificatesFromPfx(final File pfxFile, final char[] password) throws Exception {
         final KeyStore ks = KeyStore.getInstance("PKCS12");
-        final InputStream is = new java.io.FileInputStream(pfxFile);
-        try {
-            ks.load(is, password);
-        } finally {
-            is.close();
-        }
+        final byte[] bytes = IO.readFile(pfxFile);
+        ks.load(new ByteArrayInputStream(bytes), password);
         final List<X509Certificate> list = new ArrayList<X509Certificate>();
         final Set<String> seen = new TreeSet<String>();
         for (final java.util.Enumeration<String> e = ks.aliases(); e.hasMoreElements();) {
@@ -334,15 +388,20 @@ public final class RootCertificateTrustValidator {
      *
      * @return true if at least one root was loaded
      */
-    public boolean addMicrosoftRootStoreFromWindowsAPI() {
+    /**
+     * Returns the set of SHA-256 fingerprints (lowercase) of roots in the local Windows Root store (same semantics as
+     * {@link org.appwork.utils.net.httpconnection.trust.JNAWindowsTrustProvider}). Used to restrict SST-loaded certs to those that are also
+     * trusted by the local machine. Returns null on non-Windows or when the store cannot be read.
+     */
+    private static Set<String> getLocalWindowsRootFingerprints() {
         final String os = System.getProperty("os.name", "");
         if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
-            return false;
+            return null;
         }
         try {
             final List<X509Certificate> certs = WindowsCertUtils.getRootStoreCertificates();
             if (certs == null || certs.isEmpty()) {
-                return false;
+                return null;
             }
             final Set<String> fingerprints = new TreeSet<String>();
             for (final X509Certificate c : certs) {
@@ -360,30 +419,47 @@ public final class RootCertificateTrustValidator {
                 } catch (final CertificateEncodingException ignored) {
                 }
             }
-            if (!fingerprints.isEmpty()) {
-                checks.add(new ProviderCheck("Microsoft (Windows Update)", fingerprints));
-                return true;
-            }
+            return fingerprints;
         } catch (final NoClassDefFoundError e) {
-            // JNA / WindowsCertUtils nicht im Classpath
+            return null;
         } catch (final Throwable t) {
-            // e.g. UnsatisfiedLinkError when crypt32 cannot be loaded
+            return null;
         }
-        return false;
+    }
+
+    public boolean addMicrosoftRootStoreFromWindowsAPI() {
+        final String os = System.getProperty("os.name", "");
+        if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
+            return false;
+        }
+        try {
+            final Set<String> fingerprints = getLocalWindowsRootFingerprints();
+            if (fingerprints == null || fingerprints.isEmpty()) {
+                return false;
+            }
+            checks.add(new ProviderCheck("Microsoft (Windows Update)", fingerprints));
+            return true;
+        } catch (final NoClassDefFoundError e) {
+            return false;
+        } catch (final Throwable t) {
+            return false;
+        }
     }
 
     /**
      * Loads the Microsoft Root Store from Windows Update: runs certutil -generateSSTFromWU and reads the resulting roots.sst via the
-     * Windows Crypto API (CertOpenStore with CERT_STORE_PROV_FILENAME). No certutil -exportPFX required. On failure (e.g. JNA not
-     * available), falls back to certutil -exportPFX and reading the PFX. Windows only.
+     * Windows Crypto API (CertOpenStore with CERT_STORE_PROV_FILENAME). SST is always loaded via certutil and read via JNA; no PFX
+     * fallback. Only certs that are also in the local Windows Root store (same as
+     * {@link org.appwork.utils.net.httpconnection.trust.JNAWindowsTrustProvider}) are used; validation semantics match WindowsTrustProvider
+     * / JNAWindowsTrustProvider. Windows only.
      * <p>
-     * The SST contains the <i>full</i> WU root catalog (all roots Microsoft can deploy via Windows Update), so the count is typically much
-     * higher (e.g. 500+) than the local "Root" store ({@link #addMicrosoftRootStoreFromWindowsAPI()}), which only has the roots actually
-     * installed on this machine (e.g. ~177).
+     * When reading the SST, roots marked <i>Disabled</i> or <i>Not Before</i> (via CERT_FRIENDLY_NAME_PROP_ID) are excluded by
+     * {@link org.appwork.utils.os.WindowsCertUtils#getRootStoreCertificatesFromSstFile(java.io.File)}. Only roots present in both the SST
+     * and the local Windows Root store are added.
      *
      * @param workDir
      *            Directory for roots.sst; null = temporary directory
-     * @return true if the SST yielded at least one root certificate (or fallback PFX succeeded)
+     * @return true if the SST yielded at least one root certificate
      */
     public boolean addMicrosoftRootStoreViaCertutil(final File workDir) {
         final String os = System.getProperty("os.name", "");
@@ -408,10 +484,24 @@ public final class RootCertificateTrustValidator {
         if (exit1 != 0 || !sstFile.isFile()) {
             return false;
         }
-        // Read SST directly via Windows API (no certutil -exportPFX needed)
+        // Read SST via Windows API (JNA); no PFX.
+        // Only use certs that are also in the local Windows Root store (same set as JNAWindowsTrustProvider).
         try {
+            final Set<String> localRootFingerprints = getLocalWindowsRootFingerprints();
             final List<X509Certificate> certs = WindowsCertUtils.getRootStoreCertificatesFromSstFile(sstFile);
-            if (certs != null && !certs.isEmpty()) {
+            if (certs != null && !certs.isEmpty() && localRootFingerprints != null && !localRootFingerprints.isEmpty()) {
+                for (int i = 0; i < certs.size(); i++) {
+                    final X509Certificate c = certs.get(i);
+                    try {
+                        final String subject = c.getSubjectDN() != null ? c.getSubjectDN().getName() : "";
+                        final List<String> eku = c.getExtendedKeyUsage();
+                        // System.out.println("SST EKU [" + (i + 1) + "/" + certs.size() + "] " + subject + " => " +
+                        // formatEkuForConsole(eku));
+                    } catch (final Exception e) {
+                        // System.out.println("SST EKU [" + (i + 1) + "/" + certs.size() + "] (error reading cert: " + e.getMessage() +
+                        // ")");
+                    }
+                }
                 final Set<String> fingerprints = new TreeSet<String>();
                 for (int i = 0; i < certs.size(); i++) {
                     final X509Certificate c = certs.get(i);
@@ -424,7 +514,10 @@ public final class RootCertificateTrustValidator {
                     try {
                         final String fp = Hash.getSHA256(c.getEncoded());
                         if (fp != null) {
-                            fingerprints.add(fp.toLowerCase(Locale.ROOT));
+                            final String fpLower = fp.toLowerCase(Locale.ROOT);
+                            if (localRootFingerprints.contains(fpLower)) {
+                                fingerprints.add(fpLower);
+                            }
                         }
                     } catch (final CertificateEncodingException ignored) {
                     }
@@ -439,14 +532,7 @@ public final class RootCertificateTrustValidator {
         } catch (final Throwable t) {
             // e.g. crypt32 error
         }
-        // Fallback: try PFX export (may fail on some Windows versions)
-        final File pfxFile = new File(dir, "roots.pfx");
-        final String pfxName = pfxFile.getName();
-        final int exit2 = runProcess(new String[] { "certutil", "-exportPFX", sstName, pfxName }, dir);
-        if (exit2 != 0 || !pfxFile.isFile()) {
-            return false;
-        }
-        return addMicrosoftRootStoreFromPfx(pfxFile);
+        return false;
     }
 
     /**
@@ -457,23 +543,71 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Enables validation against the Microsoft Root Store (Windows Update). Tries to load the store in order: from the given PFX file (if
-     * non-null and existing), then from default {@code roots.pfx} in the current directory, then via certutil (SST from Windows Update),
-     * then from the local Windows Root store (Windows API). Stops at the first successful source and adds one check named "Microsoft
-     * (Windows Update)". Call this to enable the Microsoft WU store; do not call it to leave it disabled.
+     * Loads Microsoft root certificates from SST (certutil -generateSSTFromWU, read via JNA), restricted to those also in the local Windows
+     * Root store. Used to build the candidate list in main(); no PFX. Returns null on non-Windows, certutil failure, or when no certs pass
+     * the filter.
+     *
+     * @return array of X509Certificate, or null
+     */
+    static X509Certificate[] loadMicrosoftWindowsUpdateCertificatesFromSst() {
+        final String os = System.getProperty("os.name", "");
+        if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
+            return null;
+        }
+        File dir = null;
+        try {
+            final String tmp = System.getProperty("java.io.tmpdir", "");
+            dir = new File(tmp, "ms-roots-" + Long.toString(System.currentTimeMillis()));
+            if (!dir.mkdirs()) {
+                return null;
+            }
+            final File sstFile = new File(dir, "roots.sst");
+            final String sstName = sstFile.getName();
+            final int exit1 = runProcess(new String[] { "certutil", "-generateSSTFromWU", sstName }, dir);
+            if (exit1 != 0 || !sstFile.isFile()) {
+                return null;
+            }
+            final Set<String> localRootFingerprints = getLocalWindowsRootFingerprints();
+            final List<X509Certificate> certs = WindowsCertUtils.getRootStoreCertificatesFromSstFile(sstFile);
+            if (certs == null || certs.isEmpty() || localRootFingerprints == null || localRootFingerprints.isEmpty()) {
+                return null;
+            }
+            final List<X509Certificate> out = new ArrayList<X509Certificate>();
+            for (int i = 0; i < certs.size(); i++) {
+                final X509Certificate c = certs.get(i);
+                if (!TrustUtils.isAcceptableCaTrustAnchorForSsl(c)) {
+                    continue;
+                }
+                if (isCertificateExpired(c)) {
+                    continue;
+                }
+                try {
+                    final String fp = Hash.getSHA256(c.getEncoded());
+                    if (fp != null && localRootFingerprints.contains(fp.toLowerCase(Locale.ROOT))) {
+                        out.add(c);
+                    }
+                } catch (final CertificateEncodingException ignored) {
+                }
+            }
+            return out.isEmpty() ? null : out.toArray(new X509Certificate[out.size()]);
+        } catch (final NoClassDefFoundError e) {
+            return null;
+        } catch (final Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Enables validation against the Microsoft Root Store (Windows Update). Load order: via certutil (SST from WU, read via JNA), then from
+     * the local Windows Root store (Windows API). No PFX; SST is always loaded via certutil and read via JNA; validation matches
+     * WindowsTrustProvider / JNAWindowsTrustProvider. Stops at the first successful source and adds one check named "Microsoft (Windows
+     * Update)". Call this to enable the Microsoft WU store; do not call it to leave it disabled.
      *
      * @param optionalPfxFile
-     *            Optional PFX file (e.g. from 2nd command-line arg); may be null
+     *            Ignored (no PFX path); reserved for API compatibility, may be null
      * @return true if the store was loaded and added, false otherwise
      */
     public boolean enableMicrosoftWindowsUpdate(final File optionalPfxFile) {
-        if (optionalPfxFile != null && optionalPfxFile.isFile() && addMicrosoftRootStoreFromPfx(optionalPfxFile)) {
-            return true;
-        }
-        final File defaultPfx = new File(System.getProperty("user.dir", ""), "roots.pfx");
-        if (defaultPfx.isFile() && addMicrosoftRootStoreFromPfx(defaultPfx)) {
-            return true;
-        }
         if (addMicrosoftRootStoreViaCertutil()) {
             return true;
         }
@@ -484,10 +618,42 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Same as {@link #enableMicrosoftWindowsUpdate(File)} with null (tries default roots.pfx, then certutil, then Windows API).
+     * Same as {@link #enableMicrosoftWindowsUpdate(File)} with null (certutil SST then Windows API).
      */
     public boolean enableMicrosoftWindowsUpdate() {
         return enableMicrosoftWindowsUpdate(null);
+    }
+
+    /**
+     * Runs {@code certutil -syncWithWU [dir]} to sync the local Windows certificate stores (Root, Disallowed, etc.) from Windows Update
+     * and optionally write files (e.g. disallowedcert.sst, authrootstl.cab) to the given directory. Call before reading the Disallowed
+     * store so the bad-cert list is up to date. Windows only; no-op on other platforms.
+     *
+     * @param workDir
+     *            directory for certutil output (disallowedcert.sst, .crt files, etc.); if non-null, certutil writes files here and we can
+     *            read disallowedcert.sst from it
+     * @return the directory that was used for sync (workDir if non-null, else null); null on non-Windows or when sync failed
+     */
+    private static File runCertutilSyncWithWU(final File workDir) {
+        final String os = System.getProperty("os.name", "");
+        if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
+            return null;
+        }
+        File dir = workDir;
+        if (dir == null) {
+            final String tmp = System.getProperty("java.io.tmpdir", "");
+            dir = new File(tmp, "ms-wu-sync-" + Long.toString(System.currentTimeMillis()));
+            if (!dir.mkdirs()) {
+                return null;
+            }
+        } else if (!dir.isDirectory()) {
+            if (!dir.mkdirs()) {
+                return null;
+            }
+        }
+        final String path = dir.getAbsolutePath();
+        final int exit = runProcess(new String[] { "certutil", "-syncWithWU", path }, dir);
+        return exit == 0 ? dir : null;
     }
 
     /**
@@ -622,8 +788,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Loads SHA-256 fingerprints from the Apple Support HTML page (table column "Fingerprint (SHA-256)"). Table format: "D7 A7 A0 FB 5D 7E
-     * ..." (32 bytes, space-separated).
+     * Loads SHA-256 fingerprints from the Apple opensource security_certificates tarball (latest tag from GitHub). Extracts
+     * certificates/roots/* as DER and parses each as X.509. Fallback: if tarball fails, returns empty set.
      */
     public static Set<String> loadAppleRootFingerprints() {
         synchronized (APPLE_LOCK) {
@@ -633,20 +799,24 @@ public final class RootCertificateTrustValidator {
         }
         final Set<String> fingerprints = new TreeSet<String>();
         try {
-            final String html = readUrlToString(APPLE_ROOT_STORE_URL);
-            if (html == null) {
+            final String tagsJson = readUrlToString(APPLE_TARBALL_TAGS_API);
+            if (tagsJson == null) {
                 return fingerprints;
             }
-            // Apple: "Fingerprint (SHA-256)" column contains 32 hex bytes with spaces: "D7 A7 A0 FB ..."
-            final Pattern p = Pattern.compile("[0-9A-Fa-f]{2}(?:\\s+[0-9A-Fa-f]{2}){31}");
-            final Matcher m = p.matcher(html);
-            while (m.find()) {
-                final String withSpaces = m.group();
-                final String hex = withSpaces.replaceAll("\\s+", "").trim();
-                if (hex.length() == 64) {
-                    fingerprints.add(hex.toLowerCase(Locale.ROOT));
-                }
+            // JSON: [ {"name":"security_certificates-55349.60.3", ...}, ... ]; first element = latest
+            final Pattern tagPattern = Pattern.compile("\"name\"\\s*:\\s*\"(security_certificates-[^\"]+)\"");
+            final Matcher tagMatcher = tagPattern.matcher(tagsJson);
+            if (!tagMatcher.find()) {
+                return fingerprints;
             }
+            final String tagName = tagMatcher.group(1);
+            final String tarballUrl = APPLE_TARBALL_ARCHIVE_BASE + tagName + ".tar.gz";
+            final byte[] tarGz = readUrlToBytes(tarballUrl);
+            if (tarGz == null || tarGz.length == 0) {
+                return fingerprints;
+            }
+            final Set<String> fromTar = parseAppleTarballForRootFingerprints(new ByteArrayInputStream(tarGz));
+            fingerprints.addAll(fromTar);
         } catch (final Exception e) {
             // return empty set on error
         }
@@ -654,6 +824,175 @@ public final class RootCertificateTrustValidator {
             appleRootFingerprintsCache = fingerprints;
         }
         return fingerprints;
+    }
+
+    /**
+     * Parses a gzip-compressed tar stream (Apple security_certificates archive). Reads entries under certificates/roots/ (DER format),
+     * parses each as X.509 and returns SHA-256 fingerprints. Tar format: 512-byte header (filename 0-99, size octal at 124-135), then
+     * file content padded to 512-byte blocks.
+     */
+    private static Set<String> parseAppleTarballForRootFingerprints(final InputStream tarGzStream) {
+        final Set<String> fingerprints = new TreeSet<String>();
+        GZIPInputStream gzip = null;
+        try {
+            gzip = new GZIPInputStream(tarGzStream);
+            final byte[] header = new byte[512];
+            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            while (true) {
+                int off = 0;
+                while (off < header.length) {
+                    final int r = gzip.read(header, off, header.length - off);
+                    if (r <= 0) {
+                        return fingerprints;
+                    }
+                    off += r;
+                }
+                final String name = new String(header, 0, 100, "ISO-8859-1").trim();
+                if (name.length() == 0) {
+                    break;
+                }
+                long size = 0;
+                try {
+                    String sizeStr = new String(header, 124, 12, "ISO-8859-1").trim();
+                    sizeStr = sizeStr.replaceAll("[^0-7]", "");
+                    if (sizeStr.length() > 0) {
+                        size = Long.parseLong(sizeStr, 8);
+                    }
+                } catch (final NumberFormatException e) {
+                    size = 0;
+                }
+                if (size > 0 && size <= 65536 && name.indexOf("certificates/roots/") >= 0 && !name.endsWith("/") && !name.substring(name.lastIndexOf('/') + 1).startsWith(".")) {
+                    final byte[] der = new byte[(int) size];
+                    int read = 0;
+                    while (read < der.length) {
+                        final int r = gzip.read(der, read, der.length - read);
+                        if (r <= 0) {
+                            break;
+                        }
+                        read += r;
+                    }
+                    if (read == der.length) {
+                        try {
+                            final Certificate cert = cf.generateCertificate(new ByteArrayInputStream(der));
+                            if (cert instanceof X509Certificate) {
+                                final String fp = Hash.getSHA256(cert.getEncoded());
+                                if (fp != null) {
+                                    fingerprints.add(fp.toLowerCase(Locale.ROOT));
+                                }
+                            }
+                        } catch (final Exception ignored) {
+                        }
+                    }
+                }
+                if (size > 0) {
+                    final long pad = (512 - (size % 512)) % 512;
+                    for (long i = 0; i < pad; i++) {
+                        if (gzip.read() < 0) {
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (final Exception e) {
+            // return what we have
+        } finally {
+            if (gzip != null) {
+                try {
+                    gzip.close();
+                } catch (final Exception ignored) {
+                }
+            }
+        }
+        return fingerprints;
+    }
+
+    /**
+     * Loads SHA-256 fingerprints from the Apple "CA certificates with additional constraints" page
+     * (https://support.apple.com/en-us/103255). Includes blocked certificates and all constrained certificates (TLS constrained, S/MIME
+     * constrained, etc.). Used for the rejected list so that roots Apple blocks or restricts for TLS are not trusted for server auth.
+     */
+    public static Set<String> loadAppleRestrictedFingerprints() {
+        synchronized (APPLE_RESTRICTED_LOCK) {
+            if (appleRestrictedFingerprintsCache != null) {
+                return appleRestrictedFingerprintsCache;
+            }
+        }
+        final Set<String> fingerprints = new TreeSet<String>();
+        try {
+            final String html = readUrlToString(APPLE_RESTRICTED_URL);
+            if (html == null) {
+                return fingerprints;
+            }
+            // Page contains tables: Blocked Certificates, TLS constrained, S/MIME constrained, etc. All use 64 hex chars.
+            final Pattern p = Pattern.compile("[0-9a-fA-F]{64}");
+            final Matcher m = p.matcher(html);
+            while (m.find()) {
+                fingerprints.add(m.group().toLowerCase(Locale.ROOT));
+            }
+        } catch (final Exception e) {
+            // return empty set on error
+        }
+        synchronized (APPLE_RESTRICTED_LOCK) {
+            appleRestrictedFingerprintsCache = fingerprints;
+        }
+        return fingerprints;
+    }
+
+    /**
+     * Loads SHA-256 fingerprints from the Chromium certificate blocklist README (from {@value #CHROMIUM_SSL_DATA_BASE_URL}). Contains
+     * compromised and misissued certificates (and some keys) blocked in Chrome/Chromium. Only .pem entries (certificate hashes) are
+     * included; .key entries are skipped.
+     */
+    public static Set<String> loadChromeBlocklistFingerprints() {
+        synchronized (CHROMIUM_BLOCKLIST_LOCK) {
+            if (chromiumBlocklistFingerprintsCache != null) {
+                return chromiumBlocklistFingerprintsCache;
+            }
+        }
+        final Set<String> fingerprints = new TreeSet<String>();
+        try {
+            final String text = readUrlToString(CHROMIUM_BLOCKLIST_README_URL);
+            if (text == null) {
+                return fingerprints;
+            }
+            // README has links like [hash.pem](...) or (hash.pem). Only include .pem (cert hashes), not .key
+            final Pattern p = Pattern.compile("([0-9a-fA-F]{64})\\.pem");
+            final Matcher m = p.matcher(text);
+            while (m.find()) {
+                fingerprints.add(m.group(1).toLowerCase(Locale.ROOT));
+            }
+        } catch (final Exception e) {
+            // return empty set on error
+        }
+        synchronized (CHROMIUM_BLOCKLIST_LOCK) {
+            chromiumBlocklistFingerprintsCache = fingerprints;
+        }
+        return fingerprints;
+    }
+
+    /**
+     * Loads SHA-256 fingerprints of certificates that are revoked (or otherwise rejected) on crt.sh. Uses
+     * {@link CCADBCertificateVerificationTest#loadCrtshRevokedOrRejectedFingerprints(X509Certificate[], int)} with cache and a thread pool
+     * (parallel lookups; pool size via system property {@code ccadb.crtsh.poolSize}, default 6). Used to extend the rejected list. Returns
+     * null if the test class is unavailable or on error.
+     *
+     * @param candidates
+     *            candidate certificates to check against crt.sh
+     * @return set of revoked/rejected fingerprints (lowercase), or null
+     */
+    static Set<String> loadCrtshRevokedFingerprints(final X509Certificate[] candidates) {
+        if (candidates == null || candidates.length == 0) {
+            return null;
+        }
+        try {
+            final Set<String> set = CCADBCertificateVerificationTest.loadCrtshRevokedOrRejectedFingerprints(candidates, 200);
+            return (set != null && !set.isEmpty()) ? set : null;
+        } catch (final NoClassDefFoundError e) {
+            return null;
+        } catch (final Throwable t) {
+            LogV3.warning("crt.sh revoked check failed: " + (t.getMessage() != null ? t.getMessage() : t.getClass().getName()));
+            return null;
+        }
     }
 
     /**
@@ -668,21 +1007,26 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Loads root fingerprints from the Sycamore CT log (get-roots API).
+     * Enables validation against the Certificate Transparency log Google Pilot. Roots present in this log are treated as "CT (Google Pilot)".
      */
-    public static Set<String> loadSycamoreRootFingerprints() {
-        synchronized (SYCAMORE_LOCK) {
-            if (sycamoreRootFingerprintsCache != null) {
-                return sycamoreRootFingerprintsCache;
-            }
+    public void enableGooglePilotCT() {
+        final Set<String> set = loadGooglePilotRootFingerprints();
+        if (set != null && !set.isEmpty()) {
+            checks.add(new ProviderCheck("CT (Google Pilot)", set));
         }
+    }
+
+    /**
+     * Parses RFC 6962 get-roots JSON from a URL ("certificates":["base64",...]) and returns SHA-256 fingerprints. Used for Sycamore and
+     * Google CT (see rootfetch ct.py). Returns empty set on error.
+     */
+    private static Set<String> loadGetRootsFingerprintsFromUrl(final String url) {
         final Set<String> fingerprints = new TreeSet<String>();
         try {
-            final String json = readUrlToString(SYCAMORE_GET_ROOTS_URL);
+            final String json = readUrlToString(url);
             if (json == null) {
                 return fingerprints;
             }
-            // "certificates":["base64...","base64...",...]
             final Pattern p = Pattern.compile("\"([A-Za-z0-9+/=]{100,})\"");
             final Matcher m = p.matcher(json);
             final CertificateFactory cf = CertificateFactory.getInstance("X.509");
@@ -709,8 +1053,37 @@ public final class RootCertificateTrustValidator {
         } catch (final Exception e) {
             // return empty set on error
         }
+        return fingerprints;
+    }
+
+    /**
+     * Loads root fingerprints from the Sycamore CT log (Let's Encrypt) get-roots API only.
+     */
+    public static Set<String> loadSycamoreRootFingerprints() {
+        synchronized (SYCAMORE_LOCK) {
+            if (sycamoreRootFingerprintsCache != null) {
+                return sycamoreRootFingerprintsCache;
+            }
+        }
+        final Set<String> fingerprints = loadGetRootsFingerprintsFromUrl(SYCAMORE_GET_ROOTS_URL);
         synchronized (SYCAMORE_LOCK) {
             sycamoreRootFingerprintsCache = fingerprints;
+        }
+        return fingerprints;
+    }
+
+    /**
+     * Loads root fingerprints from the Google Pilot CT log get-roots API only.
+     */
+    public static Set<String> loadGooglePilotRootFingerprints() {
+        synchronized (GOOGLE_PILOT_LOCK) {
+            if (googlePilotRootFingerprintsCache != null) {
+                return googlePilotRootFingerprintsCache;
+            }
+        }
+        final Set<String> fingerprints = loadGetRootsFingerprintsFromUrl(GOOGLE_CT_PILOT_GET_ROOTS_URL);
+        synchronized (GOOGLE_PILOT_LOCK) {
+            googlePilotRootFingerprintsCache = fingerprints;
         }
         return fingerprints;
     }
@@ -788,14 +1161,14 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Loads root certificates from the Sycamore CT get-roots API (for candidate union).
+     * Parses RFC 6962 get-roots JSON from a URL and returns X509Certificate list. Used for candidate union from CT logs.
      */
-    public static X509Certificate[] loadSycamoreRootCertificates() {
+    private static List<X509Certificate> loadGetRootsCertificatesFromUrl(final String url) {
         final List<X509Certificate> list = new ArrayList<X509Certificate>();
         try {
-            final String json = readUrlToString(SYCAMORE_GET_ROOTS_URL);
+            final String json = readUrlToString(url);
             if (json == null) {
-                return new X509Certificate[0];
+                return list;
             }
             final Pattern p = Pattern.compile("\"([A-Za-z0-9+/=]{100,})\"");
             final Matcher m = p.matcher(json);
@@ -818,7 +1191,16 @@ public final class RootCertificateTrustValidator {
         } catch (final Exception e) {
             // return empty
         }
-        return list.toArray(new X509Certificate[list.size()]);
+        return list;
+    }
+
+    /**
+     * Loads root certificates from CT get-roots APIs: Sycamore and Google Pilot (union, for candidate union).
+     */
+    public static X509Certificate[] loadSycamoreRootCertificates() {
+        final X509Certificate[] sycamore = loadGetRootsCertificatesFromUrl(SYCAMORE_GET_ROOTS_URL).toArray(new X509Certificate[0]);
+        final X509Certificate[] pilot = loadGetRootsCertificatesFromUrl(GOOGLE_CT_PILOT_GET_ROOTS_URL).toArray(new X509Certificate[0]);
+        return unionByFingerprint(sycamore, pilot);
     }
 
     /**
@@ -844,6 +1226,92 @@ public final class RootCertificateTrustValidator {
         if (set != null && !set.isEmpty()) {
             checks.add(new ProviderCheck("Microsoft (CCADB)", set));
         }
+    }
+
+    /**
+     * Enables validation against the Microsoft AuthRoot list from authroot.stl (CTL) + per-cert .crt from Windows Update. Cross-platform
+     * (no certutil). Complements certutil/SST and CCADB. See rootfetch microsoft.py.
+     */
+    public void enableMicrosoftAuthRootStl() {
+        final Set<String> set = loadMicrosoftAuthRootStlFingerprints();
+        if (set != null && !set.isEmpty()) {
+            checks.add(new ProviderCheck("Microsoft (AuthRoot STL)", set));
+        }
+    }
+
+    /**
+     * Extracts 20-byte cert IDs from authroot.stl (BER: OCTET STRING tag 0x04, length 0x14). Cert IDs are SHA-1 hashes used as .crt
+     * filenames. Returns set of 40-char lowercase hex strings.
+     */
+    private static Set<String> extractCertIdsFromAuthrootStl(final byte[] stl) {
+        final Set<String> ids = new TreeSet<String>();
+        if (stl == null || stl.length < 22) {
+            return ids;
+        }
+        for (int i = 0; i <= stl.length - 22; i++) {
+            if (stl[i] == 0x04 && stl[i + 1] == 0x14) {
+                final StringBuilder hex = new StringBuilder(40);
+                for (int j = 0; j < 20; j++) {
+                    final int b = stl[i + 2 + j] & 0xff;
+                    hex.append(Integer.toHexString(b >> 4)).append(Integer.toHexString(b & 0x0f));
+                }
+                ids.add(hex.toString().toLowerCase(Locale.ROOT));
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * Loads SHA-256 fingerprints from Microsoft AuthRoot: download authroot.stl, parse CTL for cert IDs (SHA-1), fetch each .crt from
+     * Windows Update, parse as X.509. Cross-platform. Returns empty set on error.
+     */
+    public static Set<String> loadMicrosoftAuthRootStlFingerprints() {
+        synchronized (MICROSOFT_AUTHROOT_STL_LOCK) {
+            if (microsoftAuthRootStlFingerprintsCache != null) {
+                return microsoftAuthRootStlFingerprintsCache;
+            }
+        }
+        final Set<String> fingerprints = new TreeSet<String>();
+        try {
+            final byte[] stl = readUrlToBytes(MICROSOFT_AUTHROOT_STL_URL);
+            if (stl == null || stl.length == 0) {
+                return fingerprints;
+            }
+            final Set<String> certIds = extractCertIdsFromAuthrootStl(stl);
+            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            final int maxCerts = 600;
+            int tried = 0;
+            for (final String idHex : certIds) {
+                if (tried >= maxCerts) {
+                    break;
+                }
+                if (idHex.length() != 40) {
+                    continue;
+                }
+                tried++;
+                try {
+                    final String crtUrl = MICROSOFT_AUTHROOT_CRT_BASE + idHex + ".crt";
+                    final byte[] der = readUrlToBytes(crtUrl);
+                    if (der == null || der.length == 0) {
+                        continue;
+                    }
+                    final Certificate cert = cf.generateCertificate(new ByteArrayInputStream(der));
+                    if (cert instanceof X509Certificate) {
+                        final String fp = Hash.getSHA256(cert.getEncoded());
+                        if (fp != null) {
+                            fingerprints.add(fp.toLowerCase(Locale.ROOT));
+                        }
+                    }
+                } catch (final Exception ignored) {
+                }
+            }
+        } catch (final Exception e) {
+            // return empty set on error
+        }
+        synchronized (MICROSOFT_AUTHROOT_STL_LOCK) {
+            microsoftAuthRootStlFingerprintsCache = fingerprints;
+        }
+        return fingerprints;
     }
 
     /**
@@ -996,8 +1464,9 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Loads SHA-256 fingerprints of roots that are explicitly <b>Disabled</b> in the CCADB Microsoft report (Microsoft Status = "Disabled").
-     * Used for the rejected/disabled output (appwork-merged-cadb-rejected.*.pem). No EKU or Valid To filter so all disabled roots are included.
+     * Loads SHA-256 fingerprints of roots that are explicitly <b>Disabled</b> in the CCADB Microsoft report (Microsoft Status =
+     * "Disabled"). Used for the rejected/disabled output (appwork-merged-cadb-rejected.*.pem). No EKU or Valid To filter so all disabled
+     * roots are included.
      */
     public static Set<String> loadMicrosoftCCADBDisabledFingerprints() {
         synchronized (MICROSOFT_CCADB_LOCK) {
@@ -1170,8 +1639,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Loads SHA-256 fingerprints of roots explicitly distrusted for server auth (CKA_TRUST_SERVER_AUTH = CKT_NSS_NOT_TRUSTED) from
-     * Mozilla certdata.txt. Used for appwork-merged-cadb-rejected.*.pem.
+     * Loads SHA-256 fingerprints of roots explicitly distrusted for server auth (CKA_TRUST_SERVER_AUTH = CKT_NSS_NOT_TRUSTED) from Mozilla
+     * certdata.txt. Used for appwork-merged-cadb-rejected.*.pem.
      */
     public static Set<String> loadMozillaCertdataDistrustedFingerprints() {
         try {
@@ -1203,26 +1672,10 @@ public final class RootCertificateTrustValidator {
     }
 
     private static String readUrlToString(final String urlString) {
-        InputStream is = null;
         try {
-            final URL url = new URL(urlString);
-            final StringBuilder sb = new StringBuilder();
-            is = url.openStream();
-            final byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) > 0) {
-                sb.append(new String(buf, 0, n, "UTF-8"));
-            }
-            return sb.toString();
+            return new HttpClient().get(urlString).getResponseString();
         } catch (final Exception e) {
             return null;
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (final Exception ignored) {
-                }
-            }
         }
     }
 
@@ -1391,8 +1844,36 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Returns certificates from {@code rejectedCerts} that appear in at least {@code minProviders} of the disabled fingerprint sets (used for
-     * appwork-merged-cadb-rejected.k.pem).
+     * Returns a new list containing only certificates whose SHA-256 fingerprint is not in {@code rejectedFingerprints}. Used to build PEM
+     * files that contain only CAs not in any provider's rejected/disabled list.
+     *
+     * @param certs list of certificates (not modified)
+     * @param rejectedFingerprints set of SHA-256 fingerprints (lowercase) to exclude
+     * @return new list of certs not in rejected set; empty if certs is null or rejected set is null/empty and all are to be kept
+     */
+    public static List<X509Certificate> filterOutRejectedFingerprints(final List<X509Certificate> certs, final Set<String> rejectedFingerprints) {
+        if (certs == null || certs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        if (rejectedFingerprints == null || rejectedFingerprints.isEmpty()) {
+            return new ArrayList<X509Certificate>(certs);
+        }
+        final List<X509Certificate> out = new ArrayList<X509Certificate>(certs.size());
+        for (int i = 0; i < certs.size(); i++) {
+            try {
+                final String fp = Hash.getSHA256(certs.get(i).getEncoded());
+                if (fp != null && !rejectedFingerprints.contains(fp.toLowerCase(Locale.ROOT))) {
+                    out.add(certs.get(i));
+                }
+            } catch (final CertificateEncodingException ignored) {
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Returns certificates from {@code rejectedCerts} that appear in at least {@code minProviders} of the disabled fingerprint sets (used
+     * for appwork-merged-cadb-rejected.k.pem).
      */
     public static List<X509Certificate> getCertsRejectedByAtLeastKProviders(final List<X509Certificate> rejectedCerts, final List<Set<String>> disabledFingerprintSets, final int minProviders) {
         if (rejectedCerts == null || disabledFingerprintSets == null || minProviders < 1) {
@@ -1436,13 +1917,33 @@ public final class RootCertificateTrustValidator {
     private static final int    PEM_LINE_LENGTH = 64;
 
     /**
-     * Writes the certificates in PEM format (Base64, 64 characters per line).
+     * Writes the certificates in PEM format (Base64, 64 characters per line). Certificates are written in sorted order by SHA-256
+     * fingerprint (lowercase hex).
      */
     public static void writePEM(final List<X509Certificate> certs, final OutputStream out) throws IOException, CertificateEncodingException {
         if (certs == null) {
             return;
         }
-        for (final X509Certificate cert : certs) {
+        final List<X509Certificate> sorted = new ArrayList<X509Certificate>(certs);
+        Collections.sort(sorted, new Comparator<X509Certificate>() {
+            @Override
+            public int compare(final X509Certificate a, final X509Certificate b) {
+                String fa = "";
+                String fb = "";
+                try {
+                    final String s = Hash.getSHA256(a.getEncoded());
+                    fa = s != null ? s.toLowerCase(Locale.ROOT) : "";
+                } catch (final CertificateEncodingException ignored) {
+                }
+                try {
+                    final String s = Hash.getSHA256(b.getEncoded());
+                    fb = s != null ? s.toLowerCase(Locale.ROOT) : "";
+                } catch (final CertificateEncodingException ignored) {
+                }
+                return fa.compareTo(fb);
+            }
+        });
+        for (final X509Certificate cert : sorted) {
             final String b64 = org.appwork.utils.encoding.Base64.encodeToString(cert.getEncoded(), false);
             out.write((PEM_HEADER + "\n").getBytes("UTF-8"));
             for (int i = 0; i < b64.length(); i += PEM_LINE_LENGTH) {
@@ -1452,6 +1953,156 @@ public final class RootCertificateTrustValidator {
             }
             out.write((PEM_FOOTER + "\n").getBytes("UTF-8"));
         }
+    }
+
+    /**
+     * Builds a map from SHA-256 fingerprint (64 hex lower case) to the set of {@link RejectionReason}s (which disabled provider list(s)
+     * it is in). Used to write appwork-merged-cadb-rejected.*.json with format {@code {"fingerprint":["REASON1","REASON2"], ...}}. Uses
+     * the full set of rejected fingerprints so that e.g. crt.sh-revoked entries appear even when the cert is not in candidates.
+     */
+    private static Map<String, Set<RejectionReason>> buildRejectedFingerprintToReasonsFromFingerprints(final Set<String> rejectedFps, final List<Set<String>> disabledFingerprintSets, final List<RejectionReason> disabledProviderReasons) {
+        final Map<String, Set<RejectionReason>> fpToReasons = new LinkedHashMap<String, Set<RejectionReason>>();
+        if (rejectedFps == null || disabledFingerprintSets == null || disabledProviderReasons == null) {
+            return fpToReasons;
+        }
+        for (final String fpLower : rejectedFps) {
+            if (fpLower == null || fpLower.length() != 64) {
+                continue;
+            }
+            final Set<RejectionReason> reasons = new TreeSet<RejectionReason>();
+            for (int i = 0; i < disabledFingerprintSets.size() && i < disabledProviderReasons.size(); i++) {
+                final Set<String> set = disabledFingerprintSets.get(i);
+                if (set != null && set.contains(fpLower)) {
+                    reasons.add(disabledProviderReasons.get(i));
+                }
+            }
+            if (!reasons.isEmpty()) {
+                fpToReasons.put(fpLower, reasons);
+            }
+        }
+        return fpToReasons;
+    }
+
+    /** Well-known EKU OIDs for console display (RFC 5280 / common practice). */
+    private static final String EKU_OID_ANY              = "2.5.29.37.0";
+    private static final String EKU_OID_SERVER_AUTH      = "1.3.6.1.5.5.7.3.1";
+    private static final String EKU_OID_CLIENT_AUTH      = "1.3.6.1.5.5.7.3.2";
+    private static final String EKU_OID_CODE_SIGNING     = "1.3.6.1.5.5.7.3.3";
+    private static final String EKU_OID_EMAIL_PROTECTION = "1.3.6.1.5.5.7.3.4";
+    private static final String EKU_OID_TIMESTAMPING     = "1.3.6.1.5.5.7.3.8";
+
+    /**
+     * Formats extended key usage OIDs for console output (well-known OIDs as short names, others as OID string).
+     *
+     * @param eku
+     *            list of EKU OIDs from {@link X509Certificate#getExtendedKeyUsage()}, may be null
+     * @return comma-separated string, or "none" if null/empty
+     */
+    private static String formatEkuForConsole(final List<String> eku) {
+        if (eku == null || eku.isEmpty()) {
+            return "none";
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < eku.size(); i++) {
+            final String oid = eku.get(i);
+            if (oid == null) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            if (EKU_OID_ANY.equals(oid)) {
+                sb.append("anyExtendedKeyUsage");
+            } else if (EKU_OID_SERVER_AUTH.equals(oid)) {
+                sb.append("serverAuth");
+            } else if (EKU_OID_CLIENT_AUTH.equals(oid)) {
+                sb.append("clientAuth");
+            } else if (EKU_OID_CODE_SIGNING.equals(oid)) {
+                sb.append("codeSigning");
+            } else if (EKU_OID_EMAIL_PROTECTION.equals(oid)) {
+                sb.append("emailProtection");
+            } else if (EKU_OID_TIMESTAMPING.equals(oid)) {
+                sb.append("timeStamping");
+            } else {
+                sb.append(oid);
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : "none";
+    }
+
+    /** Escapes a string for use as JSON value (backslash and quote). */
+    private static String escapeJsonString(final String s) {
+        if (s == null) {
+            return "";
+        }
+        final StringBuilder sb = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            final char c = s.charAt(i);
+            if (c == '\\') {
+                sb.append("\\\\");
+            } else if (c == '"') {
+                sb.append("\\\"");
+            } else if (c == '\n') {
+                sb.append("\\n");
+            } else if (c == '\r') {
+                sb.append("\\r");
+            } else if (c == '\t') {
+                sb.append("\\t");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns a map containing only entries whose fingerprint appears in at least {@code minProviders} of the disabled fingerprint sets
+     * (for writing rejected.k.json).
+     */
+    private static Map<String, Set<RejectionReason>> filterFpToReasonsByMinProviders(final Map<String, Set<RejectionReason>> fpToReasons, final List<Set<String>> disabledFingerprintSets, final int minProviders) {
+        if (fpToReasons == null || disabledFingerprintSets == null || minProviders < 1) {
+            return new LinkedHashMap<String, Set<RejectionReason>>();
+        }
+        final Map<String, Set<RejectionReason>> out = new LinkedHashMap<String, Set<RejectionReason>>();
+        for (final Map.Entry<String, Set<RejectionReason>> e : fpToReasons.entrySet()) {
+            final String fp = e.getKey();
+            int count = 0;
+            for (int i = 0; i < disabledFingerprintSets.size(); i++) {
+                final Set<String> set = disabledFingerprintSets.get(i);
+                if (set != null && set.contains(fp)) {
+                    count++;
+                }
+            }
+            if (count >= minProviders) {
+                out.put(fp, e.getValue());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Writes a JSON object {@code {"fingerprint":["REASON1","REASON2"], ...}} from the supplied map. All entries are written; keys
+     * (fingerprints) and array elements (enum names) are in sorted order so that the output JSON is deterministically ordered.
+     */
+    private static void writeRejectedJson(final Map<String, Set<RejectionReason>> fpToReasons, final File file) throws IOException {
+        if (fpToReasons == null) {
+            return;
+        }
+        final List<String> sortedKeys = new ArrayList<String>(fpToReasons.keySet());
+        Collections.sort(sortedKeys);
+        final FlexiJSonObject obj = new FlexiJSonObject();
+        for (final String fp : sortedKeys) {
+            final Set<RejectionReason> reasons = fpToReasons.get(fp);
+            if (reasons != null && !reasons.isEmpty()) {
+                final FlexiJSonArray arr = new FlexiJSonArray();
+                for (final RejectionReason r : reasons) {
+                    arr.add(new FlexiJSonValue(r.name()));
+                }
+                obj.add(new KeyValueElement(obj, fp, arr));
+            }
+        }
+        final String json = new FlexiJSonPrettyStringify().toJSONString(obj);
+        IO.writeStringToFile(file, json);
     }
 
     /**
@@ -1514,9 +2165,21 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Loads a single certificate from crt.sh by SHA-256 fingerprint. Fetches the search page, parses the certificate id, downloads PEM via
-     * ?d=id, verifies the cert's SHA-256 matches the requested fingerprint, and returns the cert. Returns null if not found, parse error,
-     * or fingerprint mismatch.
+     * Directory for caching certificates loaded from crt.sh. Each file is named {@code <sha256-fingerprint>.pem}. Default:
+     * {@code user.home/.ccadb-crtsh-cache}. Override with system property {@code ccadb.crtsh.cache.dir}.
+     */
+    public static File getCrtshCacheDirectory() {
+        final String dir = System.getProperty("ccadb.crtsh.cache.dir");
+        if (dir != null && dir.length() > 0) {
+            return new File(dir);
+        }
+        return new File(System.getProperty("user.home", ""), ".ccadb-crtsh-cache");
+    }
+
+    /**
+     * Loads a single certificate from crt.sh by SHA-256 fingerprint. Uses a file cache: if {@code <fingerprint>.pem} exists in
+     * {@link #getCrtshCacheDirectory()}, the cert is loaded from there and verified by fingerprint; otherwise the cert is fetched from
+     * crt.sh and stored in the cache. Returns null if not found, parse error, or fingerprint mismatch.
      *
      * @param sha256Hex
      *            64 hex characters (lower or upper case), no colons
@@ -1527,32 +2190,95 @@ public final class RootCertificateTrustValidator {
             return null;
         }
         final String normalized = sha256Hex.toLowerCase(Locale.ROOT).replaceAll(":", "");
-        final String html = readUrlToString(CRTSH_QUERY_URL + normalized);
-        if (html == null || html.isEmpty() || html.toLowerCase(Locale.ROOT).contains("no records found") || html.toLowerCase(Locale.ROOT).contains("0 results")) {
-            return null;
+        final File cacheDir = getCrtshCacheDirectory();
+        final File cacheFile = new File(cacheDir, normalized + ".pem");
+        if (cacheFile.isFile()) {
+            try {
+                final byte[] bytes = IO.readFile(cacheFile);
+                if (bytes != null && bytes.length > 0) {
+                    final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(new ByteArrayInputStream(bytes));
+                    if (certs != null && certs.length > 0) {
+                        final X509Certificate cert = certs[0];
+                        final String actualFp = Hash.getSHA256(cert.getEncoded());
+                        if (actualFp != null && actualFp.toLowerCase(Locale.ROOT).equals(normalized)) {
+                            return cert;
+                        }
+                    }
+                }
+            } catch (final Exception ignored) {
+            }
         }
-        final Matcher idMatcher = Pattern.compile("\\?id=(\\d+)").matcher(html);
-        if (!idMatcher.find()) {
-            return null;
+        final long deadline = System.currentTimeMillis() + CRTSH_RETRY_TIMEOUT_MS;
+        int attempt = 0;
+        while (System.currentTimeMillis() < deadline) {
+            attempt++;
+            try {
+                final String html = readUrlToString(CRTSH_QUERY_URL + normalized);
+                if (html == null || html.isEmpty()) {
+                    logCrtshRetry("query empty/null", normalized, attempt);
+                } else if (html.toLowerCase(Locale.ROOT).contains("no records found") || html.toLowerCase(Locale.ROOT).contains("0 results")) {
+                    logCrtshRetry("no records", normalized, attempt);
+                } else {
+                    final Matcher idMatcher = Pattern.compile("\\?id=(\\d+)").matcher(html);
+                    if (!idMatcher.find()) {
+                        logCrtshRetry("no certificate id in response", normalized, attempt);
+                    } else {
+                        final String id = idMatcher.group(1);
+                        final String pem = readUrlToString(CRTSH_DOWNLOAD_URL + id);
+                        if (pem == null || !pem.contains("-----BEGIN CERTIFICATE-----")) {
+                            logCrtshRetry("download null or no PEM (id=" + id + ")", normalized, attempt);
+                        } else {
+                            final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(new ByteArrayInputStream(pem.getBytes("UTF-8")));
+                            if (certs == null || certs.length == 0) {
+                                logCrtshRetry("failed to parse PEM", normalized, attempt);
+                            } else {
+                                final X509Certificate cert = certs[0];
+                                final String actualFp = Hash.getSHA256(cert.getEncoded());
+                                if (actualFp == null || !actualFp.toLowerCase(Locale.ROOT).equals(normalized)) {
+                                    logCrtshRetry("fingerprint mismatch", normalized, attempt);
+                                } else {
+                                    if (!cacheDir.exists()) {
+                                        cacheDir.mkdirs();
+                                    }
+                                    if (cacheDir.isDirectory()) {
+                                        IO.writeToFile(cacheFile, pem.getBytes("UTF-8"));
+                                    }
+                                    return cert;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (final Exception e) {
+                logCrtshRetry(e.getMessage(), normalized, attempt);
+                try {
+                    LogV3.log(e);
+                } catch (final Exception ignored) {
+                }
+            }
+            final long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) {
+                break;
+            }
+            final long sleepMs = remaining < CRTSH_RETRY_DELAY_MS ? remaining : CRTSH_RETRY_DELAY_MS;
+            try {
+                Thread.sleep(sleepMs);
+            } catch (final InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logCrtshRetry("interrupted", normalized, attempt);
+                return null;
+            }
         }
-        final String id = idMatcher.group(1);
-        final String pem = readUrlToString(CRTSH_DOWNLOAD_URL + id);
-        if (pem == null || !pem.contains("-----BEGIN CERTIFICATE-----")) {
-            return null;
-        }
+        logCrtshRetry("gave up after " + (CRTSH_RETRY_TIMEOUT_MS / 1000) + "s (" + attempt + " attempts)", normalized, attempt);
+        return null;
+    }
+
+    private static void logCrtshRetry(final String reason, final String fingerprint, final int attempt) {
+        final String msg = "crt.sh " + reason + " for " + fingerprint + ", attempt " + attempt;
+        System.err.println(msg);
         try {
-            final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(new ByteArrayInputStream(pem.getBytes("UTF-8")));
-            if (certs == null || certs.length == 0) {
-                return null;
-            }
-            final X509Certificate cert = certs[0];
-            final String actualFp = Hash.getSHA256(cert.getEncoded());
-            if (actualFp == null || !actualFp.toLowerCase(Locale.ROOT).equals(normalized)) {
-                return null;
-            }
-            return cert;
-        } catch (final Exception e) {
-            return null;
+            LogV3.warning(msg);
+        } catch (final Exception ignored) {
         }
     }
 
@@ -1746,41 +2472,41 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Main entry: No input PEM. Loads candidates from the linked stores (Android, Sycamore, optionally Microsoft PFX), computes the
-     * intersection of all stores enabled via {@code enable...}, and writes only those CAs to the output PEM. JRE, OS and CCADB providers
-     * are not used.
+     * Main entry: No input PEM. Loads candidates from the linked stores (Android, Sycamore, Microsoft via certutil SST + JNA, etc.),
+     * computes the intersection of all stores enabled via {@code enable...}, and writes only those CAs to the output PEM. JRE, OS and CCADB
+     * providers are not used.
      * <p>
-     * Invocation: java ... RootCertificateTrustValidator [output.pem] [roots.pfx]
+     * Invocation: java ... RootCertificateTrustValidator [output.pem]
      * <ul>
      * <li>1st argument: optional output PEM path; if omitted, files are written to the same directory as {@code common-ca-database.pem}
      * (ccadb package) with base name {@value #DEFAULT_MERGED_PEM_BASENAME}</li>
-     * <li>2nd argument: optional Microsoft roots.pfx; otherwise on Windows: certutil (SST from WU, read via API), then local Root
-     * store</li>
+     * <li>On Windows, Microsoft (Windows Update) is loaded via certutil (SST from WU), read via JNA, then local Root store</li>
      * </ul>
      */
-    private static final String DEFAULT_MERGED_PEM_BASENAME       = "appwork-merged-cadb";
+    private static final String DEFAULT_MERGED_PEM_BASENAME      = "appwork-merged-cadb";
     private static final String DEFAULT_MERGED_PEM_REJECTED_BASE = "appwork-merged-cadb-rejected";
+    /**
+     * k used for appwork-merged-cadb-rejected.<k>.json consumed by CCADBTrustProvider (must match
+     * CCADBTrustProvider.ONLY_CAS_ACCEPTED_BY_AT_LEAST).
+     */
+    private static final String REJECTED_JSON_K_FOR_CCADB        = "3";
 
     public static void main(final String[] args) {
+        final File wuSyncDir = runCertutilSyncWithWU(null);
+        if (wuSyncDir != null) {
+            System.out.println("certutil -syncWithWU completed (Root/Disallowed stores synced; output in " + wuSyncDir.getAbsolutePath() + ").");
+        }
         final RootCertificateTrustValidator validator = new RootCertificateTrustValidator();
         // validator.enableSycamoreCT();
+        // validator.enableGooglePilotCT();
         validator.enableAppleRootStore();
         validator.enableGoogleChromeRootStore();
         validator.enableAndroidRootStore();
         validator.enableMicrosoftCCADB();
+        // validator.enableMicrosoftAuthRootStl(); // cross-platform AuthRoot from authroot.stl + .crt
         validator.enableMozillaIncludedRootsPem();
         validator.enableMozillaCertdata();
-        File msPfx = null;
-        if (args != null && args.length >= 2 && args[1] != null && !args[1].isEmpty()) {
-            msPfx = new File(args[1]);
-        }
-        if (msPfx == null || !msPfx.isFile()) {
-            final File defaultPfx = new File(System.getProperty("user.dir", ""), "roots.pfx");
-            if (defaultPfx.isFile()) {
-                msPfx = defaultPfx;
-            }
-        }
-        if (validator.enableMicrosoftWindowsUpdate(msPfx)) {
+        if (validator.enableMicrosoftWindowsUpdate()) {
             System.err.println("Microsoft (Windows Update) roots loaded.");
         } else {
             System.err.println("Microsoft (Windows Update): not loaded (omit enableMicrosoftWindowsUpdate() to disable).");
@@ -1788,7 +2514,7 @@ public final class RootCertificateTrustValidator {
         final Map<String, Integer> storeSizes = validator.getStoreSizes();
         System.out.println("Filter: only CAs acceptable for TLS server auth (TrustUtils.isAcceptableCaTrustAnchorForSsl). CAs for code signing, email, etc. only are excluded.");
         // Order and full list of all stores (including when not loaded, e.g. Microsoft WU)
-        final String[] storeOrder = new String[] { "CT (Sycamore)", "Apple (Root Store)", "Google (Chrome)", "Android (Root Store)", "Microsoft (CCADB)", "Mozilla (Included Roots PEM)", "Mozilla (certdata)", "Microsoft (Windows Update)" };
+        final String[] storeOrder = new String[] { "CT (Sycamore)", "CT (Google Pilot)", "Apple (Root Store)", "Google (Chrome)", "Android (Root Store)", "Microsoft (CCADB)", "Microsoft (AuthRoot STL)", "Mozilla (Included Roots PEM)", "Mozilla (certdata)", "Microsoft (Windows Update)" };
         System.out.println("CAs per store:");
         for (final String name : storeOrder) {
             final Integer n = storeSizes.get(name);
@@ -1816,9 +2542,9 @@ public final class RootCertificateTrustValidator {
         final X509Certificate[] androidCerts = loadAndroidRootCertificates();
         final X509Certificate[] sycamoreCerts = loadSycamoreRootCertificates();
         final X509Certificate[] mozillaCerts = loadMozillaIncludedRootsPemCertificates();
-        X509Certificate[] msCerts = new X509Certificate[0];
-        if (msPfx != null && msPfx.isFile()) {
-            msCerts = loadCertificatesFromPfx(msPfx, null);
+        X509Certificate[] msCerts = loadMicrosoftWindowsUpdateCertificatesFromSst();
+        if (msCerts == null) {
+            msCerts = new X509Certificate[0];
         }
         X509Certificate[] candidates = unionByFingerprint(androidCerts, sycamoreCerts, mozillaCerts, msCerts);
         if (candidates.length == 0) {
@@ -1887,9 +2613,13 @@ public final class RootCertificateTrustValidator {
         final String baseName;
         outDir = new File(AWTest.getWorkspace(), "AppWorkutils/src/org/appwork/utils/net/httpconnection/trust/ccadb");
         baseName = DEFAULT_MERGED_PEM_BASENAME;
-        final File outFile = new File(outDir, baseName + ".pem");
+        final File tempDir = new File(outDir, "temp");
         if (!outDir.isDirectory() && !outDir.mkdirs()) {
             System.err.println("Failed to create output directory: " + outDir.getAbsolutePath());
+            System.exit(1);
+        }
+        if (!tempDir.isDirectory() && !tempDir.mkdirs()) {
+            System.err.println("Failed to create temp directory: " + tempDir.getAbsolutePath());
             System.exit(1);
         }
         final int numStores = storeNames.size();
@@ -1898,22 +2628,197 @@ public final class RootCertificateTrustValidator {
                 f.delete();
             }
         }
+        for (File f : tempDir.listFiles()) {
+            if (f.getName().startsWith(baseName) || f.getName().startsWith(DEFAULT_MERGED_PEM_REJECTED_BASE)) {
+                f.delete();
+            }
+        }
         for (int k = 1; k <= numStores; k++) {
             final List<X509Certificate> atLeastK = getCertsAcceptedByAtLeastKProviders(candidates, results, k);
             if (atLeastK.size() == 0) {
                 continue;
             }
-            final File kFile = new File(outDir, baseName + "." + k + ".pem");
+            final File kFile = new File(tempDir, baseName + "." + k + ".pem");
             try {
-                final FileOutputStream fos = new FileOutputStream(kFile);
-                try {
-                    writePEM(atLeastK, fos);
-                } finally {
-                    fos.close();
-                }
+                final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                writePEM(atLeastK, bos);
+                IO.writeToFile(kFile, bos.toByteArray());
                 System.out.println("PEM (>= " + k + " providers): " + kFile.getAbsolutePath() + " (" + atLeastK.size() + " CAs)");
             } catch (final Exception e) {
                 System.err.println("Failed to write " + kFile.getName() + ": " + e.getMessage());
+            }
+        }
+        // Rejected/disabled: same logic as accepted, but for certs explicitly disabled by providers that support it (Microsoft CCADB,
+        // Mozilla certdata).
+        final List<String> disabledProviderNames = new ArrayList<String>();
+        final List<RejectionReason> disabledProviderReasons = new ArrayList<RejectionReason>();
+        final List<Set<String>> disabledFingerprintSets = new ArrayList<Set<String>>();
+        final Set<String> microsoftDisabled = loadMicrosoftCCADBDisabledFingerprints();
+        if (microsoftDisabled != null && !microsoftDisabled.isEmpty()) {
+            disabledProviderNames.add("Microsoft: disabled (CCADB)");
+            disabledProviderReasons.add(RejectionReason.MICROSOFT_DISABLED_CCADB);
+            disabledFingerprintSets.add(microsoftDisabled);
+        }
+        final Set<String> mozillaDistrustedFps = loadMozillaCertdataDistrustedFingerprints();
+        if (mozillaDistrustedFps != null && !mozillaDistrustedFps.isEmpty()) {
+            disabledProviderNames.add("Mozilla: distrusted (certdata)");
+            disabledProviderReasons.add(RejectionReason.MOZILLA_DISTRUSTED);
+            disabledFingerprintSets.add(mozillaDistrustedFps);
+        }
+        final Set<String> appleRestrictedFps = loadAppleRestrictedFingerprints();
+        if (appleRestrictedFps != null && !appleRestrictedFps.isEmpty()) {
+            disabledProviderNames.add("Apple: blocked/constrained");
+            disabledProviderReasons.add(RejectionReason.APPLE_BLOCKED_CONSTRAINED);
+            disabledFingerprintSets.add(appleRestrictedFps);
+        }
+        final Set<String> chromeBlocklistFps = loadChromeBlocklistFingerprints();
+        if (chromeBlocklistFps != null && !chromeBlocklistFps.isEmpty()) {
+            disabledProviderNames.add("Chrome: blocklist");
+            disabledProviderReasons.add(RejectionReason.CHROME_BLOCKLIST);
+            disabledFingerprintSets.add(chromeBlocklistFps);
+        }
+        final Set<String> crtshRevoked = loadCrtshRevokedFingerprints(candidates);
+        if (crtshRevoked != null && !crtshRevoked.isEmpty()) {
+            disabledProviderNames.add("crt.sh: revoked");
+            disabledProviderReasons.add(RejectionReason.CRTSH_REVOKED);
+            disabledFingerprintSets.add(crtshRevoked);
+        }
+        Set<String> microsoftDisallowedFps = null;
+        List<X509Certificate> microsoftDisallowedCertsList = null;
+        if (wuSyncDir != null) {
+            final File disallowedSst = new File(wuSyncDir, "disallowedcert.sst");
+            if (disallowedSst.isFile()) {
+                final List<X509Certificate> fromSst = WindowsCertUtils.getRootStoreCertificatesFromSstFile(disallowedSst);
+                if (fromSst != null && !fromSst.isEmpty()) {
+                    microsoftDisallowedFps = new TreeSet<String>();
+                    for (int i = 0; i < fromSst.size(); i++) {
+                        try {
+                            final String fp = Hash.getSHA256(fromSst.get(i).getEncoded());
+                            if (fp != null) {
+                                microsoftDisallowedFps.add(fp.toLowerCase(Locale.ROOT));
+                            }
+                        } catch (final CertificateEncodingException ignored) {
+                        }
+                    }
+                    microsoftDisallowedCertsList = fromSst;
+                }
+            }
+        }
+        if (microsoftDisallowedFps == null || microsoftDisallowedFps.isEmpty()) {
+            microsoftDisallowedFps = WindowsCertUtils.getDisallowedStoreFingerprintsSha256();
+            final List<X509Certificate> storeCerts = WindowsCertUtils.getDisallowedStoreCertificates();
+            microsoftDisallowedCertsList = (storeCerts != null && !storeCerts.isEmpty()) ? storeCerts : null;
+        }
+        if (microsoftDisallowedFps != null && !microsoftDisallowedFps.isEmpty()) {
+            disabledProviderNames.add("Microsoft: Disallowed store");
+            disabledProviderReasons.add(RejectionReason.MICROSOFT_DISALLOWED_STORE);
+            disabledFingerprintSets.add(microsoftDisallowedFps);
+        }
+        if (!disabledFingerprintSets.isEmpty()) {
+            final Set<String> rejectedFps = new TreeSet<String>();
+            if (microsoftDisabled != null) {
+                rejectedFps.addAll(microsoftDisabled);
+            }
+            if (mozillaDistrustedFps != null) {
+                rejectedFps.addAll(mozillaDistrustedFps);
+            }
+            if (appleRestrictedFps != null) {
+                rejectedFps.addAll(appleRestrictedFps);
+            }
+            if (chromeBlocklistFps != null) {
+                rejectedFps.addAll(chromeBlocklistFps);
+            }
+            if (crtshRevoked != null) {
+                rejectedFps.addAll(crtshRevoked);
+            }
+            if (microsoftDisallowedFps != null) {
+                rejectedFps.addAll(microsoftDisallowedFps);
+            }
+            // PEM files containing only CAs not in any rejected list (same k as accepted PEMs, but with rejected fingerprints removed)
+            final int noRejectedPemKAtMainOut = 3;
+            for (int k = 1; k <= numStores; k++) {
+                final List<X509Certificate> atLeastK = getCertsAcceptedByAtLeastKProviders(candidates, results, k);
+                final List<X509Certificate> notRejected = filterOutRejectedFingerprints(atLeastK, rejectedFps);
+                if (notRejected.isEmpty()) {
+                    continue;
+                }
+                final File noRejFile = (k == noRejectedPemKAtMainOut) ? new File(outDir, baseName + "." + k + "-no-rejected.pem") : new File(tempDir, baseName + "." + k + "-no-rejected.pem");
+                try {
+                    final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    writePEM(notRejected, bos);
+                    IO.writeToFile(noRejFile, bos.toByteArray());
+                    System.out.println("PEM (>= " + k + " providers, not in any rejected list): " + noRejFile.getAbsolutePath() + " (" + notRejected.size() + " CAs)");
+                } catch (final Exception e) {
+                    System.err.println("Failed to write " + noRejFile.getName() + ": " + e.getMessage());
+                }
+            }
+            final List<X509Certificate> rejectedCerts = new ArrayList<X509Certificate>();
+            final Set<String> addedFp = new TreeSet<String>();
+            for (int i = 0; i < candidates.length; i++) {
+                try {
+                    final String fp = Hash.getSHA256(candidates[i].getEncoded());
+                    if (fp != null && rejectedFps.contains(fp.toLowerCase(Locale.ROOT)) && addedFp.add(fp.toLowerCase(Locale.ROOT))) {
+                        rejectedCerts.add(candidates[i]);
+                    }
+                } catch (final CertificateEncodingException ignored) {
+                }
+            }
+            final X509Certificate[] mozillaDistrustedCerts = loadMozillaCertdataDistrustedCertificates();
+            if (mozillaDistrustedCerts != null) {
+                for (int i = 0; i < mozillaDistrustedCerts.length; i++) {
+                    try {
+                        final String fp = Hash.getSHA256(mozillaDistrustedCerts[i].getEncoded());
+                        if (fp != null && addedFp.add(fp.toLowerCase(Locale.ROOT))) {
+                            rejectedCerts.add(mozillaDistrustedCerts[i]);
+                        }
+                    } catch (final CertificateEncodingException ignored) {
+                    }
+                }
+            }
+            if (microsoftDisallowedCertsList != null) {
+                for (int i = 0; i < microsoftDisallowedCertsList.size(); i++) {
+                    try {
+                        final String fp = Hash.getSHA256(microsoftDisallowedCertsList.get(i).getEncoded());
+                        if (fp != null && addedFp.add(fp.toLowerCase(Locale.ROOT))) {
+                            rejectedCerts.add(microsoftDisallowedCertsList.get(i));
+                        }
+                    } catch (final CertificateEncodingException ignored) {
+                    }
+                }
+            }
+            System.out.println("Explicitly disabled/rejected (from " + disabledProviderNames + "): " + rejectedCerts.size() + " certs, " + rejectedFps.size() + " fingerprints");
+            final int numDisabledStores = disabledFingerprintSets.size();
+            final Map<String, Set<RejectionReason>> fpToReasons = buildRejectedFingerprintToReasonsFromFingerprints(rejectedFps, disabledFingerprintSets, disabledProviderReasons);
+            final File[] tempFiles = tempDir.listFiles();
+            if (tempFiles != null) {
+                for (int i = 0; i < tempFiles.length; i++) {
+                    if (tempFiles[i].getName().startsWith(DEFAULT_MERGED_PEM_REJECTED_BASE)) {
+                        tempFiles[i].delete();
+                    }
+                }
+            }
+            for (int k = 1; k <= numDisabledStores; k++) {
+                final List<X509Certificate> rejectedByK = getCertsRejectedByAtLeastKProviders(rejectedCerts, disabledFingerprintSets, k);
+                if (rejectedByK.isEmpty()) {
+                    continue;
+                }
+                // final File kFile = new File(outDir, DEFAULT_MERGED_PEM_REJECTED_BASE + "." + k + ".pem");
+                // try {
+                // final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                // writePEM(rejectedByK, bos);
+                // IO.writeToFile(kFile, bos.toByteArray());
+                // System.out.println("PEM rejected (>= " + k + " disabled lists): " + kFile.getAbsolutePath() + " (" + rejectedByK.size() +
+                // " CAs)");
+                // } catch (final Exception e) {
+                // System.err.println("Failed to write " + kFile.getName() + ": " + e.getMessage());
+                // }
+                final File kJsonFile = new File(tempDir, DEFAULT_MERGED_PEM_REJECTED_BASE + "." + k + ".json");
+                try {
+                    writeRejectedJson(filterFpToReasonsByMinProviders(fpToReasons, disabledFingerprintSets, k), kJsonFile);
+                    System.out.println("JSON rejected (>= " + k + " disabled lists): " + kJsonFile.getAbsolutePath());
+                } catch (final Exception e) {
+                    System.err.println("Failed to write " + kJsonFile.getName() + ": " + e.getMessage());
+                }
             }
         }
     }

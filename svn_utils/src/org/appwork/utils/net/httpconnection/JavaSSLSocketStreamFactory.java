@@ -243,6 +243,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         TLS_1_2("TLSv1.2"),
         TLS_1_1("TLSv1.1"),
         TLS_1_0("TLSv1");
+
         public final String id;
 
         private TLS(final String id) {
@@ -537,11 +538,8 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
      *      org.appwork.utils.net.httpconnection.trust.TrustCallback)
      */
     @Override
-    public SSLSocketStreamInterface create(SocketStreamInterface socketStream, String host, int port, boolean autoClose, final SSLSocketStreamOptions options, final TrustCallback trustCallback) throws IOException {
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, String host, int port, boolean autoClose, final SSLSocketStreamOptions options, final TrustCallback trustCallback) throws IOException {
         final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
-        if (trustCallback == null) {
-            throw new NullPointerException("trustCallback");
-        }
         final boolean sniEnabled = !StringUtils.isEmpty(host) && (options == null || options.isSNIEnabled());
         final AtomicReference<TrustResult> trustResult = new AtomicReference<TrustResult>();
         final TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src"/>
+	<classpathentry excluding="org/appwork/utils/net/httpconnection/trust/ccadb/temp/" kind="src" path="src"/>
 	<classpathentry kind="src" path="themes"/>
 	<classpathentry kind="lib" path="libs/miglayout.jar"/>
 	<classpathentry kind="lib" path="libs/svgSalamander.jar"/>

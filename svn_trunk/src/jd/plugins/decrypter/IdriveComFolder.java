@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -48,8 +49,9 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52350 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52359 $", interfaceVersion = 3, names = {}, urls = {})
 public class IdriveComFolder extends PluginForDecrypt {
     public IdriveComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,131 +121,176 @@ public class IdriveComFolder extends PluginForDecrypt {
         }
         String relative_path_from_url = new Regex(URLHelper.getUrlWithoutParams(contenturl), PATTERN_1).getMatch(2);
         if (relative_path_from_url != null) {
-            relative_path_from_url = "/" + URLEncode.decodeURIComponent(relative_path_from_url);
+            relative_path_from_url = URLEncode.decodeURIComponent(relative_path_from_url);
         }
         final String json_prefetch = br.getRegex("var\\s*share_Response\\s*=\\s*(\\{.*?\\});").getMatch(0);
         final Map<String, Object> prefetch = restoreFromString(json_prefetch, TypeRef.MAP);
-        final String shareid = prefetch.get("shareid").toString();
+        String serverAddress = prefetch.get("serverAddress").toString();
         List<Map<String, Object>> contents = (List<Map<String, Object>>) prefetch.get("contents");
         if (contents.size() == 0) {
-            // TODO
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String shareid = prefetch.get("shareid").toString();
         int numberofFiles = 0;
         int numberofFolders = 0;
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final List<String> resourcePaths = new ArrayList<String>();
-        {
-            // query shareProperties
-            final UrlQuery query = new UrlQuery();
-            query.appendEncoded("shareid", shareid);
-            Browser brc = br.cloneBrowser();
-            brc.postPage("/idrive/home/shareProperties", query);
-            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String serverAddress = entries.get("serverAddress").toString();
-            contents = (List<Map<String, Object>>) entries.get("contents");
-            if (contents.size() == 0) {
-                // TODO
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final FilePackage fp = FilePackage.getInstance();
-            for (final Map<String, Object> content : contents) {
-                final String resourcePath = content.get("resourcePath").toString();
-                final Object resourceType = content.get("resourceType");
-                if ("0".equals(resourceType)) {
-                    resourcePaths.add(resourcePath);
-                    numberofFolders++;
-                    continue;
-                }
-                final String name = content.get("name").toString();
-                final DownloadLink link = new DownloadLink(defaultPlugin, defaultPlugin.getHost(), "");
-                link.setProperty(IDriveCom.PROPERTY_NAME, name);
-                link.setProperty(IDriveCom.PROPERTY_PATH, resourcePath);
-                link.setProperty(IDriveCom.PROPERTY_SHAREID, shareid);
-                link.setProperty(IDriveCom.PROPERTY_SERVER, serverAddress);
-                link.setFinalFileName(name);
-                final Number size = (Number) ReflectionUtils.cast(content.get("size"), Number.class);
-                if (size != null) {
-                    link.setVerifiedFileSize(size.longValue());
-                }
-                final String path_without_filename = resourcePath.replaceFirst("/" + Pattern.quote(name) + "$", "");
-                link.setRelativeDownloadFolderPath(path_without_filename);
-                link.setDownloadPassword(passCode);
-                link.setAvailable(true);
-                fp.setName(path_without_filename);
-                link._setFilePackage(fp);
-                ret.add(link);
-                numberofFiles++;
-                distribute(link);
-            }
-        }
-        if (resourcePaths.size() > 0) {
-            // EVSID token required for evs api
-            final String evsTokenUrl = br.getRegex("var\\s*evsTokenUrl\\s*=\\s*(\"|')(.*?)(\"|')").getMatch(1);
-            if (StringUtils.isNotEmpty(evsTokenUrl)) {
-                final Browser evsCookies = br.cloneBrowser();
-                evsCookies.openHeadConnection(evsTokenUrl).disconnect();
-            } else if (br.getCookie(getHost(), "EVSID", Cookies.NOTDELETEDPATTERN) == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            while (resourcePaths.size() > 0 && !isAbort()) {
-                final String resourcePath = resourcePaths.remove(0);
-                // query folders via evs/browseFolder
+        int numberofEmptyFolders = 0;
+        try {
+            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+            final List<String> resourcePaths = new ArrayList<String>();
+            {
+                // query shareProperties
                 final UrlQuery query = new UrlQuery();
-                query.appendEncoded("p", resourcePath);
-                query.appendEncoded("json", "yes");
-                query.appendEncoded("device_id", "");
-                final Browser brc = br.cloneBrowser();
-                final String serverAddress = prefetch.get("serverAddress").toString();
-                brc.postPage("https://" + serverAddress + "/evs/browseFolder", query);
+                query.appendEncoded("shareid", shareid);
+                Browser brc = br.cloneBrowser();
+                brc.postPage("/idrive/home/shareProperties", query);
                 final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-                if (!"SUCCESS".equals(entries.get("message"))) {
-                    break;
-                }
+                serverAddress = entries.get("serverAddress").toString();
                 contents = (List<Map<String, Object>>) entries.get("contents");
-                if (contents.isEmpty()) {
-                    final DownloadLink emptyFolder = createLinkCrawlerRetry(getCurrentLink(), new DecrypterRetryException(RetryReason.EMPTY_FOLDER, resourcePath));
-                    ret.add(emptyFolder);
-                    continue;
+                if (contents.size() == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final String path = entries.get("path").toString();
                 final FilePackage fp = FilePackage.getInstance();
-                fp.setName(resourcePath);
                 for (final Map<String, Object> content : contents) {
-                    final String entryName = content.get("name").toString();
-                    String entryPath = path;
-                    if (!entryPath.endsWith("/")) {
-                        entryPath += "/";
-                    }
-                    entryPath += entryName;
-                    if (Boolean.TRUE.equals(content.get("is_dir"))) {
-                        resourcePaths.add(0, entryPath);
+                    final String resourcePath = content.get("resourcePath").toString();
+                    final Object resourceType = content.get("resourceType");
+                    if ("0".equals(resourceType)) {
+                        /* Folder */
+                        resourcePaths.add(resourcePath);
                         numberofFolders++;
-                    } else {
-                        /* File */
-                        final DownloadLink link = new DownloadLink(defaultPlugin, defaultPlugin.getHost(), "");
-                        link.setProperty(IDriveCom.PROPERTY_NAME, entryName);
-                        link.setProperty(IDriveCom.PROPERTY_PATH, entryPath);
-                        link.setProperty(IDriveCom.PROPERTY_SHAREID, shareid);
-                        link.setProperty(IDriveCom.PROPERTY_SERVER, serverAddress);
-                        link.setFinalFileName(entryName);
-                        final Number size = (Number) ReflectionUtils.cast(content.get("size"), Number.class);
-                        if (size != null) {
-                            link.setVerifiedFileSize(size.longValue());
-                        }
-                        link.setRelativeDownloadFolderPath(path);
-                        link.setDownloadPassword(passCode);
-                        link.setAvailable(true);
-                        link._setFilePackage(fp);
-                        ret.add(link);
-                        numberofFiles++;
-                        distribute(link);
+                        continue;
                     }
+                    /* File */
+                    final String name = content.get("name").toString();
+                    final DownloadLink link = new DownloadLink(defaultPlugin, defaultPlugin.getHost(), "");
+                    link.setProperty(IDriveCom.PROPERTY_NAME, name);
+                    link.setProperty(IDriveCom.PROPERTY_PATH, resourcePath);
+                    link.setProperty(IDriveCom.PROPERTY_SHAREID, shareid);
+                    link.setProperty(IDriveCom.PROPERTY_SERVER, serverAddress);
+                    link.setFinalFileName(name);
+                    final Number size = (Number) ReflectionUtils.cast(content.get("size"), Number.class);
+                    if (size != null) {
+                        link.setVerifiedFileSize(size.longValue());
+                    }
+                    final String path_without_filename = resourcePath.replaceFirst("/" + Pattern.quote(name) + "$", "");
+                    link.setRelativeDownloadFolderPath(path_without_filename);
+                    link.setDownloadPassword(passCode);
+                    link.setAvailable(true);
+                    fp.setName(path_without_filename);
+                    link._setFilePackage(fp);
+                    ret.add(link);
+                    distribute(link);
+                    numberofFiles++;
                 }
             }
+            if (!isAbort() && resourcePaths.size() > 0) {
+                logger.info("Crawling subfolders");
+                // EVSID token required for evs api
+                final String evsTokenUrl = br.getRegex("var\\s*evsTokenUrl\\s*=\\s*(\"|')(.*?)(\"|')").getMatch(1);
+                if (StringUtils.isNotEmpty(evsTokenUrl)) {
+                    final Browser evsCookies = br.cloneBrowser();
+                    evsCookies.openHeadConnection(evsTokenUrl).disconnect();
+                } else if (br.getCookie(getHost(), "EVSID", Cookies.NOTDELETEDPATTERN) == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                if (relative_path_from_url != null) {
+                    final String root_path = JavaScriptEngineFactory.walkJson(resourcePaths, "{0}/resourcePath").toString();
+                    String full_path_to_desired_folder = root_path;
+                    if (!full_path_to_desired_folder.endsWith("/")) {
+                        full_path_to_desired_folder += "/";
+                    }
+                    if (relative_path_from_url.startsWith("/")) {
+                        full_path_to_desired_folder += relative_path_from_url.substring(1);
+                    } else {
+                        full_path_to_desired_folder += relative_path_from_url;
+                    }
+                    /* API requires paths to end with slash. */
+                    if (!full_path_to_desired_folder.endsWith("/")) {
+                        full_path_to_desired_folder += "/";
+                    }
+                    logger.info("Crawling only items below user desired path: " + full_path_to_desired_folder);
+                    resourcePaths.clear();
+                    resourcePaths.add(full_path_to_desired_folder);
+                }
+
+                int numberof_http_requests = 0;
+                final HashSet<String> dupes = new HashSet<String>();
+                crawl_subfolders_recursive: do {
+                    /* Crawl (desired) subfolders in recursive way */
+                    final String resourcePath = resourcePaths.remove(0);
+                    // query folders via evs/browseFolder
+                    final UrlQuery query = new UrlQuery();
+                    query.appendEncoded("p", resourcePath);
+                    query.appendEncoded("json", "yes");
+                    query.appendEncoded("device_id", "");
+                    final Browser brc = br.cloneBrowser();
+                    numberof_http_requests++;
+                    brc.postPage("https://" + serverAddress + "/evs/browseFolder", query);
+                    final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                    if (!"SUCCESS".equals(entries.get("message"))) {
+                        logger.info("Stopping because: message!='success'");
+                        break crawl_subfolders_recursive;
+                    }
+                    final String path = entries.get("path").toString();
+                    contents = (List<Map<String, Object>>) entries.get("contents");
+                    if (contents.isEmpty()) {
+                        /* This subfolder is offline -> Provide feedback to user */
+                        final DownloadLink emptyFolder = createLinkCrawlerRetry(getCurrentLink(), new DecrypterRetryException(RetryReason.EMPTY_FOLDER, resourcePath));
+                        ret.add(emptyFolder);
+                        distribute(emptyFolder);
+                        numberofEmptyFolders++;
+                        continue crawl_subfolders_recursive;
+                    }
+                    final FilePackage fp = FilePackage.getInstance();
+                    fp.setName(resourcePath);
+                    int numberofNewItemsThisRun = 0;
+                    for (final Map<String, Object> content : contents) {
+                        final String entryName = content.get("name").toString();
+                        String entryPath = path;
+                        if (!entryPath.endsWith("/")) {
+                            entryPath += "/";
+                        }
+                        entryPath += entryName;
+                        if (!dupes.add(entryPath)) {
+                            /* Endless-loop protection -> This should never happen! */
+                            logger.warning("Skipping duplicated path: " + entryPath);
+                            continue;
+                        }
+                        if (Boolean.TRUE.equals(content.get("is_dir"))) {
+                            resourcePaths.add(0, entryPath);
+                            numberofFolders++;
+                        } else {
+                            /* File */
+                            final DownloadLink link = new DownloadLink(defaultPlugin, defaultPlugin.getHost(), "");
+                            link.setProperty(IDriveCom.PROPERTY_NAME, entryName);
+                            link.setProperty(IDriveCom.PROPERTY_PATH, entryPath);
+                            link.setProperty(IDriveCom.PROPERTY_SHAREID, shareid);
+                            link.setProperty(IDriveCom.PROPERTY_SERVER, serverAddress);
+                            link.setFinalFileName(entryName);
+                            final Number size = (Number) ReflectionUtils.cast(content.get("size"), Number.class);
+                            if (size != null) {
+                                link.setVerifiedFileSize(size.longValue());
+                            }
+                            link.setRelativeDownloadFolderPath(path);
+                            link.setDownloadPassword(passCode);
+                            link.setAvailable(true);
+                            link._setFilePackage(fp);
+                            ret.add(link);
+                            distribute(link);
+                            numberofFiles++;
+                        }
+                        numberofNewItemsThisRun++;
+                    }
+                    logger.info("HTTP-Requests: " + numberof_http_requests + " | Crawled files: " + numberofFiles + " | Non-empty folders: " + numberofFolders + " | Empty folders: " + numberofEmptyFolders);
+                    if (numberofNewItemsThisRun == 0) {
+                        logger.warning("Found 0 new items this run -> Stopping to prevent endless loop");
+                        break crawl_subfolders_recursive;
+                    }
+                } while (resourcePaths.size() > 0 && !this.isAbort());
+            }
+            return ret;
+        } finally {
+            logger.info("Crawled files: " + numberofFiles + " | Non-empty folders: " + numberofFolders + " | Empty folders: " + numberofEmptyFolders);
         }
-        logger.info("Crawled files: " + numberofFiles + " | Folders: " + numberofFolders);
-        return ret;
     }
 
     public static Form getPasswordProtectedForm(Plugin plugin, final Browser br) {

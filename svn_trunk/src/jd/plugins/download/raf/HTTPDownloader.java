@@ -613,8 +613,17 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
     }
 
     private static class ConnectionHashInfo extends HashInfo {
+        private ConnectionHashInfo(String hash, TYPE type, final boolean trustworthy) {
+            super(hash, type, trustworthy, false);
+        }
+
         private ConnectionHashInfo(String hash, TYPE type) {
-            super(hash, type, true, false);
+            this(hash, type, true);
+        }
+
+        @Override
+        public HashInfo clone(boolean isTrustWorthy, boolean isForced) {
+            return new ConnectionHashInfo(getHash(), getType(), isTrustWorthy);
         }
 
         @Override
@@ -629,7 +638,12 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
 
     private static HashInfo newConnectionHashInfo(final LogInterface logger, String hash, TYPE type) {
         try {
-            return new ConnectionHashInfo(hash, type);
+            final HashInfo ret = new ConnectionHashInfo(hash, type);
+            if (ret != null && ret.getHash().matches("^0+$")) {
+                // suspicious all 0/zeros hash, don't trust it
+                return ret.clone(false, false);
+            }
+            return ret;
         } catch (IllegalArgumentException e) {
             if (logger != null) {
                 logger.log(e);

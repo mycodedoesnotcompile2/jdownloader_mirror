@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 52311 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52352 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -866,7 +866,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final boolean prefer_server_filename = cfg.getBooleanProperty("USE_ORIGINAL_SERVER_FILENAME", false);
         /* Convert embed links to normal links */
         if (new Regex(contenturl, PATTERN_EMBED).patternFind()) {
-            final String viewkey = PornHubCom.getViewkeyFromURL(contenturl);
+            final String viewkey = PornHubCom.getContentIDFromURL(contenturl);
             final String newLink = br.getRegex("(https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.(?:com|org)/view_video\\.php\\?viewkey=" + Pattern.quote(viewkey) + ")").getMatch(0);
             if (newLink == null) {
                 this.hostplugin.checkErrors(br, source, account);
@@ -886,7 +886,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             PornHubCom.getPage(br, contenturl);
         }
         final String username = PornHubCom.getUserName(this, br);
-        final String viewkey = PornHubCom.getViewkeyFromURL(contenturl);
+        final String viewkey = PornHubCom.getContentIDFromURL(contenturl);
         // PornHubCom.getPage(br, PornHubCom.createPornhubVideolink(viewkey, aa));
         final String siteTitle = PornHubCom.getSiteTitle(this, br);
         final Map<String, Map<String, String>> qualities = PornHubCom.getVideoLinks(this, br);

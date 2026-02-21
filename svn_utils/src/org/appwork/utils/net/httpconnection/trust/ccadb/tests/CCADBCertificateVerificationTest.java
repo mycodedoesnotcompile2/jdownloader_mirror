@@ -37,9 +37,19 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -48,6 +58,7 @@ import java.util.regex.Pattern;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
@@ -67,7 +78,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
     private static final ConcurrentHashMap<String, CrtshCacheEntry> CRTSH_CACHE     = new ConcurrentHashMap<String, CrtshCacheEntry>();
     private static final ConcurrentHashMap<String, Long>            PERSISTED_FOUND = new ConcurrentHashMap<String, Long>();
     private static final Object                                     FILE_LOCK       = new Object();
-    private static final String                                     PERSISTED_NAME  = "crtsh-verified.txt";
+    private static final String                                     PERSISTED_NAME  = "crtsh-verified-2.txt";
 
     /** Cache entry: day index + result (null = not found on crt.sh). */
     private static final class CrtshCacheEntry {
@@ -110,9 +121,15 @@ public class CCADBCertificateVerificationTest extends AWTest {
     /** Max certs to check; default all. Set e.g. CCADB_VERIFY_LIMIT=10 for quick run. */
     private static final String SYS_PROP_LIMIT                      = "CCADB_VERIFY_LIMIT";
     private static final int    DELAY_MS_BETWEEN_REQUESTS           = 200;
+    /** Thread pool size for parallel crt.sh lookups. Override with system property {@code ccadb.crtsh.poolSize}. */
+    private static final String SYS_PROP_CRTSH_POOL_SIZE            = "ccadb.crtsh.poolSize";
+    private static final int    CRTSH_POOL_SIZE_DEFAULT             = 6;
     /** Known revoked certificate (precert, crt.sh shows Revoked via CRL); used to assert that revocation is parsed correctly. */
     private static final String REVOKED_TEST_SHA256                 = "f45d090e1bf24738a8e86734aa7acf7c9e65b619eb19660b1f73c9973f11b841";
-    /** Known revoked intermediate certificate (COMODO RSA Domain Validation Secure Server CA 3, OneCRL/CRL revoked); practical negative test. */
+    /**
+     * Known revoked intermediate certificate (COMODO RSA Domain Validation Secure Server CA 3, OneCRL/CRL revoked); practical negative
+     * test.
+     */
     private static final String REVOKED_INTERMEDIATE_CA_TEST_SHA256 = "9147c38e03b46c8ce5dddb02caa2932f1e1675c0a001529138336ed10d99983a";
 
     public static void main(final String[] args) {
@@ -181,6 +198,22 @@ public class CCADBCertificateVerificationTest extends AWTest {
     }
 
     /**
+     * Thread pool size for parallel crt.sh lookups. Reads system property {@code ccadb.crtsh.poolSize}, default
+     * {@value #CRTSH_POOL_SIZE_DEFAULT}.
+     */
+    static int getCrtshPoolSize() {
+        try {
+            final String v = System.getProperty(SYS_PROP_CRTSH_POOL_SIZE);
+            if (v != null && !v.isEmpty()) {
+                final int n = Integer.parseInt(v);
+                return n > 0 ? n : CRTSH_POOL_SIZE_DEFAULT;
+            }
+        } catch (final NumberFormatException ignored) {
+        }
+        return CRTSH_POOL_SIZE_DEFAULT;
+    }
+
+    /**
      * Load https://crt.sh/?q=&lt;sha256&gt; and parse the main certificate information. Returns null if not found or on error. Uses
      * persisted cache (user.home/.tests): if fingerprint was successfully verified within 12h, returns cached result without HTTP.
      */
@@ -197,16 +230,25 @@ public class CCADBCertificateVerificationTest extends AWTest {
         }
         final String url = CRTSH_BASE + sha256Hex;
         try {
+            LogV3.info("crt.sh request: GET " + url);
             final RequestContext body = httpGet(url);
+            if (body == null) {
+                LogV3.warning("crt.sh request failed (no response): " + url);
+                CRTSH_CACHE.put(sha256Hex, new CrtshCacheEntry(dayIndex, null));
+                return null;
+            }
             final CrtshInfo info = parseCrtshPage(body.getResponseString());
             CRTSH_CACHE.put(sha256Hex, new CrtshCacheEntry(dayIndex, info));
             if (info != null) {
                 PERSISTED_FOUND.put(sha256Hex, Long.valueOf(now));
                 saveToPersistedCache(sha256Hex, now);
+                LogV3.info("crt.sh response: " + sha256Hex + " -> " + (info.revocationStatus != null && (info.revocationStatus.toLowerCase().contains("revoked") && !info.revocationStatus.toLowerCase().contains("not revoked")) ? "revoked" : "ok"));
+            } else {
+                LogV3.info("crt.sh response: " + sha256Hex + " -> not found / parse error");
             }
             return info;
         } catch (final Exception e) {
-            LogV3.fine("crt.sh fetch failed for " + sha256Hex + ": " + e.getMessage());
+            LogV3.warning("crt.sh fetch failed for " + sha256Hex + ": " + e.getMessage());
             CRTSH_CACHE.put(sha256Hex, new CrtshCacheEntry(dayIndex, null));
             return null;
         }
@@ -227,12 +269,12 @@ public class CCADBCertificateVerificationTest extends AWTest {
             http.setReadTimeout(120000);
             http.setConnectTimeout(60000);
             final RequestContext ctx = http.trust(CurrentJRETrustProvider.getInstance()).get(url);
-            if (ctx.getCode() != 200) {
-                Thread.sleep(5000);
-                continue;
-            } else {
+            final int code = ctx != null ? ctx.getCode() : -1;
+            LogV3.info("crt.sh HTTP " + (code > 0 ? Integer.valueOf(code) : "error") + " " + url + (i > 0 ? " (retry " + i + ")" : ""));
+            if (ctx != null && ctx.getCode() == 200) {
                 return ctx;
             }
+            Thread.sleep(5000);
         }
         return null;
     }
@@ -279,8 +321,8 @@ public class CCADBCertificateVerificationTest extends AWTest {
     }
 
     /**
-     * Runs the two revoked-cert HTTP requests to crt.sh. Must be called before any other crt.sh HTTP request when
-     * revocation parsing is used. Omit when all lookups are served from cache (no HTTP needed).
+     * Runs the two revoked-cert HTTP requests to crt.sh. Must be called before any other crt.sh HTTP request when revocation parsing is
+     * used. Omit when all lookups are served from cache (no HTTP needed).
      */
     static void runRevokedValidationTests() throws Exception {
         final CrtshInfo revokedInfo = fetchAndParseCrtshNoCache(REVOKED_TEST_SHA256);
@@ -388,5 +430,93 @@ public class CCADBCertificateVerificationTest extends AWTest {
             revocationStatus = revMatcher.group(1);
         }
         return new CrtshInfo(crtShId != null ? crtShId : "", summary != null ? summary : "", sha256 != null ? sha256 : "", sha1 != null ? sha1 : "", revocationStatus != null ? revocationStatus : "", ccadbDisclosed);
+    }
+
+    /**
+     * Returns true if crt.sh info indicates the certificate should be rejected (e.g. revoked via CRL/OCSP).
+     */
+    public static boolean isRevokedOrRejected(final CrtshInfo info) {
+        if (info == null) {
+            return false;
+        }
+        final String rev = info.revocationStatus;
+        DebugMode.breakIf(rev == null);
+        return rev != null && rev.toLowerCase().contains("revoked") && !rev.toLowerCase().contains("not revoked");
+    }
+
+    /**
+     * Checks all given certificates against crt.sh in parallel using a thread pool (with cache). Returns the set of SHA-256 fingerprints
+     * (lowercase) that are revoked or otherwise rejected on crt.sh. Uses the same cache and parsing as the test;
+     * {@link #loadPersistedCache()} is implied. Used by
+     * {@link org.appwork.utils.net.httpconnection.trust.ide.RootCertificateTrustValidator} to extend the rejected list. Pool size is
+     * {@link #getCrtshPoolSize()} (system property {@code ccadb.crtsh.poolSize}, default 6). {@code delayMsBetweenRequests} is ignored when
+     * using the pool (concurrency is limited by pool size).
+     *
+     * @param certificates
+     *            certificates to check (e.g. candidate list)
+     * @param delayMsBetweenRequests
+     *            ignored when using thread pool; kept for API compatibility (was delay between sequential requests)
+     * @return set of rejected fingerprints, or empty set if none; never null
+     */
+    public static Set<String> loadCrtshRevokedOrRejectedFingerprints(final X509Certificate[] certificates, final int delayMsBetweenRequests) {
+        final Set<String> rejected = new TreeSet<String>();
+        if (certificates == null || certificates.length == 0) {
+            return rejected;
+        }
+        loadPersistedCache();
+        final List<String> sha256List = new ArrayList<String>();
+        for (int i = 0; i < certificates.length; i++) {
+            final X509Certificate cert = certificates[i];
+            if (cert == null) {
+                continue;
+            }
+            String sha256 = null;
+            try {
+                sha256 = Hash.getSHA256(cert.getEncoded());
+            } catch (final CertificateEncodingException e) {
+                continue;
+            }
+            if (sha256 != null && sha256.length() == 64) {
+                sha256List.add(sha256);
+            }
+        }
+        if (sha256List.isEmpty()) {
+            return rejected;
+        }
+        final int poolSize = Math.min(getCrtshPoolSize(), sha256List.size());
+        final ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+        try {
+            final List<Callable<String>> tasks = new ArrayList<Callable<String>>();
+            for (final String sha256 : sha256List) {
+                tasks.add(new Callable<String>() {
+                    @Override
+                    public String call() {
+                        final CrtshInfo info = fetchAndParseCrtsh(sha256);
+                        return isRevokedOrRejected(info) ? sha256.toLowerCase() : null;
+                    }
+                });
+            }
+            final List<Future<String>> futures = executor.invokeAll(tasks);
+            for (final Future<String> f : futures) {
+                try {
+                    final String rev = f.get();
+                    if (rev != null) {
+                        rejected.add(rev);
+                    }
+                } catch (final ExecutionException e) {
+                    // skip failed lookups
+                }
+            }
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            executor.shutdown();
+            try {
+                executor.awaitTermination(5, TimeUnit.MINUTES);
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return rejected;
     }
 }

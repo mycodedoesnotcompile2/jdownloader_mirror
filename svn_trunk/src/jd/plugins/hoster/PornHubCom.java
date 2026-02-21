@@ -37,23 +37,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -86,18 +69,33 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 52301 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52353 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
     // private static final boolean FREE_RESUME = true;
     // private static final int FREE_MAXCHUNKS = 0;
-    private static final boolean                  ACCOUNT_FREE_RESUME                                = true;
-    private static final int                      ACCOUNT_FREE_MAXCHUNKS                             = 0;
     private static final int                      ACCOUNT_FREE_MAXDOWNLOADS                          = 5;
     public static final boolean                   use_download_workarounds                           = true;
-    private static final String                   type_photo                                         = "(?i).+/photo/(\\d+)";
-    private static final String                   type_gif_webm                                      = "(?i).+/(?:embed)?gif/(\\d+)";
+    private static final Pattern                  PATTERN_PHOTO                                      = Pattern.compile(".+/photo/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern                  PATTERN_GIF_WEBM                                   = Pattern.compile(".+/(?:embed)?gif/(\\d+)", Pattern.CASE_INSENSITIVE);
     public static final String                    html_privatevideo                                  = "id=\"iconLocked\"";
     public static final String                    html_privateimage                                  = "profile/private-lock\\.png";
     private String                                dlUrl                                              = null;
@@ -257,6 +255,23 @@ public class PornHubCom extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_PHOTO).patternFind()) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_PHOTO).patternFind()) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    @Override
     public String getMirrorID(final DownloadLink link) {
         final String quality = link.getStringProperty(PROPERTY_QUALITY);
         final String viewkey = link.getStringProperty(PROPERTY_VIEWKEY);
@@ -311,16 +326,16 @@ public class PornHubCom extends PluginForHost {
      * @throws MalformedURLException
      */
     public static String correctAddedURL(final String pluginDomain, final String url) throws PluginException, MalformedURLException {
-        final String viewKey = getViewkeyFromURL(url);
+        final String viewKey = getContentIDFromURL(url);
         final String urlDomain = Browser.getHost(url);
         if ("pornhubdecrypted".equals(urlDomain)) {
             /* do not modify pornhubdecrypted URLs */
             return url;
         }
         final String preferredSubdomain = getPreferredSubdomain(url);
-        if (url.matches(type_photo)) {
+        if (new Regex(url, PATTERN_PHOTO).patternFind()) {
             return createPornhubImageLink(pluginDomain, preferredSubdomain, urlDomain, viewKey, null);
-        } else if (url.matches(type_gif_webm)) {
+        } else if (new Regex(url, PATTERN_GIF_WEBM).patternFind()) {
             return createPornhubGifLink(pluginDomain, preferredSubdomain, urlDomain, viewKey, null);
         } else {
             return createPornhubVideoLink(pluginDomain, preferredSubdomain, urlDomain, viewKey, null);
@@ -517,9 +532,9 @@ public class PornHubCom extends PluginForHost {
         String viewKey = null;
         try {
             final String url = link.getPluginPatternMatcher();
-            viewKey = getViewkeyFromURL(url);
+            viewKey = getContentIDFromURL(url);
         } catch (PluginException e) {
-            viewKey = getViewkeyFromURL(source_url);
+            viewKey = getContentIDFromURL(source_url);
         }
         /* User-chosen quality, set in decrypter */
         String html_filename = null;
@@ -527,7 +542,7 @@ public class PornHubCom extends PluginForHost {
         boolean isVideo = false;
         final String quality = link.getStringProperty(PROPERTY_QUALITY);
         boolean cachedURLFlag = false;
-        if (link.getPluginPatternMatcher().matches(type_photo)) {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_PHOTO).patternFind()) {
             final String linkHost = Browser.getHost(link.getPluginPatternMatcher());
             /* Offline links should also have nice filenames */
             link.setName(viewKey + ".jpg");
@@ -562,7 +577,7 @@ public class PornHubCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             html_filename = viewKey + "." + ext;
-        } else if (link.getPluginPatternMatcher().matches(type_gif_webm)) {
+        } else if (new Regex(link.getPluginPatternMatcher(), PATTERN_GIF_WEBM).patternFind()) {
             final String linkHost = Browser.getHost(link.getPluginPatternMatcher());
             /* Offline links should also have nice filenames */
             boolean webm = link.getBooleanProperty(PROPERTY_WEBM_PREFERENCE, getPluginConfig().getBooleanProperty(GIFS_WEBM, true));
@@ -583,11 +598,25 @@ public class PornHubCom extends PluginForHost {
                 /* Fallback */
                 html_filename = viewKey;
             }
-            String gif_url = br.getRegex("data-gif=\"(https?://[^\"]+)").getMatch(0);
+            final String[] gif_urls = br.getRegex("data-gif=\"(https?://[^\"]+)").getColumn(0);
+            String gif_url = null;
+            for (final String this_gif_url : gif_urls) {
+                if (this_gif_url.contains(viewKey)) {
+                    gif_url = this_gif_url;
+                    break;
+                }
+            }
             if (gif_url == null) {
                 logger.info("gif not found for:" + viewKey);
             }
-            String webm_url = br.getRegex("data-webm=\"(https?://[^\"]+)").getMatch(0);
+            final String[] webm_urls = br.getRegex("data-webm=\"(https?://[^\"]+)").getColumn(0);
+            String webm_url = null;
+            for (final String this_webm_url : webm_urls) {
+                if (this_webm_url.contains(viewKey)) {
+                    gif_url = this_webm_url;
+                    break;
+                }
+            }
             if (webm_url == null) {
                 logger.info("webm not found for:" + viewKey);
             }
@@ -807,6 +836,10 @@ public class PornHubCom extends PluginForHost {
                 /* Wide open - risky */
                 flashVars = br.getRegex("(var\\s*flashvars_\\d+.*?)(loadScriptUniqueId|</script)").getMatch(0);
             }
+            if (flashVars == null) {
+                // shorties
+                flashVars = br.getRegex("JSON_SHORTIES\\s*=\\s*insertAfterNthPosition\\((\\[\\s*\\{.*?\\}\\s*\\])\\s*,[\\w\\_\\s*]+,[\\w\\_\\s*]+\\)\\s*").getMatch(0);
+            }
             boolean embed = false;
             if (flashVars == null) {
                 /* Wide open - risky, embed */
@@ -833,7 +866,20 @@ public class PornHubCom extends PluginForHost {
         }
         final Map<String, Map<String, String>> qualities = new LinkedHashMap<String, Map<String, String>>();
         if (flashVars != null) {
-            final Map<String, Object> values = JavaScriptEngineFactory.jsonToJavaMap(flashVars);
+            Object flashVarsValues = JavaScriptEngineFactory.jsonToJavaObject(flashVars);
+            final Map<String, Object> values;
+            if (flashVarsValues instanceof Map) {
+                values = (Map<String, Object>) flashVarsValues;
+            } else if (flashVarsValues instanceof List) {
+                values = ((List<Map<String, Object>>) flashVarsValues).get(0);
+                final String vkey = (String) values.get("vkey");
+                if (!StringUtils.containsIgnoreCase(br.getURL(), vkey)) {
+                    // first one in list should be current video/shorties
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             if (values == null || values.size() < 1) {
                 return null;
             }
@@ -852,6 +898,9 @@ public class PornHubCom extends PluginForHost {
                 final String videoUrl = (String) mediaDefinition.get("videoUrl");
                 format = format.toLowerCase(Locale.ENGLISH);
                 Object qualityO = mediaDefinition.get("quality");
+                if (qualityO == null && mediaDefinition.get("height") instanceof Number) {
+                    qualityO = mediaDefinition.get("height").toString();
+                }
                 if (qualityO == null) {
                     /* This should never happen */
                     plugin.getLogger().info("Skipping mediaDefinition due to missing 'quality' field: " + mediaDefinition);
@@ -997,12 +1046,12 @@ public class PornHubCom extends PluginForHost {
              */
             if (var_player_quality_dp == null || var_player_quality_dp.length == 0) {
                 /* Last chance fallback to embedded video. */
-                /* 2017-02-09: For embed player - usually only 480p will be available. */
+                /* 2017-02-09: For embed player - >>>>>>>!!!usually only 480p will be available.!!!<<<<<<<<< */
                 /* Access embed video URL. */
                 /* viewkey should never be null! */
                 plugin.getLogger().warning("Doing embed fallback -> Max quality may be 480p!!");
                 try {
-                    final String viewkey = getViewkeyFromURL(br.getURL());
+                    final String viewkey = getContentIDFromURL(br.getURL());
                     if (viewkey != null && !StringUtils.contains(br.getURL(), "embed/" + viewkey)) {
                         final Browser brc = br.cloneBrowser();
                         getPage(brc, createPornhubVideoLinkEmbedFree(plugin.getHost(), brc, viewkey));
@@ -1096,21 +1145,10 @@ public class PornHubCom extends PluginForHost {
             dl = new HLSDownloader(link, br, hlsContainers.get(0).getDownloadurl());
             dl.startDownload();
         } else {
-            final boolean resume;
-            final int maxchunks;
-            if (link.getDownloadURL().matches(type_photo)) {
-                resume = true;
-                /* We only have small pictures --> No chunkload needed */
-                maxchunks = 1;
-                requestFileInformation(link, account);
-            } else {
-                resume = ACCOUNT_FREE_RESUME;
-                maxchunks = ACCOUNT_FREE_MAXCHUNKS;
-                if (StringUtils.isEmpty(dlUrl)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
+            if (StringUtils.isEmpty(dlUrl)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dlUrl, resume, maxchunks);
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dlUrl, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 if (dl.getConnection().getResponseCode() == 403) {
@@ -1225,9 +1263,8 @@ public class PornHubCom extends PluginForHost {
 
     /**
      * Performs a full login via website to obtain fresh cookies. There are minor differences between login for free domain/account and
-     * premium (pornhubpremium.com). </br>
-     * Free login: https://www.pornhub.org/login </br>
-     * Premium login: https://www.pornhubpremium.com/premium/login
+     * premium (pornhubpremium.com). </br> Free login: https://www.pornhub.org/login </br> Premium login:
+     * https://www.pornhubpremium.com/premium/login
      */
     private void performFullLogin(final Browser br, final Account account, final String domain, final String path) throws Exception {
         logger.info("Performing full login");
@@ -1325,8 +1362,7 @@ public class PornHubCom extends PluginForHost {
     }
 
     /**
-     * Checks login and sets account-type. </br>
-     * Expects browser instance to be logged in already (cookies need to be there).
+     * Checks login and sets account-type. </br> Expects browser instance to be logged in already (cookies need to be there).
      *
      * @throws Exception
      */
@@ -1600,7 +1636,6 @@ public class PornHubCom extends PluginForHost {
     static {
         synchronized (DEFAULT_COOKIES) {
             DEFAULT_COOKIES.put("accessAgeDisclaimerPH", "1");
-            DEFAULT_COOKIES.put("accessAgeDisclaimerUK", "1");// 2023-07-19
             /* 2023-04-14: STATE OF UTAH WARNING */
             DEFAULT_COOKIES.put("accessPH", "1");
         }
@@ -1694,7 +1729,7 @@ public class PornHubCom extends PluginForHost {
         }
     }
 
-    public static String getViewkeyFromURL(final String url) throws PluginException {
+    public static String getContentIDFromURL(final String url) throws PluginException {
         if (StringUtils.isEmpty(url)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -1710,11 +1745,11 @@ public class PornHubCom extends PluginForHost {
         if (!StringUtils.isEmpty(ret)) {
             return ret;
         }
-        ret = new Regex(url, type_photo).getMatch(0);
+        ret = new Regex(url, PATTERN_PHOTO).getMatch(0);
         if (!StringUtils.isEmpty(ret)) {
             return ret;
         }
-        ret = new Regex(url, type_gif_webm).getMatch(0);
+        ret = new Regex(url, PATTERN_GIF_WEBM).getMatch(0);
         if (!StringUtils.isEmpty(ret)) {
             return ret;
         }

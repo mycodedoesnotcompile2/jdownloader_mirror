@@ -27,22 +27,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -61,7 +45,23 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 52067 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52353 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -420,18 +420,22 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         int numberofResultsSimpleCount = 0;
         int index = 0;
         final Map<String, Object> filemap = (Map<String, Object>) postmap.get("file");
-        if (!filemap.isEmpty()) {
+        if (!filemap.isEmpty() && filemap.get("path") != null) {
             final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, filemap, index);
             /* null = item is a duplicate */
             if (media != null) {
                 kemonoResults.add(media);
                 index++;
+
             }
             numberofResultsSimpleCount++;
         }
         final List<Map<String, Object>> attachments = (List<Map<String, Object>>) postmap.get("attachments");
         if (attachments != null) {
             for (final Map<String, Object> attachment : attachments) {
+                if (!attachment.isEmpty() && attachment.get("path") == null) {
+                    continue;
+                }
                 final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, attachment, index);
                 /* null = item is a duplicate */
                 if (media != null) {
@@ -576,9 +580,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     };
 
     /**
-     * Returns userID for given username. </br>
-     * Uses API to find userID. </br>
-     * Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {

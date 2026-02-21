@@ -50,8 +50,8 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.appwork.utils.Hash;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.Hash;
 import org.appwork.utils.formatter.HexFormatter;
 
 import com.sun.jna.Pointer;
@@ -534,8 +534,8 @@ public class WindowsCertUtils {
 
     /**
      * Reads the Windows "Root" store (Trusted Root Certification Authorities) and returns all certificates as SHA-256 fingerprints (hex,
-     * lowercase). Opens the <b>logical</b> store (CERT_STORE_PROV_SYSTEM), i.e. the merged view of Current User and Local Machine – all roots
-     * that Windows trusts for the current user (including Windows Update), without admin rights. Windows only; requires JNA/crypt32.
+     * lowercase). Opens the <b>logical</b> store (CERT_STORE_PROV_SYSTEM), i.e. the merged view of Current User and Local Machine – all
+     * roots that Windows trusts for the current user (including Windows Update), without admin rights. Windows only; requires JNA/crypt32.
      *
      * @return Set of SHA-256 fingerprints (lowercase hex), or null on error / non-Windows
      */
@@ -558,13 +558,92 @@ public class WindowsCertUtils {
     }
 
     /**
+     * Reads the Windows "Disallowed" store (certificates that must not be trusted; populated e.g. by {@code certutil -syncWithWU}). Returns
+     * all certificates in that store as X509Certificate instances. Opens the logical store (CERT_STORE_PROV_SYSTEM). Windows only;
+     * requires JNA/crypt32. Use this to include Microsoft's "bad cert list" in rejected/block lists.
+     *
+     * @return List of X509Certificate, or null on error / non-Windows; empty list if no certs or store does not exist
+     */
+    public static List<X509Certificate> getDisallowedStoreCertificates() {
+        final String os = System.getProperty("os.name", "");
+        if (os == null || !os.toLowerCase(Locale.ROOT).contains("win")) {
+            return null;
+        }
+        final int flags = WindowsCertUtilsCrypt.CERT_SYSTEM_STORE_CURRENT_USER | WindowsCertUtilsCrypt.CERT_STORE_OPEN_EXISTING_FLAG | WindowsCertUtilsCrypt.CERT_STORE_READONLY_FLAG;
+        final HANDLE store = WindowsCertUtilsCrypt.INSTANCE.CertOpenStore(WindowsCertUtilsCrypt.CERT_STORE_PROV_SYSTEM, 0, null, flags, new WString("Disallowed"));
+        if (store == null || Pointer.nativeValue(store.getPointer()) == 0) {
+            return null;
+        }
+        final List<X509Certificate> certs = new ArrayList<X509Certificate>();
+        Pointer ctx = null;
+        try {
+            CertificateFactory cf;
+            try {
+                cf = CertificateFactory.getInstance("X.509");
+            } catch (final CertificateException e) {
+                return certs;
+            }
+            while (true) {
+                ctx = WindowsCertUtilsCrypt.INSTANCE.CertEnumCertificatesInStore(store, ctx);
+                if (ctx == null || Pointer.nativeValue(ctx) == 0) {
+                    break;
+                }
+                try {
+                    final CERT_CONTEXT certCtx = Structure.newInstance(CERT_CONTEXT.class, ctx);
+                    certCtx.read();
+                    if (certCtx.pbCertEncoded != null && certCtx.cbCertEncoded > 0) {
+                        final byte[] der = certCtx.pbCertEncoded.getByteArray(0, certCtx.cbCertEncoded);
+                        final Certificate c = cf.generateCertificate(new ByteArrayInputStream(der));
+                        if (c instanceof X509Certificate) {
+                            certs.add((X509Certificate) c);
+                        }
+                    }
+                } catch (final Throwable t) {
+                    LogV3.warning("Skip cert in Disallowed store: " + t.getMessage());
+                }
+            }
+        } finally {
+            WindowsCertUtilsCrypt.INSTANCE.CertCloseStore(store, 0);
+        }
+        return certs;
+    }
+
+    /**
+     * Reads the Windows "Disallowed" store and returns all certificates as SHA-256 fingerprints (hex, lowercase). Populated e.g. by
+     * {@code certutil -syncWithWU}. Windows only.
+     *
+     * @return Set of SHA-256 fingerprints (lowercase hex), or null on error / non-Windows
+     */
+    public static Set<String> getDisallowedStoreFingerprintsSha256() {
+        final List<X509Certificate> certs = getDisallowedStoreCertificates();
+        if (certs == null || certs.isEmpty()) {
+            return null;
+        }
+        final Set<String> fingerprints = new TreeSet<String>();
+        for (final X509Certificate c : certs) {
+            try {
+                final String fp = Hash.getSHA256(c.getEncoded());
+                if (fp != null) {
+                    fingerprints.add(fp.toLowerCase(Locale.ROOT));
+                }
+            } catch (final CertificateEncodingException ignored) {
+            }
+        }
+        return fingerprints.isEmpty() ? null : fingerprints;
+    }
+
+    /**
      * Reads a serialized store file (.sst), e.g. from certutil -generateSSTFromWU, via the Windows Crypto API and returns all certificates
-     * therein as X509Certificate instances. Allows evaluating the Windows Update root store without certutil -exportPFX.
-     * Windows only; requires JNA/crypt32; the file must exist and be readable.
+     * therein as X509Certificate instances. Allows evaluating the Windows Update root store without certutil -exportPFX. Windows only;
+     * requires JNA/crypt32; the file must exist and be readable.
      * <p>
-     * <b>Note:</b> The SST from {@code certutil -generateSSTFromWU} contains the <i>full</i> Windows Update root catalog (all roots
-     * that WU can deploy), typically 500+. The local "Root" store ({@link #getRootStoreCertificates()}) contains only the roots
-     * actually installed on this machine (often ~150–200). So SST count is usually much higher than the local store.
+     * <b>Note:</b> The SST from {@code certutil -generateSSTFromWU} contains the <i>full</i> Windows Update root catalog (all roots that WU
+     * can deploy), including roots marked <i>Disabled</i> or <i>Not Before</i> in the Microsoft root program. This method <i>excludes</i>
+     * such certs by reading {@code CERT_FRIENDLY_NAME_PROP_ID} and skipping entries whose friendly name contains "Disabled" or "Not Before"
+     * (case-insensitive). Only roots that are currently trusted for new use are returned.
+     * <p>
+     * The local "Root" store ({@link #getRootStoreCertificates()}) contains only the roots actually installed on this machine (often
+     * ~150–200). The SST count before filtering is typically 500+; after excluding disabled/not-before it is lower.
      *
      * @param sstFile
      *            .sst file (e.g. from certutil -generateSSTFromWU roots.sst)
@@ -599,6 +678,7 @@ public class WindowsCertUtils {
                     break;
                 }
                 try {
+                   
                     final CERT_CONTEXT certCtx = Structure.newInstance(CERT_CONTEXT.class, ctx);
                     certCtx.read();
                     if (certCtx.pbCertEncoded != null && certCtx.cbCertEncoded > 0) {

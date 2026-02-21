@@ -298,11 +298,12 @@ public abstract class AbstractPostRequest extends HttpRequest {
 
     protected List<KeyValuePair> readPostParameters(final CONTENT_TYPE content_type, final String charSet) throws IOException, UnsupportedEncodingException {
         if (content_type != null) {
-            final InputStream inputStream = this.getInputStream();
+            InputStream inputStream = this.getInputStream();
             switch (content_type) {
             case JSON: {
                 final byte[] jsonBytes = IO.readStream(-1, inputStream);
-                final String jsonString = modifyByContentType(content_type, new String(jsonBytes, charSet));
+                String jsonString = new String(jsonBytes, charSet);
+                jsonString = modifyByContentType(content_type, jsonString);
                 // try to parse JSonRequest object
                 JSonRequest jsonRequest = null;
                 if (jsonString.startsWith("[")) {
@@ -344,7 +345,8 @@ public abstract class AbstractPostRequest extends HttpRequest {
                 break;
             case X_WWW_FORM_URLENCODED: {
                 final byte[] formBytes = IO.readStream(-1, inputStream);
-                final String formString = modifyByContentType(content_type, new String(formBytes, charSet));
+                String formString = new String(formBytes, charSet);
+                formString = modifyByContentType(content_type, formString);
                 return HttpServerConnection.parseParameterList(formString);
             }
             case UNKNOWN:
@@ -411,4 +413,4 @@ public abstract class AbstractPostRequest extends HttpRequest {
      * @return
      */
     public abstract RequestMethod getRequestMethod();
-}
+ }

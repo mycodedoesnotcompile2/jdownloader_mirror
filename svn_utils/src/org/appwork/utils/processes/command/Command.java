@@ -35,15 +35,25 @@ package org.appwork.utils.processes.command;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.JNAHelper;
+import org.appwork.exceptions.NotSupportedException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.JavaVersion;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.processes.ProcessBuilderFactory;
+
+import com.sun.jna.Pointer;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 
 /**
  * @author Thomas
@@ -190,6 +200,86 @@ public class Command {
 
     public Process getProcess() {
         return process;
+    }
+
+    /**
+     * Returns the process ID (PID) of the process.
+     * <p>
+     * Implementation strategy:
+     * <ul>
+     * <li>Java 9+: Uses Process.pid() via reflection (source 1.8 compatible)</li>
+     * <li>Pre-Java 9 on Unix/Mac: Uses reflection to access the 'pid' field on UnixProcess</li>
+     * <li>Pre-Java 9 on Windows: Uses reflection to get the process handle, then JNA Kernel32.GetProcessId()</li>
+     * </ul>
+     *
+     * @return the process ID as long
+     * @throws NotSupportedException
+     *             if no method is available to retrieve the PID on the current platform/JVM
+     * @throws IllegalStateException
+     *             if the process has not been started yet
+     */
+    public long getPID() throws NotSupportedException {
+        final Process proc = getProcess();
+        if (proc == null) {
+            throw new IllegalStateException("Process not yet started!");
+        }
+        // Java 9+: use Process.pid() via reflection (source 1.8 compatible)
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
+            try {
+                final Long pid = ReflectionUtils.invoke(proc.getClass(), "pid", proc, Long.class);
+                if (pid != null) {
+                    return pid.longValue();
+                }
+            } catch (InvocationTargetException e) {
+                LogV3.log(e);
+            }
+        }
+        // Pre-Java 9: Use reflection on internal Process implementation
+        if (CrossSystem.isUnix() || CrossSystem.isMac()) {
+            // Unix/Mac: ProcessImpl has a 'pid' field
+            try {
+                final Number pid = ReflectionUtils.getFieldValue(proc.getClass(), "pid", proc, Number.class);
+                if (pid != null) {
+                    return pid.longValue();
+                }
+            } catch (InvocationTargetException e) {
+                LogV3.log(e);
+            } catch (NoSuchFieldException e) {
+                LogV3.log(e);
+            }
+        } else if (CrossSystem.isWindows()) {
+            // Windows: ProcessImpl has a 'handle' field, use JNA to get PID from handle
+            try {
+                final Long handle = ReflectionUtils.getFieldValue(proc.getClass(), "handle", proc, Long.class);
+                if (handle != null && handle.longValue() != 0) {
+                    return getPIDFromWindowsHandle(handle.longValue());
+                }
+            } catch (NotSupportedException e) {
+                throw e;
+            } catch (InvocationTargetException e) {
+                LogV3.log(e);
+            } catch (NoSuchFieldException e) {
+                LogV3.log(e);
+            }
+        }
+        throw new NotSupportedException("Cannot retrieve PID: no supported method available for this platform/JVM combination");
+    }
+
+    /**
+     * Retrieves the PID from a Windows process handle using JNA.
+     *
+     * @param handle
+     *            the Windows process handle
+     * @return the process ID
+     * @throws NotSupportedException
+     *             if JNA is not available
+     */
+    protected long getPIDFromWindowsHandle(long handle) throws NotSupportedException {
+        if (!JNAHelper.isJNAAvailable()) {
+            throw new NotSupportedException("JNA is not available to retrieve PID from Windows handle");
+        }
+        final HANDLE hProcess = new HANDLE(Pointer.createConstant(handle));
+        return Kernel32.INSTANCE.GetProcessId(hProcess);
     }
 
     /**

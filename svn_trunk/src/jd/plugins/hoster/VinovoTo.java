@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52341 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52355 $", interfaceVersion = 3, names = {}, urls = {})
 public class VinovoTo extends XFileSharingProBasic {
     public VinovoTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -149,14 +149,8 @@ public class VinovoTo extends XFileSharingProBasic {
         if (token == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String sitekey = br.getRegex("data-sitekey=\"(0x[^\"]+)").getMatch(0);
-        if (sitekey == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String cdn_server = br.getRegex("data-base=\"(http[^\"]+)").getMatch(0);
-        if (cdn_server == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        String cdn_server = regex_cdn_server(br);
+        final String turnstileSitekey = br.getRegex("data-sitekey=\"(0x[^\"]+)").getMatch(0);
         final UrlQuery query1 = new UrlQuery();
         query1.appendEncoded("recaptcha", "");
         query1.appendEncoded("token", token);
@@ -174,28 +168,54 @@ public class VinovoTo extends XFileSharingProBasic {
             }
             throw new PluginException(LinkStatus.ERROR_FATAL, message);
         }
-        final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, sitekey).getToken();
-        final UrlQuery query2 = new UrlQuery();
-        query2.appendEncoded("captcha", cfTurnstileResponse);
-        query2.appendEncoded("token", token);
-        brc.postPage("/api/file/urldown/" + fuid, query2);
-        final Map<String, Object> resp2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (!"ok".equalsIgnoreCase(resp2.get("status").toString())) {
-            final String msg = (String) resp2.get("message");
-            String message = "Failed to generate final downloadurl";
-            if (!StringUtils.isEmpty(msg)) {
-                message = msg;
+        String directurl;
+        if (turnstileSitekey != null) {
+            if (cdn_server == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            throw new PluginException(LinkStatus.ERROR_FATAL, message);
-        }
-        /* 2025-10-27: Browser waits 3 seconds now but this wait time can be skipped. */
-        final String url = resp2.get("url").toString();
-        String directurl = cdn_server + "/download/" + url;
-        /* Append same parameters as done in browser (not mandatory). */
-        if (!directurl.contains("?")) {
-            directurl += "?a=0&r=";
+            final UrlQuery query2 = new UrlQuery();
+            logger.info("Performing official download");
+            final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileSitekey).getToken();
+            query2.appendEncoded("captcha", cfTurnstileResponse);
+            query2.appendEncoded("token", token);
+            brc.postPage("/api/file/urldown/" + fuid, query2);
+            final Map<String, Object> resp2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (!"ok".equalsIgnoreCase(resp2.get("status").toString())) {
+                final String msg = (String) resp2.get("message");
+                String message = "Failed to generate final downloadurl";
+                if (!StringUtils.isEmpty(msg)) {
+                    message = msg;
+                }
+                throw new PluginException(LinkStatus.ERROR_FATAL, message);
+            }
+            /* 2025-10-27: Browser waits 3 seconds now but this wait time can be skipped. */
+            final String url = resp2.get("url").toString();
+            directurl = cdn_server + "/download/" + url;
+            /* Append same parameters as done in browser (not mandatory). */
+            if (!directurl.contains("?")) {
+                directurl += "?a=0&r=";
+            }
+        } else {
+            logger.info("Performing stream download");
+            final String streaming_token = resp1.get("token").toString();
+            if (StringUtils.isEmpty(streaming_token)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            if (cdn_server == null) {
+                /* When video streaming is in use, we need to access the video embed page to obtain the cdn server value. */
+                br.getPage("/e/" + fuid);
+                cdn_server = regex_cdn_server(br);
+                if (cdn_server == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+            directurl = cdn_server + "/stream/" + streaming_token;
         }
         handleDownload(link, account, directurl, null);
+    }
+
+    private String regex_cdn_server(final Browser br) {
+        return br.getRegex("data-base=\"(http[^\"]+)").getMatch(0);
     }
 
     @Override

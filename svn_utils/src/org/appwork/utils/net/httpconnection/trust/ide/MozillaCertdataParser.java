@@ -27,34 +27,34 @@ import java.util.TreeSet;
 import org.appwork.utils.Hash;
 
 /**
- * Parser for Mozilla NSS certdata.txt. Extracts root certificates and their NSS trust bits
- * (CKA_TRUST_SERVER_AUTH, CKA_TRUST_EMAIL_PROTECTION, CKA_TRUST_CODE_SIGNING, etc.). Only certs
- * with CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR are returned; roots with only
- * CKA_TRUST_EMAIL_PROTECTION or CKA_TRUST_CODE_SIGNING (CKT_NSS_MUST_VERIFY_TRUST for server auth)
- * are excluded, so the result set is exactly the roots intended for <b>website / TLS server
- * authentication</b>, consistent with CCADB "TrustBitsInclude=Websites".
+ * Parser for Mozilla NSS certdata.txt. Extracts root certificates and their NSS trust bits (CKA_TRUST_SERVER_AUTH,
+ * CKA_TRUST_EMAIL_PROTECTION, CKA_TRUST_CODE_SIGNING, etc.). Only certs with CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR are
+ * returned; roots with only CKA_TRUST_EMAIL_PROTECTION or CKA_TRUST_CODE_SIGNING (CKT_NSS_MUST_VERIFY_TRUST for server auth) are excluded,
+ * so the result set is exactly the roots intended for <b>website / TLS server authentication</b>, consistent with CCADB
+ * "TrustBitsInclude=Websites".
  * <p>
  * See https://firefox-source-docs.mozilla.org/security/nss/runbooks/rootstore.html and
  * https://hg.mozilla.org/projects/nss/file/tip/lib/ckfw/builtins/certdata.txt
  */
 public final class MozillaCertdataParser {
-
-    private static final String CKO_CERTIFICATE       = "CKO_CERTIFICATE";
-    private static final String CKO_NSS_TRUST           = "CKO_NSS_TRUST";
-    private static final String CKA_CLASS              = "CKA_CLASS";
-    private static final String CKA_VALUE              = "CKA_VALUE";
-    private static final String CKA_CERT_SHA1_HASH     = "CKA_CERT_SHA1_HASH";
-    private static final String CKA_TRUST_SERVER_AUTH   = "CKA_TRUST_SERVER_AUTH";
-    private static final String MULTILINE_OCTAL        = "MULTILINE_OCTAL";
+    private static final String CKO_CERTIFICATE           = "CKO_CERTIFICATE";
+    private static final String CKO_NSS_TRUST             = "CKO_NSS_TRUST";
+    private static final String CKA_CLASS                 = "CKA_CLASS";
+    private static final String CKA_VALUE                 = "CKA_VALUE";
+    private static final String CKA_CERT_SHA1_HASH        = "CKA_CERT_SHA1_HASH";
+    private static final String CKA_TRUST_SERVER_AUTH     = "CKA_TRUST_SERVER_AUTH";
+    private static final String MULTILINE_OCTAL           = "MULTILINE_OCTAL";
     private static final String CKT_NSS_TRUSTED_DELEGATOR = "CKT_NSS_TRUSTED_DELEGATOR";
     private static final String CKT_NSS_NOT_TRUSTED       = "CKT_NSS_NOT_TRUSTED";
 
     /**
      * Result: SHA-256 fingerprints of roots that have CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR.
      *
-     * @param input certdata.txt stream (UTF-8)
+     * @param input
+     *            certdata.txt stream (UTF-8)
      * @return set of lowercase hex SHA-256 fingerprints (no colons)
-     * @throws IOException on read error
+     * @throws IOException
+     *             on read error
      */
     public static Set<String> getTrustedForServerAuthFingerprints(final InputStream input) throws IOException {
         final X509Certificate[] certs = getTrustedForServerAuthCertificates(input);
@@ -74,9 +74,11 @@ public final class MozillaCertdataParser {
     /**
      * Result: Root certificates that have CKA_TRUST_SERVER_AUTH = CKT_NSS_TRUSTED_DELEGATOR.
      *
-     * @param input certdata.txt stream (UTF-8)
+     * @param input
+     *            certdata.txt stream (UTF-8)
      * @return array of X509Certificate (may be empty)
-     * @throws IOException on read error
+     * @throws IOException
+     *             on read error
      */
     public static X509Certificate[] getTrustedForServerAuthCertificates(final InputStream input) throws IOException {
         final List<Object> objects = parseObjects(input);
@@ -210,8 +212,8 @@ public final class MozillaCertdataParser {
     }
 
     /**
-     * Parses certdata.txt into a list of attribute maps. Each object is a Map from attribute name
-     * (e.g. CKA_VALUE, CKA_CLASS) to value (byte[] for MULTILINE_OCTAL, String for simple values).
+     * Parses certdata.txt into a list of attribute maps. Each object is a Map from attribute name (e.g. CKA_VALUE, CKA_CLASS) to value
+     * (byte[] for MULTILINE_OCTAL, String for simple values).
      */
     private static List<Object> parseObjects(final InputStream input) throws IOException {
         final BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));

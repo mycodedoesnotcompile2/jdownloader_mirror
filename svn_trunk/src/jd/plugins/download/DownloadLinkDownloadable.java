@@ -780,12 +780,18 @@ public class DownloadLinkDownloadable implements Downloadable {
     public void setHashInfo(final HashInfo hashInfo) {
         if (hashInfo == null) {
             return;
-        } else if (!hashInfo.isTrustworthy()) {
-            return;
         }
         final HashInfo existingHashInfo = getHashInfo();
-        if (existingHashInfo == null || hashInfo.equals(existingHashInfo) || hashInfo.isStrongerThan(existingHashInfo)) {
-            getDownloadLink().setHashInfo(hashInfo);
+        if (!hashInfo.isTrustworthy()) {
+            if (existingHashInfo == null || (hashInfo.equals(existingHashInfo) && existingHashInfo.isTrustworthy())) {
+                // no hashInfo is known yet, or change same hash from trusted to non trusted
+                getDownloadLink().setHashInfo(hashInfo);
+            }
+        } else {
+            if (existingHashInfo == null || hashInfo.equals(existingHashInfo) || hashInfo.isStrongerThan(existingHashInfo)) {
+                // no hashInfo is known yet, or same hash, or new hash is "stronger" than existing
+                getDownloadLink().setHashInfo(hashInfo);
+            }
         }
     }
 

@@ -19,9 +19,8 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 
-@HostPlugin(revision = "$Revision: 52348 $", interfaceVersion = 2, names = { "idrive.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52356 $", interfaceVersion = 2, names = { "idrive.com" }, urls = { "" })
 public class IDriveCom extends PluginForHost {
-
     public static final String PROPERTY_NAME    = "name_property";
     public static final String PROPERTY_SERVER  = "server_property";
     public static final String PROPERTY_PATH    = "resourcePath_property";
@@ -46,6 +45,11 @@ public class IDriveCom extends PluginForHost {
     @Override
     protected String getDefaultFileName(DownloadLink link) {
         return link.getStringProperty(PROPERTY_NAME);
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        return this.getHost() + "://shareid/" + link.getStringProperty(PROPERTY_SHAREID) + "/path/" + link.getStringProperty(PROPERTY_PATH);
     }
 
     @Override
@@ -121,7 +125,6 @@ public class IDriveCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return null;
+        return "https://www." + getHost() + "/terms-and-conditions";
     }
-
 }

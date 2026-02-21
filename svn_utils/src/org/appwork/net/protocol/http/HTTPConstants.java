@@ -361,7 +361,7 @@ public class HTTPConstants {
      * browser to block the response if it detects an attack rather than sanitising the script.
      *
      * <p>
-     * <b>⚠️ DEPRECATED - DO NOT USE</b>
+     * <b>WARNING: DEPRECATED - DO NOT USE</b>
      * </p>
      * <p>
      * This header is deprecated and should no longer be used in modern applications. It has been removed from major browsers (Chrome 78+,

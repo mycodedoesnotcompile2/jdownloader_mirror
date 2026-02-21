@@ -986,7 +986,7 @@ public class HttpClient {
                     if (ret < 0) {
                         this.onDone();
                     } else {
-                        context.onBytesLoaded(b, off, len);
+                        context.onBytesLoaded(b, off, ret);
                     }
                     return ret;
                 } finally {

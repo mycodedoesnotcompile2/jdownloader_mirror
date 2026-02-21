@@ -37,12 +37,12 @@ public interface AntiStandbyConfig extends ExtensionConfigInterface {
                     return new HashSet<Condition>(Arrays.asList(Condition.CRAWLING, Condition.DOWNLOADING));
                 }
             }
-            return new HashSet<Condition>(Arrays.asList(Condition.RUNNING));
+            return new HashSet<Condition>(Arrays.asList(Condition.CRAWLING, Condition.DOWNLOADING, Condition.EXTRACTING));
         }
     }
 
     @AboutConfig
-    // @DefaultEnumArrayValue({ "RUNNING" }), disabled for migration
+    // @DefaultEnumArrayValue({ "CRAWLING", "DOWNLOADING", "EXTRACTING" })// disabled for migration
     @DefaultFactory(DefaultCondition.class)
     @DefaultOnNull
     public Set<Condition> getCondition();
