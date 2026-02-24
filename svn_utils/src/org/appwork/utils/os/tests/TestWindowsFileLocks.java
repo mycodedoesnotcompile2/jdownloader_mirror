@@ -48,6 +48,7 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.os.WindowsUtils.HandleInfo;
 import org.appwork.utils.os.WindowsUtils.LockInfo;
+import org.appwork.utils.processes.command.Command;
 
 /**
  * Test suite for Windows file lock dete ction functionality. Tests the ability to identify which processes have file handles/locks on
@@ -256,64 +257,55 @@ public class TestWindowsFileLocks extends AWTest {
     }
 
     /**
-     * Gets the PID of a Process object via reflection (Java 1.6-1.8 compatible). Returns -1 if not available.
-     */
-    private int getProcessPid(Process proc) {
-        try {
-            // Java 9+: use pid() method if available
-            java.lang.reflect.Method pidMethod = proc.getClass().getMethod("pid");
-            Object result = pidMethod.invoke(proc);
-            if (result instanceof Long) {
-                return ((Long) result).intValue();
-            }
-        } catch (Exception e) {
-            // Ignore, try reflection on field
-        }
-        try {
-            // Windows ProcessImpl has a 'handle' field - we need to get PID from kernel
-            java.lang.reflect.Field handleField = proc.getClass().getDeclaredField("handle");
-            handleField.setAccessible(true);
-            long handle = handleField.getLong(proc);
-            if (handle != 0) {
-                return com.sun.jna.platform.win32.Kernel32.INSTANCE.GetProcessId(new com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer.createConstant(handle)));
-            }
-        } catch (Exception e) {
-            // Ignore
-        }
-        return -1;
-    }
-
-    /**
      * Starts cmd.exe with user home as working directory and verifies that the handle scan finds cmd.exe holding a handle on the user home
-     * directory. This tests handle detection for external processes and directory handles.
+     * directory. This tests handle detection for external processes and directory handles, including access/grant type verification.
      */
     private void testCmdExeHomeHandle() throws Exception {
         File userHome = new File(System.getProperty("user.home"));
         logInfoAnyway("Testing cmd.exe handle on user home: " + userHome.getAbsolutePath());
-        ProcessBuilder pb = new ProcessBuilder("cmd.exe");
-        pb.directory(userHome);
-        Process proc = pb.start();
+        Command cmd = new Command("cmd.exe");
+        cmd.setDirectory(userHome);
+        cmd.start(true);
         try {
             Thread.sleep(500);
-            int cmdPid = getProcessPid(proc);
-            if (cmdPid <= 0) {
-                logInfoAnyway("Could not get PID of cmd.exe, skipping test");
-                return;
-            }
+            long cmdPid = cmd.getPID();
             logInfoAnyway("Started cmd.exe with PID " + cmdPid);
             // Check handles of cmd.exe process
-            List<HandleInfo> cmdHandles = WindowsUtils.listHandlesForProcess(cmdPid);
+            List<HandleInfo> cmdHandles = WindowsUtils.listHandlesForProcess((int) cmdPid);
             logInfoAnyway("cmd.exe has " + cmdHandles.size() + " handles");
             boolean foundHomeHandle = false;
+            HandleInfo homeHandle = null;
             String homePathNorm = userHome.getAbsolutePath().toLowerCase().replace('/', '\\');
             for (HandleInfo h : cmdHandles) {
                 if (h.getPath() != null) {
                     String handlePath = h.getPath().toLowerCase().replace('/', '\\');
                     if (handlePath.contains(homePathNorm) || homePathNorm.contains(handlePath)) {
                         foundHomeHandle = true;
-                        logInfoAnyway("  Found home handle: access=" + h.getAccessString() + " path=" + h.getPath());
+                        homeHandle = h;
+                        logInfoAnyway("  Found home handle: access=" + h.getAccessString() + " (0x" + Integer.toHexString(h.getGrantedAccess()) + ") path=" + h.getPath());
+                        // Test grant type methods
+                        logInfoAnyway("    canRead=" + h.canRead() + " canWrite=" + h.canWrite() + " canExecute=" + h.canExecute() + " canDelete=" + h.canDelete());
                     }
                 }
+            }
+            // Verify grant types if home handle was found
+            if (homeHandle != null) {
+                // cmd.exe working directory handle should have at least synchronize access
+                assertTrue(homeHandle.getGrantedAccess() != 0, "Home handle should have non-zero granted access");
+                // Verify getAccessString returns a non-empty string
+                assertNotNull(homeHandle.getAccessString());
+                assertTrue(homeHandle.getAccessString().length() > 0 || homeHandle.getAccessString().equals("-"), "getAccessString should return a valid string");
+                // Test that getGrantedAccess raw value matches boolean helper results
+                int access = homeHandle.getGrantedAccess();
+                boolean expectRead = (access & WindowsUtils.FILE_READ_DATA) != 0;
+                boolean expectWrite = (access & WindowsUtils.FILE_WRITE_DATA) != 0;
+                boolean expectExecute = (access & WindowsUtils.FILE_EXECUTE) != 0;
+                boolean expectDelete = (access & WindowsUtils.ACCESS_DELETE) != 0;
+                assertThat(homeHandle.canRead()).is(expectRead);
+                assertThat(homeHandle.canWrite()).is(expectWrite);
+                assertThat(homeHandle.canExecute()).is(expectExecute);
+                assertThat(homeHandle.canDelete()).is(expectDelete);
+                logInfoAnyway("  Grant type verification passed for home handle");
             }
             // Also test getLocksOnPathViaHandleScan for the directory
             List<LockInfo> locks = WindowsUtils.getLocksOnPathViaHandleScan(userHome);
@@ -337,8 +329,8 @@ public class TestWindowsFileLocks extends AWTest {
                 logInfoAnyway("INFO: getLocksOnPathViaHandleScan did not find cmd.exe on user home");
             }
         } finally {
-            proc.destroy();
-            proc.waitFor();
+            cmd.destroy();
+            cmd.getProcess().waitFor();
             logInfoAnyway("cmd.exe terminated");
         }
     }

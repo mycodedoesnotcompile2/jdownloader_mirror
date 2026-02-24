@@ -24,7 +24,7 @@ import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 
 @ScriptAPI(description = "The context download list package")
 public class FilePackageSandBox {
-    private final FilePackage filePackage;
+    protected final FilePackage filePackage;
 
     public FilePackageSandBox(FilePackage parentNode) {
         this.filePackage = parentNode;

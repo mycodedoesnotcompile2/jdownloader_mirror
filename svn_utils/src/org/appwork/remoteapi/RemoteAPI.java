@@ -65,6 +65,7 @@ import org.appwork.remoteapi.exceptions.ApiCommandNotAvailable;
 import org.appwork.remoteapi.exceptions.AuthException;
 import org.appwork.remoteapi.exceptions.BadParameterException;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
+import org.appwork.remoteapi.exceptions.FileNotFound404Exception;
 import org.appwork.remoteapi.exceptions.InternalApiException;
 import org.appwork.remoteapi.exceptions.RemoteAPIException;
 import org.appwork.remoteapi.responsewrapper.DataObject;
@@ -603,9 +604,9 @@ public class RemoteAPI implements HttpRequestHandler {
         return true;
     }
 
-    protected boolean onUnknownRequest(final HttpRequest request, final HttpResponse response) {
+    protected boolean onUnknownRequest(final HttpRequest request, final HttpResponse response) throws FileNotFound404Exception {
         LogV3.info("Unknown API Request: " + request);
-        return false;
+        throw new FileNotFound404Exception();
     }
 
     protected BasicRemoteAPIException preProcessBasicRemoteAPIException(final RemoteAPIRequest request, final RemoteAPIResponse response, final BasicRemoteAPIException e) {

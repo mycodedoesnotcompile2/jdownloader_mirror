@@ -58,6 +58,7 @@ import jd.utils.JDUtilities;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -65,7 +66,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52356 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 52365 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -851,6 +852,37 @@ public class FlickrCom extends PluginForHost {
         }
     }
 
+    private boolean isTokenValid(final String token) {
+        try {
+            String jwtContent = token;
+            final int pad = jwtContent.length() % 4;
+            switch (pad) {
+            case 1:
+                jwtContent += "===";
+                break;
+            case 2:
+                jwtContent += "==";
+                break;
+            case 3:
+                jwtContent += "=";
+                break;
+            case 0:
+                break;
+            }
+            final String jwt = Base64.decodeToString(jwtContent);
+            final String exp = new Regex(jwt, "\"e(?:xp)?\"\\s*:\\s*(\\d+)").getMatch(0);
+            final long expireOn = Long.parseLong(exp) * 1000;
+            if (System.currentTimeMillis() < expireOn) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            logger.log(e);
+            return false;
+        }
+    }
+
     @Override
     protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         final DownloadLink link = this.getDownloadLink();
@@ -862,12 +894,20 @@ public class FlickrCom extends PluginForHost {
         }
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
+            final UrlQuery query = UrlQuery.parse(con.getURL().toExternalForm());
             if (con.getResponseCode() == 429) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Error 429 too many requests", 5 * 60 * 1000l);
             } else if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Request forbidden by administrative rules")) {
+                // might be head request and no body available
                 final int minutesWait = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED, default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED);
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Error 403: Your IP was banned by flickr.com", minutesWait * 60 * 1000l);
             } else if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Invalid signature")) {
+                // might be head request and no body available
+                // expired signature via body response
+                link.removeProperty(getDirecturlProperty(link));
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 403: Invalid signature: outdated direct-link?", 15 * 60 * 1000l);
+            } else if (con.getResponseCode() == 403 && query.containsKey("s") && !isTokenValid(query.getDecoded("s"))) {
+                // expired signature via signature expire check
                 link.removeProperty(getDirecturlProperty(link));
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 403: Invalid signature: outdated direct-link?", 15 * 60 * 1000l);
             }

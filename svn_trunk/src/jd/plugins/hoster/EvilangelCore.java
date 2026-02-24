@@ -27,22 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfig.BestSelectionMethod;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -66,7 +50,23 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52325 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfig.BestSelectionMethod;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52361 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class EvilangelCore extends PluginForHost {
     public EvilangelCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,7 +125,7 @@ public abstract class EvilangelCore extends PluginForHost {
     private final String         URL_EVILANGEL_FILM                         = "(?i)https?://members\\.evilangel.com/[a-z]{2}/([A-Za-z0-9\\-_%]+)/film/(\\d+)";
     @Deprecated
     private final String         URL_EVILANGEL_FREE_TRAILER                 = "(?i)https?://(?:www\\.)?evilangel\\.com/[a-z]{2}/video/([A-Za-z0-9\\-_%]+)/(\\d+)";
-    private static final Pattern PATTERN_VIDEO                              = Pattern.compile("/(?:[a-z]{2}/)?(?:movie|video)/[A-Za-z0-9\\-_%]+(?:/[A-Za-z0-9\\-_%]+)?/(\\d+)");
+    private static final Pattern PATTERN_VIDEO                              = Pattern.compile("/(?:[a-z]{2}/)?(?:movie|video)/([A-Za-z0-9\\-_%]+)(?:/([A-Za-z0-9\\-_%]+))?/(\\d+)");
     private static final Pattern PATTERN_DIRECT                             = Pattern.compile("/movieaction/download/(\\d+)/(\\d+p)/mp4\\?codec=[^&]+");
     private final String         PROPERTY_ACTORS                            = "actors";
     private final String         PROPERTY_DATE                              = "date";
@@ -265,8 +265,7 @@ public abstract class EvilangelCore extends PluginForHost {
                 List<Map<String, Object>> qualitiesList = null;
                 if (htmlVideoJson == null && htmlVideoJson2 == null) {
                     /**
-                     * 2023-04-19: New (tested with: evilangel.com) </br>
-                     * TODO: Test this with other supported websites such as wicked.com.
+                     * 2023-04-19: New (tested with: evilangel.com) </br> TODO: Test this with other supported websites such as wicked.com.
                      */
                     final Browser brc = br.cloneBrowser();
                     brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -363,8 +362,8 @@ public abstract class EvilangelCore extends PluginForHost {
                         }
                     }
                     /**
-                     * A scene can also contain DVD-information. </br>
-                     * --> Ensure to set the correct information which is later used for filenames.
+                     * A scene can also contain DVD-information. </br> --> Ensure to set the correct information which is later used for
+                     * filenames.
                      */
                     final Map<String, Object> movieInfos = (Map<String, Object>) root.get("movieInfos");
                     if (movieInfos != null) {
@@ -717,19 +716,23 @@ public abstract class EvilangelCore extends PluginForHost {
 
     protected String getURLTitle(final DownloadLink link) {
         final String matcher = link.getPluginPatternMatcher();
-        String title = new Regex(matcher, URL_EVILANGEL_FILM).getMatch(0);
-        if (title != null) {
-            return URLEncode.decodeURIComponent(title);
+        final String filmTitle = new Regex(matcher, URL_EVILANGEL_FILM).getMatch(0);
+        if (filmTitle != null) {
+            return URLEncode.decodeURIComponent(filmTitle);
         }
-        title = new Regex(matcher, URL_EVILANGEL_FREE_TRAILER).getMatch(0);
-        if (title != null) {
-            return URLEncode.decodeURIComponent(title);
+        final String trailerTitle = new Regex(matcher, URL_EVILANGEL_FREE_TRAILER).getMatch(0);
+        if (trailerTitle != null) {
+            return URLEncode.decodeURIComponent(trailerTitle);
         }
         final Regex urlinfo = new Regex(matcher, PATTERN_VIDEO);
         if (urlinfo.patternFind()) {
-            final String param1 = urlinfo.getMatch(0);
-            final String param2 = urlinfo.getMatch(1);
-            title = (param1 != null && param2 != null) ? param1 + "_" + param2 : param1;
+            final String contentSource = urlinfo.getMatch(0);
+            final String name = urlinfo.getMatch(1);
+            final String id = urlinfo.getMatch(2);
+            String title = name;
+            if (StringUtils.isEmpty(title)) {
+                title = contentSource + "_" + id;
+            }
             return URLEncode.decodeURIComponent(title);
         }
         logger.warning("!Developer mistake! Unsupported URL!");
@@ -867,8 +870,8 @@ public abstract class EvilangelCore extends PluginForHost {
             }
             login.remove("submit");
             /**
-             * 2021-09-01: Form may contain "rememberme" two times with value "0" AND "1"! Same via browser! </br>
-             * Only add "rememberme": "1" if that is not already present in our form.
+             * 2021-09-01: Form may contain "rememberme" two times with value "0" AND "1"! Same via browser! </br> Only add "rememberme":
+             * "1" if that is not already present in our form.
              */
             final String remembermeCookieKey = "rememberme";
             boolean containsRemembermeFieldWithValue1 = false;

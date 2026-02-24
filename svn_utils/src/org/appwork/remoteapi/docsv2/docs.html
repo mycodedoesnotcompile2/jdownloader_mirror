@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>__DOCS_TITLE__</title>
+  <style>
+    :root { --bg:#f3f7fa; --panel:#fff; --ink:#17232d; --muted:#536576; --line:#d7e1e8; --chip:#e7f3f9; font-family:'IBM Plex Sans','Segoe UI',sans-serif; }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(150deg,#eef4f8,#f9fbfd);color:var(--ink);overflow:hidden}
+    .layout{display:grid;grid-template-columns:320px 1fr;height:100vh}
+    .side{border-right:1px solid var(--line);background:#fbfdff;padding:14px;overflow:hidden;display:flex;flex-direction:column}
+    .main{padding:18px;overflow:auto}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+    h1{font-size:20px;margin:0 0 10px} h2{font-size:16px;margin:0 0 10px} h3{font-size:13px;margin:12px 0 6px;color:var(--muted)}
+    input,select,textarea,button{width:100%;padding:8px;border:1px solid #bfd0db;border-radius:8px;background:#fff;color:#0f1c28}
+    select[multiple]{min-height:96px}
+    textarea{min-height:72px;resize:vertical;font-family:ui-monospace,Consolas,monospace}
+    .btn{background:linear-gradient(135deg,#0f9cb7,#0d7b95);color:#fff;border:none;font-weight:600;cursor:pointer}
+    .muted{color:var(--muted);font-size:12px}
+    .item{padding:8px;border:1px solid transparent;border-radius:8px;cursor:pointer}
+    .item:hover{background:#eef7fb;border-color:#d4e8f2}
+    .item.active{background:#dff0f8;border-color:#b7d9e8}
+    .ns{margin-bottom:8px}
+    .ns-title{padding:7px 8px;border:1px solid #d4e2ea;border-radius:8px;background:#f1f7fb;font-size:12px;font-weight:700;cursor:pointer}
+    .ns-title:hover{background:#e9f3f9}
+    .ns-count{font-weight:500;color:var(--muted);margin-left:6px}
+    .ns-items{margin-top:6px;padding-left:10px;border-left:2px solid #e2edf4}
+    .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--chip);padding:2px 6px;border-radius:6px;display:inline-block}
+    .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+    .tag{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.02em;background:#e8eef3;color:#193446;border:1px solid #c8d6e1}
+    .tag-icon{margin-right:4px;opacity:.85}
+    .tag.exp{background:#fff3df;border-color:#f0c993;color:#7f4f00}
+    .tag.dep{background:#ffe8e8;border-color:#f2bcbc;color:#7a1d1d}
+    .type-link{display:inline-block;padding:1px 6px;border-radius:6px;background:#eaf4fb;border:1px solid #cfe3f1;color:#0f5379;cursor:pointer}
+    .type-link:hover{background:#dff0fb}
+    pre{margin:0;padding:10px;background:#0f1f2a;color:#e6f3fa;border-radius:8px;overflow:hidden;font-size:12px;white-space:pre-wrap;word-break:break-word;min-height:44px}
+    table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--line);padding:6px;text-align:left;font-size:12px}
+    #list{flex:1 1 auto;overflow:auto;min-height:0}
+    #typeOverlay{position:fixed;inset:0;background:rgba(9,21,31,.45);display:none;align-items:flex-start;justify-content:center;padding:18px;z-index:40}
+    #typePanel{width:min(96vw,1500px);max-height:calc(100vh - 36px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(10,30,46,.25);padding:14px}
+    #typePanel h3{margin-top:4px}
+    #typePanel .close{float:right;width:auto;padding:4px 10px}
+    .type-browser{display:grid;grid-template-columns:minmax(300px,38%) 1fr;gap:12px;align-items:start}
+    .type-browser-nav{display:flex;align-items:center;gap:10px;margin:6px 0 10px 0;padding:8px;border:1px solid var(--line);border-radius:10px;background:#f8fbfd}
+    .type-browser-back{width:auto;padding:6px 10px;background:#0f7f98;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer}
+    .type-browser-back:disabled{opacity:.45;cursor:default}
+    .type-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0}
+    .type-crumb{width:auto;padding:3px 8px;border:1px solid #cadbe6;background:#fff;border-radius:999px;font-size:11px;cursor:pointer;color:#22465c}
+    .type-crumb.active{background:#dff0f8;border-color:#b7d9e8;font-weight:700}
+    .type-crumb-sep{font-size:11px;color:var(--muted)}
+    .type-browser-left{display:flex;flex-direction:column;gap:8px}
+    .type-field-list{border:1px solid var(--line);border-radius:10px;max-height:52vh;overflow:auto;background:#fbfdff;padding:6px}
+    .type-field-item{display:flex;flex-direction:column;gap:4px;text-align:left;width:100%;padding:6px;border:1px solid transparent;border-radius:8px;background:transparent}
+    .type-field-main{width:100%;padding:6px;border:0;background:transparent;text-align:left;cursor:pointer;border-radius:6px}
+    .type-field-item:hover{background:#eef7fb;border-color:#d4e8f2}
+    .type-field-item.active{background:#dff0f8;border-color:#b7d9e8}
+    .type-field-item-name{font-weight:700;font-size:12px;color:#102838}
+    .type-field-item-type{font-size:11px;color:#2f5a73;padding-left:6px}
+    .type-field-item-desc{display:block;margin-top:3px;font-size:11px;color:var(--muted)}
+    .type-field-detail{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;min-height:260px}
+    .type-nav-link{width:auto;padding:2px 7px;border:1px solid #cfe3f1;border-radius:8px;background:#eaf4fb;color:#0f5379;cursor:pointer;font-size:11px}
+    .type-nav-link:hover{background:#dff0fb}
+    @media(max-width:960px){body{overflow:auto}.layout{grid-template-columns:1fr;height:auto;min-height:100vh}.side{border-right:none;border-bottom:1px solid var(--line)}#list{max-height:40vh}.type-browser{grid-template-columns:1fr}.type-field-list{max-height:32vh}}
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="side">
+      <h1>__DOCS_TITLE__</h1>
+      <div style="height:8px"></div>
+      <input id="search" placeholder="Filter namespace/method">
+      <div style="height:12px"></div>
+      <div id="list"></div>
+    </aside>
+    <main class="main">
+      <input id="token" type="hidden" value="">
+      <div id="root" class="card">Loading API definition...</div>
+    </main>
+  </div>
+  <div id="typeOverlay">
+    <div id="typePanel">
+      <button class="btn close" id="typeClose">Close</button>
+      <div id="typeRoot"></div>
+    </div>
+  </div>
+  <script src="./docsJs__TOKEN_QUERY__"></script>
+</body>
+</html>

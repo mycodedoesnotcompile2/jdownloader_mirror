@@ -20,10 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -37,7 +33,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52289 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
+@DecrypterPlugin(revision = "$Revision: 52364 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,11 +116,13 @@ public class CutyIo extends PluginForDecrypt {
         long passedTimeMillis = 0;
         if (br.containsHTML("id=\"turnstile-widget\"") || CaptchaHelperCrawlerPluginCloudflareTurnstile.containsCloudflareTurnstileClass(form3)) {
             final String tsKey = "0x4AAAAAAABnHbN4cNchLhd_";
-            final Browser brc = br.cloneBrowser();
-            brc.getPage("https://cdn.cuty.io/js/public/links/last.js?id=f4f3bcae68da87c1b86167fe79d01ae7");
-            /* Check if our static key is still correct */
-            if (!brc.containsHTML(Pattern.quote(tsKey))) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Turnstile key has changed");
+            if (!br.containsHTML(Pattern.quote(tsKey))) {
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("https://cdn.cuty.io/js/public/links/last.js?id=f4f3bcae68da87c1b86167fe79d01ae7");
+                /* Check if our static key is still correct */
+                if (!brc.containsHTML(Pattern.quote(tsKey))) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Turnstile key has changed");
+                }
             }
             final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, tsKey).getToken();
             form3.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));

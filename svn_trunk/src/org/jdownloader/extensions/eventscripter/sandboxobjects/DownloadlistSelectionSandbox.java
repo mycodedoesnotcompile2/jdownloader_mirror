@@ -1,5 +1,6 @@
 package org.jdownloader.extensions.eventscripter.sandboxobjects;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jd.plugins.DownloadLink;
@@ -49,6 +50,25 @@ public class DownloadlistSelectionSandbox {
         return ret;
     }
 
+    public DownloadLinkSandBox[] getSelectedLinks(final FilePackageSandBox filePackageSandbox) {
+        if (selectionInfo == null || filePackageSandbox == null || filePackageSandbox.filePackage == null) {
+            return null;
+        }
+        for (PackageView<FilePackage, DownloadLink> packageView : selectionInfo.getPackageViews()) {
+            if (packageView.getPackage() == filePackageSandbox.filePackage) {
+                final List<DownloadLinkSandBox> ret = new ArrayList<DownloadLinkSandBox>();
+                final List<DownloadLink> children = packageView.getSelectedChildren();
+                if (children != null) {
+                    for (DownloadLink child : children) {
+                        ret.add(new DownloadLinkSandBox(child));
+                    }
+                }
+                return ret.toArray(new DownloadLinkSandBox[0]);
+            }
+        }
+        return null;
+    }
+
     @Deprecated
     public DownloadLinkSandBox[] getDownloadLinks() {
         return getLinks();
@@ -70,16 +90,34 @@ public class DownloadlistSelectionSandbox {
         }
     }
 
+    public boolean isPackageSelected(final FilePackageSandBox filePackageSandbox) {
+        if (selectionInfo == null || filePackageSandbox == null || filePackageSandbox.filePackage == null) {
+            return false;
+        }
+        for (PackageView<FilePackage, DownloadLink> packageView : selectionInfo.getPackageViews()) {
+            if (packageView.getPackage() == filePackageSandbox.filePackage) {
+                return packageView.isPackageSelected();
+            }
+        }
+        return false;
+    }
+
     public FilePackageSandBox[] getPackages() {
+        return getPackages(false);
+    }
+
+    public FilePackageSandBox[] getPackages(final boolean includeSelectedOnly) {
         if (selectionInfo == null) {
             return null;
         }
         final List<PackageView<FilePackage, DownloadLink>> packageViews = selectionInfo.getPackageViews();
-        final FilePackageSandBox[] ret = new FilePackageSandBox[packageViews.size()];
-        for (int i = 0; i < ret.length; i++) {
-            ret[i] = new FilePackageSandBox(packageViews.get(i).getPackage());
+        final List<FilePackageSandBox> ret = new ArrayList<FilePackageSandBox>(packageViews.size());
+        for (PackageView<FilePackage, DownloadLink> packageView : packageViews) {
+            if (!includeSelectedOnly || packageView.isPackageSelected()) {
+                ret.add(new FilePackageSandBox(packageView.getPackage()));
+            }
         }
-        return ret;
+        return ret.toArray(new FilePackageSandBox[0]);
     }
 
     public FilePackageSandBox getContextPackage() {

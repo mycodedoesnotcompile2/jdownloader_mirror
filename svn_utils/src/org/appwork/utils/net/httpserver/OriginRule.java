@@ -87,7 +87,7 @@ public class OriginRule {
             throw new IllegalArgumentException("Origin pattern cannot be null");
         }
         this.origin = originPattern;
-        this.paths = Collections.unmodifiableList(new ArrayList<Pattern>(pathPatterns));
+        this.paths = pathPatterns == null ? null : Collections.unmodifiableList(new ArrayList<Pattern>(pathPatterns));
     }
 
     public OriginRule(final Pattern originPattern, final Pattern... pathPatterns) {

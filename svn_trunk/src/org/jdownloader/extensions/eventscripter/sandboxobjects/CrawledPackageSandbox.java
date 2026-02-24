@@ -18,7 +18,7 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberTableModel;
 
 @ScriptAPI(description = "The context linkgabber list package")
 public class CrawledPackageSandbox {
-    private final CrawledPackage filePackage;
+    protected final CrawledPackage filePackage;
 
     public CrawledPackageSandbox(CrawledPackage parentNode) {
         this.filePackage = parentNode;

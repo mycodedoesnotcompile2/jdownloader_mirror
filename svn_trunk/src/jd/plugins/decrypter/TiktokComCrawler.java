@@ -60,7 +60,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52356 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52362 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -779,16 +779,18 @@ public class TiktokComCrawler extends PluginForDecrypt {
                 }
                 if (best_play_addr != null) {
                     final String url = (String) JavaScriptEngineFactory.walkJson(best_play_addr, "UrlList/{0}");
-                    video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_WEBSITE, url);
-                    final Object data_size = best_play_addr.get("DataSize");
-                    if (data_size != null) {
-                        /**
-                         * Set filesize of download-version because streaming- and download-version are nearly identical. </br> If a video
-                         * is watermarked and downloads are prohibited both versions should be identical.
-                         */
-                        video0.setDownloadSize(Long.parseLong(data_size.toString()));
+                    if (url != null) {
+                        video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_WEBSITE, url);
+                        final Object data_size = best_play_addr.get("DataSize");
+                        if (data_size != null) {
+                            /**
+                             * Set filesize of download-version because streaming- and download-version are nearly identical. </br> If a
+                             * video is watermarked and downloads are prohibited both versions should be identical.
+                             */
+                            video0.setDownloadSize(Long.parseLong(data_size.toString()));
+                        }
+                        foundVideoDownloadlink = true;
                     }
-                    foundVideoDownloadlink = true;
                 }
             }
             if (!foundVideoDownloadlink) {

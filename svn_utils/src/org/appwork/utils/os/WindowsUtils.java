@@ -1819,7 +1819,7 @@ public class WindowsUtils {
      * @return list of LockInfo for processes that have a handle on this path (may be empty)
      */
     public static List<LockInfo> getLocksOnPathViaHandleScan(File filePath) {
-        return getLocksOnPathViaHandleScan(filePath, 0);
+        return getLocksOnPathViaHandleScan(filePath, -1);
     }
 
     /**
@@ -1837,13 +1837,9 @@ public class WindowsUtils {
      */
     private static final int PROCESS_HANDLE_CACHE_SIZE = 16;
 
-    public static List<LockInfo> getLocksOnPathViaHandleScan(File filePath, int maxHandles) {
-        if (!CrossSystem.isWindows()) {
-            return Collections.emptyList();
-        }
+    public static List<LockInfo> getLocksOnPathViaHandleScan(File filePath, final int maxHandles) {
         final String targetPath = normalizePathForCompare(filePath.getAbsolutePath());
         final List<LockInfo> result = new ArrayList<LockInfo>();
-        final int stopAt = maxHandles > 0 ? maxHandles : Integer.MAX_VALUE;
         final Set<Integer> foundPids = new HashSet<Integer>();
         final Set<Integer> failedPids = new HashSet<Integer>();
         // LRU cache: pid -> process handle (insertion order, oldest first)
@@ -1864,7 +1860,7 @@ public class WindowsUtils {
             scanAllSystemHandles(new HandleEntryConsumer() {
                 @Override
                 public boolean accept(int pid, int handleVal, int objectType, int grantedAccess) {
-                    if (result.size() >= stopAt) {
+                    if (maxHandles > 0 && result.size() >= maxHandles) {
                         return false;
                     }
                     if (objectType != OBJECT_TYPE_FILE) {
@@ -1895,7 +1891,10 @@ public class WindowsUtils {
                             LogV3.exception(WindowsUtils.class, e);
                         }
                     }
-                    return result.size() < stopAt;
+                    if (maxHandles <= 0) {
+                        return true;
+                    }
+                    return result.size() < maxHandles;
                 }
             });
         } finally {
@@ -2148,9 +2147,6 @@ public class WindowsUtils {
      *            logged; the scan continues with the next handle and is not aborted.
      */
     private static void scanAllSystemHandles(HandleEntryConsumer consumer) {
-        if (!CrossSystem.isWindows()) {
-            return;
-        }
         IntByReference returnLength = new IntByReference();
         final boolean is64 = com.sun.jna.Native.POINTER_SIZE == 8;
         final int maxBuffer = LIST_HANDLES_MAX_BUFFER;
@@ -2209,14 +2205,6 @@ public class WindowsUtils {
                     }
                     continue;
                 }
-                if (buffer != null) {
-                    try {
-                        buffer.close();
-                    } catch (Throwable t) {
-                        /* ignore */
-                    }
-                    buffer = null;
-                }
                 break;
             }
             if (!useExtended) {
@@ -2255,6 +2243,10 @@ public class WindowsUtils {
                         }
                         continue;
                     }
+                    if (buffer != null) {
+                        buffer.close();
+                        buffer = null;
+                    }
                     LogV3.warning("scanAllSystemHandles: NtQuerySystemInformation failed, status=0x" + Integer.toHexString(status));
                     return;
                 }
@@ -2277,8 +2269,10 @@ public class WindowsUtils {
                 entrySize = is64 ? new HandleScanLegacyEntry64().size() : new HandleScanLegacyEntry32().size();
                 arrayOffset = HANDLES_ARRAY_OFFSET;
             }
-            LogV3.info("scanAllSystemHandles: useExtended=" + useExtended + ", is64=" + is64 + ", handleCount=" + handleCount + ", entrySize=" + entrySize + ", bufSize=" + bufSize);
-            LogV3.info("scanAllSystemHandles: POINTER_SIZE=" + com.sun.jna.Native.POINTER_SIZE + ", Ex64.size=" + new HandleScanExEntry64().size() + ", Ex32.size=" + new HandleScanExEntry32().size());
+            // LogV3.info("scanAllSystemHandles: useExtended=" + useExtended + ", is64=" + is64 + ", handleCount=" + handleCount + ",
+            // entrySize=" + entrySize + ", bufSize=" + bufSize);
+            // LogV3.info("scanAllSystemHandles: POINTER_SIZE=" + com.sun.jna.Native.POINTER_SIZE + ", Ex64.size=" + new
+            // HandleScanExEntry64().size() + ", Ex32.size=" + new HandleScanExEntry32().size());
             for (int i = 0; i < handleCount; i++) {
                 int offset = arrayOffset + i * entrySize;
                 if (offset + entrySize > bufSize) {
@@ -2375,9 +2369,10 @@ public class WindowsUtils {
                 return true;
             }
         });
-        LogV3.info("listHandlesForProcess: first 20 PIDs in handle table: " + debugPids);
-        LogV3.info("listHandlesForProcess: first object types for PID " + targetPid + ": " + debugTypes);
-        LogV3.info("listHandlesForProcess: scanned " + debugCounters[0] + " handles total, " + debugCounters[1] + " matched PID " + targetPid);
+        // LogV3.info("listHandlesForProcess: first 20 PIDs in handle table: " + debugPids);
+        // LogV3.info("listHandlesForProcess: first object types for PID " + targetPid + ": " + debugTypes);
+        // LogV3.info("listHandlesForProcess: scanned " + debugCounters[0] + " handles total, " + debugCounters[1] + " matched PID " +
+        // targetPid);
         if (collectedHandles.isEmpty()) {
             return Collections.emptyList();
         }
