@@ -27,6 +27,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
@@ -59,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 52331 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 52371 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,16 +126,16 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         /* Website may return huge amounts of json/html */
         br.setLoadLimit(br.getLoadLimit() * 4);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String contentURL = param.getCryptedUrl();
+        String contenturl = param.getCryptedUrl();
         final DropBoxConfig cfg = PluginJsonConfig.get(DropBoxConfig.class);
-        if (contentURL.matches(DropboxCom.TYPE_SC_GALLERY)) {
+        if (contenturl.matches(DropboxCom.TYPE_SC_GALLERY)) {
             /* Gallery */
             /*
              * 2019-09-25: Galleries are rarely used by Dropbox Users. Basically these are folders but we cannot access them like folders
              * and they cannot be accessed via API(?). Also downloading single objects from galleries works a bit different than files from
              * folders.
              */
-            br.getPage(contentURL);
+            br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -158,21 +159,32 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 }
             } catch (final Exception e) {
                 /* Fallback - add .zip containing all elements of that gallery! This should never happen! */
-                final DownloadLink dl = this.createSingleFileDownloadLink(contentURL);
+                final DownloadLink dl = this.createSingleFileDownloadLink(contenturl);
                 if (currentGalleryName != null) {
                     dl.setFinalFileName("Gallery - " + currentGalleryName + ".zip");
                 } else {
-                    dl.setFinalFileName("Gallery - " + new Regex(contentURL, "https?://[^/]+/(.+)").getMatch(0) + ".zip");
+                    dl.setFinalFileName("Gallery - " + new Regex(contenturl, "https?://[^/]+/(.+)").getMatch(0) + ".zip");
                 }
                 ret.add(dl);
             }
             return ret;
         }
         /* File/folder */
-        /* Correct added URL. */
-        contentURL = contentURL.replaceFirst("(?i)dl\\.dropboxusercontent\\.com/", this.getHost() + "/");
-        /* Avoid immediate redirect to file content (we want to have the html page). */
-        contentURL = contentURL.replaceAll("(?i)dl=1", "dl=0");
+        /* Correct added URL before accessing it. */
+        contenturl = contenturl.replaceFirst("(?i)dl\\.dropboxusercontent\\.com/", this.getHost() + "/");
+        final UrlQuery added_url_query = UrlQuery.parse(contenturl);
+        if (added_url_query != null && added_url_query.list().size() > 0) {
+            /* Avoid immediate redirect to file content (we want to have the html page). */
+            added_url_query.remove("dl");
+            added_url_query.remove("raw");
+            if (added_url_query.list().size() == 0) {
+                /* No params left */
+                contenturl = URLHelper.getUrlWithoutParams(contenturl);
+            } else {
+                /* Some params left -> re-build url */
+                contenturl = URLHelper.getUrlWithoutParams(contenturl) + "?" + added_url_query.toString();
+            }
+        }
         /*
          * 2019-09-24: isSingleFile may sometimes be wrong but if our URL contains 'crawl_subfolders=' we know it has been added via crawler
          * and it is definitely a folder and not a file!
@@ -192,7 +204,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             DropBoxComCrawler.setPasswordCookie(br, storedPasswordCookieValue);
             passwordCookieValue = storedPasswordCookieValue;
         }
-        br.getPage(contentURL);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("sharing/error_shmodel|class=\"not-found\">")) {
@@ -234,7 +246,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 }
                 query.add("content_id", Encoding.urlEncode(content_id));
                 query.add("password", Encoding.urlEncode(passCode));
-                query.add("url", Encoding.urlEncode(new URL(contentURL).getPath()));
+                query.add("url", Encoding.urlEncode(new URL(contenturl).getPath()));
                 brc.postPage("/sm/auth", query);
                 final String status = PluginJSonUtils.getJson(brc, "status");
                 if (!"error".equalsIgnoreCase(status)) {
@@ -255,7 +267,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             final int waitSeconds = 5;
             logger.info("User entered correct password \"" + passCode + "\" | Waiting seconds before continuing: " + waitSeconds);
             this.sleep(waitSeconds * 1000, param);
-            br.getPage(contentURL);
+            br.getPage(contenturl);
         }
         if (isOfflineWebsite(br)) {
             /* Item was deleted */
@@ -291,9 +303,9 @@ public class DropBoxComCrawler extends PluginForDecrypt {
          * https://www.dropbox.com/s/5h5bnwzklsev6ch </br>
          * --> Redirects to: https://www.dropbox.com/s/5h5bnwzklsev6ch/1mb.test
          */
-        contentURL = br.getURL();
+        contenturl = br.getURL();
         if (!br.getURL().matches(TYPES_NORMAL)) {
-            logger.warning("Possible redirect to unsupported URL: " + br.getURL());
+            logger.warning("Detected redirect to possibly unsupported URL: " + br.getURL());
         }
         /* Decrypt file- and folderlinks */
         String subFolderPath = getAdoptedCloudFolderStructure();
@@ -337,7 +349,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         if (StringUtils.isEmpty(rlkey)) {
             rlkey = UrlQuery.parse(param.getCryptedUrl()).get("rlkey");
         }
-        final Regex urlinfoTypeC = new Regex(contentURL, "(?i)https://[^/]+/scl/([^/]+)/([^/]+)/([^/\\?]+).*");
+        final Regex urlinfoTypeC = new Regex(contenturl, "(?i)https://[^/]+/scl/([^/]+)/([^/]+)/([^/\\?]+).*");
         if (urlinfoTypeC.patternFind()) {
             if (StringUtils.isEmpty(link_type)) {
                 link_type = "c";
@@ -351,7 +363,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         } else {
             /* Typically dropbox.com/sh/bla/bla(?params...)? */
             link_type = "s";
-            final Regex urlinfo = new Regex(contentURL, "(?i)https?://[^/]+/([^/]+)/([^/]+)/([\\w\\-]+).*");
+            final Regex urlinfo = new Regex(contenturl, "(?i)https?://[^/]+/([^/]+)/([^/]+)/([\\w\\-]+).*");
             if (StringUtils.isEmpty(link_key)) {
                 link_key = urlinfo.getMatch(1);
             }
@@ -365,7 +377,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         brc.setAllowedResponseCodes(400);
         int numberofItemsWalkedThroughSoFar = 0;
         if (sub_path == null) {
-            sub_path = getFilepathFromURL(contentURL);
+            sub_path = getFilepathFromURL(contenturl);
         }
         if (sub_path == null) {
             /* We're crawling a root directory. */

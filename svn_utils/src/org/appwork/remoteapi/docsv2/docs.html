@@ -8,6 +8,21 @@
     :root { --bg:#f3f7fa; --panel:#fff; --ink:#17232d; --muted:#536576; --line:#d7e1e8; --chip:#e7f3f9; font-family:'IBM Plex Sans','Segoe UI',sans-serif; }
     *{box-sizing:border-box}
     body{margin:0;background:linear-gradient(150deg,#eef4f8,#f9fbfd);color:var(--ink);overflow:hidden}
+    .app{height:100vh;display:flex;flex-direction:column}
+    .topnav{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:#f8fbfd}
+    .navbtn{width:auto;padding:8px 14px;border:1px solid #c7d8e3;border-radius:999px;background:#fff;color:#1a3850;cursor:pointer;font-size:12px;font-weight:700}
+    .navbtn.active{background:#dff0f8;border-color:#9bc6dc}
+    .statusstrip{display:grid;grid-template-columns:auto 1fr 220px 40px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#f5f9fc,#edf5fa)}
+    .statusstrip .label{font-size:12px;color:var(--muted)}
+    .status-main{min-width:0}
+    .status-text{font-size:12px;color:#1f3a4d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .progress-wrap{display:flex;align-items:center;gap:8px}
+    .progress-track{position:relative;height:10px;border-radius:999px;background:#dbe8f1;border:1px solid #c4d7e4;overflow:hidden;flex:1}
+    .progress-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#0f9cb7,#0d7b95)}
+    .progress-label{min-width:48px;text-align:right;font-size:11px;color:#335269}
+    .status-icon{width:32px;height:32px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff}
+    .page{flex:1;min-height:0}
+    .page.hidden{display:none}
     .layout{display:grid;grid-template-columns:320px 1fr;height:100vh}
     .side{border-right:1px solid var(--line);background:#fbfdff;padding:14px;overflow:hidden;display:flex;flex-direction:column}
     .main{padding:18px;overflow:auto}
@@ -61,22 +76,103 @@
     .type-field-detail{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;min-height:260px}
     .type-nav-link{width:auto;padding:2px 7px;border:1px solid #cfe3f1;border-radius:8px;background:#eaf4fb;color:#0f5379;cursor:pointer;font-size:11px}
     .type-nav-link:hover{background:#dff0fb}
-    @media(max-width:960px){body{overflow:auto}.layout{grid-template-columns:1fr;height:auto;min-height:100vh}.side{border-right:none;border-bottom:1px solid var(--line)}#list{max-height:40vh}.type-browser{grid-template-columns:1fr}.type-field-list{max-height:32vh}}
+    @media(max-width:960px){body{overflow:auto}.app{height:auto;min-height:100vh}.statusstrip{grid-template-columns:1fr;gap:6px}.page{height:auto;min-height:0}.layout{grid-template-columns:1fr;height:auto;min-height:100vh}.side{border-right:none;border-bottom:1px solid var(--line)}#list{max-height:40vh}.type-browser{grid-template-columns:1fr}.type-field-list{max-height:32vh}.remote-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <div class="layout">
-    <aside class="side">
-      <h1>__DOCS_TITLE__</h1>
-      <div style="height:8px"></div>
-      <input id="search" placeholder="Filter namespace/method">
-      <div style="height:12px"></div>
-      <div id="list"></div>
-    </aside>
-    <main class="main">
-      <input id="token" type="hidden" value="">
-      <div id="root" class="card">Loading API definition...</div>
-    </main>
+  <div class="app">
+    <div class="topnav">
+      <button id="navDocs" class="navbtn active">API Docs</button>
+      <button id="navRemote" class="navbtn">Connect Remote</button>
+    </div>
+    <div class="statusstrip">
+      <div id="globalAlive">Checking...</div>
+      <div class="status-main">
+        <div class="label">Connect Status</div>
+        <div id="globalStatusText" class="status-text">-</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track"><div id="globalProgressFill" class="progress-fill"></div></div>
+        <div id="globalProgressLabel" class="progress-label">-</div>
+      </div>
+      <img id="globalStatusIcon" class="status-icon" alt="status icon">
+    </div>
+    <div id="pageDocs" class="page">
+    <div class="layout">
+      <aside class="side">
+        <h1>__DOCS_TITLE__</h1>
+        <div class="muted">Browse all endpoints, inspect parameter/return/exception models, and execute requests live against this Connect instance.</div>
+        <div style="height:8px"></div>
+        <input id="search" placeholder="Filter namespace/method">
+        <div style="height:12px"></div>
+        <div id="list"></div>
+      </aside>
+      <main class="main">
+        <input id="token" type="hidden" value="">
+        <div id="root" class="card">Loading API definition...</div>
+      </main>
+    </div>
+    </div>
+    <div id="pageRemote" class="page hidden">
+    <div class="remote-wrap">
+      <div class="remote-grid">
+        <div class="card">
+          <h2>Namespaces</h2>
+          <div class="muted">Repository namespaces loaded from <code>connect/listRepositories</code>. The selected namespace is used for installation actions.</div>
+          <div class="inline">
+            <select id="remoteNamespace"></select>
+            <select id="remotePackageHash" title="Package hash from pending updates"></select>
+            <button id="remoteRefreshRepos" class="btn" type="button">Refresh Repositories</button>
+          </div>
+          <div id="remoteRepoInfo" class="muted" style="margin-top:8px">No repositories loaded.</div>
+        </div>
+        <div class="card full">
+          <h2>Actions</h2>
+          <div class="muted">
+            <b>Show GUI / Hide GUI:</b> Opens or hides the local Connect desktop window.<br>
+            <b>Request Installation:</b> Sends <code>update/requestInstallation</code> with the JSON options below.<br>
+            <b>Cancel Installation:</b> Sends <code>update/cancel</code> for the currently active installation workflow.<br>
+            <b>Poll Installation Status Now:</b> One immediate call to <code>update/getInstallationStatus</code> for the requestID.
+          </div>
+          <div class="toolbar">
+            <button id="remoteShowGui" class="btn" type="button">Show GUI</button>
+            <button id="remoteHideGui" class="btn" type="button">Hide GUI</button>
+            <button id="remoteRequestInstall" class="btn" type="button">Request Installation</button>
+            <button id="remoteCancelInstall" class="btn" type="button">Cancel Installation</button>
+            <button id="remoteListPackageContents" class="btn" type="button">List Package Contents</button>
+            <button id="remoteLoadOptionals" class="btn" type="button">Load Optionals</button>
+            <button id="remoteSetOptionals" class="btn" type="button">Set Optionals</button>
+            <button id="remoteBlockIntervalChecks" class="btn" type="button">Block Interval Checks</button>
+          </div>
+          <h3>InstallOptions JSON</h3>
+          <div class="muted">Edit only the options you want to override. The selected namespace is injected automatically.</div>
+          <textarea id="remoteInstallOptions" placeholder='{"namespaces":["..."]}'></textarea>
+          <h3>Optionals State JSON</h3>
+          <div class="muted">Editable map for <code>optionals/set</code>: <code>{"OPTIONAL_KEY": true}</code></div>
+          <textarea id="remoteOptionalsState" placeholder='{"OPTIONAL_KEY":true}'></textarea>
+          <div class="inline" style="margin-top:8px">
+            <input id="remoteBlockDuration" placeholder="block duration (e.g. 10m)" value="10m">
+          </div>
+          <div class="inline" style="margin-top:8px">
+            <input id="remoteRequestId" placeholder="requestID for polling">
+            <button id="remotePollStatusNow" class="btn" type="button">Poll Installation Status Now</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Installation Status</h2>
+          <pre id="remoteInstallStatus">(no status yet)</pre>
+        </div>
+        <div class="card">
+          <h2>connect/getState</h2>
+          <pre id="remoteConnectState">(no state yet)</pre>
+        </div>
+        <div class="card full">
+          <h2>Action Output</h2>
+          <pre id="remoteActionOutput">(no action yet)</pre>
+        </div>
+      </div>
+    </div>
+  </div>
   </div>
   <div id="typeOverlay">
     <div id="typePanel">

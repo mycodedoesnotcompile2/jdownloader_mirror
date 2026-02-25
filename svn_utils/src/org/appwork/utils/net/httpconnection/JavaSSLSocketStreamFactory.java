@@ -94,8 +94,8 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
     /*
      * https://risdenk.github.io/2018/03/26/oracle-jdk-missing-ciphers-libsunec.so.html
-     *
-     *
+     * 
+     * 
      * TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
      * TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
      */
@@ -243,7 +243,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         TLS_1_2("TLSv1.2"),
         TLS_1_1("TLSv1.1"),
         TLS_1_0("TLSv1");
-
         public final String id;
 
         private TLS(final String id) {
@@ -576,6 +575,9 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
             throw thr;
         }
         return new JSSESSLSocketStreamInterface() {
+            final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
+            final KeyManager[]           keyManager    = trustCallback.getKeyManager();
+
             @Override
             public SSLSocket getSocket() {
                 return sslSocket;
@@ -637,6 +639,16 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                 final TrustResult ret = trustResult.get();
                 DebugMode.breakIf(ret == null);
                 return ret;
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustProvider;
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManager;
             }
         };
     }

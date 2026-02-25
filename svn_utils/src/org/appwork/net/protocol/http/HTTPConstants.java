@@ -450,4 +450,5 @@ public class HTTPConstants {
     public static final String           ACCESS_CONTROL_ALLOW_CREDENTIALS              = "Access-Control-Allow-Credentials";
     public static final String           ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK        = "Access-Control-Request-Private-Network";
     public static final String           ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK          = "Access-Control-Allow-Private-Network";
+    public static final String           X_TOKEN                                       = "x-token";
 }

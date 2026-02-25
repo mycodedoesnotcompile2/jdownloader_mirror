@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.appwork.utils.os.CrossSystem;
 import org.objectweb.asm.ClassReader;
 
 /**
@@ -60,7 +61,7 @@ public class CouplingHelper {
     private static volatile Map<String, Set<String>> REFERENCE_INDEX_CACHE = null;
 
     public static void main(String[] args) throws IOException {
-        System.out.println(CouplingHelper.findReferenceTree(org.appwork.utils.zip.ZipIOReader.class));
+        System.out.println(CouplingHelper.findReferenceTree(CrossSystem.class));
     }
 
     public static class ReferenceNode {

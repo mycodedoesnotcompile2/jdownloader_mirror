@@ -11,6 +11,7 @@ package org.appwork.utils.net.httpconnection.trust.ide;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -39,21 +40,22 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.storage.flexijson.FlexiJSonArray;
+import org.appwork.storage.flexijson.FlexiJSonObject;
+import org.appwork.storage.flexijson.FlexiJSonValue;
+import org.appwork.storage.flexijson.KeyValueElement;
+import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.Hash;
 import org.appwork.utils.IO;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 import org.appwork.utils.net.httpconnection.trust.ccadb.tests.CCADBCertificateVerificationTest;
 import org.appwork.utils.os.WindowsCertUtils;
-import org.appwork.storage.flexijson.FlexiJSonArray;
-import org.appwork.storage.flexijson.FlexiJSonObject;
-import org.appwork.storage.flexijson.FlexiJSonValue;
-import org.appwork.storage.flexijson.KeyValueElement;
-import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 
 /**
  * Validates root certificates against multiple trust providers (JRE, OS, Mozilla/CCADB, CT Sycamore, Apple, Google Chrome, Android,
@@ -99,13 +101,14 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
  * (fingerprint-only stores) by loading the cert from <a href="https://crt.sh/">crt.sh</a> by SHA-256; the downloaded cert is verified by
  * fingerprint before use (max 200 fetches).
  * <p>
- * <b>Reference: zmap/rootfetch</b> (https://github.com/zmap/rootfetch) – Python scripts to fetch root stores from Apple, Microsoft,
- * Mozilla NSS, Java (keytool), Android (git), and Google CT (get-roots). Comparison: we use <i>Mozilla</i> certdata from hg.mozilla.org (NSS
- * tip), same idea; <i>Microsoft</i> we use certutil/SST and Disallowed store, they use authroot.stl + per-cert .crt from
+ * <b>Reference: zmap/rootfetch</b> (https://github.com/zmap/rootfetch) – Python scripts to fetch root stores from Apple, Microsoft, Mozilla
+ * NSS, Java (keytool), Android (git), and Google CT (get-roots). Comparison: we use <i>Mozilla</i> certdata from hg.mozilla.org (NSS tip),
+ * same idea; <i>Microsoft</i> we use certutil/SST and Disallowed store, they use authroot.stl + per-cert .crt from
  * download.windowsupdate.com; <i>Apple</i> we use support.apple.com lists, they use opensource.apple.com tarballs; <i>Android</i> we use
- * googlesource roots.pem (pinned rev), they clone git and use latest stable tag; <i>CT</i> we use Sycamore and Google Pilot as separate providers (RFC 6962 get-roots); they use multiple Google CT logs and a union. Useful URLs from rootfetch: Microsoft
- * authroot.stl = {@code http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authroot.stl} (alternative to SST);
- * Google CT get-roots e.g. {@code https://ct.googleapis.com/pilot/ct/v1/get-roots}.
+ * googlesource roots.pem (pinned rev), they clone git and use latest stable tag; <i>CT</i> we use Sycamore and Google Pilot as separate
+ * providers (RFC 6962 get-roots); they use multiple Google CT logs and a union. Useful URLs from rootfetch: Microsoft authroot.stl =
+ * {@code http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authroot.stl} (alternative to SST); Google CT
+ * get-roots e.g. {@code https://ct.googleapis.com/pilot/ct/v1/get-roots}.
  */
 public final class RootCertificateTrustValidator {
     /** Result per certificate: fingerprint, subject, and the names of providers that accept it. */
@@ -167,21 +170,46 @@ public final class RootCertificateTrustValidator {
         MICROSOFT_DISALLOWED_STORE
     }
 
+    /**
+     * Returns a short description and optional URL for the rejection reason (for console output).
+     */
+    public static String getRejectionReasonDescription(final RejectionReason reason) {
+        if (reason == null) {
+            return "";
+        }
+        switch (reason) {
+        case MICROSOFT_DISABLED_CCADB:
+            return "Microsoft Trusted Root Program: root is in CCADB report with status 'Disabled' (no longer trusted by Microsoft).";
+        case MOZILLA_DISTRUSTED:
+            return "Mozilla NSS certdata: root is explicitly distrusted for server auth (CKT_NSS_NOT_TRUSTED).";
+        case APPLE_BLOCKED_CONSTRAINED:
+            return "Apple: root is Blocked or TLS constrained (cannot be used for TLS). S/MIME, Timestamp, Code Signing constrained are not included. See https://support.apple.com/en-us/103255";
+        case CHROME_BLOCKLIST:
+            return "Chromium/Chrome blocklist: root (or cert) is listed as compromised or misissued. See Chromium net/data/ssl/blocklist.";
+        case CRTSH_REVOKED:
+            return "crt.sh: certificate is reported as revoked or rejected in the crt.sh database.";
+        case MICROSOFT_DISALLOWED_STORE:
+            return "Microsoft Windows: root is in the Disallowed Certificates store (distrusted by Windows Update / enterprise).";
+        default:
+            return reason.name();
+        }
+    }
+
     private static final String       AUTH_TYPE                       = "RSA";
     private final List<ProviderCheck> checks                          = new ArrayList<ProviderCheck>();
     /** CT get-roots URLs (RFC 6962); see rootfetch ct.py. */
     private static final String       SYCAMORE_GET_ROOTS_URL          = "https://log.sycamore.ct.letsencrypt.org/2025h2d/ct/v1/get-roots";
-    private static final String       GOOGLE_CT_PILOT_GET_ROOTS_URL  = "https://ct.googleapis.com/pilot/ct/v1/get-roots";
+    private static final String       GOOGLE_CT_PILOT_GET_ROOTS_URL   = "https://ct.googleapis.com/pilot/ct/v1/get-roots";
     private static Set<String>        sycamoreRootFingerprintsCache;
     private static final Object       SYCAMORE_LOCK                   = new Object();
     private static Set<String>        googlePilotRootFingerprintsCache;
     private static final Object       GOOGLE_PILOT_LOCK               = new Object();
     /**
-     * Apple Root Store from opensource tarball (certificates/roots as DER). List of tags from GitHub API; latest tag used for download.
-     * See https://github.com/apple-oss-distributions/security_certificates
+     * Apple Root Store from opensource tarball (certificates/roots as DER). List of tags from GitHub API; latest tag used for download. See
+     * https://github.com/apple-oss-distributions/security_certificates
      */
     private static final String       APPLE_TARBALL_TAGS_API          = "https://api.github.com/repos/apple-oss-distributions/security_certificates/tags";
-    private static final String       APPLE_TARBALL_ARCHIVE_BASE     = "https://github.com/apple-oss-distributions/security_certificates/archive/refs/tags/";
+    private static final String       APPLE_TARBALL_ARCHIVE_BASE      = "https://github.com/apple-oss-distributions/security_certificates/archive/refs/tags/";
     private static Set<String>        appleRootFingerprintsCache;
     private static final Object       APPLE_LOCK                      = new Object();
     /**
@@ -192,9 +220,8 @@ public final class RootCertificateTrustValidator {
     private static Set<String>        appleRestrictedFingerprintsCache;
     private static final Object       APPLE_RESTRICTED_LOCK           = new Object();
     /**
-     * Chromium net/data/ssl tree at main (latest). See
-     * https://chromium.googlesource.com/chromium/src/+/main/net/data/ssl
-     * Used so all Chromium SSL data URLs point to the same revision; change this to pin a commit or use another branch.
+     * Chromium net/data/ssl tree at main (latest). See https://chromium.googlesource.com/chromium/src/+/main/net/data/ssl Used so all
+     * Chromium SSL data URLs point to the same revision; change this to pin a commit or use another branch.
      */
     private static final String       CHROMIUM_SSL_DATA_BASE_URL      = "https://raw.githubusercontent.com/chromium/chromium/main/net/data/ssl";
     /**
@@ -220,8 +247,8 @@ public final class RootCertificateTrustValidator {
     private static Set<String>        microsoftCCADBDisabledFingerprintsCache;
     private static final Object       MICROSOFT_CCADB_LOCK            = new Object();
     /** Microsoft AuthRoot from authroot.stl (CTL) + per-cert .crt; cross-platform. See rootfetch microsoft.py. */
-    private static final String       MICROSOFT_AUTHROOT_STL_URL     = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authroot.stl";
-    private static final String       MICROSOFT_AUTHROOT_CRT_BASE    = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/";
+    private static final String       MICROSOFT_AUTHROOT_STL_URL      = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authroot.stl";
+    private static final String       MICROSOFT_AUTHROOT_CRT_BASE     = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/";
     private static Set<String>        microsoftAuthRootStlFingerprintsCache;
     private static final Object       MICROSOFT_AUTHROOT_STL_LOCK     = new Object();
     /** Mozilla Included Roots PEM (CCADB, TrustBitsInclude=Websites). */
@@ -625,9 +652,9 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Runs {@code certutil -syncWithWU [dir]} to sync the local Windows certificate stores (Root, Disallowed, etc.) from Windows Update
-     * and optionally write files (e.g. disallowedcert.sst, authrootstl.cab) to the given directory. Call before reading the Disallowed
-     * store so the bad-cert list is up to date. Windows only; no-op on other platforms.
+     * Runs {@code certutil -syncWithWU [dir]} to sync the local Windows certificate stores (Root, Disallowed, etc.) from Windows Update and
+     * optionally write files (e.g. disallowedcert.sst, authrootstl.cab) to the given directory. Call before reading the Disallowed store so
+     * the bad-cert list is up to date. Windows only; no-op on other platforms.
      *
      * @param workDir
      *            directory for certutil output (disallowedcert.sst, .crt files, etc.); if non-null, certutil writes files here and we can
@@ -828,8 +855,8 @@ public final class RootCertificateTrustValidator {
 
     /**
      * Parses a gzip-compressed tar stream (Apple security_certificates archive). Reads entries under certificates/roots/ (DER format),
-     * parses each as X.509 and returns SHA-256 fingerprints. Tar format: 512-byte header (filename 0-99, size octal at 124-135), then
-     * file content padded to 512-byte blocks.
+     * parses each as X.509 and returns SHA-256 fingerprints. Tar format: 512-byte header (filename 0-99, size octal at 124-135), then file
+     * content padded to 512-byte blocks.
      */
     private static Set<String> parseAppleTarballForRootFingerprints(final InputStream tarGzStream) {
         final Set<String> fingerprints = new TreeSet<String>();
@@ -908,8 +935,9 @@ public final class RootCertificateTrustValidator {
 
     /**
      * Loads SHA-256 fingerprints from the Apple "CA certificates with additional constraints" page
-     * (https://support.apple.com/en-us/103255). Includes blocked certificates and all constrained certificates (TLS constrained, S/MIME
-     * constrained, etc.). Used for the rejected list so that roots Apple blocks or restricts for TLS are not trusted for server auth.
+     * (https://support.apple.com/en-us/103255). Only <b>Blocked Certificates</b> and <b>TLS constrained</b> are included.
+     * S/MIME constrained, Timestamp constrained, and Code Signing constrained are explicitly excluded. Used for the rejected list
+     * so that roots Apple blocks or restricts for TLS are not trusted for server auth.
      */
     public static Set<String> loadAppleRestrictedFingerprints() {
         synchronized (APPLE_RESTRICTED_LOCK) {
@@ -923,9 +951,25 @@ public final class RootCertificateTrustValidator {
             if (html == null) {
                 return fingerprints;
             }
-            // Page contains tables: Blocked Certificates, TLS constrained, S/MIME constrained, etc. All use 64 hex chars.
+            final String htmlLower = html.toLowerCase(Locale.ROOT);
+            // Only Blocked Certificates and TLS constrained; exclude S/MIME, Timestamp, Code Signing constrained.
+            final int blockedIdx = htmlLower.indexOf("blocked certificates");
+            final int constrainedIdx = htmlLower.indexOf("constrained certificates");
+            final int tlsIdx = htmlLower.indexOf("tls constrained");
+            final int smimeIdx = htmlLower.indexOf("s/mime constrained");
+            final int timestampIdx = htmlLower.indexOf("timestamp constrained");
+            final int codeSigningIdx = htmlLower.indexOf("code signing constrained");
+            StringBuilder section = new StringBuilder();
+            if (blockedIdx >= 0) {
+                final int blockEnd = (tlsIdx >= 0 && tlsIdx > blockedIdx) ? tlsIdx : (constrainedIdx >= 0 && constrainedIdx > blockedIdx ? constrainedIdx : html.length());
+                section.append(html.substring(blockedIdx, blockEnd));
+            }
+            if (tlsIdx >= 0) {
+                final int tlsEnd = (smimeIdx > tlsIdx) ? smimeIdx : (timestampIdx > tlsIdx ? timestampIdx : (codeSigningIdx > tlsIdx ? codeSigningIdx : html.length()));
+                section.append(html.substring(tlsIdx, tlsEnd));
+            }
             final Pattern p = Pattern.compile("[0-9a-fA-F]{64}");
-            final Matcher m = p.matcher(html);
+            final Matcher m = p.matcher(section.toString());
             while (m.find()) {
                 fingerprints.add(m.group().toLowerCase(Locale.ROOT));
             }
@@ -1007,7 +1051,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Enables validation against the Certificate Transparency log Google Pilot. Roots present in this log are treated as "CT (Google Pilot)".
+     * Enables validation against the Certificate Transparency log Google Pilot. Roots present in this log are treated as "CT (Google
+     * Pilot)".
      */
     public void enableGooglePilotCT() {
         final Set<String> set = loadGooglePilotRootFingerprints();
@@ -1735,7 +1780,8 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Validates a single certificate.
+     * Validates a single certificate (fingerprint in store / single-cert provider check). Use {@link #validateChain(X509Certificate[])} to
+     * check whether the full chain is trusted by each store (TLS-style).
      */
     public CertTrustResult validateOne(final X509Certificate cert) {
         String fingerprint = null;
@@ -1757,6 +1803,48 @@ public final class RootCertificateTrustValidator {
             }
             try {
                 final TrustResult result = check.provider.checkServerTrusted(chain, AUTH_TYPE, null);
+                if (result != null && result.isTrusted()) {
+                    acceptedBy.add(check.name);
+                }
+            } catch (final Exception ignored) {
+                // not trusted by this provider
+            }
+        }
+        return new CertTrustResult(fpLower, subject, acceptedBy);
+    }
+
+    /**
+     * Validates the full certificate chain (as presented by the server, optionally with resolved root). For each store: reports whether
+     * that store <i>trusts</i> the chain (TLS-style: chain is valid for that store) or, for fingerprint-only stores, whether the chain's
+     * root CA is in the store. Rejected lists are not evaluated here; they indicate explicit block/revocation of the root.
+     *
+     * @param fullChain
+     *            full chain leaf-first, root last (e.g. [leaf, intermediate, root])
+     * @return result for the root cert: which stores trust this chain
+     */
+    public CertTrustResult validateChain(final X509Certificate[] fullChain) {
+        if (fullChain == null || fullChain.length == 0) {
+            return new CertTrustResult("", "", Collections.<String> emptyList());
+        }
+        final X509Certificate root = fullChain[fullChain.length - 1];
+        String fingerprint = null;
+        try {
+            fingerprint = Hash.getSHA256(root.getEncoded());
+        } catch (final CertificateEncodingException e) {
+            // use empty fingerprint
+        }
+        final String fpLower = fingerprint != null ? fingerprint.toLowerCase(Locale.ROOT) : "";
+        final String subject = root.getSubjectX500Principal() != null ? root.getSubjectX500Principal().getName() : "";
+        final List<String> acceptedBy = new ArrayList<String>();
+        for (final ProviderCheck check : checks) {
+            if (check.fingerprintSet != null) {
+                if (check.fingerprintSet.contains(fpLower)) {
+                    acceptedBy.add(check.name);
+                }
+                continue;
+            }
+            try {
+                final TrustResult result = check.provider.checkServerTrusted(fullChain, AUTH_TYPE, null);
                 if (result != null && result.isTrusted()) {
                     acceptedBy.add(check.name);
                 }
@@ -1847,8 +1935,10 @@ public final class RootCertificateTrustValidator {
      * Returns a new list containing only certificates whose SHA-256 fingerprint is not in {@code rejectedFingerprints}. Used to build PEM
      * files that contain only CAs not in any provider's rejected/disabled list.
      *
-     * @param certs list of certificates (not modified)
-     * @param rejectedFingerprints set of SHA-256 fingerprints (lowercase) to exclude
+     * @param certs
+     *            list of certificates (not modified)
+     * @param rejectedFingerprints
+     *            set of SHA-256 fingerprints (lowercase) to exclude
      * @return new list of certs not in rejected set; empty if certs is null or rejected set is null/empty and all are to be kept
      */
     public static List<X509Certificate> filterOutRejectedFingerprints(final List<X509Certificate> certs, final Set<String> rejectedFingerprints) {
@@ -1956,9 +2046,9 @@ public final class RootCertificateTrustValidator {
     }
 
     /**
-     * Builds a map from SHA-256 fingerprint (64 hex lower case) to the set of {@link RejectionReason}s (which disabled provider list(s)
-     * it is in). Used to write appwork-merged-cadb-rejected.*.json with format {@code {"fingerprint":["REASON1","REASON2"], ...}}. Uses
-     * the full set of rejected fingerprints so that e.g. crt.sh-revoked entries appear even when the cert is not in candidates.
+     * Builds a map from SHA-256 fingerprint (64 hex lower case) to the set of {@link RejectionReason}s (which disabled provider list(s) it
+     * is in). Used to write appwork-merged-cadb-rejected.*.json with format {@code {"fingerprint":["REASON1","REASON2"], ...}}. Uses the
+     * full set of rejected fingerprints so that e.g. crt.sh-revoked entries appear even when the cert is not in candidates.
      */
     private static Map<String, Set<RejectionReason>> buildRejectedFingerprintToReasonsFromFingerprints(final Set<String> rejectedFps, final List<Set<String>> disabledFingerprintSets, final List<RejectionReason> disabledProviderReasons) {
         final Map<String, Set<RejectionReason>> fpToReasons = new LinkedHashMap<String, Set<RejectionReason>>();
@@ -2376,6 +2466,378 @@ public final class RootCertificateTrustValidator {
         }
     }
 
+    /**
+     * Fetches the server certificate chain from the given HTTPS URL (using {@link HttpClient} with {@link AllTrustProvider} so the chain is
+     * returned even when the certificate would be distrusted), then validates the root CA against all configured stores and prints detailed
+     * per-store status: which store trusts the root, which rejects it (with reason), and which does not contain the root.
+     * <p>
+     * Example: {@code RootCertificateTrustValidator.printStoreDetailed("https://appwork.org")}
+     *
+     * @param urlString
+     *            HTTPS URL (e.g. "https://appwork.org"); if no scheme is given, "https://" is prepended
+     */
+    public static void printStoreDetailed(final String urlString) {
+        String requestUrl = urlString != null ? urlString.trim() : "";
+        if (requestUrl.isEmpty()) {
+            System.err.println("printStoreDetailed: URL is empty.");
+            return;
+        }
+        if (!requestUrl.contains("://")) {
+            requestUrl = "https://" + requestUrl;
+        }
+        if (!requestUrl.toLowerCase(Locale.ROOT).startsWith("https://")) {
+            System.err.println("printStoreDetailed: URL must be HTTPS (got: " + requestUrl + ").");
+            return;
+        }
+        X509Certificate[] chain = null;
+        try {
+            final HttpClient client = new HttpClient();
+            client.setTrustProvider(AllTrustProvider.getInstance());
+            final HttpClient.RequestContext req = HttpClient.RequestContext.get(requestUrl);
+            client.execute(req);
+            final TrustResult tr = req.getTrustResult();
+            chain = tr != null ? tr.getChain() : null;
+        } catch (final Throwable e) {
+            System.err.println("printStoreDetailed: Failed to connect to " + requestUrl + ": " + (e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+            return;
+        }
+        if (chain == null || chain.length == 0) {
+            System.err.println("printStoreDetailed: No certificate chain received from " + requestUrl + ".");
+            return;
+        }
+        final X509Certificate lastInChain = chain[chain.length - 1];
+        final X509Certificate rootCert = resolveRootFromChain(chain);
+        final boolean chainWasIncomplete = (rootCert != lastInChain);
+        if (chainWasIncomplete && rootCert != null) {
+            System.out.println("(Server sent incomplete chain; root was resolved from JRE trust store.)");
+        }
+        String rootFp = null;
+        try {
+            rootFp = Hash.getSHA256(rootCert.getEncoded());
+        } catch (final CertificateEncodingException e) {
+            // ignore
+        }
+        final String rootFpLower = rootFp != null ? rootFp.toLowerCase(Locale.ROOT) : "";
+        final String rootSubject = rootCert.getSubjectX500Principal() != null ? rootCert.getSubjectX500Principal().getName() : "";
+        final RootCertificateTrustValidator validator = new RootCertificateTrustValidator();
+        validator.enableAppleRootStore();
+        validator.enableGoogleChromeRootStore();
+        validator.enableAndroidRootStore();
+        validator.enableMicrosoftCCADB();
+        validator.enableMozillaIncludedRootsPem();
+        validator.enableMozillaCertdata();
+        validator.enableMicrosoftWindowsUpdate();
+        final X509Certificate[] fullChain = (rootCert != lastInChain) ? buildFullChainWithRoot(chain, rootCert) : chain;
+        final CertTrustResult trustResult = validator.validateChain(fullChain);
+        final List<String> acceptedBy = trustResult.getAcceptedByProviders();
+        final Map<String, Integer> storeSizes = validator.getStoreSizes();
+        final List<String> disabledProviderNames = new ArrayList<String>();
+        final List<RejectionReason> disabledProviderReasons = new ArrayList<RejectionReason>();
+        final List<Set<String>> disabledFingerprintSets = new ArrayList<Set<String>>();
+        Set<String> microsoftDisabled = loadMicrosoftCCADBDisabledFingerprints();
+        if (microsoftDisabled != null && !microsoftDisabled.isEmpty()) {
+            disabledProviderNames.add("Microsoft: disabled (CCADB)");
+            disabledProviderReasons.add(RejectionReason.MICROSOFT_DISABLED_CCADB);
+            disabledFingerprintSets.add(microsoftDisabled);
+        }
+        final Set<String> mozillaDistrustedFps = loadMozillaCertdataDistrustedFingerprints();
+        if (mozillaDistrustedFps != null && !mozillaDistrustedFps.isEmpty()) {
+            disabledProviderNames.add("Mozilla: distrusted (certdata)");
+            disabledProviderReasons.add(RejectionReason.MOZILLA_DISTRUSTED);
+            disabledFingerprintSets.add(mozillaDistrustedFps);
+        }
+        final Set<String> appleRestrictedFps = loadAppleRestrictedFingerprints();
+        if (appleRestrictedFps != null && !appleRestrictedFps.isEmpty()) {
+            disabledProviderNames.add("Apple: blocked/constrained");
+            disabledProviderReasons.add(RejectionReason.APPLE_BLOCKED_CONSTRAINED);
+            disabledFingerprintSets.add(appleRestrictedFps);
+        }
+        final Set<String> chromeBlocklistFps = loadChromeBlocklistFingerprints();
+        if (chromeBlocklistFps != null && !chromeBlocklistFps.isEmpty()) {
+            disabledProviderNames.add("Chrome: blocklist");
+            disabledProviderReasons.add(RejectionReason.CHROME_BLOCKLIST);
+            disabledFingerprintSets.add(chromeBlocklistFps);
+        }
+        final Set<String> crtshRevoked = loadCrtshRevokedFingerprints(new X509Certificate[] { rootCert });
+        if (crtshRevoked != null && !crtshRevoked.isEmpty()) {
+            disabledProviderNames.add("crt.sh: revoked");
+            disabledProviderReasons.add(RejectionReason.CRTSH_REVOKED);
+            disabledFingerprintSets.add(crtshRevoked);
+        }
+        Set<String> microsoftDisallowedFps = WindowsCertUtils.getDisallowedStoreFingerprintsSha256();
+        if (microsoftDisallowedFps != null && !microsoftDisallowedFps.isEmpty()) {
+            disabledProviderNames.add("Microsoft: Disallowed store");
+            disabledProviderReasons.add(RejectionReason.MICROSOFT_DISALLOWED_STORE);
+            disabledFingerprintSets.add(microsoftDisallowedFps);
+        }
+        System.out.println("--- Store detail for URL: " + requestUrl + " ---");
+        System.out.println("Root CA subject: " + (rootSubject.length() > 80 ? rootSubject.substring(0, 77) + "..." : rootSubject));
+        System.out.println("Root CA SHA-256: " + (rootFpLower.length() == 64 ? rootFpLower : "(unknown)"));
+        System.out.println();
+        System.out.println("Per-store: does this store TRUST the chain? (chain validated TLS-style); count = CAs in that store:");
+        for (final Map.Entry<String, Integer> e : storeSizes.entrySet()) {
+            final String storeName = e.getKey();
+            final int count = e.getValue() != null ? e.getValue().intValue() : -1;
+            final String countStr = count >= 0 ? count + " CAs" : "n/a";
+            String status;
+            if (acceptedBy.contains(storeName)) {
+                status = "TRUSTED";
+            } else {
+                RejectionReason rejectionReason = null;
+                for (int i = 0; i < disabledFingerprintSets.size() && i < disabledProviderReasons.size(); i++) {
+                    if (disabledFingerprintSets.get(i) != null && disabledFingerprintSets.get(i).contains(rootFpLower)) {
+                        rejectionReason = disabledProviderReasons.get(i);
+                        break;
+                    }
+                }
+                if (rejectionReason != null) {
+                    status = "REJECTED (" + rejectionReason.name() + ")";
+                } else {
+                    status = "NOT_IN_STORE";
+                }
+            }
+            System.out.println("  " + storeName + ": " + status + " (" + countStr + " in store)");
+        }
+        System.out.println("Rejected/block lists: is the chain's root explicitly listed (JA)? count = entries in that list:");
+        for (int i = 0; i < disabledProviderNames.size(); i++) {
+            final String name = disabledProviderNames.get(i);
+            if (storeSizes.containsKey(name)) {
+                continue;
+            }
+            final Set<String> set = i < disabledFingerprintSets.size() ? disabledFingerprintSets.get(i) : null;
+            final int listSize = set != null ? set.size() : 0;
+            final RejectionReason reason = i < disabledProviderReasons.size() ? disabledProviderReasons.get(i) : null;
+            final String status = (set != null && set.contains(rootFpLower)) ? "REJECTED (" + (reason != null ? reason.name() : "?") + ")" : "NOT_IN_STORE";
+            System.out.println("  " + name + ": " + status + " (" + listSize + " entries in list)");
+        }
+        final List<String> rejectedListNames = new ArrayList<String>();
+        final List<RejectionReason> rejectedReasonsForRoot = new ArrayList<RejectionReason>();
+        for (int i = 0; i < disabledProviderNames.size() && i < disabledFingerprintSets.size(); i++) {
+            final Set<String> set = disabledFingerprintSets.get(i);
+            if (set != null && set.contains(rootFpLower)) {
+                rejectedListNames.add(disabledProviderNames.get(i));
+                rejectedReasonsForRoot.add(i < disabledProviderReasons.size() ? disabledProviderReasons.get(i) : null);
+            }
+        }
+        System.out.println();
+        System.out.println("Rejected lists containing this root:");
+        if (rejectedListNames.isEmpty()) {
+            System.out.println("  (none)");
+        } else {
+            for (int r = 0; r < rejectedListNames.size(); r++) {
+                final String name = rejectedListNames.get(r);
+                final RejectionReason reason = r < rejectedReasonsForRoot.size() ? rejectedReasonsForRoot.get(r) : null;
+                System.out.println("  " + name);
+                if (rootFpLower.length() == 64) {
+                    System.out.println("    Rejected CA SHA-256: " + rootFpLower + " (use for search)");
+                }
+                System.out.println("    -> " + getRejectionReasonDescription(reason));
+            }
+        }
+        System.out.println();
+        System.out.println("Rejection reason legend (what each list means):");
+        for (final RejectionReason r : RejectionReason.values()) {
+            System.out.println("  " + r.name() + ": " + getRejectionReasonDescription(r));
+        }
+        final int acceptedCount = acceptedBy.size();
+        final boolean inRejectedList = !rejectedListNames.isEmpty();
+        System.out.println();
+        System.out.println("Merged PEM files (this root would appear in):");
+        if (acceptedCount <= 0) {
+            System.out.println("  (none – root not accepted by any store)");
+        } else {
+            final List<String> mergedNames = new ArrayList<String>();
+            for (int k = 1; k <= acceptedCount; k++) {
+                mergedNames.add(DEFAULT_MERGED_PEM_BASENAME + "." + k + ".pem");
+            }
+            System.out.println("  " + join(mergedNames, ", "));
+            if (!inRejectedList) {
+                final List<String> noRejNames = new ArrayList<String>();
+                for (int k = 1; k <= acceptedCount; k++) {
+                    noRejNames.add(DEFAULT_MERGED_PEM_BASENAME + "." + k + "-no-rejected.pem");
+                }
+                System.out.println("  Also (not in any rejected list): " + join(noRejNames, ", "));
+            } else {
+                System.out.println("  (root is in a rejected/blocklist → not in *-no-rejected.pem)");
+            }
+        }
+        final List<File> foundIn = findMergedPemFilesContainingFingerprint(rootFpLower);
+        if (!foundIn.isEmpty()) {
+            System.out.println();
+            System.out.println("Found in (on disk):");
+            for (final File f : foundIn) {
+                System.out.println("  " + f.getAbsolutePath());
+            }
+        }
+        System.out.println("--- end ---");
+    }
+
+    /**
+     * Resolves the effective root CA from the server chain. If the last certificate is self-signed (subject equals issuer), it is returned.
+     * Otherwise the JRE default cacerts is searched for a CA whose subject equals the issuer of the last cert (handles incomplete chains
+     * where the server did not send the root).
+     *
+     * @param chain
+     *            server certificate chain (leaf first, root last; may be incomplete)
+     * @return the root CA to use for store checks (never null if chain is non-empty)
+     */
+    private static X509Certificate resolveRootFromChain(final X509Certificate[] chain) {
+        if (chain == null || chain.length == 0) {
+            return null;
+        }
+        final X509Certificate last = chain[chain.length - 1];
+        if (isSelfSigned(last)) {
+            return last;
+        }
+        final String issuerName = last.getIssuerDN() != null ? last.getIssuerDN().getName() : null;
+        if (issuerName == null || issuerName.length() == 0) {
+            return last;
+        }
+        java.io.FileInputStream fis = null;
+        try {
+            final File cacertsFile = new File(System.getProperty("java.home"), "lib/security/cacerts");
+            if (!cacertsFile.isFile()) {
+                return last;
+            }
+            final KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            final char[] password = "changeit".toCharArray();
+            try {
+                fis = new FileInputStream(cacertsFile);
+                ks.load(fis, password);
+            } catch (final Exception e1) {
+                try {
+                    if (fis != null) {
+                        try {
+                            fis.close();
+                        } catch (final IOException ignored) {
+                        }
+                        fis = null;
+                    }
+                    fis = new FileInputStream(cacertsFile);
+                    ks.load(fis, null);
+                } catch (final Exception e2) {
+                    return last;
+                }
+            }
+            final java.util.Enumeration<String> aliases = ks.aliases();
+            if (aliases == null) {
+                return last;
+            }
+            while (aliases.hasMoreElements()) {
+                final String alias = aliases.nextElement();
+                if (!ks.isCertificateEntry(alias)) {
+                    continue;
+                }
+                final Certificate c = ks.getCertificate(alias);
+                if (!(c instanceof X509Certificate)) {
+                    continue;
+                }
+                final X509Certificate ca = (X509Certificate) c;
+                final String subjectName = ca.getSubjectDN() != null ? ca.getSubjectDN().getName() : null;
+                if (subjectName != null && subjectName.equals(issuerName)) {
+                    return ca;
+                }
+            }
+        } catch (final Throwable ignored) {
+            // fall through to return last
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (final IOException ignored) {
+                }
+            }
+        }
+        return last;
+    }
+
+    private static boolean isSelfSigned(final X509Certificate cert) {
+        if (cert == null) {
+            return false;
+        }
+        final String sub = cert.getSubjectDN() != null ? cert.getSubjectDN().getName() : null;
+        final String iss = cert.getIssuerDN() != null ? cert.getIssuerDN().getName() : null;
+        return sub != null && sub.length() > 0 && sub.equals(iss);
+    }
+
+    /**
+     * Builds full chain by appending the resolved root to the server chain (for incomplete chains).
+     */
+    private static X509Certificate[] buildFullChainWithRoot(final X509Certificate[] serverChain, final X509Certificate rootCert) {
+        if (serverChain == null || rootCert == null) {
+            return serverChain != null ? serverChain : new X509Certificate[0];
+        }
+        final X509Certificate[] full = new X509Certificate[serverChain.length + 1];
+        for (int i = 0; i < serverChain.length; i++) {
+            full[i] = serverChain[i];
+        }
+        full[serverChain.length] = rootCert;
+        return full;
+    }
+
+    /**
+     * Scans default merged-PEM locations and current dir for PEM files whose certificate set contains the given SHA-256 fingerprint
+     * (lowercase 64 hex). Returns list of files that contain the fingerprint.
+     */
+    private static List<File> findMergedPemFilesContainingFingerprint(final String fingerprintSha256Lower) {
+        final List<File> out = new ArrayList<File>();
+        if (fingerprintSha256Lower == null || fingerprintSha256Lower.length() != 64) {
+            return out;
+        }
+        final List<File> dirsToScan = new ArrayList<File>();
+        try {
+            final File defaultOut = new File(AWTest.getWorkspace(), "AppWorkutils/src/org/appwork/utils/net/httpconnection/trust/ccadb");
+            if (defaultOut.isDirectory()) {
+                dirsToScan.add(defaultOut);
+                final File tempDir = new File(defaultOut, "temp");
+                if (tempDir.isDirectory()) {
+                    dirsToScan.add(tempDir);
+                }
+            }
+        } catch (final Throwable ignored) {
+            // AWTest.getWorkspace() not available
+        }
+        dirsToScan.add(new File("."));
+        for (final File dir : dirsToScan) {
+            final File[] files = dir.listFiles();
+            if (files == null) {
+                continue;
+            }
+            for (final File f : files) {
+                final String name = f.getName();
+                if (!f.isFile() || (!name.startsWith(DEFAULT_MERGED_PEM_BASENAME) && !name.startsWith(DEFAULT_MERGED_PEM_REJECTED_BASE))) {
+                    continue;
+                }
+                if (!name.endsWith(".pem")) {
+                    continue;
+                }
+                try {
+                    final byte[] bytes = IO.readFile(f);
+                    if (bytes == null || bytes.length == 0) {
+                        continue;
+                    }
+                    final X509Certificate[] certs = TrustUtils.loadCertificatesFromPEM(new ByteArrayInputStream(bytes));
+                    if (certs == null) {
+                        continue;
+                    }
+                    for (int i = 0; i < certs.length; i++) {
+                        try {
+                            final String fp = Hash.getSHA256(certs[i].getEncoded());
+                            if (fp != null && fingerprintSha256Lower.equals(fp.toLowerCase(Locale.ROOT))) {
+                                out.add(f);
+                                break;
+                            }
+                        } catch (final CertificateEncodingException ignored) {
+                        }
+                    }
+                } catch (final Throwable ignored) {
+                    // skip unreadable or invalid PEM
+                }
+            }
+        }
+        return out;
+    }
+
     private static String join(final List<String> list, final String sep) {
         final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < list.size(); i++) {
@@ -2492,6 +2954,7 @@ public final class RootCertificateTrustValidator {
     private static final String REJECTED_JSON_K_FOR_CCADB        = "3";
 
     public static void main(final String[] args) {
+        RootCertificateTrustValidator.printStoreDetailed("https://appwork.org");
         final File wuSyncDir = runCertutilSyncWithWU(null);
         if (wuSyncDir != null) {
             System.out.println("certutil -syncWithWU completed (Root/Disallowed stores synced; output in " + wuSyncDir.getAbsolutePath() + ").");

@@ -3,8 +3,15 @@ package org.appwork.remoteapi.docsv2.model;
 import java.util.List;
 
 import org.appwork.remoteapi.docsv2.model.DocsV2Definition.TypeDoc;
+import org.appwork.storage.Storable;
 
-public class DocsV2StorableDefinition {
+public class DocsV2StorableDefinition implements Storable {
+    /**
+     *
+     */
+    public DocsV2StorableDefinition() {
+    }
+
     private long          generatedAt;
     private String        javaType;
     private List<TypeDoc> types;

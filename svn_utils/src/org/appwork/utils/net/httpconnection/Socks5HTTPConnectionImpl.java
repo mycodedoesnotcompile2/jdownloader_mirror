@@ -33,9 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.Socket;
 import java.net.URL;
 
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
@@ -43,7 +40,6 @@ import org.appwork.utils.net.socketconnection.Socks5SocketConnection;
 import org.appwork.utils.net.socketconnection.SocksSocketConnection.DESTTYPE;
 
 public class Socks5HTTPConnectionImpl extends AbstractSocksHTTPConnection {
-
     public Socks5HTTPConnectionImpl(URL url, HTTPProxy proxy, DESTTYPE destType) {
         super(url, proxy, destType);
     }
@@ -53,29 +49,12 @@ public class Socks5HTTPConnectionImpl extends AbstractSocksHTTPConnection {
     }
 
     @Override
-    protected Socket createRawConnectionSocket(final InetAddress bindInetAddress) throws IOException {
-        final Socks5SocketConnection socket = buildSocksSocketConnection();
-        socket.setSoTimeout(getReadTimeout());
-        return socket;
-    }
-
-    @Override
-    protected SocketStreamInterface connect(SocketStreamInterface socketStream) throws IOException {
-        final Socket socket = socketStream.getSocket();
-        final Socks5SocketConnection socks5Socket = ((Socks5SocketConnection) socket);
-        this.endPointInetSocketAddress = buildConnectEndPointSocketAddress(socks5Socket);
-        socks5Socket.connect(endPointInetSocketAddress, this.getConnectTimeout(), proxyRequest);
-        return socketStream;
-    }
-
-    @Override
     protected IPVERSION getEndPointIPVersion() {
         return IPVERSION.IPV4_IPV6;
     }
 
     @Override
     protected Socks5SocketConnection buildSocksSocketConnection() {
-        final Socks5SocketConnection socket = new Socks5SocketConnection(this.getProxy(), getDestType());
-        return socket;
+        return new Socks5SocketConnection(this.getProxy(), getDestType());
     }
 }

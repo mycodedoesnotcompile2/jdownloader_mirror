@@ -1,11 +1,5 @@
 package org.jdownloader.extensions.eventscripter.sandboxobjects;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.plugins.DownloadLink;
-
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.ExtractionStatus;
 import org.jdownloader.extensions.extraction.MissingArchiveFile;
@@ -58,12 +52,9 @@ public class ArchiveFileSandbox {
 
     public CrawledLinkSandbox[] getCrawledLinks() {
         if (archiveFile instanceof CrawledLinkArchiveFile) {
-            final List<CrawledLinkSandbox> ret = new ArrayList<CrawledLinkSandbox>();
-            for (final CrawledLink link : ((CrawledLinkArchiveFile) archiveFile).getLinks()) {
-                ret.add(new CrawledLinkSandbox(link));
-            }
-            if (ret.size() > 0) {
-                return ret.toArray(new CrawledLinkSandbox[0]);
+            final CrawledLinkSandbox[] ret = CrawledLinkSandbox.wrapSandBox(((CrawledLinkArchiveFile) archiveFile).getLinks());
+            if (ret.length > 0) {
+                return ret;
             }
         }
         return null;
@@ -71,12 +62,9 @@ public class ArchiveFileSandbox {
 
     public DownloadLinkSandBox[] getDownloadLinks() {
         if (archiveFile instanceof DownloadLinkArchiveFile) {
-            final List<DownloadLinkSandBox> ret = new ArrayList<DownloadLinkSandBox>();
-            for (final DownloadLink link : ((DownloadLinkArchiveFile) archiveFile).getDownloadLinks()) {
-                ret.add(new DownloadLinkSandBox(link));
-            }
-            if (ret.size() > 0) {
-                return ret.toArray(new DownloadLinkSandBox[0]);
+            final DownloadLinkSandBox[] ret = DownloadLinkSandBox.wrapSandBox(((DownloadLinkArchiveFile) archiveFile).getDownloadLinks());
+            if (ret.length > 0) {
+                return ret;
             }
         }
         return null;

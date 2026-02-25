@@ -49,6 +49,7 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.txtresource.TranslationFactory;
@@ -74,7 +75,7 @@ import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
 public class BasicHTTP implements Interruptible {
     protected final static Charset          UTF8           = Charset.forName("UTF-8");
-    protected HashSet<Integer>              allowedResponseCodes;
+    protected Set<Integer>                  allowedResponseCodes;
     protected final HashMap<String, String> requestHeader;
     protected volatile HTTPConnection       connection;
     protected int                           connectTimeout = 15000;
@@ -88,21 +89,18 @@ public class BasicHTTP implements Interruptible {
         this.requestHeader = new HashMap<String, String>();
     }
 
-    /**
-     * @param connection
-     *            TODO
-     * @throws IOException
-     *
-     */
     protected void checkResponseCode(HTTPConnection connection) throws InvalidResponseCode {
-        final HashSet<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
-        if (allowedResponseCodes != null) {
-            if (allowedResponseCodes.contains(-1)) {
-                // allow all
-                return;
-            } else if (!allowedResponseCodes.contains(connection.getResponseCode())) {
-                throw this.createInvalidResponseCodeException(connection);
-            }
+        final Set<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
+        if (allowedResponseCodes == null) {
+            return;
+        } else if (allowedResponseCodes.contains(connection.getResponseCode())) {
+            return;
+        } else if (allowedResponseCodes.contains(-1) && connection.getResponseCode() != HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
+            // if we want to allow 999, allowedResponseCodes MUSt explicitly contain it. -1 does not allow 999 but all others
+            // allow all
+            return;
+        } else {
+            throw this.createInvalidResponseCodeException(connection);
         }
     }
 
@@ -116,6 +114,9 @@ public class BasicHTTP implements Interruptible {
      * @return
      */
     protected InvalidResponseCode createInvalidResponseCodeException(HTTPConnection connection) {
+        if (connection != null && connection.getResponseCode() == HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
+            return new InvalidHttpResponseException(connection);
+        }
         return new InvalidResponseCode(connection);
     }
 
@@ -375,7 +376,7 @@ public class BasicHTTP implements Interruptible {
         }
     }
 
-    public HashSet<Integer> getAllowedResponseCodes() {
+    public Set<Integer> getAllowedResponseCodes() {
         return this.allowedResponseCodes;
     }
 
@@ -563,7 +564,7 @@ public class BasicHTTP implements Interruptible {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override
@@ -925,7 +926,7 @@ public class BasicHTTP implements Interruptible {
     }
 
     protected void setAllowedResponseCodes(final HTTPConnection connection) {
-        final HashSet<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
+        final Set<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
         if (allowedResponseCodes != null) {
             final int[] ret = new int[allowedResponseCodes.size()];
             int i = 0;
@@ -937,7 +938,7 @@ public class BasicHTTP implements Interruptible {
     }
 
     public void setAllowedResponseCodes(final int... codes) {
-        final HashSet<Integer> allowedResponseCodes = new HashSet<Integer>();
+        final Set<Integer> allowedResponseCodes = new HashSet<Integer>();
         for (final int i : codes) {
             allowedResponseCodes.add(i);
         }

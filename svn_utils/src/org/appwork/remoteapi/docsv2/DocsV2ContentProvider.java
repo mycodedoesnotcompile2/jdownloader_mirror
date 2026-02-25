@@ -7,4 +7,6 @@ public interface DocsV2ContentProvider {
     String createDocsDefinitionJson() throws Exception;
 
     String createStorableDefinitionJson(String javaType) throws Exception;
+
+    String createExampleJson(String javaType, boolean includeDocumentation) throws Exception;
 }

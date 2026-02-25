@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -1182,15 +1182,19 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public boolean hasIcon(final String key) {
-        boolean hasIcon = false;
+        return getIconURL(key) != null;
+    }
+
+    public URL getIconURL(final String key) {
+        URL url = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            hasIcon = delegate.hasIcon(key);
+            url = delegate.getIconURL(key);
         }
-        if (!hasIcon) {
-            hasIcon = lookupImageUrl(key, null) != null;
+        if (url == null) {
+            url = lookupImageUrl(key, null);
         }
-        return hasIcon;
+        return url;
     }
 
     /**
@@ -1215,18 +1219,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         } else {
             return path.substring(index + 1);
         }
-    }
-
-    public URL getIconURL(final String string) {
-        URL ret = null;
-        final Theme delegate = getDelegate();
-        if (delegate != null) {
-            ret = delegate.getIconURL(string);
-        }
-        if (ret == null) {
-            ret = lookupImageUrl(string, null);
-        }
-        return ret;
     }
 
     /*

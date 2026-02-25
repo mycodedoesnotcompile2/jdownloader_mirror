@@ -161,7 +161,9 @@ public class SSLHttpServer extends HttpServer {
         return sc;
     }
 
-    /** ALPN protocol "http/1.1" (used only on Java 9+ via reflection to avoid compile dependency on {@code javax.net.ssl.SSLParameters}). */
+    /**
+     * ALPN protocol "http/1.1" (used only on Java 9+ via reflection to avoid compile dependency on {@code javax.net.ssl.SSLParameters}).
+     */
     private static final String[] ALPN_HTTP_1_1 = new String[] { "http/1.1" };
 
     /**
@@ -248,9 +250,9 @@ public class SSLHttpServer extends HttpServer {
     }
 
     private static void closeQuietly(final SSLSocket sslSocket) {
-        LogV3.fine("SSL connection closed by client or handshake abort");
         try {
-            if (sslSocket != null) {
+            if (sslSocket != null && !sslSocket.isClosed()) {
+                LogV3.fine("SSL connection closed by client or handshake abort");
                 sslSocket.close();
             }
         } catch (final Throwable ignored) {

@@ -34,6 +34,7 @@
 package org.appwork.testframework;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -45,9 +46,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.serializer.Deser;
 import org.appwork.utils.Application;
@@ -90,7 +93,6 @@ public class TestJREProvider {
          * 64-bit JRE
          */
         BIT_64;
-
         /**
          * Returns the current system's bitness.
          */
@@ -392,17 +394,17 @@ public class TestJREProvider {
             LogV3.log(e);
         }
     }
-    // ==================== NEW API with JreOptions ====================
 
+    // ==================== NEW API with JreOptions ====================
     /**
      * Executes a method on a class in a JRE with the specified options. The class is loaded directly in the child JRE (not serialized).
      * <p>
      * Example:
      *
      * <pre>
-     * TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_11_0), MyTest.class, "testMethod");
-     * TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_8).jvmArgs("-Xmx512m"), MyTest.class, "testWithParams", "arg1", 42);
-     * TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_6).bit(Bitness.BIT_32).detailedVersion("1.6.0_45"), MyTest.class, "oldTest");
+     * TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_11_0), MyTest.class, &quot;testMethod&quot;);
+     * TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_8).jvmArgs(&quot;-Xmx512m&quot;), MyTest.class, &quot;testWithParams&quot;, &quot;arg1&quot;, 42);
+     * TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_6).bit(Bitness.BIT_32).detailedVersion(&quot;1.6.0_45&quot;), MyTest.class, &quot;oldTest&quot;);
      * </pre>
      *
      * @param options
@@ -437,17 +439,19 @@ public class TestJREProvider {
      * Executes a static method in a child JRE process.
      */
     private static void executeMethodInJRE(final File javaBinary, final File workFolder, final List<String> jvmArgs, final Class<?> clazz, final String methodName, final Object[] params, final JavaVersion version, final Bitness bitness) throws Exception {
-        final File compatibleRunnerDir = ensureCompatibleRunner(version, workFolder);
-        final boolean useMinimalRunner = compatibleRunnerDir != null;
+        final int targetClassVersion = getClassVersionForJava(version);
+        final boolean useMinimalRunner = targetClassVersion < getClassFileVersion(JREMethodRunner.class);
         File compiledClassesDir = null;
+        File minimalRunnerDir = null;
         if (useMinimalRunner) {
+            minimalRunnerDir = ensureCompatibleMinimalRunner(version, workFolder);
             compiledClassesDir = ensureCompatibleUserClass(version, workFolder, clazz);
         } else {
             checkClassVersionCompatibility(version, JREMethodRunner.class);
             checkClassVersionCompatibility(version, clazz);
         }
         if (useMinimalRunner && params != null && params.length > 0) {
-            throw new IllegalArgumentException("MinimalMethodRunner does not support parameters. Either compile your project with lower Java compliance level, or use a method without parameters for Java " + getFeatureVersion(version) + " tests.");
+            throw new IllegalArgumentException(MinimalMethodRunner.class.getSimpleName() + " does not support parameters. Either compile your project with lower Java compliance level, or use a method without parameters for Java " + getFeatureVersion(version) + " tests.");
         }
         workFolder.mkdirs();
         File paramsFile = null;
@@ -459,11 +463,11 @@ public class TestJREProvider {
                 IO.secureWrite(paramsFile, json, SYNC.META_AND_DATA);
             }
             String classpath = System.getProperty("java.class.path");
-            if (useMinimalRunner) {
-                classpath = compatibleRunnerDir.getAbsolutePath() + File.pathSeparator + classpath;
-                if (compiledClassesDir != null) {
-                    classpath = compiledClassesDir.getAbsolutePath() + File.pathSeparator + classpath;
-                }
+            if (useMinimalRunner && minimalRunnerDir != null) {
+                classpath = minimalRunnerDir.getAbsolutePath() + File.pathSeparator + classpath;
+            }
+            if (useMinimalRunner && compiledClassesDir != null) {
+                classpath = compiledClassesDir.getAbsolutePath() + File.pathSeparator + classpath;
             }
             final List<String> command = new ArrayList<String>();
             command.add(javaBinary.getAbsolutePath());
@@ -473,7 +477,7 @@ public class TestJREProvider {
             command.add("-cp");
             command.add(classpath);
             if (useMinimalRunner) {
-                command.add("MinimalMethodRunner");
+                command.add(MinimalMethodRunner.class.getName());
                 command.add(clazz.getName());
                 command.add(methodName);
                 command.add(exceptionFile.getAbsolutePath());
@@ -484,7 +488,7 @@ public class TestJREProvider {
                 command.add(paramsFile != null ? paramsFile.getAbsolutePath() : "null");
                 command.add(exceptionFile.getAbsolutePath());
             }
-            LogV3.info("Starting JRE method: " + clazz.getName() + "." + methodName + "() in " + javaBinary.getAbsolutePath() + (useMinimalRunner ? " (using MinimalMethodRunner)" : ""));
+            LogV3.info("Starting JRE method: " + clazz.getName() + "." + methodName + "() in " + javaBinary.getAbsolutePath() + (useMinimalRunner ? " (using " + MinimalMethodRunner.class.getSimpleName() + ")" : ""));
             final ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(false);
             final Process process = pb.start();
@@ -510,7 +514,7 @@ public class TestJREProvider {
                         errorMessage = "Class or method not found in child JRE: " + clazz.getName() + "." + methodName;
                         break;
                     case 3:
-                        errorMessage = "Invalid arguments passed to MinimalMethodRunner";
+                        errorMessage = "Invalid arguments passed to " + MinimalMethodRunner.class.getSimpleName();
                         break;
                     default:
                         errorMessage = "Child JRE process exited with code " + exitCode;
@@ -589,7 +593,7 @@ public class TestJREProvider {
     }
 
     /**
-     * Reads exception information from a text file written by MinimalMethodRunner.
+     * Reads exception information from a text file written by {@link MinimalMethodRunner}.
      */
     private static String readTextExceptionFromFile(final File exceptionFile) {
         if (!exceptionFile.exists() || exceptionFile.length() == 0) {
@@ -633,17 +637,74 @@ public class TestJREProvider {
      * Returns a folder name for the given OS family.
      */
     private static String getOSFolderName(final OSFamily osFamily) {
-        switch (osFamily) {
-        case WINDOWS:
-            return "windows";
-        case LINUX:
-        case BSD:
-            return "linux";
-        case MAC:
-            return "mac";
-        default:
-            return "unknown";
+        return osFamily.name().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Ensures a MinimalMethodRunner compatible with the target JRE is available. If the in-repo MinimalMethodRunner.class is too new
+     * (e.g. project compiled with Java 8 but target is Java 7), compiles MinimalMethodRunner.java for the target version.
+     *
+     * @return Directory containing the compatible MinimalMethodRunner.class, or null to use the class from the classpath
+     */
+    private static File ensureCompatibleMinimalRunner(final JavaVersion targetVersion, final File workFolder) throws Exception {
+        final int targetClassVersion = getClassVersionForJava(targetVersion);
+        final int runnerVersion;
+        try {
+            runnerVersion = getClassFileVersion(MinimalMethodRunner.class);
+        } catch (final Exception e) {
+            LogV3.warning("Could not read MinimalMethodRunner class version: " + e.getMessage());
+            return null;
         }
+        if (runnerVersion <= targetClassVersion) {
+            return null;
+        }
+        final File runnerDir = new File(workFolder, "compiled_minimal_runner");
+        final File runnerClassFile = new File(runnerDir, MinimalMethodRunner.class.getName().replace('.', '/') + ".class");
+        if (runnerClassFile.exists()) {
+            try {
+                final int compiledVersion = getClassFileVersionFromFile(runnerClassFile);
+                if (compiledVersion <= targetClassVersion) {
+                    LogV3.info("Using pre-compiled " + MinimalMethodRunner.class.getSimpleName() + " for Java " + getFeatureVersion(targetVersion));
+                    return runnerDir;
+                }
+            } catch (final Exception e) {
+                // Recompile
+            }
+        }
+        final File javacBinary = findSystemJavac();
+        if (javacBinary == null || !javacBinary.exists()) {
+            throw new UnsupportedClassVersionError(MinimalMethodRunner.class.getSimpleName() + " was compiled for Java " + getJavaVersionForClassVersion(runnerVersion) + " but target is Java " + getJavaVersionForClassVersion(targetClassVersion) + ". No javac found in system JDK to compile a compatible runner. Ensure you are running from a JDK (not JRE) or set project compiler compliance to " + getJavaVersionForClassVersion(targetClassVersion) + ".");
+        }
+        final List<File> sourcePaths = findSourcePaths();
+        if (sourcePaths.isEmpty()) {
+            throw new IOException("No source paths found to compile " + MinimalMethodRunner.class.getSimpleName());
+        }
+        final File runnerSourceFile = findSourceFileForClass(MinimalMethodRunner.class.getName(), sourcePaths);
+        if (runnerSourceFile == null || !runnerSourceFile.exists()) {
+            throw new UnsupportedClassVersionError(MinimalMethodRunner.class.getSimpleName() + " was compiled for Java " + getJavaVersionForClassVersion(runnerVersion) + " but target is Java " + getJavaVersionForClassVersion(targetClassVersion) + ". Source file not found for on-the-fly compilation. Set project compiler compliance to " + getJavaVersionForClassVersion(targetClassVersion) + " or ensure " + MinimalMethodRunner.class.getName() + ".java is on the source path.");
+        }
+        LogV3.info("Compiling " + MinimalMethodRunner.class.getSimpleName() + " for Java " + getFeatureVersion(targetVersion) + " (in-repo class is Java " + getJavaVersionForClassVersion(runnerVersion) + ")...");
+        deleteDirectory(runnerDir);
+        runnerDir.mkdirs();
+        // Source path root: directory that contains package root "org" (e.g. .../src/main/java for org.appwork.testframework)
+        File sourceRoot = runnerSourceFile.getParentFile();
+        for (int i = 0; i < 3; i++) {
+            sourceRoot = sourceRoot.getParentFile();
+            if (sourceRoot == null) {
+                throw new IOException("Could not determine source root for " + runnerSourceFile.getAbsolutePath());
+            }
+        }
+        final String targetVersionStr = getFeatureVersion(targetVersion) <= 8 ? "1." + getFeatureVersion(targetVersion) : String.valueOf(getFeatureVersion(targetVersion));
+        final List<File> sourceFiles = new ArrayList<File>();
+        sourceFiles.add(runnerSourceFile);
+        final StringBuilder compileOutput = new StringBuilder();
+        final int exitCode = compileWithArgFile(javacBinary, runnerDir, targetVersionStr, sourceRoot.getAbsolutePath(), sourceFiles, compileOutput);
+        if (exitCode != 0 || !runnerClassFile.exists()) {
+            LogV3.severe("Failed to compile " + MinimalMethodRunner.class.getSimpleName() + " for Java " + getFeatureVersion(targetVersion) + ":\n" + compileOutput.toString());
+            throw new IOException("Failed to compile " + MinimalMethodRunner.class.getSimpleName() + " for Java " + getFeatureVersion(targetVersion) + ". See log output above for details.");
+        }
+        LogV3.info(MinimalMethodRunner.class.getSimpleName() + " compiled successfully for Java " + getFeatureVersion(targetVersion));
+        return runnerDir;
     }
 
     /**
@@ -658,23 +719,6 @@ public class TestJREProvider {
             final String actualJavaVersion = getJavaVersionForClassVersion(actualClassVersion);
             throw new UnsupportedClassVersionError("Class " + clazz.getName() + " was compiled for Java " + actualJavaVersion + " (class version " + actualClassVersion + ") but target JRE is Java " + targetJavaVersion + " (class version " + targetClassVersion + "). " + "To run tests in older JREs, you need to compile your project with a lower compiler compliance level (e.g. 1.6) in Eclipse: " + "Project Properties -> Java Compiler -> Compiler compliance level");
         }
-    }
-
-    /**
-     * Source code for a minimal method runner that has no external dependencies and can be compiled for any Java version.
-     */
-    private static final String MINIMAL_METHOD_RUNNER_SOURCE = "import java.io.*;\n" + "import java.lang.reflect.*;\n" + "public class MinimalMethodRunner {\n" + "    public static void main(String[] args) {\n" + "        if (args.length < 3) { System.exit(3); return; }\n" + "        String className = args[0];\n" + "        String methodName = args[1];\n" + "        String exceptionFilePath = args[2];\n" + "        File exceptionFile = new File(exceptionFilePath);\n" + "        try {\n" + "            Class clazz = Class.forName(className);\n" + "            Method method = null;\n" + "            for (Method m : clazz.getDeclaredMethods()) {\n" + "                if (m.getName().equals(methodName)) { method = m; break; }\n" + "            }\n" + "            if (method == null) {\n" + "                throw new NoSuchMethodException(methodName);\n" + "            }\n"
-            + "            method.setAccessible(true);\n" + "            Object instance = null;\n" + "            if (!Modifier.isStatic(method.getModifiers())) {\n" + "                instance = clazz.newInstance();\n" + "            }\n" + "            method.invoke(instance);\n" + "            System.exit(0);\n" + "        } catch (InvocationTargetException e) {\n" + "            Throwable cause = e.getCause() != null ? e.getCause() : e;\n" + "            cause.printStackTrace(System.err);\n" + "            writeException(exceptionFile, cause);\n" + "            System.exit(1);\n" + "        } catch (Throwable e) {\n" + "            e.printStackTrace(System.err);\n" + "            writeException(exceptionFile, e);\n" + "            System.exit(2);\n" + "        }\n" + "    }\n" + "    private static void writeException(File f, Throwable e) {\n" + "        try {\n"
-            + "            PrintWriter pw = new PrintWriter(new FileWriter(f));\n" + "            pw.println(e.getClass().getName());\n" + "            pw.println(e.getMessage() != null ? e.getMessage() : \"\");\n" + "            e.printStackTrace(pw);\n" + "            pw.close();\n" + "        } catch (Exception ignore) {}\n" + "    }\n" + "}\n";
-
-    /**
-     * Ensures a compatible runner is available for the target JRE. If the built-in runner is not compatible, compiles a minimal runner
-     * using the target JDK's javac.
-     *
-     * @return Path to the directory containing the compatible runner class, or null if the built-in runner is compatible
-     */
-    private static File ensureCompatibleRunner(final JavaVersion targetVersion, final File jreCacheFolder) throws Exception {
-        return ensureCompatibleRunnerInternal(targetVersion, jreCacheFolder, "MinimalMethodRunner", MINIMAL_METHOD_RUNNER_SOURCE, JREMethodRunner.class);
     }
 
     /**
@@ -694,24 +738,18 @@ public class TestJREProvider {
         if (javacBinary == null || !javacBinary.exists()) {
             throw new UnsupportedClassVersionError("Class " + clazz.getName() + " was compiled for Java " + getJavaVersionForClassVersion(classVersion) + " but target is Java " + getJavaVersionForClassVersion(targetClassVersion) + ". No javac found in system JDK to recompile.");
         }
+        LogV3.info("Recompiling " + clazz.getName() + " for Java " + getFeatureVersion(targetVersion) + "...");
+        LogV3.info("Searching for source paths (classpath and project directories)...");
         final List<File> sourcePaths = findSourcePaths();
         if (sourcePaths.isEmpty()) {
             throw new IOException("No source paths found for recompilation");
         }
-        final File dependencyCacheFile = new File(compiledDir, "dependencies.cache");
-        Set<String> classesToCompile = loadDependencyCache(dependencyCacheFile);
-        boolean usedCache = classesToCompile != null;
-        if (classesToCompile == null) {
-            LogV3.info("Analyzing dependencies of " + clazz.getName() + " using ASM...");
-            classesToCompile = findClassesToRecompile(clazz.getName(), targetClassVersion);
-        }
+        LogV3.info("Found " + sourcePaths.size() + " source path(s). Resolving dependencies for " + clazz.getName() + " (target class version " + targetClassVersion + ")...");
+        Set<String> classesToCompile = findClassesToRecompile(clazz.getName(), targetClassVersion);
         if (classesToCompile.isEmpty()) {
             return null;
         }
-        if (isCacheValid(compiledDir, classesToCompile, targetClassVersion)) {
-            LogV3.info("Using pre-compiled " + clazz.getSimpleName() + " and " + (classesToCompile.size() - 1) + " dependencies for Java " + getFeatureVersion(targetVersion));
-            return compiledDir;
-        }
+        LogV3.info("Found " + classesToCompile.size() + " class(es) to recompile. Resolving source files...");
         deleteDirectory(compiledDir);
         compiledDir.mkdirs();
         final String targetVersionStr = getFeatureVersion(targetVersion) <= 8 ? "1." + getFeatureVersion(targetVersion) : String.valueOf(getFeatureVersion(targetVersion));
@@ -722,24 +760,14 @@ public class TestJREProvider {
             }
             sourcePathStr.append(sourcePaths.get(i).getAbsolutePath());
         }
-        LogV3.info("Using compiler: " + javacBinary.getAbsolutePath() + " (compiling with -target " + getFeatureVersion(targetVersion) + ")");
         List<File> sourceFiles = collectSourceFiles(classesToCompile, sourcePaths);
+        LogV3.info("Using compiler: " + javacBinary.getAbsolutePath() + " (compiling " + sourceFiles.size() + " source file(s) with -target " + getFeatureVersion(targetVersion) + ")...");
         StringBuilder compileOutput = new StringBuilder();
         int exitCode = compileWithArgFile(javacBinary, compiledDir, targetVersionStr, sourcePathStr.toString(), sourceFiles, compileOutput);
-        if (exitCode != 0 && usedCache && isClassNotFoundError(compileOutput.toString())) {
-            LogV3.info("Compilation failed with cached dependencies, re-analyzing with ASM...");
-            deleteDirectory(compiledDir);
-            compiledDir.mkdirs();
-            classesToCompile = findClassesToRecompile(clazz.getName(), targetClassVersion);
-            sourceFiles = collectSourceFiles(classesToCompile, sourcePaths);
-            compileOutput = new StringBuilder();
-            exitCode = compileWithArgFile(javacBinary, compiledDir, targetVersionStr, sourcePathStr.toString(), sourceFiles, compileOutput);
-        }
         if (exitCode != 0) {
             LogV3.severe("Compilation failed for Java " + getFeatureVersion(targetVersion) + ":\n" + compileOutput.toString());
             throw new IOException("Compilation failed for Java " + getFeatureVersion(targetVersion) + ". See log output above for details.");
         }
-        saveDependencyCache(dependencyCacheFile, classesToCompile);
         final String classFileName = clazz.getName().replace('.', '/') + ".class";
         final File compiledClassFile = new File(compiledDir, classFileName);
         if (!compiledClassFile.exists()) {
@@ -771,47 +799,7 @@ public class TestJREProvider {
         if (!missingSourceClasses.isEmpty()) {
             LogV3.warning("Some dependencies have no source available (will use existing .class files): " + missingSourceClasses);
         }
-        LogV3.info("Compiling " + sourceFiles.size() + " classes...");
         return sourceFiles;
-    }
-
-    private static Set<String> loadDependencyCache(final File cacheFile) {
-        if (!cacheFile.exists()) {
-            return null;
-        }
-        try {
-            final String content = IO.readFileToString(cacheFile);
-            final Set<String> classes = new HashSet<String>();
-            for (final String line : content.split("\n")) {
-                final String trimmed = line.trim();
-                if (!trimmed.isEmpty()) {
-                    classes.add(trimmed);
-                }
-            }
-            if (classes.isEmpty()) {
-                return null;
-            }
-            LogV3.info("Using cached dependency list (" + classes.size() + " classes)");
-            return classes;
-        } catch (final Exception e) {
-            return null;
-        }
-    }
-
-    private static void saveDependencyCache(final File cacheFile, final Set<String> classes) {
-        try {
-            final StringBuilder sb = new StringBuilder();
-            for (final String className : classes) {
-                sb.append(className).append("\n");
-            }
-            IO.secureWrite(cacheFile, sb.toString(), SYNC.META_AND_DATA);
-        } catch (final Exception e) {
-            LogV3.log(e);
-        }
-    }
-
-    private static boolean isClassNotFoundError(final String compileOutput) {
-        return compileOutput.contains("cannot find symbol") || compileOutput.contains("package") && compileOutput.contains("does not exist") || compileOutput.contains("ClassNotFoundException");
     }
 
     /**
@@ -859,62 +847,50 @@ public class TestJREProvider {
     }
 
     /**
-     * Checks if the cache directory contains all required classes with compatible versions.
-     */
-    private static boolean isCacheValid(final File compiledDir, final Set<String> classesToCompile, final int targetClassVersion) {
-        if (!compiledDir.exists() || !compiledDir.isDirectory()) {
-            return false;
-        }
-        for (final String className : classesToCompile) {
-            final String classFileName = className.replace('.', '/') + ".class";
-            final File classFile = new File(compiledDir, classFileName);
-            if (!classFile.exists()) {
-                return false;
-            }
-            try {
-                final int version = getClassFileVersionFromFile(classFile);
-                if (version > targetClassVersion) {
-                    return false;
-                }
-            } catch (final Exception e) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Uses ASM to find all classes that need to be recompiled for the target version.
+     * Uses ClassCollector2 (cached, fast) to find all classes that need to be recompiled for the target version.
      */
     private static Set<String> findClassesToRecompile(final String className, final int targetClassVersion) throws Exception {
         final Set<String> needsRecompile = new HashSet<String>();
-        final ClassCollector collector = new ClassCollector() {
-            @Override
-            protected boolean skip(final String clazz) {
-                if (super.skip(clazz)) {
-                    return true;
-                }
-                try {
-                    final int version = getClassFileVersion(Class.forName(clazz));
-                    return version <= targetClassVersion;
-                } catch (final Exception e) {
-                    return true;
-                }
-            }
-        };
-        final java.util.Map<String, String> allClasses = collector.getClasses(className, true);
+        final ClassLoader loader = TestJREProvider.class.getClassLoader();
+        final Map<String, String> allClasses = new ClassCollector2().getClasses(className, true);
         for (final String clazz : allClasses.keySet()) {
             try {
-                final int version = getClassFileVersion(Class.forName(clazz));
+                final int version = getClassFileVersionFromClassName(clazz, loader);
                 if (version > targetClassVersion) {
                     needsRecompile.add(clazz);
                 }
+            } catch (final Error e) {
+                needsRecompile.add(clazz);
             } catch (final Exception e) {
-                // Skip classes that can't be loaded
+                // Skip classes that can't be loaded or read
             }
         }
         needsRecompile.add(className);
         return needsRecompile;
+    }
+
+    /**
+     * Reads the class file major version from the classloader resource (no Class.forName). Returns -1 if not readable.
+     * Reads only the first 8 bytes (magic + minor + major) so unknown future Java versions are still compared correctly.
+     */
+    private static int getClassFileVersionFromClassName(final String className, final ClassLoader loader) throws IOException {
+        final String path = className.replace('.', '/') + ".class";
+        final InputStream is = loader.getResourceAsStream(path);
+        if (is == null) {
+            return -1;
+        }
+        try {
+            final DataInputStream dis = new DataInputStream(is);
+            final byte[] header = new byte[8];
+            dis.readFully(header);
+            // Class file: magic 0-3, minor 4-5, major 6-7 (big-endian)
+            if (header[0] == (byte) 0xCA && header[1] == (byte) 0xFE && header[2] == (byte) 0xBA && header[3] == (byte) 0xBE) {
+                return (header[6] & 0xFF) << 8 | (header[7] & 0xFF);
+            }
+            return -1;
+        } finally {
+            is.close();
+        }
     }
 
     /**
@@ -1006,51 +982,6 @@ public class TestJREProvider {
         }
     }
 
-    private static File ensureCompatibleRunnerInternal(final JavaVersion targetVersion, final File jreCacheFolder, final String runnerName, final String runnerSource, final Class<?> originalRunnerClass) throws Exception {
-        final int targetClassVersion = getClassVersionForJava(targetVersion);
-        final int runnerClassVersion = getClassFileVersion(originalRunnerClass);
-        if (runnerClassVersion <= targetClassVersion) {
-            return null;
-        }
-        final File runnerDir = new File(jreCacheFolder, "compiled_runner");
-        final File runnerClass = new File(runnerDir, runnerName + ".class");
-        if (runnerClass.exists()) {
-            final int compiledVersion = getClassFileVersionFromFile(runnerClass);
-            if (compiledVersion <= targetClassVersion) {
-                LogV3.info("Using pre-compiled " + runnerName + " for Java " + getFeatureVersion(targetVersion));
-                return runnerDir;
-            }
-            runnerClass.delete();
-        }
-        final File javacBinary = findSystemJavac();
-        if (javacBinary == null || !javacBinary.exists()) {
-            throw new UnsupportedClassVersionError(originalRunnerClass.getSimpleName() + " was compiled for Java " + getJavaVersionForClassVersion(runnerClassVersion) + " but target is Java " + getJavaVersionForClassVersion(targetClassVersion) + ". No javac found in system JDK to compile a compatible runner. " + "Ensure you are running from a JDK (not JRE) or compile your project with lower compiler compliance level.");
-        }
-        LogV3.info("Compiling " + runnerName + " for Java " + getFeatureVersion(targetVersion) + " using system javac...");
-        runnerDir.mkdirs();
-        final File sourceFile = new File(runnerDir, runnerName + ".java");
-        IO.writeStringToFile(sourceFile, runnerSource);
-        final String targetVersionStr = getFeatureVersion(targetVersion) <= 8 ? "1." + getFeatureVersion(targetVersion) : String.valueOf(getFeatureVersion(targetVersion));
-        final ProcessBuilder pb = new ProcessBuilder(javacBinary.getAbsolutePath(), "-source", targetVersionStr, "-target", targetVersionStr, "-d", runnerDir.getAbsolutePath(), sourceFile.getAbsolutePath());
-        pb.redirectErrorStream(true);
-        final Process process = pb.start();
-        final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String line;
-        final StringBuilder output = new StringBuilder();
-        while ((line = reader.readLine()) != null) {
-            output.append(line).append("\n");
-        }
-        final int exitCode = process.waitFor();
-        reader.close();
-        sourceFile.delete();
-        if (exitCode != 0 || !runnerClass.exists()) {
-            LogV3.severe("Failed to compile " + runnerName + " for Java " + getFeatureVersion(targetVersion) + ":\n" + output.toString());
-            throw new IOException("Failed to compile " + runnerName + ". See log output above for details.");
-        }
-        LogV3.info(runnerName + " compiled successfully");
-        return runnerDir;
-    }
-
     /**
      * Finds the javac binary from the current system JDK.
      */
@@ -1081,11 +1012,7 @@ public class TestJREProvider {
     private static int getClassFileVersionFromFile(final File classFile) throws IOException {
         final FileInputStream fis = new FileInputStream(classFile);
         try {
-            fis.skip(4);
-            fis.skip(2);
-            final int majorHigh = fis.read();
-            final int majorLow = fis.read();
-            return (majorHigh << 8) | majorLow;
+            return JavaVersion.readClassJVMVersion(fis).classID;
         } finally {
             fis.close();
         }
@@ -1098,21 +1025,19 @@ public class TestJREProvider {
      * Returns the class file major version for a JavaVersion.
      */
     private static int getClassVersionForJava(final JavaVersion version) {
-        final int feature = getFeatureVersion(version);
-        if (feature <= 1) {
-            return 45;
-        }
-        return 44 + feature;
+        return version.classID;
     }
 
     /**
      * Returns a human-readable Java version string for a class file version.
      */
     private static String getJavaVersionForClassVersion(final int classVersion) {
-        if (classVersion <= 48) {
-            return "1." + (classVersion - 44);
+        for (JavaVersion version : JavaVersion.values()) {
+            if (version.classID == classVersion) {
+                return version.getVersionString();
+            }
         }
-        return String.valueOf(classVersion - 44);
+        throw new WTFException("Unknown classVersion:" + classVersion);
     }
 
     /**
@@ -1121,15 +1046,8 @@ public class TestJREProvider {
     private static int getClassFileVersion(final Class<?> clazz) throws IOException {
         final String resourceName = "/" + clazz.getName().replace('.', '/') + ".class";
         final InputStream is = clazz.getResourceAsStream(resourceName);
-        if (is == null) {
-            return 52;
-        }
         try {
-            is.skip(4);
-            is.skip(2);
-            final int majorHigh = is.read();
-            final int majorLow = is.read();
-            return (majorHigh << 8) | majorLow;
+            return JavaVersion.readClassJVMVersion(is).classID;
         } finally {
             is.close();
         }
@@ -1431,7 +1349,6 @@ public class TestJREProvider {
         case WINDOWS:
             return "windows";
         case LINUX:
-        case BSD:
             return "linux";
         case MAC:
             return "mac";
@@ -1778,7 +1695,7 @@ public class TestJREProvider {
      * serve as fallback when the API is unavailable.
      */
     private static final String[][] ZULU_KNOWN_VERSIONS = {
-        // Java 6
+                                                        // Java 6
         { "6", "6.22.0.3", "6.0.119" },
         // Java 7
         { "7", "7.56.0.11", "7.0.352" },
@@ -1817,7 +1734,7 @@ public class TestJREProvider {
         // Java 24
         { "24", "24.28.79", "24" },
         // Java 25
-        { "25", "25.32.21", "25.0.2" } };
+        { "25", "25.32.21", "25.0.2" }                 };
 
     /**
      * Finds known Zulu version info for a Java feature version.

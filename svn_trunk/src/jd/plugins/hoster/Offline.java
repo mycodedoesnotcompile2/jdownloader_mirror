@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 52276 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52367 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -305,6 +305,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "hexload.com", "hexupload.net", "hexupload.com" });
         ret.add(new String[] { "uploadfile.pl", "wyslij-plik.pl", "wrzucplik.pl" });
         ret.add(new String[] { "playeur.com" });
+        ret.add(new String[] { "casthq.to" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

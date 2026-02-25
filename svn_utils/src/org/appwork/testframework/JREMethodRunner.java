@@ -42,14 +42,15 @@ import java.lang.reflect.Modifier;
 
 import org.appwork.serializer.Deser;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 
 /**
  * Runner class that executes a method on a class in a child JRE process. This class is used internally by
  * {@link TestJREProvider#runInJRE(org.appwork.utils.JavaVersion, Class, String, Object...)}.
  * <p>
- * The runner first looks for a static method. If not found, it looks for an instance method and creates an instance of the class using
- * the default constructor.
+ * The runner first looks for a static method. If not found, it looks for an instance method and creates an instance of the class using the
+ * default constructor.
  * <p>
  * Arguments:
  * <ul>
@@ -86,6 +87,7 @@ public class JREMethodRunner {
             System.exit(EXIT_INVALID_ARGS);
             return;
         }
+        Application.setApplication(".JREMethodRunner");
         final String className = args[0];
         final String methodName = args[1];
         final String paramsFilePath = args[2];

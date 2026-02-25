@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,65 +32,17 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpconnection;
+package org.appwork.utils.net.BasicHTTP;
 
-import java.net.InetAddress;
-
-import javax.net.ssl.KeyManager;
-
-import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
 
 /**
  * @author daniel
- * @date 28.07.2017
+ * @date Feb 17, 2026
  *
  */
-public class KeepAliveSSLSocketStream extends KeepAliveSocketStream implements SSLSocketStreamInterface {
-    public KeepAliveSSLSocketStream(HTTPProxy proxy, String host, SSLSocketStreamInterface socket, long keepAliveTimeout, long maxRequests, InetAddress localIP, InetAddress[] remoteIPs) {
-        super(proxy, host, socket, keepAliveTimeout, maxRequests, localIP, remoteIPs);
-    }
-
-    @Override
-    public boolean isSsl() {
-        return true;
-    }
-
-    @Override
-    public String getCipherSuite() {
-        return getSocketStream().getCipherSuite();
-    }
-
-    @Override
-    public SocketStreamInterface getParentSocketStream() {
-        return getSocketStream().getParentSocketStream();
-    }
-
-    public SSLSocketStreamInterface getSocketStream() {
-        return (SSLSocketStreamInterface) socket;
-    }
-
-    @Override
-    public SSLSocketStreamOptions getOptions() {
-        return getSocketStream().getOptions();
-    }
-
-    @Override
-    public SSLSocketStreamFactory getSSLSocketStreamFactory() {
-        return getSocketStream().getSSLSocketStreamFactory();
-    }
-
-    @Override
-    public TrustResult getTrustResult() {
-        return getSocketStream().getTrustResult();
-    }
-
-    @Override
-    public TrustProviderInterface getTrustProvider() {
-        return getSocketStream().getTrustProvider();
-    }
-
-    @Override
-    public KeyManager[] getKeyManager() {
-        return getSocketStream().getKeyManager();
+public class InvalidHttpResponseException extends InvalidResponseCode {
+    public InvalidHttpResponseException(HTTPConnection connection) {
+        super(connection);
     }
 }

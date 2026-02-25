@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 
@@ -30,7 +31,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52371 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class FlexShareCore extends antiDDoSForHost {
     public FlexShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,10 +130,19 @@ public abstract class FlexShareCore extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
-    // Using FlexShareScript 1.2.1, heavily modified
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
+        if (filenameFromURL != null) {
+            return filenameFromURL;
+        } else {
+            return this.getFID(link);
+        }
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         /*
@@ -144,15 +154,6 @@ public abstract class FlexShareCore extends antiDDoSForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
-        if (!link.isNameSet()) {
-            final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-            if (filenameFromURL != null) {
-                link.setName(filenameFromURL);
-            } else {
-                link.setName(this.getFID(link));
-            }
-        }
-        this.setBrowserExclusive();
         if (getAPIKey() != null) {
             return requestFileInformationAPI(link);
         } else {
@@ -163,12 +164,14 @@ public abstract class FlexShareCore extends antiDDoSForHost {
     public AvailableStatus requestFileInformationAPI(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
         getPage(getMainPage() + "/api/info.php?api_key=" + getAPIKey() + "&file_id=" + getFID(link));
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)file does not exist")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("file does not exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String filename = br.getRegex("\\[file_name\\] => (.*?)\n").getMatch(0);
         final String filesize = br.getRegex("\\[file_size\\] => (\\d+)\n").getMatch(0);
-        if (filename == null || filesize == null) {
+        if (StringUtils.isEmpty(filename) || StringUtils.isEmpty(filesize)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* Set final filename here because some hosters tag their files */
@@ -194,30 +197,33 @@ public abstract class FlexShareCore extends antiDDoSForHost {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
             }
-        } else {
-            br.followConnection();
-            if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)>\\s*The file you have requested does not exist")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            String filename = br.getRegex("(?i)<title>\\s*([^<]+)\\s*\\|\\s*ExtMatrix\\s*-\\s*The Premium Cloud Storage\\s*</title>").getMatch(0);
-            final Regex fileInfo = br.getRegex("style=\"text-align:(center|left|right);\">\\s*(Premium Only\\!)?([^\"<>]+) \\(([0-9\\.]+ [A-Za-z]+)(\\))?(,[^<>\"/]+)?</h1>");
-            if (filename == null) {
-                filename = fileInfo.getMatch(2);
-            }
-            String filesize = fileInfo.getMatch(3);
-            /* Set final filename here because hoster is tagging filenames that are given via Content-Disposition header. */
-            if (filename != null) {
-                filename = Encoding.htmlDecode(filename).trim();
-                /*
-                 * 2023-07-14: Premium users may get another representation of the file information html website -> Remove stuff we don't
-                 * need.
-                 */
-                filename = filename.replaceFirst("^(?i)Download \\|\\s*", "");
-                link.setFinalFileName(filename);
-            }
-            if (filesize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesize));
-            }
+            return AvailableStatus.TRUE;
+        }
+        br.followConnection();
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*The file you have requested does not exist")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Die von Ihnen angeforderte Datei existiert nicht")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String filename = br.getRegex("(?i)<title>\\s*([^<]+)\\s*\\|\\s*ExtMatrix\\s*-\\s*The Premium Cloud Storage\\s*</title>").getMatch(0);
+        final Regex fileInfo = br.getRegex("style=\"text-align:(center|left|right);\">\\s*(Premium Only\\!)?([^\"<>]+) \\(([0-9\\.]+ [A-Za-z]+)(\\))?(,[^<>\"/]+)?</h1>");
+        if (filename == null) {
+            filename = fileInfo.getMatch(2);
+        }
+        String filesize = fileInfo.getMatch(3);
+        /* Set final filename here because hoster is tagging filenames that are given via Content-Disposition header. */
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            /*
+             * 2023-07-14: Premium users may get another representation of the file information html website -> Remove stuff we don't need.
+             */
+            filename = filename.replaceFirst("^(?i)Download \\|\\s*", "");
+            link.setFinalFileName(filename);
+        }
+        if (filesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesize));
         }
         return AvailableStatus.TRUE;
     }
@@ -295,9 +301,9 @@ public abstract class FlexShareCore extends antiDDoSForHost {
     }
 
     protected void handleErrors(final DownloadLink link, final Account account) throws PluginException {
-        if (br.containsHTML("(?i)(>\\s*Premium Only\\s*\\!|you have requested require a premium account for download\\.\\s*<|you have requested require a premium account for download|>\\s*Only premium accounts are able to download this file)")) {
+        if (br.containsHTML("(>\\s*Premium Only\\s*\\!|you have requested require a premium account for download\\.\\s*<|you have requested require a premium account for download|>\\s*Only premium accounts are able to download this file)")) {
             throw new AccountRequiredException();
-        } else if (br.containsHTML("(?i)<title>\\s*Site Maintenance\\s*</title>")) {
+        } else if (br.containsHTML("<title>\\s*Site Maintenance\\s*</title>")) {
             if (dl != null) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server Maintenance", 30 * 60 * 1000l);
             } else {
@@ -411,7 +417,7 @@ public abstract class FlexShareCore extends antiDDoSForHost {
     }
 
     protected boolean isLoggedIN(final Browser br) {
-        if (br.getCookie(br.getHost(), "auth", Cookies.NOTDELETEDPATTERN) != null && br.containsHTML("(?i)/logout\\.php")) {
+        if (br.getCookie(br.getHost(), "auth", Cookies.NOTDELETEDPATTERN) != null && br.containsHTML("/logout\\.php")) {
             return true;
         } else {
             return false;
@@ -439,7 +445,7 @@ public abstract class FlexShareCore extends antiDDoSForHost {
                 }
             }
             final String validUntilDateStr = br.getRegex("(?i)Premium End\\s*:\\s*</td>\\s+<td>([^<>]*?)</td>").getMatch(0);
-            if (br.containsHTML("(?i)>\\s*Premium Member\\s*<")) {
+            if (br.containsHTML(">\\s*Premium Member\\s*<")) {
                 account.setType(AccountType.PREMIUM);
                 account.setConcurrentUsePossible(true);
                 if (validUntilDateStr != null) {
@@ -450,7 +456,7 @@ public abstract class FlexShareCore extends antiDDoSForHost {
                     }
                 }
                 if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    if (br.containsHTML("(?i)direct=0")) {
+                    if (br.containsHTML("direct=0")) {
                         ai.setStatus(account.getType().getLabel() + " | Direct Downloads: Enabled");
                     } else {
                         ai.setStatus(account.getType().getLabel() + " | Direct Downloads: Disabled");

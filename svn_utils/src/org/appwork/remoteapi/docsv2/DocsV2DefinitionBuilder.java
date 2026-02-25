@@ -1,10 +1,13 @@
 package org.appwork.remoteapi.docsv2;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -54,8 +57,15 @@ import org.appwork.storage.StorableDoc;
 import org.appwork.storage.StorableExample;
 import org.appwork.storage.StorableAvailableSince;
 import org.appwork.storage.StorableDeprecatedSince;
+import org.appwork.storage.flexijson.FlexiJsonMapperForConfig;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiUtils;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
+import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyPrinterForConfig;
+import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
+import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.CompiledType;
 import org.appwork.utils.reflection.JsonSyntax;
@@ -86,6 +96,109 @@ public class DocsV2DefinitionBuilder {
         }
         ret.setTypes(resultTypes);
         return Deser.toString(ret, SC.NETWORK_TRANSFER);
+    }
+
+    public String createExampleJson(final String javaType, final boolean includeDocumentation, final Map<String, InterfaceHandler<RemoteAPIInterface>> handlers, final DocsV2ProjectDataProvider provider) throws Exception {
+        final Class<?> targetClass = resolveExampleTargetClass(javaType, handlers, provider);
+        if (targetClass == null) {
+            throw new IllegalArgumentException("Type not found: " + String.valueOf(javaType));
+        }
+        if (Throwable.class.isAssignableFrom(targetClass)) {
+            return buildExceptionEnvelopeExampleJson(targetClass, includeDocumentation);
+        }
+        final String directExample = extractExample(targetClass);
+        if (StringUtils.isNotEmpty(directExample)) {
+            return renderAnnotationExample(directExample, targetClass, includeDocumentation);
+        }
+        Object exampleInstance = createExampleInstance(targetClass);
+        if (exampleInstance != null) {
+            applyAnnotatedExamplesToObject(exampleInstance, targetClass);
+        }
+        if (includeDocumentation) {
+            if (exampleInstance != null) {
+                return FlexiUtils.serializeConfigStorable(exampleInstance);
+            }
+            final FlexiJsonMapperForConfig mapper = new FlexiJsonMapperForConfig();
+            final FlexiJSonNode node = mapper.objectToJsonNode(null, CompiledType.create(targetClass));
+            return new FlexiJSonPrettyPrinterForConfig(null).toJSONString(node);
+        } else {
+            if (exampleInstance != null) {
+                return FlexiUtils.serializeToPrettyJson(exampleInstance);
+            }
+            final FlexiJSonMapper mapper = new FlexiJSonMapper();
+            final FlexiJSonNode node = mapper.objectToJsonNode(null, CompiledType.create(targetClass));
+            return new FlexiJSonPrettyStringify().toJSONString(node);
+        }
+    }
+
+    private String renderAnnotationExample(final String rawExample, final Class<?> targetClass, final boolean includeDocumentation) throws Exception {
+        final String example = StringUtils.valueOrEmpty(rawExample).trim();
+        if (StringUtils.isEmpty(example)) {
+            return "";
+        }
+        if (includeDocumentation) {
+            try {
+                final Object typed = FlexiUtils.jsonToObject(example, CompiledType.create(targetClass));
+                return FlexiUtils.serializeConfigStorable(typed);
+            } catch (final Throwable ignore) {
+            }
+        }
+        try {
+            final Object parsed = FlexiUtils.jsonToObject(example, CompiledType.OBJECT);
+            return FlexiUtils.serializeToPrettyJson(parsed);
+        } catch (final Throwable ignore) {
+        }
+        return example;
+    }
+
+    private void applyAnnotatedExamplesToObject(final Object target, final Class<?> targetClass) {
+        if (target == null || targetClass == null) {
+            return;
+        }
+        try {
+            final ClassCache cache = ClassCache.getClassCache(targetClass);
+            for (final Getter getter : cache.getGetter()) {
+                if (getter == null || StringUtils.isEmpty(getter.getKey())) {
+                    continue;
+                }
+                final Setter setter = cache.getSetter(getter.getKey());
+                if (setter == null) {
+                    continue;
+                }
+                String example = getter.getMethod() == null ? null : extractExample(getter.getMethod());
+                if (StringUtils.isEmpty(example)) {
+                    final Field field = findFieldInHierarchy(targetClass, getter.getKey());
+                    if (field != null) {
+                        example = extractExample(field);
+                    }
+                }
+                if (StringUtils.isEmpty(example)) {
+                    continue;
+                }
+                try {
+                    final CompiledType compiledType = CompiledType.create(setter.getType(), targetClass);
+                    final Object value = FlexiUtils.jsonToObject(example, compiledType);
+                    setter.setValue(target, value);
+                } catch (final Throwable ignore) {
+                }
+            }
+        } catch (final Throwable ignore) {
+        }
+    }
+
+    private Field findFieldInHierarchy(final Class<?> startClass, final String fieldName) {
+        Class<?> current = startClass;
+        while (current != null && current != Object.class) {
+            try {
+                final Field field = current.getDeclaredField(fieldName);
+                if (field != null) {
+                    return field;
+                }
+            } catch (final Throwable ignore) {
+            }
+            current = current.getSuperclass();
+        }
+        return null;
     }
 
     public DocsV2Definition buildInteractiveDocsDefinition(final Map<String, InterfaceHandler<RemoteAPIInterface>> handlers, final DocsV2ProjectDataProvider provider) {
@@ -133,7 +246,6 @@ public class DocsV2DefinitionBuilder {
                 endpoint.setAvailableSinceMessage(endpointLifecycle.availableSinceMessage);
                 endpoint.setDeprecatedSince(endpointLifecycle.deprecatedSince);
                 endpoint.setDeprecatedSinceMessage(endpointLifecycle.deprecatedSinceMessage);
-                endpoint.setAuth(provider == null ? new ArrayList<DocsV2Definition.AuthDoc>() : provider.extractAuthInfo(methodName, method.getAnnotations()));
                 endpoint.setTags(extractTags(method));
                 endpoint.setParameters(new ArrayList<ParameterDoc>());
                 final APIParameterNames parameterNames = method.getAnnotation(APIParameterNames.class);
@@ -352,7 +464,6 @@ public class DocsV2DefinitionBuilder {
             final DocInfo typeDocInfo = extractDocInfo(cls, provider);
             typeDoc.setDescription(typeDocInfo.text);
             typeDoc.setWikiLinks(typeDocInfo.wikiLinks);
-            typeDoc.setExample(extractExample(cls));
             final LifecycleInfo typeLifecycle = extractLifecycleInfo(cls);
             typeDoc.setAvailableSince(typeLifecycle.availableSince);
             typeDoc.setAvailableSinceMessage(typeLifecycle.availableSinceMessage);
@@ -374,7 +485,6 @@ public class DocsV2DefinitionBuilder {
                             final DocInfo enumDocInfo = extractDocInfo(enumField, provider, false);
                             enumValueDoc.setDescription(enumDocInfo.text);
                             enumValueDoc.setWikiLinks(enumDocInfo.wikiLinks);
-                            enumValueDoc.setExample(extractExample(enumField));
                         } catch (final Throwable ignore) {
                         }
                         enumValueDocs.add(enumValueDoc);
@@ -386,6 +496,11 @@ public class DocsV2DefinitionBuilder {
                 typeDoc.setKind("object");
                 final List<FieldDoc> fields = new ArrayList<FieldDoc>();
                 typeDoc.setFields(fields);
+                if (Map.class.isAssignableFrom(cls) || Collection.class.isAssignableFrom(cls)) {
+                    // Maps/collections are serialized by their elements, not by bean getter properties.
+                    docs.put(cls.getName(), typeDoc);
+                    continue;
+                }
                 try {
                     final ClassCache cache = ClassCache.getClassCache(cls);
                     final List<Getter> getters = new ArrayList<Getter>(cache.getGetter());
@@ -403,7 +518,6 @@ public class DocsV2DefinitionBuilder {
                         final DocInfo getterDocInfo = getter.getMethod() != null ? extractDocInfo(getter.getMethod(), provider, false) : null;
                         field.setDescription(getterDocInfo != null ? getterDocInfo.text : null);
                         field.setWikiLinks(getterDocInfo != null ? getterDocInfo.wikiLinks : null);
-                        field.setExample(getter.getMethod() != null ? extractExample(getter.getMethod()) : null);
                         if (getter.getMethod() != null) {
                             final LifecycleInfo getterLifecycle = extractLifecycleInfo(getter.getMethod());
                             field.setAvailableSince(getterLifecycle.availableSince);
@@ -411,7 +525,7 @@ public class DocsV2DefinitionBuilder {
                             field.setDeprecatedSince(getterLifecycle.deprecatedSince);
                             field.setDeprecatedSinceMessage(getterLifecycle.deprecatedSinceMessage);
                         }
-                        if (StringUtils.isEmpty(field.getDescription()) || StringUtils.isEmpty(field.getExample())) {
+                        if (StringUtils.isEmpty(field.getDescription())) {
                             try {
                                 final Field reflected = cls.getDeclaredField(field.getName());
                                 if (reflected != null) {
@@ -421,9 +535,6 @@ public class DocsV2DefinitionBuilder {
                                         if (field.getWikiLinks() == null || field.getWikiLinks().size() == 0) {
                                             field.setWikiLinks(reflectedDocInfo.wikiLinks);
                                         }
-                                    }
-                                    if (StringUtils.isEmpty(field.getExample())) {
-                                        field.setExample(extractExample(reflected));
                                     }
                                     if (StringUtils.isEmpty(field.getAvailableSince()) || StringUtils.isEmpty(field.getDeprecatedSince())) {
                                         final LifecycleInfo reflectedLifecycle = extractLifecycleInfo(reflected);
@@ -463,6 +574,11 @@ public class DocsV2DefinitionBuilder {
         if (type == null || sink == null) {
             return;
         }
+        try {
+            collectClassesFromCompiledType(CompiledType.create(type), sink);
+            return;
+        } catch (final Throwable ignore) {
+        }
         if (type instanceof Class<?>) {
             final Class<?> cls = (Class<?>) type;
             if (cls.isArray()) {
@@ -498,6 +614,23 @@ public class DocsV2DefinitionBuilder {
         }
         if (type instanceof GenericArrayType) {
             collectClassesFromType(((GenericArrayType) type).getGenericComponentType(), sink);
+        }
+    }
+
+    private void collectClassesFromCompiledType(final CompiledType type, final Set<Class<?>> sink) {
+        if (type == null || sink == null) {
+            return;
+        }
+        if (type.raw != null) {
+            if (!type.raw.isArray()) {
+                sink.add(type.raw);
+            }
+        }
+        final CompiledType[] componentTypes = type.getComponentTypes();
+        if (componentTypes != null) {
+            for (final CompiledType componentType : componentTypes) {
+                collectClassesFromCompiledType(componentType, sink);
+            }
         }
     }
 
@@ -709,6 +842,164 @@ public class DocsV2DefinitionBuilder {
         return ret;
     }
 
+    private Class<?> resolveExampleTargetClass(final String javaType, final Map<String, InterfaceHandler<RemoteAPIInterface>> handlers, final DocsV2ProjectDataProvider provider) {
+        String type = StringUtils.valueOrEmpty(javaType).trim();
+        if (StringUtils.isEmpty(type)) {
+            return null;
+        }
+        if (type.startsWith("__exception__:")) {
+            type = type.substring("__exception__:".length()).trim();
+        }
+        final int genericIndex = type.indexOf('<');
+        if (genericIndex > 0) {
+            type = type.substring(0, genericIndex).trim();
+        }
+        final Class<?> directClass = tryLoadClassByName(type);
+        if (directClass != null) {
+            return directClass;
+        }
+        final DocsV2Definition definition = buildInteractiveDocsDefinition(handlers, provider);
+        if (definition.getTypes() != null) {
+            for (final TypeDoc typeDoc : definition.getTypes()) {
+                if (typeDoc == null) {
+                    continue;
+                }
+                if (StringUtils.equals(type, typeDoc.getJavaType()) || StringUtils.equals(type, typeDoc.getName()) || StringUtils.equals(type, simpleTypeName(typeDoc.getJavaType()))) {
+                    final Class<?> loaded = tryLoadClassByName(typeDoc.getJavaType());
+                    if (loaded != null) {
+                        return loaded;
+                    }
+                }
+            }
+        }
+        if (definition.getEndpoints() != null) {
+            for (final EndpointDoc endpoint : definition.getEndpoints()) {
+                if (endpoint == null || endpoint.getExceptions() == null) {
+                    continue;
+                }
+                for (final ExceptionDoc exceptionDoc : endpoint.getExceptions()) {
+                    if (exceptionDoc == null) {
+                        continue;
+                    }
+                    if (StringUtils.equals(type, exceptionDoc.getType()) || StringUtils.equals(type, exceptionDoc.getSimpleName())) {
+                        final Class<?> loaded = tryLoadClassByName(exceptionDoc.getType());
+                        if (loaded != null) {
+                            return loaded;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private Class<?> tryLoadClassByName(final String javaType) {
+        final String raw = StringUtils.valueOrEmpty(javaType).trim();
+        if (StringUtils.isEmpty(raw)) {
+            return null;
+        }
+        try {
+            return Class.forName(raw);
+        } catch (final Throwable ignore) {
+        }
+        return null;
+    }
+
+    private String buildExceptionEnvelopeExampleJson(final Class<?> exceptionClass, final boolean includeDocumentation) throws Exception {
+        final ExampleExceptionEnvelope envelope = new ExampleExceptionEnvelope();
+        envelope.setSrc("DEVICE");
+        envelope.setType(exceptionClass == null ? "Exception" : exceptionClass.getSimpleName());
+        if (exceptionClass != null && BasicRemoteAPIException.class.isAssignableFrom(exceptionClass)) {
+            final BasicRemoteAPIException sample = instantiateRemoteAPIException(exceptionClass.asSubclass(BasicRemoteAPIException.class));
+            if (sample != null) {
+                envelope.setType(StringUtils.valueOrEmpty(sample.getType()));
+                envelope.setData(sample.getData());
+            }
+        }
+        if (includeDocumentation) {
+            return FlexiUtils.serializeConfigStorable(envelope);
+        }
+        return FlexiUtils.serializeToPrettyJson(envelope);
+    }
+
+    private Object createExampleInstance(final Class<?> cls) {
+        if (cls == null) {
+            return null;
+        }
+        if (cls.isPrimitive() || String.class == cls || Number.class.isAssignableFrom(cls) || cls == Boolean.class || cls == Character.class) {
+            return createSimpleDefaultValue(cls);
+        }
+        if (cls.isEnum()) {
+            final Object[] values = cls.getEnumConstants();
+            return values != null && values.length > 0 ? values[0] : null;
+        }
+        if (cls.isArray()) {
+            return Array.newInstance(cls.getComponentType(), 0);
+        }
+        if (Map.class.isAssignableFrom(cls)) {
+            return new LinkedHashMap<String, Object>();
+        }
+        if (Collection.class.isAssignableFrom(cls)) {
+            return new ArrayList<Object>();
+        }
+        if (Modifier.isAbstract(cls.getModifiers()) || cls.isInterface()) {
+            return null;
+        }
+        try {
+            final Constructor<?> constructor = cls.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (final Throwable ignore) {
+        }
+        return null;
+    }
+
+    private Object createSimpleDefaultValue(final Class<?> cls) {
+        if (cls == null) {
+            return null;
+        }
+        if (cls == String.class) {
+            return "";
+        }
+        if (cls == boolean.class || cls == Boolean.class) {
+            return Boolean.FALSE;
+        }
+        if (cls == char.class || cls == Character.class) {
+            return Character.valueOf('\0');
+        }
+        if (cls == byte.class || cls == Byte.class) {
+            return Byte.valueOf((byte) 0);
+        }
+        if (cls == short.class || cls == Short.class) {
+            return Short.valueOf((short) 0);
+        }
+        if (cls == int.class || cls == Integer.class) {
+            return Integer.valueOf(0);
+        }
+        if (cls == long.class || cls == Long.class) {
+            return Long.valueOf(0L);
+        }
+        if (cls == float.class || cls == Float.class) {
+            return Float.valueOf(0f);
+        }
+        if (cls == double.class || cls == Double.class) {
+            return Double.valueOf(0d);
+        }
+        return null;
+    }
+
+    private String simpleTypeName(final String javaType) {
+        final String raw = StringUtils.valueOrEmpty(javaType).trim();
+        if (StringUtils.isEmpty(raw)) {
+            return raw;
+        }
+        final int lastDot = raw.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot + 1 < raw.length()) {
+            return raw.substring(lastDot + 1);
+        }
+        return raw;
+    }
+
     private static class DocInfo {
         private String       text;
         private List<String> wikiLinks;
@@ -719,5 +1010,35 @@ public class DocsV2DefinitionBuilder {
         private String availableSinceMessage;
         private String deprecatedSince;
         private String deprecatedSinceMessage;
+    }
+
+    public static class ExampleExceptionEnvelope {
+        private String src;
+        private String type;
+        private Object data;
+
+        public String getSrc() {
+            return src;
+        }
+
+        public void setSrc(final String src) {
+            this.src = src;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(final String type) {
+            this.type = type;
+        }
+
+        public Object getData() {
+            return data;
+        }
+
+        public void setData(final Object data) {
+            this.data = data;
+        }
     }
 }

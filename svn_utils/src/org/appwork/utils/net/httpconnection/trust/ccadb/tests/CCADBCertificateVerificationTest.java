@@ -115,7 +115,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
         }
     }
 
-    private static final String PEM_RESOURCE                        = "common-ca-database.pem";
+    private static final String PEM_RESOURCE                        = org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider.APPWORK_MERGED_PEM;
     /** crt.sh: output=json is not supported for sha256 lookup, only for domain search (q=). We use default HTML. */
     private static final String CRTSH_BASE                          = "https://crt.sh/?q=";
     /** Max certs to check; default all. Set e.g. CCADB_VERIFY_LIMIT=10 for quick run. */

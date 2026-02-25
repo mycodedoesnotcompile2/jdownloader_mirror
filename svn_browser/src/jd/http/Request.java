@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -199,27 +200,28 @@ public abstract class Request {
     /*
      * default timeouts, because 0 is infinite and BAD, if we need 0 then we have to set it manually
      */
-    protected int                  connectTimeout    = 30000;
-    protected int                  readTimeout       = 60000;
-    protected Cookies              cookies           = null;
-    protected RequestHeader        headers;
-    protected String               htmlCode;
-    protected URLConnectionAdapter httpConnection;
-    protected long                 readTime          = -1;
-    protected boolean              requested         = false;
-    protected int                  readLimit         = 1 * 1024 * 1024;
-    protected HTTPProxy            proxy;
-    protected URL                  url;
-    protected String               customCharset     = null;
-    protected byte[]               responseBytes     = null;
-    protected boolean              contentDecoded    = true;
-    protected boolean              keepByteArray     = false;
-    protected Boolean              sslTrustALL       = null;
-    protected long                 requestID         = -1;
-    protected long                 browserID         = -1;
-    protected long                 browserParentID   = -1;
-    protected IPVERSION            ipVersion         = null;
-    protected InetAddress          customInetAddress = null;
+    protected int                    connectTimeout    = 30000;
+    protected int                    readTimeout       = 60000;
+    protected Cookies                cookies           = null;
+    protected RequestHeader          headers;
+    protected String                 htmlCode;
+    protected URLConnectionAdapter   httpConnection;
+    protected long                   readTime          = -1;
+    protected boolean                requested         = false;
+    protected int                    readLimit         = 1 * 1024 * 1024;
+    protected HTTPProxy              proxy;
+    protected URL                    url;
+    protected String                 customCharset     = null;
+    protected byte[]                 responseBytes     = null;
+    protected boolean                contentDecoded    = true;
+    protected boolean                keepByteArray     = false;
+    protected Boolean                sslTrustALL       = null;
+    protected long                   requestID         = -1;
+    protected long                   browserID         = -1;
+    protected long                   browserParentID   = -1;
+    protected IPVERSION              ipVersion         = null;
+    protected InetAddress            customInetAddress = null;
+    protected WeakReference<Browser> browser           = new WeakReference<Browser>(null);
 
     public InetAddress getCustomInetAddress() {
         return this.customInetAddress;
@@ -322,9 +324,7 @@ public abstract class Request {
         throw new WTFException("Not Implemented");
     }
 
-    public RequestMethod getRequestMethod() {
-        return null;
-    }
+    public abstract RequestMethod getRequestMethod();
 
     protected String caller = null;
 
@@ -332,11 +332,22 @@ public abstract class Request {
         return this.caller;
     }
 
+    protected Browser getBrowser() {
+        return this.browser.get();
+    }
+
     protected Request connect(final Browser br) throws IOException {
-        if (this.requestID == -1 && br != null) {
-            this.browserID = br.getBrowserID();
-            this.requestID = br.getNextRequestID();
-            this.browserParentID = br.getBrowserParentID();
+        if (br != null) {
+            final Browser previousBr = this.getBrowser();
+            if (previousBr != null && previousBr != br) {
+                throw new WTFException();
+            }
+            this.browser = new WeakReference<Browser>(br);
+            if (this.requestID == -1) {
+                this.browserID = br.getBrowserID();
+                this.requestID = br.getNextRequestID();
+                this.browserParentID = br.getBrowserParentID();
+            }
         }
         if (this.getIPVersion() == null) {
             this.setIPVersion(br.getIPVersion());
@@ -679,21 +690,23 @@ public abstract class Request {
         if (!this.isRequested()) {
             return "Request not sent yet";
         } else {
-            String htmlCode = null;
             try {
-                htmlCode = this.getHtmlCode();
+                final String htmlCode = this.getHtmlCode();
                 if (StringUtils.isEmpty(htmlCode)) {
                     final String location = this.getLocation();
                     if (location != null) {
-                        return "Not HTML Code. Redirect to: " + location;
+                        return "No htmlCode read. Redirect to: " + location;
+                    } else if (RequestMethod.HEAD.equals(this.getRequestMethod())) {
+                        return "No response body available for HEAD request";
                     } else {
                         return "No htmlCode read";
                     }
+                } else {
+                    return htmlCode;
                 }
             } catch (final Throwable e) {
                 return "NOTEXT: " + e.getMessage();
             }
-            return htmlCode;
         }
     }
 
@@ -890,7 +903,7 @@ public abstract class Request {
     }
 
     private void openConnection() throws IOException {
-        this.httpConnection = HTTPConnectionFactory.createHTTPConnection(URLHelper.getURL(this.getURL(), true, false, false), this.getProxy());
+        this.httpConnection = this.getBrowser().createHTTPConnection(this, this.getProxy());
         this.httpConnection.setLegacyConnectEnabled(false);
         this.httpConnection.setRequest(this);
         this.httpConnection.setIPVersion(this.getIPVersion());
@@ -1028,17 +1041,17 @@ public abstract class Request {
 
     public boolean containsHTML(final String regex) {
         final String htmlCode = this.getHtmlCode(false);
-        return htmlCode != null ? new Regex(htmlCode, regex).matches() : false;
+        return htmlCode != null && new Regex(htmlCode, regex).matches();
     }
 
     public Regex getRegex(final Pattern pattern) {
         final String htmlCode = this.getHtmlCode(false);
-        return new Regex(htmlCode != null ? htmlCode : "", pattern);
+        return new Regex(StringUtils.valueOrEmpty(htmlCode), pattern);
     }
 
     public Regex getRegex(final String string) {
         final String htmlCode = this.getHtmlCode(false);
-        return new Regex(htmlCode != null ? htmlCode : "", string);
+        return new Regex(StringUtils.valueOrEmpty(htmlCode), string);
     }
 
     public void setURL(final URL url) {

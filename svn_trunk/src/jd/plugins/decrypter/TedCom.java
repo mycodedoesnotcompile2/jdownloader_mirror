@@ -11,6 +11,7 @@ import java.util.Random;
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.http.Request;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -23,11 +24,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.utils.JDUtilities;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 52372 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
 public class TedCom extends PluginForDecrypt {
     public TedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,6 +89,13 @@ public class TedCom extends PluginForDecrypt {
     private ArrayList<DownloadLink> decryptedLinks                     = new ArrayList<DownloadLink>();
     private String                  parameter                          = null;
     private SubConfiguration        cfg                                = null;
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0");
+        return ret;
+    }
 
     /** Old 'apikey' value = "TEDDOWNLOAD" */
     /** Old download-way: "http://www.ted.com/download/links/slug/" + plainfilename (slug) + "/type/talks/ext/mp4" */
@@ -186,6 +195,8 @@ public class TedCom extends PluginForDecrypt {
                     /* Sometimes, a mirror is available e.g. YouTube (above code) and vimeo (here via URL). */
                     decryptedLinks.add(createDownloadlink(uri));
                 }
+            }
+            if (false && decryptedLinks.size() > 0) {
                 return;
             }
             /* All streaming resources */
@@ -206,6 +217,7 @@ public class TedCom extends PluginForDecrypt {
                     dl.setProperty("directlink", httpStream.get("file").toString());
                     dl.setProperty("type", "video");
                     dl.setProperty("selectedvideoquality", bitrate);
+                    dl.setReferrerUrl(br.getURL());
                     if (cfg.getBooleanProperty(CHECKFAST_VIDEOS, false)) {
                         dl.setAvailable(true);
                     }
@@ -217,12 +229,8 @@ public class TedCom extends PluginForDecrypt {
                     dl.setContentUrl(parameter);
                     foundVideoLinks.put(bitrate, dl);
                 }
-            } else {
+            } else if (false) {
                 final Map http_stream_url_list = null;
-                /* 2022-02-25: Did not implement HLS support for now. */
-                if (true) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
                 final Iterator<Entry<String, Object>> iteratorAvailableQualities = http_stream_url_list.entrySet().iterator();
                 while (iteratorAvailableQualities.hasNext()) {
                     final Entry<String, Object> currentObject = iteratorAvailableQualities.next();
@@ -334,7 +342,7 @@ public class TedCom extends PluginForDecrypt {
             }
             /** Decrypt subtitles */
             final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) playerData.get("languages");
-            if (subtitles != null) {
+            if (subtitles != null && hls != null) {
                 final String[][] allSubtitleValues = { { "sq", "Albanian" }, { "ar", "Arabic" }, { "hy", "Armenian" }, { "az", "Azerbaijani" }, { "bn", "Bengali" }, { "bg", "Bulgarian" }, { "zh-cn", "Chinese, Simplified" }, { "zh-tw", "Chinese, Traditional" }, { "hr", "Croatian" }, { "cs", "Czech" }, { "da", "Danish" }, { "nl", "Dutch" }, { "en", "English" }, { "et", "Estonian" }, { "fi", "Finnish" }, { "fr", "French" }, { "ka", "Georgian" }, { "de", "German" }, { "el", "Greek" }, { "he", "Hebrew" }, { "hu", "Hungarian" }, { "id", "Indonesian" }, { "it", "Italian" }, { "ja", "Japanese" }, { "ko", "Korean" }, { "ku", "Kurdish" }, { "lt", "Lithuanian" }, { "mk", "Macedonian" }, { "ms", "Malay" }, { "nb", "Norwegian Bokmal" }, { "fa", "Persian" }, { "pl", "Polish" }, { "pt", "Portuguese" }, { "pt-br", "Portuguese, Brazilian" }, { "ro", "Romanian" }, { "ru", "Russian" },
                         { "sr", "Serbian" }, { "sk", "Slovak" }, { "sl", "Slovenian" }, { "es", "Spanish" }, { "sv", "Swedish" }, { "th", "Thai" }, { "tr", "Turkish" }, { "uk", "Ukrainian" }, { "vi", "Vietnamese" } };
                 final ArrayList<String[]> selectedSubtitles = new ArrayList<String[]>();

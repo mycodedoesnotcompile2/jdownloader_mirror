@@ -37,7 +37,7 @@ import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
-@DecrypterPlugin(revision = "$Revision: 52364 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52372 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +121,7 @@ public class CutyIo extends PluginForDecrypt {
                 brc.getPage("https://cdn.cuty.io/js/public/links/last.js?id=f4f3bcae68da87c1b86167fe79d01ae7");
                 /* Check if our static key is still correct */
                 if (!brc.containsHTML(Pattern.quote(tsKey))) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Turnstile key has changed");
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Turnstile might have changed");
                 }
             }
             final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, tsKey).getToken();

@@ -266,4 +266,11 @@ public abstract class HttpRequest implements HttpRequestInterface {
     public Object getProperty(String key) {
         return properties.get(key);
     }
+
+    /**
+     * @param authMethod
+     */
+    public Object removeProperty(String key) {
+        return properties.remove(key);
+    }
 }

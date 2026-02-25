@@ -41,6 +41,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import jd.http.requests.FormData;
+import jd.http.requests.GetRequest;
+import jd.http.requests.HeadRequest;
+import jd.http.requests.PostFormDataRequest;
+import jd.http.requests.PostRequest;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.InputField;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -58,23 +67,14 @@ import org.appwork.utils.net.PublicSuffixList;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnection.HTTPResponseCodeException;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyException;
 import org.appwork.utils.net.httpconnection.ProxyAuthException;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
 import org.appwork.utils.parser.UrlQuery;
 
-import jd.http.requests.FormData;
-import jd.http.requests.GetRequest;
-import jd.http.requests.HeadRequest;
-import jd.http.requests.PostFormDataRequest;
-import jd.http.requests.PostRequest;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-
-public class Browser {
+public class Browser implements HTTPConnectionFactoryInterface {
     public class BlockedByException extends BrowserException {
         private static final long          serialVersionUID = 9215538386994469323L;
         private final BlockedTypeInterface blockedBy;
@@ -146,7 +146,6 @@ public class Browser {
         STRICT_ORIGIN,
         STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
         UNSAFE_URL;
-
         public static boolean isSameProtocol(final Request current, final Request next) {
             return StringUtils.equalsIgnoreCase(current.getURL().getProtocol(), next.getURL().getProtocol());
         }
@@ -901,7 +900,8 @@ public class Browser {
     }
 
     public boolean containsHTML(final String regex) {
-        return new Regex(this, regex).matches();
+        final Request request = this.getRequest();
+        return request != null && request.isRequested() && request.containsHTML(regex);
     }
 
     /** Wrapper, will use 'EEE, dd MMM yyyy HH:mm:ss z' as formatter value. */
@@ -1072,12 +1072,12 @@ public class Browser {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      *
      *
-     * 
+     *
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1849,6 +1849,11 @@ public class Browser {
         } else {
             requ = new Request(connection) {
                 @Override
+                public RequestMethod getRequestMethod() {
+                    return connection.getRequestMethod();
+                }
+
+                @Override
                 public long postRequest() throws IOException {
                     return 0;
                 }
@@ -1917,8 +1922,8 @@ public class Browser {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
-     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
+     * facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request != null) {
@@ -2715,8 +2720,7 @@ public class Browser {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br>
-     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2867,8 +2871,7 @@ public class Browser {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br>
-     * To be called after a sent request.
+     * Checks for block by firewalls and similar. </br> To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (this.getThrowExceptionOnBlockedBy(request)) {
@@ -2899,8 +2902,7 @@ public class Browser {
         /* 526: Invalid SSL certificate */
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-         * Cloudflare block happens. </br>
-         * I've just added code 502 to the list of "Cloudflare response-codes".
+         * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
          */
         /*
          * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
@@ -3074,6 +3076,58 @@ public class Browser {
     }
 
     public static enum GenericSupportedBlockTypes implements LabelInterface, BlockedTypeInterface {
+        MALWAREBYTES_LOCALHOST_DNS {
+            @Override
+            public String getLabel() {
+                return "Malwarebytes DNS localhost block";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.DNS;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SOFTWARE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
+        GENERIC_LOCALHOST_DNS {
+            @Override
+            public String getLabel() {
+                return "DNS localhost block";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.DNS;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.ISP;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         CLOUDFLARE {
             @Override
             public String getLabel() {
@@ -3615,8 +3669,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                             */
+                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                 */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {
@@ -3799,8 +3853,8 @@ public class Browser {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
-     * See also: https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
+     * https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();
@@ -3820,5 +3874,33 @@ public class Browser {
      */
     public void setDefaultSSLTrustALL(Boolean defaultSSLTrustALL) {
         this.defaultSSLTrustALL = defaultSSLTrustALL;
+    }
+
+    @Override
+    public URLConnectionAdapter createHTTPConnection(Request request, HTTPProxy proxy) throws IOException {
+        final URL url = URLHelper.getURL(request.getURL(), true, false, false);
+        if (proxy == null) {
+            return new URLConnectionAdapterDirectImpl(url);
+        } else {
+            if (proxy.isPreferNativeImplementation()) {
+                return new URLConnectionAdapterNative(url, proxy);
+            } else {
+                switch (proxy.getType()) {
+                case NONE:
+                case DIRECT:
+                    return new URLConnectionAdapterDirectImpl(url, proxy);
+                case HTTP:
+                case HTTPS:
+                    return new URLConnectionAdapterHTTPProxyImpl(url, proxy);
+                case SOCKS4:
+                case SOCKS4A:
+                    return new URLConnectionAdapterSocks4Impl(url, proxy);
+                case SOCKS5:
+                    return new URLConnectionAdapterSocks5Impl(url, proxy);
+                default:
+                    throw new RuntimeException("unsupported proxy type: " + proxy.getType().name());
+                }
+            }
+        }
     }
 }

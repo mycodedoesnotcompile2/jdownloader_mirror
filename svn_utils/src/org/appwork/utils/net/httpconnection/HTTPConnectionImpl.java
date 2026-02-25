@@ -544,36 +544,54 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     final KeepAliveSocketStream socketStream = socketPoolIterator.next();
                     final Socket socket = socketStream.getSocket();
                     if (socket.isClosed() || socketStream.isTimedOut()) {
+                        socketPoolIterator.remove();
                         try {
                             socket.close();
                         } catch (final Throwable ignore) {
                         }
-                        socketPoolIterator.remove();
                         continue;
-                    } else if (socket.getPort() != port || !socketStream.sameBoundIP(localIP)) {
+                    } else if (socket.getPort() != port) {
+                        // different destination port
                         continue;
-                    } else if (socketStream.isSsl() && ssl && socketStream.sameHost(host)) {
-                        /**
-                         * ssl needs to have same hostname to avoid (SNI)
-                         *
-                         * <p>
-                         * Your browser sent a request that this server could not understand.<br />
-                         * Host name provided via SNI and via HTTP are different
-                         * </p>
-                         */
+                    } else if (!socketStream.sameBoundIP(localIP)) {
+                        // different bound IP
+                        continue;
+                    } else if (socketStream.isSsl() != ssl) {
+                        // different protocol
+                        continue;
+                    }
+                    if (ssl) {
+                        if (!socketStream.sameHost(host)) {
+                            /**
+                             * ssl needs to have same hostname to avoid (SNI)
+                             *
+                             * <p>
+                             * Your browser sent a request that this server could not understand.<br />
+                             * Host name provided via SNI and via HTTP are different
+                             * </p>
+                             */
+                            continue;
+                        } else if (!getTrustProvider().equals(((KeepAliveSSLSocketStream) socketStream).getTrustProvider() != getTrustProvider())) {
+                            // different trust provider
+                            continue;
+                        } else if (!Arrays.equals(getKeyManagers(), ((KeepAliveSSLSocketStream) socketStream).getKeyManager())) {
+                            // different key manager
+                            continue;
+                        }
                         socketPoolIterator.remove();
                         if (checkSocketChannel(socket)) {
                             return socketStream;
                         } else {
                             continue;
                         }
-                    } else if (socketStream.isSsl() == false && ssl == false && (socketStream.sameHost(host) || (dnsLookup && socketStream.sameRemoteIPs(getRemoteIPs(host, true))))) {
-                        // same hostname or same ip
-                        socketPoolIterator.remove();
-                        if (checkSocketChannel(socket)) {
-                            return socketStream;
-                        } else {
-                            continue;
+                    } else {
+                        if ((socketStream.sameHost(host) || (dnsLookup && socketStream.sameRemoteIPs(getRemoteIPs(host, true))))) {
+                            socketPoolIterator.remove();
+                            if (checkSocketChannel(socket)) {
+                                return socketStream;
+                            } else {
+                                continue;
+                            }
                         }
                     }
                 }
@@ -932,6 +950,12 @@ public class HTTPConnectionImpl implements HTTPConnection {
         this.profiler = profiler;
     }
 
+    protected void connectEndPoint(SocketStreamInterface socket, InetSocketAddress connectedInetSocketAddress, int requestedConnectTimeout) throws IOException {
+        if (socket != null) {
+            socket.getSocket().connect(connectedInetSocketAddress, requestedConnectTimeout);
+        }
+    }
+
     public void connect() throws IOException {
         final HTTPConnectionProfilerInterface profiler = getProfiler();
         if (profiler != null) {
@@ -979,7 +1003,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                             startMS = Time.systemIndependentCurrentJVMTimeMillis();
                             this.connectionSocket = createConnectionSocket(bindInetAddress);
                             /** no workaround for infinite connect timeouts **/
-                            this.connectionSocket.getSocket().connect(connectedInetSocketAddress, requestedConnectTimeout);
+                            connectEndPoint(connectionSocket, connectedInetSocketAddress, requestedConnectTimeout);
                             this.setReadTimeout(getReadTimeout());
                         } else {
                             /**
@@ -991,7 +1015,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                                 this.connectionSocket = createConnectionSocket(bindInetAddress);
                                 final long beforeConnectMS = Time.systemIndependentCurrentJVMTimeMillis();
                                 try {
-                                    this.connectionSocket.getSocket().connect(connectedInetSocketAddress, remainingConnectTimeout);
+                                    connectEndPoint(connectionSocket, connectedInetSocketAddress, remainingConnectTimeout);
                                     this.setReadTimeout(getReadTimeout());
                                     break;
                                 } catch (final IOException e) {
@@ -1392,7 +1416,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     } else if (HTTPConstants.ResponseCode.SUCCESS_NO_CONTENT.matches(getResponseCode())) {
                         /*
                          * https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204
-                         *
+                         * 
                          * Although this status code is intended to describe a response with no body, servers may erroneously include data
                          * following the headers.
                          */

@@ -759,23 +759,13 @@ public class ScriptEnvironment {
     @ScriptAPI(description = "Get a list of all downloadlinks")
     public static DownloadLinkSandBox[] getAllDownloadLinks() {
         final List<DownloadLink> links = DownloadController.getInstance().getAllChildren();
-        final DownloadLinkSandBox[] ret = new DownloadLinkSandBox[links.size()];
-        int i = 0;
-        for (final DownloadLink link : links) {
-            ret[i++] = new DownloadLinkSandBox(link);
-        }
-        return ret;
+        return DownloadLinkSandBox.wrapSandBox(links);
     }
 
     @ScriptAPI(description = "Get a list of all crawledlinks")
     public static CrawledLinkSandbox[] getAllCrawledLinks() {
         final List<CrawledLink> links = LinkCollector.getInstance().getAllChildren();
-        final CrawledLinkSandbox[] ret = new CrawledLinkSandbox[links.size()];
-        int i = 0;
-        for (final CrawledLink link : links) {
-            ret[i++] = new CrawledLinkSandbox(link);
-        }
-        return ret;
+        return CrawledLinkSandbox.wrapSandBox(links);
     }
 
     @ScriptAPI(description = "Get a list of all running packages")

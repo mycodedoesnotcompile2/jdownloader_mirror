@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,7 +32,7 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.processes.command.tests;
+package org.appwork.testframework.tests;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -39,22 +40,18 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import org.appwork.exceptions.NotSupportedException;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestJREProvider;
 import org.appwork.testframework.TestJREProvider.JreOptions;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.JavaVersionInterface;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.processes.command.Command;
 
 /**
- * Test for {@link Command#getPID()} method.
+ * @author daniel
+ * @date Feb 23, 2026
  *
- * @author Thomas
- * @date 20.02.2026
  */
-public class CommandGetPIDTest extends AWTest implements Serializable {
+public class TestJREProviderTest extends AWTest implements Serializable {
     /**
      * @author thomas
      * @date 20.02.2026
@@ -66,7 +63,6 @@ public class CommandGetPIDTest extends AWTest implements Serializable {
 
     @Override
     public void runTest() throws Exception {
-        testGetPIDBeforeStart();
         final List<JavaVersion> runJREs = new ArrayList<JavaVersion>();
         runJREs.addAll(Arrays.asList(JavaVersion.JVM_1_6, JavaVersion.JVM_1_8, JavaVersion.JVM_9_0, JavaVersion.JVM_11_0, JavaVersion.JVM_17_0, JavaVersion.JVM_21_0, JavaVersion.JVM_25_0));
         final JavaVersionInterface currentJRE = JavaVersion.getVersion().getBase();
@@ -79,84 +75,7 @@ public class CommandGetPIDTest extends AWTest implements Serializable {
             }
         }
         for (JavaVersion runJRE : runJREs) {
-            TestJREProvider.executeInJRE(JreOptions.version(runJRE), CommandGetPIDTest.class, "testGetPIDAfterStart");
-        }
-        testGetPIDMatchesExpected();
-    }
-
-    /**
-     * Tests that getPID() throws IllegalStateException when called before process is started.
-     */
-    private void testGetPIDBeforeStart() throws Exception {
-        logInfoAnyway("Test: getPID() before start should throw IllegalStateException");
-        Command cmd;
-        if (CrossSystem.isWindows()) {
-            cmd = new Command("cmd.exe", "/C", "echo test");
-        } else {
-            cmd = new Command("echo", "test");
-        }
-        try {
-            cmd.getPID();
-            throw new AssertionError("Expected IllegalStateException when calling getPID() before start()");
-        } catch (IllegalStateException e) {
-            logInfoAnyway("  OK: Got expected IllegalStateException: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Tests that getPID() returns a valid PID after the process has started.
-     */
-    private void testGetPIDAfterStart() throws Exception {
-        logInfoAnyway("Test: getPID() after start should return valid PID > 0");
-        Command cmd;
-        if (CrossSystem.isWindows()) {
-            cmd = new Command("cmd.exe", "/C", "ping -n 2 127.0.0.1");
-        } else {
-            cmd = new Command("sleep", "2");
-        }
-        try {
-            cmd.start(true);
-            try {
-                long pid = cmd.getPID();
-                logInfoAnyway("  Got PID: " + pid);
-                assertTrue(pid > 0, "PID should be > 0");
-            } catch (NotSupportedException e) {
-                logInfoAnyway("  SKIPPED: getPID() not supported on this platform/JVM: " + e.getMessage());
-            }
-        } finally {
-            cmd.destroy();
-        }
-    }
-
-    /**
-     * Tests getPID() with a longer running process and verifies the PID remains consistent.
-     */
-    private void testGetPIDMatchesExpected() throws Exception {
-        logInfoAnyway("Test: getPID() should return consistent PID for same process");
-        logInfoAnyway("  Java Version: " + JavaVersion.getVersion());
-        logInfoAnyway("  OS Family: " + CrossSystem.getOSFamily());
-        Command cmd;
-        if (CrossSystem.isWindows()) {
-            cmd = new Command("cmd.exe", "/C", "ping -n 3 127.0.0.1");
-        } else {
-            cmd = new Command("sleep", "3");
-        }
-        try {
-            cmd.start(true);
-            try {
-                long pid1 = cmd.getPID();
-                logInfoAnyway("  First getPID() call: " + pid1);
-                assertTrue(pid1 > 0, "PID should be > 0");
-                Thread.sleep(100);
-                long pid2 = cmd.getPID();
-                logInfoAnyway("  Second getPID() call: " + pid2);
-                assertThat(pid1).is(pid2);
-                logInfoAnyway("  OK: PID is consistent across multiple calls");
-            } catch (NotSupportedException e) {
-                logInfoAnyway("  SKIPPED: getPID() not supported on this platform/JVM: " + e.getMessage());
-            }
-        } finally {
-            cmd.destroy();
+            TestJREProvider.executeInJRE(JreOptions.version(runJRE).jvmArgs("-DTEST_JRE_VERSION=" + runJRE.name()), TestJREProviderTestMethod.class, "test");
         }
     }
 }

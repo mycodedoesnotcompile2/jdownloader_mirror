@@ -35,9 +35,7 @@ package org.appwork.utils.net.httpconnection;
 
 import java.io.IOException;
 import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URL;
 import java.net.UnknownHostException;
 
@@ -51,20 +49,12 @@ import org.appwork.utils.net.socketconnection.SocksSocketConnection.DESTTYPE;
  *
  */
 public class Socks4HTTPConnectionImpl extends AbstractSocksHTTPConnection {
-
     public Socks4HTTPConnectionImpl(URL url, HTTPProxy proxy, DESTTYPE destType) {
         super(url, proxy, destType);
     }
 
     public Socks4HTTPConnectionImpl(URL url, HTTPProxy proxy) {
         super(url, proxy);
-    }
-
-    @Override
-    protected Socket createRawConnectionSocket(final InetAddress bindInetAddress) throws IOException {
-        final Socks4SocketConnection socket = buildSocksSocketConnection();
-        socket.setSoTimeout(getReadTimeout());
-        return socket;
     }
 
     @Override
@@ -90,17 +80,7 @@ public class Socks4HTTPConnectionImpl extends AbstractSocksHTTPConnection {
     }
 
     @Override
-    protected SocketStreamInterface connect(SocketStreamInterface socketStream) throws IOException {
-        final Socket socket = socketStream.getSocket();
-        final Socks4SocketConnection socks4Socket = ((Socks4SocketConnection) socket);
-        this.endPointInetSocketAddress = buildConnectEndPointSocketAddress(socks4Socket);
-        socks4Socket.connect(endPointInetSocketAddress, this.getConnectTimeout(), this.proxyRequest);
-        return socketStream;
-    }
-
-    @Override
     protected Socks4SocketConnection buildSocksSocketConnection() {
-        final Socks4SocketConnection socket = new Socks4SocketConnection(this.getProxy(), getDestType());
-        return socket;
+        return new Socks4SocketConnection(this.getProxy(), getDestType());
     }
 }

@@ -33,18 +33,20 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.socketconnection;
 
+import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.SocketStreamInterface;
 
 /**
  * @author daniel
  * @date Jul 6, 2022
  *
  */
-public abstract class SocksSocketConnection extends SocketConnection {
+public abstract class SocksSocketConnection extends SocketConnection implements SocketStreamInterface {
     protected final DESTTYPE destType;
 
     public SocksSocketConnection(HTTPProxy proxy, DESTTYPE destType) {
@@ -74,6 +76,12 @@ public abstract class SocksSocketConnection extends SocketConnection {
 
     public DESTTYPE getDestType() {
         return destType;
+    }
+    
+    
+    @Override
+    public Socket getSocket() {
+      return this;
     }
 
     public abstract DESTTYPE getDestType(final SocketAddress endpoint);

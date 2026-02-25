@@ -63,6 +63,12 @@ import org.appwork.utils.net.httpserver.OriginRule;
  * <li>Path prefix restrictions</li>
  * </ul>
  *
+ * <p>
+ * The path {@code /connect/probe} is used in tests as a typical path-aware CORS example. In the Connect API,
+ * the probe endpoint also requires valid authentication like all other API endpoints; this test only verifies
+ * CORS path-aware behavior, not authentication.
+ * </p>
+ *
  * @author AppWork
  */
 public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
@@ -97,7 +103,8 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
     }
 
     /**
-     * Test 26: Path-aware CORS - Origin with path restriction allows only matching path
+     * Test 26: Path-aware CORS - Origin with path restriction allows only matching path.
+     * In the Connect API, /connect/probe also requires valid authentication; this test only checks CORS path rules.
      */
     private void testPathAwareCorsOriginWithPath() throws Exception {
         LogV3.info("Test 26: Path-aware CORS - Origin with path restriction");

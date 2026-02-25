@@ -10,7 +10,11 @@ import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.remoteapi.ContentSecurityHeader;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
+import org.appwork.remoteapi.docsv2.model.DocsV2Definition;
+import org.appwork.remoteapi.docsv2.model.DocsV2StorableDefinition;
 import org.appwork.remoteapi.exceptions.InternalApiException;
+import org.appwork.serializer.Deser;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.HTTPHeader;
@@ -75,34 +79,38 @@ public class DocsV2APIImpl implements DocsV2APIInterface {
     }
 
     @Override
-    public void docsDefinition(final RemoteAPIRequest request, final RemoteAPIResponse response) throws InternalApiException {
+    public DocsV2Definition docsDefinition(final RemoteAPIRequest request) throws InternalApiException {
         if (this.provider == null) {
             throw new InternalApiException("No DocsV2ContentProvider configured");
         }
         try {
-            final byte[] json = this.provider.createDocsDefinitionJson().getBytes(StandardCharsets.UTF_8);
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json; charset=utf-8"));
-            response.setResponseCode(ResponseCode.SUCCESS_OK);
-            response.sendBytes(request, json);
-        } catch (final IOException e) {
-            throw new InternalApiException(e);
+            return Deser.fromString(this.provider.createDocsDefinitionJson(), new TypeRef<DocsV2Definition>() {
+            });
         } catch (final Exception e) {
             throw new InternalApiException(e);
         }
     }
 
     @Override
-    public void getStorableDefinition(final RemoteAPIRequest request, final RemoteAPIResponse response, final String javaType) throws InternalApiException {
+    public DocsV2StorableDefinition getStorableDefinition(final RemoteAPIRequest request, final String javaType) throws InternalApiException {
         if (this.provider == null) {
             throw new InternalApiException("No DocsV2ContentProvider configured");
         }
         try {
-            final byte[] json = this.provider.createStorableDefinitionJson(javaType).getBytes(StandardCharsets.UTF_8);
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json; charset=utf-8"));
-            response.setResponseCode(ResponseCode.SUCCESS_OK);
-            response.sendBytes(request, json);
-        } catch (final IOException e) {
+            return Deser.fromString(this.provider.createStorableDefinitionJson(javaType), new TypeRef<DocsV2StorableDefinition>() {
+            });
+        } catch (final Exception e) {
             throw new InternalApiException(e);
+        }
+    }
+
+    @Override
+    public String createExampleJson(final RemoteAPIRequest request, final String javaType, final boolean includeDocumentation) throws InternalApiException {
+        if (this.provider == null) {
+            throw new InternalApiException("No DocsV2ContentProvider configured");
+        }
+        try {
+            return this.provider.createExampleJson(javaType, includeDocumentation);
         } catch (final Exception e) {
             throw new InternalApiException(e);
         }

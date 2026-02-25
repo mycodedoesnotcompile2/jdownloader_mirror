@@ -38,6 +38,8 @@ import javax.net.ssl.SSLHandshakeException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.testframework.TestJREProvider;
+import org.appwork.testframework.TestJREProvider.JreOptions;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.net.httpclient.HttpClient;
@@ -66,12 +68,21 @@ public class SSLProtocolVersionTest extends ProxyConnectionTestBase {
 
     @Override
     public void runTest() throws Exception {
+        TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_8), SSLProtocolVersionTest.class, "testSSLProtocolVersionsInThisJRE");
+        TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_11_0), SSLProtocolVersionTest.class, "testSSLProtocolVersionsInThisJRE");
+    }
+
+    /**
+     * Runs SSL/TLS protocol version tests in the current JRE. Invoked via TestJREProvider for JVM_1_8 and JVM_11_0.
+     * On Java 11+ TLS 1.0/1.1 are disabled by default; on Java 8 they may still connect.
+     */
+    public void testSSLProtocolVersionsInThisJRE() throws Exception {
         try {
             setupProxyServers();
             // getClientWithSSLProtocol(...) supports only direct and none proxy
             final List<HTTPProxy> directOnlyVariants = ConnectionVariants.createDirectOnly();
             final List<HTTPProxy> variants = getConnectionVariants();
-            // Test TLS 1.1 - should fail (disabled by default in modern Java)
+            // Test TLS 1.1 - should fail on Java 11+ (disabled by default)
             for (final HTTPProxy proxy : directOnlyVariants) {
                 try {
                     getClientWithSSLProtocol(TLS.TLS_1_1.id).proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_1_BADSSL_COM_1011);
@@ -82,7 +93,7 @@ public class SSLProtocolVersionTest extends ProxyConnectionTestBase {
                     assertTrue(Exceptions.containsInstanceOf(e, SSLHandshakeException.class));
                 }
             }
-            // Test TLS 1.0 - should fail (disabled by default in modern Java)
+            // Test TLS 1.0 - should fail on Java 11+ (disabled by default)
             for (final HTTPProxy proxy : directOnlyVariants) {
                 try {
                     getClientWithSSLProtocol(TLS.TLS_1_0.id).proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_0_BADSSL_COM_1010);
@@ -103,7 +114,7 @@ public class SSLProtocolVersionTest extends ProxyConnectionTestBase {
                 new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://tls-v1-2.badssl.com:1012/");
                 new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://appwork.org");
             }
-            // Test that TLS 1.1/1.0 are rejected even with TrustAllProvider (all variants)
+            // Test that TLS 1.1/1.0 are rejected even with TrustAllProvider (all variants) on Java 11+
             for (final HTTPProxy proxy : variants) {
                 try {
                     new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_1_BADSSL_COM_1011);

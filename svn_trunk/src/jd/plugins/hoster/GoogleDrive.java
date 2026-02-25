@@ -89,7 +89,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51491 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52379 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -226,6 +226,7 @@ public class GoogleDrive extends PluginForHost {
      */
     public static final String    PROPERTY_TEAM_DRIVE_ID                         = "TEAM_DRIVE_ID";
     public static final String    PROPERTY_ROOT_DIR                              = "root_dir";
+    public static final String    PROPERTY_FILE_OWNER                            = "owner";
     /* Account properties */
     private final String          PROPERTY_ACCOUNT_ACCESS_TOKEN                  = "ACCESS_TOKEN";
     private final String          PROPERTY_ACCOUNT_REFRESH_TOKEN                 = "REFRESH_TOKEN";
@@ -455,12 +456,12 @@ public class GoogleDrive extends PluginForHost {
      * Fields for file hashes: md5Checksum, sha1Checksum, sha256Checksum </br>
      */
     public static final String getSingleFilesFieldsAPI() {
-        return "kind,mimeType,id,name,size,description,md5Checksum,sha256Checksum,exportLinks,capabilities(canDownload),resourceKey,modifiedTime,shortcutDetails(targetId,targetMimeType)";
+        return "kind,mimeType,id,name,size,description,md5Checksum,sha256Checksum,exportLinks,capabilities(canDownload),resourceKey,modifiedTime,shortcutDetails(targetId,targetMimeType),owners(displayName)";
         // return "*";
     }
 
     public static final String getSingleFilesFieldsWebsite() {
-        return "kind,mimeType,id,title,fileSize,description,md5Checksum,sha256Checksum,exportLinks,capabilities(canDownload),resourceKey,modifiedDate,shortcutDetails(targetId,targetMimeType)";
+        return "kind,mimeType,id,title,fileSize,description,md5Checksum,sha256Checksum,exportLinks,capabilities(canDownload),resourceKey,modifiedDate,shortcutDetails(targetId,targetMimeType),ownerNames";
     }
 
     private boolean useAPIForLinkcheck() {
@@ -501,10 +502,23 @@ public class GoogleDrive extends PluginForHost {
             filename = entries.get("title").toString();
             filesize = JavaScriptEngineFactory.toLong(entries.get("fileSize"), -1);
             modifiedDate = (String) entries.get("modifiedDate");
+            /* WebAPI v2: ownerNames is a plain list of strings */
+            final List<String> ownerNames = (List<String>) entries.get("ownerNames");
+            if (ownerNames != null && !ownerNames.isEmpty()) {
+                link.setProperty(PROPERTY_FILE_OWNER, ownerNames.get(0));
+            }
         } else {
             filename = entries.get("name").toString();
             filesize = JavaScriptEngineFactory.toLong(entries.get("size"), -1);
             modifiedDate = (String) entries.get("modifiedTime");
+            /* API v3: owners is a list of objects with displayName */
+            final List<Map<String, Object>> owners = (List<Map<String, Object>>) entries.get("owners");
+            if (owners != null && !owners.isEmpty()) {
+                final String ownerDisplayName = (String) owners.get(0).get("displayName");
+                if (!StringUtils.isEmpty(ownerDisplayName)) {
+                    link.setProperty(PROPERTY_FILE_OWNER, ownerDisplayName);
+                }
+            }
         }
         String mimeType = (String) entries.get("mimeType");
         final Map<String, Object> shortcutDetails = (Map<String, Object>) entries.get("shortcutDetails");

@@ -66,7 +66,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52365 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 52372 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -872,7 +872,7 @@ public class FlickrCom extends PluginForHost {
             final String jwt = Base64.decodeToString(jwtContent);
             final String exp = new Regex(jwt, "\"e(?:xp)?\"\\s*:\\s*(\\d+)").getMatch(0);
             final long expireOn = Long.parseLong(exp) * 1000;
-            if (System.currentTimeMillis() < expireOn) {
+            if (System.currentTimeMillis() + (5 * 60 * 1000) < expireOn) {
                 return true;
             } else {
                 return false;

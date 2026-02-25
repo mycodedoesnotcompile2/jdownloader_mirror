@@ -29,4 +29,9 @@ public class DocsV2DefinitionContentProvider implements DocsV2ContentProvider {
     public String createStorableDefinitionJson(final String javaType) throws Exception {
         return definitionBuilder.createStorableDefinitionJson(javaType, handlers, projectDataProvider);
     }
+
+    @Override
+    public String createExampleJson(final String javaType, final boolean includeDocumentation) throws Exception {
+        return definitionBuilder.createExampleJson(javaType, includeDocumentation, handlers, projectDataProvider);
+    }
 }

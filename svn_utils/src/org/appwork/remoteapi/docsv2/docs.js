@@ -1,5 +1,5 @@
 (function() {
-  const state = { def: null, selected: null, editors: {}, nsOpen: {}, suppressHashChange: false, responsePreviewUrl: null };
+  const state = { def: null, selected: null, editors: {}, nsOpen: {}, suppressHashChange: false, responsePreviewUrl: null, page: 'docs', remote: { repos: [], namespaces: [], requestId: '', connectTimer: null, installTimer: null, iconBlobUrl: null } };
   const LOG_PREFIX = '[RemoteDocs]';
   const by = (id) => document.getElementById(id);
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -83,6 +83,27 @@
     const t = by('token').value.trim();
     if (!t) return {};
     return { 'X-TOKEN': t };
+  }
+
+  async function callApi(path, args, expectBinary) {
+    const body = JSON.stringify(Array.isArray(args) ? args : []);
+    const headers = Object.assign({ 'Content-Type': 'application/json;charset=UTF-8' }, authHeaders());
+    const url = path.startsWith('/') ? path : ('/' + path);
+    const resp = await fetch(url, { method: 'POST', headers, body });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error('HTTP ' + resp.status + ' ' + resp.statusText + ' @ ' + path + ' body: ' + errText.slice(0, 400));
+    }
+    if (expectBinary) {
+      return { response: resp, data: await resp.blob() };
+    }
+    const txt = await resp.text();
+    if (!txt) return { response: resp, data: null };
+    try {
+      return { response: resp, data: unwrapApiPayload(JSON.parse(txt)) };
+    } catch (e) {
+      return { response: resp, data: txt };
+    }
   }
 
   function typeHint(type) {
@@ -186,10 +207,10 @@
   function renderWikiLinks(links) {
     const list = Array.isArray(links) ? links.filter((x) => !!x) : [];
     if (!list.length) return '';
-    let html = '<div class="muted" style="margin-top:6px">Wiki: ';
+    let html = '<div class="muted" style="margin-top:6px">Related links (more docs/details): ';
     list.forEach((url, idx) => {
       if (idx > 0) html += ' | ';
-      html += '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(url) + '</a>';
+      html += '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Docs &amp; details</a>';
     });
     html += '</div>';
     return html;
@@ -412,7 +433,7 @@
         const wiki = renderWikiLinks(entry && entry.wikiLinks);
         return '<tr><td><code>' + esc(name) + '</code></td><td>' + (desc ? esc(desc) : '<span class="muted">-</span>') + '</td><td>' + (wiki || '<span class="muted">-</span>') + '</td><td>' + (example ? '<pre>' + esc(formatExampleJsonText(example)) + '</pre>' : '<span class="muted">-</span>') + '</td></tr>';
       }).join('');
-      return '<h3>Enum values</h3><table><tr><th>Value</th><th>Description</th><th>Wiki</th><th>Example</th></tr>' + rows + '</table>';
+      return '<h3>Enum values</h3><table><tr><th>Value</th><th>Description</th><th>Related Links</th><th>Example</th></tr>' + rows + '</table>';
     }
     const values = Array.isArray(doc.enumValues) ? doc.enumValues : [];
     if (!values.length) return '<div class="muted">No enum values documented.</div>';
@@ -1055,19 +1076,13 @@
       ex += '<tr><td>' + exceptionTypeLink(x) + '</td><td>' + esc(x.http || '') + '</td><td>' + renderDocText(x.description || '', x.wikiLinks) + '</td><td>' + renderWikiLinks(x.wikiLinks) + '</td></tr>';
     });
 
-    let auth = '';
-    (ep.auth || []).forEach((x) => {
-      auth += '<div class="muted"><b>' + esc(x.name) + '</b> ' + esc(x.doc || '') + '</div>';
-    });
-
     root.innerHTML = '<h2>' + esc(ep.path) + '</h2>' +
       '<div class="muted">' + renderDocText(ep.description || '', ep.wikiLinks) + '</div>' +
       renderLifecycleInfo(ep) +
       renderWikiLinks(ep.wikiLinks) +
       renderTags(ep.tags) +
       '<div style="height:8px"></div><div class="muted">Return: ' + renderReturnTypes(ep) + '</div>' +
-      (auth ? '<div style="height:6px"></div>' + auth : '') +
-      '<h3>Exceptions</h3><table><tr><th>Type</th><th>HTTP</th><th>Description</th><th>Wiki</th></tr>' +
+      '<h3>Exceptions</h3><table><tr><th>Type</th><th>HTTP</th><th>Description</th><th>Related Links</th></tr>' +
       (ex || '<tr><td colspan="4" class="muted">No declared exceptions</td></tr>') + '</table>' +
       '<h3>Parameters</h3><table><tr><th>Name</th><th>Type</th><th>Value</th></tr>' +
       (p || '<tr><td colspan="3" class="muted">No parameters</td></tr>') +
@@ -1181,11 +1196,446 @@
       });
   }
 
+  function setPage(page) {
+    state.page = page === 'remote' ? 'remote' : 'docs';
+    const docs = by('pageDocs');
+    const remote = by('pageRemote');
+    const navDocs = by('navDocs');
+    const navRemote = by('navRemote');
+    if (docs) docs.classList.toggle('hidden', state.page !== 'docs');
+    if (remote) remote.classList.toggle('hidden', state.page !== 'remote');
+    if (navDocs) navDocs.classList.toggle('active', state.page === 'docs');
+    if (navRemote) navRemote.classList.toggle('active', state.page === 'remote');
+    if (state.page === 'remote') {
+      startRemotePolling();
+    } else {
+      stopRemotePolling();
+    }
+  }
+
+  function statusPill(ok, text) {
+    const clazz = ok === true ? 'status-ok' : (ok === false ? 'status-bad' : 'status-warn');
+    return '<span class="status-pill ' + clazz + '">' + esc(text || '-') + '</span>';
+  }
+
+  function setRemoteIconBlob(blob) {
+    const imgRemote = by('remoteStatusIcon');
+    const imgGlobal = by('globalStatusIcon');
+    if (!imgRemote && !imgGlobal) return;
+    if (state.remote.iconBlobUrl) {
+      try { URL.revokeObjectURL(state.remote.iconBlobUrl); } catch (e) {}
+      state.remote.iconBlobUrl = null;
+    }
+    if (!blob) {
+      if (imgRemote) imgRemote.removeAttribute('src');
+      if (imgGlobal) imgGlobal.removeAttribute('src');
+      return;
+    }
+    state.remote.iconBlobUrl = URL.createObjectURL(blob);
+    if (imgRemote) imgRemote.src = state.remote.iconBlobUrl;
+    if (imgGlobal) imgGlobal.src = state.remote.iconBlobUrl;
+  }
+
+  function setRemoteActionOutput(value) {
+    if (typeof value === 'string') {
+      setPre('remoteActionOutput', value);
+      return;
+    }
+    try {
+      setPre('remoteActionOutput', JSON.stringify(value, null, 2));
+    } catch (e) {
+      setPre('remoteActionOutput', String(value));
+    }
+  }
+
+  function extractIconKeyFromStatus(status) {
+    if (!status || typeof status !== 'object') return null;
+    const direct = status.guiStatusIcon || status.statusKey || status.iconKey;
+    if (direct) return String(direct);
+    const updates = status.updates && typeof status.updates === 'object' ? status.updates : null;
+    if (updates) {
+      const firstKey = Object.keys(updates)[0];
+      if (firstKey) {
+        const first = updates[firstKey];
+        if (first && first.iconKey) return String(first.iconKey);
+      }
+    }
+    return null;
+  }
+
+  function extractProgressText(status) {
+    if (!status || typeof status !== 'object') return '-';
+    const percent = status.progressPercent;
+    if (typeof percent === 'number') return String(percent) + '%';
+    if (typeof status.progress === 'number') return String(status.progress);
+    if (status.currentStep && status.maxSteps) return String(status.currentStep) + '/' + String(status.maxSteps);
+    return '-';
+  }
+
+  function extractProgressPercent(status) {
+    if (!status || typeof status !== 'object') return null;
+    let v = null;
+    if (typeof status.progressPercent === 'number') {
+      v = status.progressPercent;
+    } else if (typeof status.progress === 'number') {
+      v = status.progress <= 1 ? status.progress * 100 : status.progress;
+    } else if (typeof status.currentStep === 'number' && typeof status.maxSteps === 'number' && status.maxSteps > 0) {
+      v = (status.currentStep / status.maxSteps) * 100;
+    }
+    if (typeof v !== 'number' || Number.isNaN(v)) return null;
+    if (v < 0) v = 0;
+    if (v > 100) v = 100;
+    return v;
+  }
+
+  function setProgressUi(status) {
+    const labelText = extractProgressText(status);
+    const percent = extractProgressPercent(status);
+    const fillRemote = by('remoteProgressFill');
+    const fillGlobal = by('globalProgressFill');
+    const labelRemote = by('remoteProgress');
+    const labelGlobal = by('globalProgressLabel');
+    const width = percent == null ? 0 : Math.round(percent);
+    if (fillRemote) fillRemote.style.width = width + '%';
+    if (fillGlobal) fillGlobal.style.width = width + '%';
+    if (labelRemote) labelRemote.textContent = percent == null ? labelText : (width + '%');
+    if (labelGlobal) labelGlobal.textContent = percent == null ? labelText : (width + '%');
+  }
+
+  async function refreshRemoteRepositories() {
+    try {
+      const res = await callApi('connect/listRepositories', []);
+      const repos = Array.isArray(res.data) ? res.data : [];
+      state.remote.repos = repos;
+      const seen = {};
+      state.remote.namespaces = repos.map((r) => r && r.namespace).filter((x) => x && !seen[x] && (seen[x] = true));
+      const select = by('remoteNamespace');
+      if (select) {
+        const current = select.value;
+        select.innerHTML = '';
+        state.remote.namespaces.forEach((ns) => {
+          const opt = document.createElement('option');
+          opt.value = String(ns);
+          opt.textContent = String(ns);
+          select.appendChild(opt);
+        });
+        if (current && state.remote.namespaces.includes(current)) {
+          select.value = current;
+        }
+      }
+      refreshPackageHashOptions();
+      applyNamespaceToInstallOptions();
+      const info = by('remoteRepoInfo');
+      if (info) {
+        info.textContent = repos.length ? ('Loaded repositories: ' + repos.length + ', namespaces: ' + state.remote.namespaces.length) : 'No repositories returned.';
+      }
+    } catch (e) {
+      error('refreshRemoteRepositories failed', e);
+      const info = by('remoteRepoInfo');
+      if (info) info.textContent = 'Repository refresh failed: ' + String(e);
+    }
+  }
+
+  function refreshPackageHashOptions() {
+    const ns = by('remoteNamespace') ? by('remoteNamespace').value : '';
+    const hashSelect = by('remotePackageHash');
+    if (!hashSelect) return;
+    const hashes = [];
+    const dedupe = {};
+    (state.remote.repos || []).forEach((repo) => {
+      if (!repo || String(repo.namespace || '') !== String(ns || '')) return;
+      const pending = repo.pendingUpdate || {};
+      const hash = String(pending.hash || '').trim();
+      if (!hash || dedupe[hash]) return;
+      dedupe[hash] = true;
+      hashes.push(hash);
+    });
+    const current = hashSelect.value;
+    hashSelect.innerHTML = '';
+    hashes.forEach((hash) => {
+      const opt = document.createElement('option');
+      opt.value = hash;
+      opt.textContent = hash;
+      hashSelect.appendChild(opt);
+    });
+    if (current && hashes.includes(current)) {
+      hashSelect.value = current;
+    }
+  }
+
+  function applyNamespaceToInstallOptions() {
+    const ns = by('remoteNamespace') ? by('remoteNamespace').value : '';
+    const area = by('remoteInstallOptions');
+    if (!area) return;
+    let parsed = {};
+    try {
+      parsed = JSON.parse(String(area.value || '{}'));
+    } catch (e) {
+      parsed = {};
+    }
+    if (ns) parsed.namespaces = [ns];
+    area.value = JSON.stringify(parsed, null, 2);
+  }
+
+  function parseOptionalsToMap(optionalsList) {
+    const map = {};
+    (Array.isArray(optionalsList) ? optionalsList : []).forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const key = String(entry.id || entry.key || entry.name || '').trim();
+      if (!key) return;
+      let enabled = false;
+      if (typeof entry.enabled === 'boolean') enabled = entry.enabled;
+      else if (typeof entry.active === 'boolean') enabled = entry.active;
+      else if (typeof entry.value === 'boolean') enabled = entry.value;
+      else if (typeof entry.state === 'boolean') enabled = entry.state;
+      map[key] = enabled;
+    });
+    return map;
+  }
+
+  async function pollConnectRemoteState() {
+    const globalAliveEl = by('globalAlive');
+    const globalStatusEl = by('globalStatusText');
+    const aliveEl = by('remoteAlive');
+    const statusEl = by('remoteStatusText');
+    try {
+      const alive = await callApi('connect/isAlive', []);
+      const aliveValue = alive.data === true || String(alive.data).toLowerCase() === 'true';
+      if (aliveEl) aliveEl.innerHTML = statusPill(aliveValue, aliveValue ? 'Connected' : 'Disconnected');
+      if (globalAliveEl) globalAliveEl.innerHTML = statusPill(aliveValue, aliveValue ? 'Connected' : 'Disconnected');
+      const stateRes = await callApi('connect/getState', []);
+      const connectState = stateRes.data || {};
+      setPre('remoteConnectState', JSON.stringify(connectState, null, 2));
+      const statusText = String(connectState.statusText || connectState.message || connectState.guiStatusText || '-');
+      if (statusEl) statusEl.textContent = statusText;
+      if (globalStatusEl) globalStatusEl.textContent = statusText;
+      setProgressUi(connectState);
+      const iconKey = extractIconKeyFromStatus(connectState);
+      if (iconKey) {
+        const iconRes = await callApi('resources/getIcon', [iconKey, 32, 32], true);
+        setRemoteIconBlob(iconRes.data);
+      } else {
+        setRemoteIconBlob(null);
+      }
+    } catch (e) {
+      if (aliveEl) aliveEl.innerHTML = statusPill(false, 'Error');
+      if (globalAliveEl) globalAliveEl.innerHTML = statusPill(false, 'Error');
+      if (statusEl) statusEl.textContent = String(e);
+      if (globalStatusEl) globalStatusEl.textContent = String(e);
+      setProgressUi(null);
+    }
+  }
+
+  async function pollInstallationStatusOnce() {
+    const requestId = String((by('remoteRequestId') && by('remoteRequestId').value) || '').trim();
+    if (!requestId) {
+      setPre('remoteInstallStatus', 'No requestID set.');
+      return;
+    }
+    try {
+      const res = await callApi('update/getInstallationStatus', [requestId]);
+      const status = res.data || {};
+      setPre('remoteInstallStatus', JSON.stringify(status, null, 2));
+      const iconKey = extractIconKeyFromStatus(status);
+      if (iconKey) {
+        const iconRes = await callApi('resources/getIcon', [iconKey, 32, 32], true);
+        setRemoteIconBlob(iconRes.data);
+      }
+      const done = String(status.requestState || '').toUpperCase() === 'DONE' || status.active === false;
+      if (done && state.remote.installTimer) {
+        clearInterval(state.remote.installTimer);
+        state.remote.installTimer = null;
+      }
+    } catch (e) {
+      setPre('remoteInstallStatus', 'Polling failed: ' + String(e));
+    }
+  }
+
+  function stopRemotePolling() {
+    if (state.remote.installTimer) {
+      clearInterval(state.remote.installTimer);
+      state.remote.installTimer = null;
+    }
+  }
+
+  function stopAllRemotePolling() {
+    stopRemotePolling();
+    if (state.remote.connectTimer) {
+      clearInterval(state.remote.connectTimer);
+      state.remote.connectTimer = null;
+    }
+  }
+
+  function startRemotePolling() {
+    if (!by('pageRemote')) return;
+    if (!state.remote.connectTimer) {
+      pollConnectRemoteState();
+      state.remote.connectTimer = setInterval(pollConnectRemoteState, 3000);
+    }
+    const requestId = String((by('remoteRequestId') && by('remoteRequestId').value) || '').trim();
+    if (requestId && !state.remote.installTimer) {
+      pollInstallationStatusOnce();
+      state.remote.installTimer = setInterval(pollInstallationStatusOnce, 2000);
+    }
+  }
+
+  async function requestInstallationFromRemoteUi() {
+    try {
+      const area = by('remoteInstallOptions');
+      let options = {};
+      try {
+        options = JSON.parse(String((area && area.value) || '{}'));
+      } catch (e) {
+        throw new Error('InstallOptions JSON is invalid: ' + String(e));
+      }
+      const ns = by('remoteNamespace') ? by('remoteNamespace').value : '';
+      if (ns) options.namespaces = [ns];
+      const res = await callApi('update/requestInstallation', [options]);
+      setPre('remoteInstallStatus', JSON.stringify(res.data, null, 2));
+      const requestId = res.data && res.data.requestID ? String(res.data.requestID) : '';
+      if (by('remoteRequestId')) by('remoteRequestId').value = requestId;
+      if (requestId) {
+        if (state.remote.installTimer) clearInterval(state.remote.installTimer);
+        state.remote.installTimer = setInterval(pollInstallationStatusOnce, 2000);
+        pollInstallationStatusOnce();
+      }
+    } catch (e) {
+      setPre('remoteInstallStatus', 'RequestInstallation failed: ' + String(e));
+    }
+  }
+
+  async function listPackageContentsFromRemoteUi() {
+    const ns = String((by('remoteNamespace') && by('remoteNamespace').value) || '').trim();
+    const hash = String((by('remotePackageHash') && by('remotePackageHash').value) || '').trim();
+    if (!ns) {
+      setRemoteActionOutput('Select a namespace first.');
+      return;
+    }
+    if (!hash) {
+      setRemoteActionOutput('No package hash available for selected namespace.');
+      return;
+    }
+    try {
+      const res = await callApi('update/listPackageContents', [ns, hash]);
+      setRemoteActionOutput(res.data);
+    } catch (e) {
+      setRemoteActionOutput('listPackageContents failed: ' + String(e));
+    }
+  }
+
+  async function loadOptionalsFromRemoteUi() {
+    const ns = String((by('remoteNamespace') && by('remoteNamespace').value) || '').trim();
+    if (!ns) {
+      setRemoteActionOutput('Select a namespace first.');
+      return;
+    }
+    try {
+      const res = await callApi('optionals/list', [ns]);
+      setRemoteActionOutput(res.data);
+      const map = parseOptionalsToMap(res.data);
+      if (by('remoteOptionalsState')) {
+        by('remoteOptionalsState').value = JSON.stringify(map, null, 2);
+      }
+    } catch (e) {
+      setRemoteActionOutput('optionals/list failed: ' + String(e));
+    }
+  }
+
+  async function setOptionalsFromRemoteUi() {
+    const ns = String((by('remoteNamespace') && by('remoteNamespace').value) || '').trim();
+    if (!ns) {
+      setRemoteActionOutput('Select a namespace first.');
+      return;
+    }
+    let map = {};
+    try {
+      map = JSON.parse(String((by('remoteOptionalsState') && by('remoteOptionalsState').value) || '{}'));
+    } catch (e) {
+      setRemoteActionOutput('Optionals state JSON invalid: ' + String(e));
+      return;
+    }
+    try {
+      const res = await callApi('optionals/set', [ns, map]);
+      setRemoteActionOutput(res.data == null ? 'optionals/set executed.' : res.data);
+    } catch (e) {
+      setRemoteActionOutput('optionals/set failed: ' + String(e));
+    }
+  }
+
+  async function blockIntervalChecksFromRemoteUi() {
+    const ns = String((by('remoteNamespace') && by('remoteNamespace').value) || '').trim();
+    if (!ns) {
+      setRemoteActionOutput('Select a namespace first.');
+      return;
+    }
+    const duration = String((by('remoteBlockDuration') && by('remoteBlockDuration').value) || '10m').trim() || '10m';
+    try {
+      const res = await callApi('update/blockIntervalChecks', [[ns], duration]);
+      setRemoteActionOutput(res.data == null ? ('blockIntervalChecks executed for ' + ns + ' with duration ' + duration + '.') : res.data);
+    } catch (e) {
+      setRemoteActionOutput('blockIntervalChecks failed: ' + String(e));
+    }
+  }
+
+  function initRemoteUi() {
+    if (!by('pageRemote')) return;
+    if (by('navDocs')) by('navDocs').addEventListener('click', () => setPage('docs'));
+    if (by('navRemote')) by('navRemote').addEventListener('click', () => setPage('remote'));
+    if (by('remoteRefreshRepos')) by('remoteRefreshRepos').addEventListener('click', refreshRemoteRepositories);
+    if (by('remoteNamespace')) by('remoteNamespace').addEventListener('change', () => {
+      applyNamespaceToInstallOptions();
+      refreshPackageHashOptions();
+    });
+    if (by('remoteShowGui')) by('remoteShowGui').addEventListener('click', async () => {
+      try { await callApi('connect/show', []); } catch (e) { error('connect/show failed', e); }
+    });
+    if (by('remoteHideGui')) by('remoteHideGui').addEventListener('click', async () => {
+      try { await callApi('connect/hide', []); } catch (e) { error('connect/hide failed', e); }
+    });
+    if (by('remoteCancelInstall')) by('remoteCancelInstall').addEventListener('click', async () => {
+      try { await callApi('update/cancel', []); } catch (e) { error('update/cancel failed', e); }
+    });
+    if (by('remoteRequestInstall')) by('remoteRequestInstall').addEventListener('click', requestInstallationFromRemoteUi);
+    if (by('remoteListPackageContents')) by('remoteListPackageContents').addEventListener('click', listPackageContentsFromRemoteUi);
+    if (by('remoteLoadOptionals')) by('remoteLoadOptionals').addEventListener('click', loadOptionalsFromRemoteUi);
+    if (by('remoteSetOptionals')) by('remoteSetOptionals').addEventListener('click', setOptionalsFromRemoteUi);
+    if (by('remoteBlockIntervalChecks')) by('remoteBlockIntervalChecks').addEventListener('click', blockIntervalChecksFromRemoteUi);
+    if (by('remotePollStatusNow')) by('remotePollStatusNow').addEventListener('click', () => {
+      pollInstallationStatusOnce();
+      const requestId = String((by('remoteRequestId') && by('remoteRequestId').value) || '').trim();
+      if (requestId && !state.remote.installTimer) {
+        state.remote.installTimer = setInterval(pollInstallationStatusOnce, 2000);
+      }
+    });
+    if (by('remoteRequestId')) by('remoteRequestId').addEventListener('input', () => {
+      const requestId = String(by('remoteRequestId').value || '').trim();
+      if (!requestId && state.remote.installTimer) {
+        clearInterval(state.remote.installTimer);
+        state.remote.installTimer = null;
+      }
+    });
+    if (by('remoteInstallOptions') && !String(by('remoteInstallOptions').value || '').trim()) {
+      by('remoteInstallOptions').value = JSON.stringify({ namespaces: [] }, null, 2);
+    }
+    if (by('remoteOptionalsState') && !String(by('remoteOptionalsState').value || '').trim()) {
+      by('remoteOptionalsState').value = JSON.stringify({}, null, 2);
+    }
+    refreshRemoteRepositories();
+    if (!state.remote.connectTimer) {
+      pollConnectRemoteState();
+      state.remote.connectTimer = setInterval(pollConnectRemoteState, 3000);
+    }
+  }
+
   window.addEventListener('error', (ev) => {
     error('window error', ev.message, ev.filename, ev.lineno, ev.colno);
   });
   window.addEventListener('unhandledrejection', (ev) => {
     error('unhandled rejection', ev.reason);
+  });
+  window.addEventListener('beforeunload', () => {
+    stopAllRemotePolling();
+    setRemoteIconBlob(null);
   });
 
   const qp = new URLSearchParams(location.search);
@@ -1253,5 +1703,7 @@
     }
   });
   by('search').addEventListener('input', renderList);
+  initRemoteUi();
+  setPage('docs');
   loadDef();
 })();

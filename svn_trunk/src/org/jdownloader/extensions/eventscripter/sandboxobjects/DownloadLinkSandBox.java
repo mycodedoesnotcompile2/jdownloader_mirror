@@ -1,6 +1,7 @@
 package org.jdownloader.extensions.eventscripter.sandboxobjects;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +80,17 @@ public class DownloadLinkSandBox {
                 downloadLink.setPriorityEnum(Priority.DEFAULT);
             }
         }
+    }
+
+    protected static DownloadLinkSandBox[] wrapSandBox(Collection<DownloadLink> links) {
+        final List<DownloadLinkSandBox> ret = new ArrayList<DownloadLinkSandBox>();
+        if (links == null) {
+            return ret.toArray(new DownloadLinkSandBox[0]);
+        }
+        for (DownloadLink link : links) {
+            ret.add(new DownloadLinkSandBox(link));
+        }
+        return ret.toArray(new DownloadLinkSandBox[0]);
     }
 
     /**

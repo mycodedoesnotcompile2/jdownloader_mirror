@@ -87,6 +87,21 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
     protected abstract SocksSocketConnection buildSocksSocketConnection();
 
     @Override
+    protected Socket createRawConnectionSocket(final InetAddress bindInetAddress) throws IOException {
+        final SocksSocketConnection socket = buildSocksSocketConnection();
+        socket.setSoTimeout(getReadTimeout());
+        return socket;
+    }
+
+    @Override
+    protected void connectEndPoint(SocketStreamInterface socket, InetSocketAddress connectedInetSocketAddress, int requestedConnectTimeout) throws IOException {
+        if (!(socket instanceof SocksSocketConnection)) {
+            throw new IllegalStateException();
+        }
+        ((SocksSocketConnection) socket).connect(endPointInetSocketAddress, requestedConnectTimeout, proxyRequest);
+    }
+
+    @Override
     public void connect() throws IOException {
         final HTTPConnectionProfilerInterface profiler = getProfiler();
         if (profiler != null) {
@@ -108,7 +123,8 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
             try {
                 final long startTime = Time.systemIndependentCurrentJVMTimeMillis();
                 this.sockssocket = this.createConnectionSocket(null);
-                this.sockssocket = connect(sockssocket);
+                this.sockssocket = connectSocks(sockssocket);
+                connectEndPoint(sockssocket, endPointInetSocketAddress, getConnectTimeout());
                 if (this.httpURL.getProtocol().startsWith("https")) {
                     /* we need to lay ssl over normal socks5 connection */
                     try {
@@ -268,7 +284,12 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
         return InetSocketAddress.createUnresolved(getHostname(), getConnectEndpointPort());
     }
 
-    abstract protected SocketStreamInterface connect(SocketStreamInterface socketStream) throws IOException;
+    protected SocketStreamInterface connectSocks(SocketStreamInterface socketStream) throws IOException {
+        final Socket socket = socketStream.getSocket();
+        final SocksSocketConnection socksSocket = ((SocksSocketConnection) socket);
+        this.endPointInetSocketAddress = buildConnectEndPointSocketAddress(socksSocket);
+        return socketStream;
+    }
 
     @Override
     protected String getRequestInfo() {

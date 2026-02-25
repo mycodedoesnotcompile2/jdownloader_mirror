@@ -37,40 +37,38 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.net.HeaderCollection;
 
 /**
  * Configuration class for header validation rules.
- * 
- * Defines mandatory headers (must be present, optionally with specific values matching regex patterns) and forbidden headers (must not be present or must not match regex patterns).
+ *
+ * Defines mandatory headers (must be present, optionally with specific values matching regex patterns) and forbidden headers (must not be
+ * present or must not match regex patterns).
  */
 public class HeaderValidationRules {
     /**
-     * Map of mandatory headers. Key is header name (case-insensitive), value is regex pattern that the header value must match, or null if any value is acceptable.
-     * Example: {"x-appwork": "1"} means header "x-appwork" must be present with value exactly "1".
-     * Example: {"x-appwork": ".*"} means header "x-appwork" must be present with any value.
-     * Example: {"x-appwork": null} means header "x-appwork" must be present, but value doesn't matter.
-     * Example: {"x-version": "\\d+\\.\\d+"} means header "x-version" must match the regex pattern (e.g., "1.0", "2.5").
+     * Map of mandatory headers. Key is header name (case-insensitive), value is regex pattern that the header value must match, or null if
+     * any value is acceptable. Example: {"x-appwork": "1"} means header "x-appwork" must be present with value exactly "1". Example:
+     * {"x-appwork": ".*"} means header "x-appwork" must be present with any value. Example: {"x-appwork": null} means header "x-appwork"
+     * must be present, but value doesn't matter. Example: {"x-version": "\\d+\\.\\d+"} means header "x-version" must match the regex
+     * pattern (e.g., "1.0", "2.5").
      */
-    private final Map<String, String> mandatoryHeaders;
-    
+    private Map<String, String> mandatoryHeaders;
     /**
-     * Map of forbidden headers. Key is header name (case-insensitive), value is regex pattern that the header value must not match, or null if header itself is forbidden regardless of value.
-     * Example: {"sec-fetch-site": null} means header "sec-fetch-site" must not be present at all.
-     * Example: {"sec-fetch-site": "cross-site"} means header "sec-fetch-site" must not have value matching "cross-site" (but other values are allowed).
+     * Map of forbidden headers. Key is header name (case-insensitive), value is regex pattern that the header value must not match, or null
+     * if header itself is forbidden regardless of value. Example: {"sec-fetch-site": null} means header "sec-fetch-site" must not be
+     * present at all. Example: {"sec-fetch-site": "cross-site"} means header "sec-fetch-site" must not have value matching "cross-site"
+     * (but other values are allowed).
      */
-    private final Map<String, String> forbiddenHeaders;
+    private Map<String, String> forbiddenHeaders;
 
     /**
-     * Creates HeaderValidationRules with default values:
-     * - Mandatory: {"x-appwork": "1"}
-     * - Forbidden: common sec-fetch-* headers
+     * Creates HeaderValidationRules with default values: - Mandatory: {"x-appwork": "1"} - Forbidden: common sec-fetch-* headers
      */
     public HeaderValidationRules() {
         this.mandatoryHeaders = new HashMap<String, String>();
         this.mandatoryHeaders.put(HTTPConstants.X_APPWORK, "1");
-        
         this.forbiddenHeaders = new HashMap<String, String>();
         // Common sec-fetch-* headers that browsers send
         this.forbiddenHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, null);
@@ -80,12 +78,32 @@ public class HeaderValidationRules {
     }
 
     /**
+     * @param key
+     */
+    public void removeForbiddenHeader(String key) {
+        HashMap<String, String> newMap = new HashMap<String, String>(forbiddenHeaders);
+        newMap.remove(key);
+        forbiddenHeaders = newMap;
+    }
+
+    /**
+     * @param key
+     */
+    public void removeMandatoryHeader(String key) {
+        HashMap<String, String> newMap = new HashMap<String, String>(mandatoryHeaders);
+        newMap.remove(key);
+        mandatoryHeaders = newMap;
+    }
+
+    /**
      * Creates HeaderValidationRules with custom mandatory and forbidden headers.
-     * 
+     *
      * @param mandatoryHeaders
-     *            Map of mandatory headers. Key is header name, value is regex pattern that the header value must match, or null if any value is acceptable.
+     *            Map of mandatory headers. Key is header name, value is regex pattern that the header value must match, or null if any
+     *            value is acceptable.
      * @param forbiddenHeaders
-     *            Map of forbidden headers. Key is header name, value is regex pattern that the header value must not match, or null if header itself is forbidden.
+     *            Map of forbidden headers. Key is header name, value is regex pattern that the header value must not match, or null if
+     *            header itself is forbidden.
      */
     public HeaderValidationRules(final Map<String, String> mandatoryHeaders, final Map<String, String> forbiddenHeaders) {
         this.mandatoryHeaders = mandatoryHeaders != null ? new HashMap<String, String>(mandatoryHeaders) : new HashMap<String, String>();
@@ -94,7 +112,7 @@ public class HeaderValidationRules {
 
     /**
      * Returns the map of mandatory headers.
-     * 
+     *
      * @return Map where key is header name and value is regex pattern that the header value must match (or null if any value is acceptable)
      */
     public Map<String, String> getMandatoryHeaders() {
@@ -103,8 +121,9 @@ public class HeaderValidationRules {
 
     /**
      * Returns the map of forbidden headers.
-     * 
-     * @return Map where key is header name and value is regex pattern that the header value must not match (or null if header itself is forbidden)
+     *
+     * @return Map where key is header name and value is regex pattern that the header value must not match (or null if header itself is
+     *         forbidden)
      */
     public Map<String, String> getForbiddenHeaders() {
         return new HashMap<String, String>(this.forbiddenHeaders);
@@ -112,7 +131,7 @@ public class HeaderValidationRules {
 
     /**
      * Checks if header validation is enabled (i.e., if there are any rules defined).
-     * 
+     *
      * @return true if there are mandatory or forbidden headers defined
      */
     public boolean isEnabled() {
@@ -123,10 +142,10 @@ public class HeaderValidationRules {
 
     /**
      * Validates the request headers against the configured rules.
-     * 
-     * Checks if all mandatory headers are present (and match their required patterns if specified)
-     * and if no forbidden headers are present (or match their forbidden patterns if specified).
-     * 
+     *
+     * Checks if all mandatory headers are present (and match their required patterns if specified) and if no forbidden headers are present
+     * (or match their forbidden patterns if specified).
+     *
      * @param headers
      *            The request headers to validate
      * @return true if the request is allowed (all rules are satisfied), false otherwise
@@ -135,18 +154,15 @@ public class HeaderValidationRules {
         if (headers == null) {
             return !this.isEnabled();
         }
-
         // Check mandatory headers
         Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
         for (final Map.Entry<String, String> entry : mandatoryHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String requiredPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
-
             if (header == null || header.getValue() == null) {
                 return false;
             }
-
             // If requiredPattern is not null, check that the header value matches the regex pattern
             if (requiredPattern != null) {
                 final String headerValue = header.getValue();
@@ -155,14 +171,12 @@ public class HeaderValidationRules {
                 }
             }
         }
-
         // Check forbidden headers
         Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
         for (final Map.Entry<String, String> entry : forbiddenHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String forbiddenPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
-
             if (header != null) {
                 // If forbiddenPattern is null, header itself is forbidden regardless of value
                 if (forbiddenPattern == null) {
@@ -175,14 +189,12 @@ public class HeaderValidationRules {
                 }
             }
         }
-
         return true;
     }
 
     /**
-     * Gets a detailed error message describing why the request is not allowed.
-     * Returns null if the request is allowed.
-     * 
+     * Gets a detailed error message describing why the request is not allowed. Returns null if the request is allowed.
+     *
      * @param headers
      *            The request headers to validate
      * @return Error message string if validation fails, null if validation passes
@@ -194,18 +206,15 @@ public class HeaderValidationRules {
             }
             return null;
         }
-
         // Check mandatory headers
         Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
         for (final Map.Entry<String, String> entry : mandatoryHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String requiredPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
-
             if (header == null || header.getValue() == null) {
                 return "Missing mandatory header: " + headerName;
             }
-
             // If requiredPattern is not null, check that the header value matches the regex pattern
             if (requiredPattern != null) {
                 final String headerValue = header.getValue();
@@ -214,14 +223,12 @@ public class HeaderValidationRules {
                 }
             }
         }
-
         // Check forbidden headers
         Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
         for (final Map.Entry<String, String> entry : forbiddenHeadersValue.entrySet()) {
             final String headerName = entry.getKey();
             final String forbiddenPattern = entry.getValue();
             final HTTPHeader header = headers.get(headerName);
-
             if (header != null) {
                 // If forbiddenPattern is null, header itself is forbidden regardless of value
                 if (forbiddenPattern == null) {
@@ -234,30 +241,29 @@ public class HeaderValidationRules {
                 }
             }
         }
-
         return null;
     }
 
     /**
      * Returns a string representation of this header validation rules configuration for debugging purposes.
-     * 
+     *
      * <p>
      * The format shows all configured rules in a readable format:
      * </p>
+     *
      * <pre>
      * HeaderValidationRules[
      *   mandatoryHeaders={x-appwork=1},
      *   forbiddenHeaders={sec-fetch-site=null, sec-fetch-mode=null, sec-fetch-user=null, sec-fetch-dest=null}
      * ]
      * </pre>
-     * 
+     *
      * @return A string representation of this header validation rules configuration
      */
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("HeaderValidationRules[");
         boolean hasContent = false;
-
         Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
         if (!mandatoryHeadersValue.isEmpty()) {
             sb.append("mandatoryHeaders=").append(mandatoryHeadersValue);
@@ -266,7 +272,6 @@ public class HeaderValidationRules {
             sb.append("mandatoryHeaders={}");
             hasContent = true;
         }
-
         Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
         if (!forbiddenHeadersValue.isEmpty()) {
             if (hasContent) {
@@ -279,9 +284,7 @@ public class HeaderValidationRules {
             }
             sb.append("forbiddenHeaders={}");
         }
-
         sb.append("]");
         return sb.toString();
     }
 }
-

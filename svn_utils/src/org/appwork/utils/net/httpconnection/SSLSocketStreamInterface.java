@@ -33,6 +33,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
+import javax.net.ssl.KeyManager;
+
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+
 /**
  * @author daniel
  *
@@ -45,4 +49,8 @@ public interface SSLSocketStreamInterface extends SocketStreamInterface, TrustRe
     public SSLSocketStreamOptions getOptions();
 
     public SSLSocketStreamFactory getSSLSocketStreamFactory();
+
+    public TrustProviderInterface getTrustProvider();
+
+    public KeyManager[] getKeyManager();
 }

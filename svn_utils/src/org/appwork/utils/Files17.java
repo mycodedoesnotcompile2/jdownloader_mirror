@@ -220,18 +220,18 @@ public class Files17 {
             if (followLinks(options)) {
                 try {
                     path.getFileSystem().provider().checkAccess(path);
+                    // file exists
+                    return true;
                 } catch (NoSuchFileException e) {
                     return false;
                 } catch (AccessDeniedException e) {
-                    // we may have access to read the attributes anyway
-                    Files.readAttributes(path, BasicFileAttributes.class, options);
+                    // try via Files.readAttributes
                 } catch (FileSystemException e) {
-                    Files.readAttributes(path, BasicFileAttributes.class, options);
+                    // try via Files.readAttributes
                 }
-            } else {
-                // attempt to read attributes without following links
-                Files.readAttributes(path, BasicFileAttributes.class, options);
             }
+            // attempt to read attributes of path with given options
+            Files.readAttributes(path, BasicFileAttributes.class, options);
             // file exists
             return true;
         } catch (NoSuchFileException e) {
@@ -249,7 +249,7 @@ public class Files17 {
      */
     public static boolean existsDirectory(Path path, LinkOption... options) throws ExtIOException {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, options);
+            final BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, options);
             return attributes.isDirectory();
         } catch (NoSuchFileException e) {
             return false;
@@ -266,7 +266,7 @@ public class Files17 {
      */
     public static boolean existsFile(Path path, LinkOption... options) throws ExtIOException {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, options);
+            final BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, options);
             return attributes.isRegularFile();
         } catch (NoSuchFileException e) {
             return false;

@@ -38,13 +38,13 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public boolean isEnabled() {
-        return super.isEnabled() && this.validateLogins();
+        return super.isEnabled() && validateLogins();
     }
 
     final public void solve(final SolverJob<T> job) throws InterruptedException, SolverException {
-        if (!validateLogins()) {
+        if (!isEnabled()) {
             return;
-        } else if (!isEnabled()) {
+        } else if (!validateLogins()) {
             return;
         } else if (getChallengeVetoReason(job.getChallenge()) != null) {
             return;

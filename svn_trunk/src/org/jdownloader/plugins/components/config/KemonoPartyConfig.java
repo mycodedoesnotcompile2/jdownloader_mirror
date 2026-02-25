@@ -13,13 +13,23 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "kemono.cr", type = Type.CRAWLER)
 public interface KemonoPartyConfig extends PluginConfigInterface {
-    final String                    text_CrawlHttpLinksFromPostContent = "Crawl http links in post text?";
-    final String                    text_TextCrawlMode                 = "When to add post text content as .txt file:";
-    public static final TRANSLATION TRANSLATION                        = new TRANSLATION();
+    final String                    text_CrawlHttpLinksFromPostContent       = "Crawl http links in post text?";
+    final String                    text_PostTextLinkFilterMode              = "Post text link filter mode:";
+    final String                    text_PostTextLinkFilterPattern           = "Post text link filter pattern (regex):";
+    final String                    text_TextCrawlMode                       = "When to add post text content as .txt file:";
+    public static final TRANSLATION TRANSLATION                              = new TRANSLATION();
 
     public static class TRANSLATION {
         public String getCrawlHttpLinksFromPostContent_label() {
             return text_CrawlHttpLinksFromPostContent;
+        }
+
+        public String getPostTextLinkFilterMode_label() {
+            return text_PostTextLinkFilterMode;
+        }
+
+        public String getPostTextLinkFilterPattern_label() {
+            return text_PostTextLinkFilterPattern;
         }
 
         public String getTextCrawlMode_label() {
@@ -42,6 +52,42 @@ public interface KemonoPartyConfig extends PluginConfigInterface {
     boolean isCrawlHttpLinksFromPostContent();
 
     void setCrawlHttpLinksFromPostContent(boolean b);
+
+    public static enum PostTextLinkFilterMode implements LabelInterface {
+        DISABLED {
+            @Override
+            public String getLabel() {
+                return "Disabled (crawl all links)";
+            }
+        },
+        WHITELIST {
+            @Override
+            public String getLabel() {
+                return "Whitelist (only crawl matching links)";
+            }
+        },
+        BLACKLIST {
+            @Override
+            public String getLabel() {
+                return "Blacklist (exclude matching links)";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("DISABLED")
+    @DescriptionForConfigEntry(text_PostTextLinkFilterMode)
+    @Order(11)
+    PostTextLinkFilterMode getPostTextLinkFilterMode();
+
+    void setPostTextLinkFilterMode(PostTextLinkFilterMode mode);
+
+    @AboutConfig
+    @DescriptionForConfigEntry(text_PostTextLinkFilterPattern)
+    @Order(12)
+    String getPostTextLinkFilterPattern();
+
+    void setPostTextLinkFilterPattern(String pattern);
 
     public static enum TextCrawlMode implements LabelInterface {
         ALWAYS {

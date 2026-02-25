@@ -37,7 +37,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 52361 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52372 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,7 @@ public class StreamwishCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com", "ultpreplayer.com", "recordplay.biz", "hgplaycdn.com", "hailindihg.com", "auvexiug.com", "davioad.com", "habetar.com", "hglink.to", "kravaxxa.com", "zuvioeb.com", "tryzendm.com", "yuguaab.com", "xenolyzb.com", "guxhag.com", "guxhag.hg", "dumbalag.com", "haxloppd.com", "medixiru.com", "hgcloud.to", "audinifer.com", "vibuxer.com", "hanerix.com", "masukestin.com", "playnixes.com", "hglamioz.com" });
+        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com", "ultpreplayer.com", "recordplay.biz", "hgplaycdn.com", "hailindihg.com", "auvexiug.com", "davioad.com", "habetar.com", "hglink.to", "kravaxxa.com", "zuvioeb.com", "tryzendm.com", "yuguaab.com", "xenolyzb.com", "guxhag.com", "guxhag.hg", "dumbalag.com", "haxloppd.com", "medixiru.com", "hgcloud.to", "audinifer.com", "vibuxer.com", "hanerix.com", "masukestin.com", "playnixes.com", "hglamioz.com", "niramirus.com" });
         /** Tags for developers: streamwish, awish, sexbjcam.com */
         /**
          * Related links for developers: <br>

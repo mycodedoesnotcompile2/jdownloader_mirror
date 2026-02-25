@@ -29,7 +29,7 @@ import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
  * output as {@code <fingerprint> FailedIn: JRE,OS,CRTSH}.
  */
 public class CCADBPEMTrustProviderTest extends AWTest {
-    private static final String PEM_RESOURCE = "common-ca-database.pem";
+    private static final String PEM_RESOURCE = org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider.APPWORK_MERGED_PEM;
 
     public static void main(final String[] args) {
         run();

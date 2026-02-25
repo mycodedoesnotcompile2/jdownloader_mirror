@@ -239,12 +239,16 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         final Object cfgO = this.getConfigInterface();
         if (cfgO == null) {
             // TODO: Remove this fallback
-            logger.warning("Solver has no config");
-            return PluginJsonConfig.get(CaptchaSolverPluginConfig.class);
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                logger.warning("Solver has no config");
+                return PluginJsonConfig.get(CaptchaSolverPluginConfig.class);
+            } else {
+                throw new IllegalArgumentException("Solver has no config");
+            }
         }
         if (!(cfgO instanceof CaptchaSolverPluginConfig)) {
-            logger.warning("Unexpected solver config type");
-            throw new IllegalArgumentException("");
+            /* Developer mistake */
+            throw new IllegalArgumentException("Unexpected solver config type");
         }
         final CaptchaSolverPluginConfig cfg = (CaptchaSolverPluginConfig) cfgO;
         return cfg;

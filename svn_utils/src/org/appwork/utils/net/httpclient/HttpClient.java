@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.net.ssl.KeyManager;
@@ -74,8 +75,6 @@ import org.appwork.utils.net.CountingConnection;
 import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.DownloadProgress;
 import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.net.BasicHTTP.ReadIOException;
-import org.appwork.utils.net.BasicHTTP.WriteIOException;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
 import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
@@ -598,7 +597,7 @@ public class HttpClient {
     }
 
     protected final static Charset          UTF8                 = Charset.forName("UTF-8");
-    protected HashSet<Integer>              allowedResponseCodes = new HashSet<Integer>(Arrays.asList(-1));
+    protected Set<Integer>                  allowedResponseCodes = new HashSet<Integer>(Arrays.asList(-1));
     protected int                           connectTimeout       = 15000;
     protected LogInterface                  logger               = null;
     protected HTTPProxy                     proxy                = HTTPProxy.NONE;
@@ -620,21 +619,26 @@ public class HttpClient {
      *
      */
     protected void checkResponseCode(final RequestContext context) throws InvalidResponseCode {
-        final HashSet<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
-        if (allowedResponseCodes != null) {
-            if (allowedResponseCodes.contains(context.getConnection().getResponseCode())) {
-                return;
-            }
-            if (allowedResponseCodes.contains(-1) && context.getConnection().getResponseCode() != HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
-                // if we want to allow 999, allowedResponseCodes MUSt explicitly contain it. -1 does not allow 999 but all others
-                // allow all
-                return;
-            }
-            if (context.getConnection().getResponseCode() == HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
-                throw new InvalidHttpResponseException(context);
-            }
-            throw new InvalidResponseCode(context);
+        final Set<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
+        if (allowedResponseCodes == null) {
+            return;
+        } else if (allowedResponseCodes.contains(context.getConnection().getResponseCode())) {
+            return;
         }
+        if (allowedResponseCodes.contains(-1) && context.getConnection().getResponseCode() != HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
+            // if we want to allow 999, allowedResponseCodes MUSt explicitly contain it. -1 does not allow 999 but all others
+            // allow all
+            return;
+        } else {
+            throw createInvalidResponseCodeException(context);
+        }
+    }
+
+    protected InvalidResponseCode createInvalidResponseCodeException(final RequestContext context) throws InvalidResponseCode {
+        if (context != null && context.getConnection().getResponseCode() == HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode()) {
+            throw new InvalidHttpResponseException(context);
+        }
+        throw new InvalidResponseCode(context);
     }
 
     public void clearRequestHeader() {
@@ -700,7 +704,7 @@ public class HttpClient {
                 final long connectMethodElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectMethodStartTime;
                 LogV3.fine("HttpClient.connect: connect method failed after " + connectMethodElapsed + "ms: " + e.getMessage());
             }
-            throw new HttpClientException(context, new ReadIOException(e));
+            throw new HttpClientException(context, new ReadIOException(context, e));
         }
         if (!returnOutputStream) {
             if (this.isVerboseLog()) {
@@ -792,7 +796,7 @@ public class HttpClient {
         return this.execute(new RequestContext().setMethod(RequestMethod.GET).setUrl(url));
     }
 
-    public HashSet<Integer> getAllowedResponseCodes() {
+    public Set<Integer> getAllowedResponseCodes() {
         return this.allowedResponseCodes;
     }
 
@@ -831,7 +835,7 @@ public class HttpClient {
      * @param <E>
      * @param HttpClientException
      */
-    private <E extends Throwable> E handleInterrupt(final E exception) throws InterruptedException, E {
+    protected <E extends Throwable> E handleInterrupt(final E exception) throws InterruptedException, E {
         if (exception instanceof InterruptedException) {
             throw (InterruptedException) exception;
         } else if (Thread.interrupted() || exception instanceof InterruptedIOException) {
@@ -1007,7 +1011,7 @@ public class HttpClient {
                             break;
                         }
                     } catch (final IOException e) {
-                        throw new ReadIOException(e);
+                        throw new ReadIOException(context, e);
                     }
                     if (Thread.interrupted()) {
                         throw new InterruptedException();
@@ -1016,7 +1020,7 @@ public class HttpClient {
                         try {
                             out.write(b, 0, len);
                         } catch (final IOException e) {
-                            throw new WriteIOException(e);
+                            throw new WriteIOException(context, e);
                         }
                     }
                 }
@@ -1130,7 +1134,7 @@ public class HttpClient {
                         outputStream.flush();
                         outputStream.close();
                     } catch (final IOException e) {
-                        throw new WriteIOException(e);
+                        throw new WriteIOException(context, e);
                     } finally {
                         directHTTPConnectionOutputStream.setClosingAllowed(before);
                     }
@@ -1182,7 +1186,7 @@ public class HttpClient {
             } catch (final HttpClientException e) {
                 throw this.handleInterrupt(e);
             } catch (final IOException e) {
-                throw this.handleInterrupt(new HttpClientException(context, new ReadIOException(e)));
+                throw this.handleInterrupt(new HttpClientException(context, new ReadIOException(context, e)));
             } catch (RuntimeException e) {
                 throw e;
             } finally {
@@ -1253,7 +1257,7 @@ public class HttpClient {
     }
 
     public void setAllowedResponseCodes(final int... codes) {
-        final HashSet<Integer> allowedResponseCodes = new HashSet<Integer>();
+        final Set<Integer> allowedResponseCodes = new HashSet<Integer>();
         for (final int i : codes) {
             allowedResponseCodes.add(i);
         }
@@ -1261,7 +1265,7 @@ public class HttpClient {
     }
 
     protected void setAllowedResponseCodes(final RequestContext context) {
-        final HashSet<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
+        final Set<Integer> allowedResponseCodes = this.getAllowedResponseCodes();
         if (allowedResponseCodes != null) {
             final int[] ret = new int[allowedResponseCodes.size()];
             int i = 0;
@@ -1334,7 +1338,7 @@ public class HttpClient {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override

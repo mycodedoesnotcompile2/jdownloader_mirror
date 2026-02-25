@@ -2,6 +2,7 @@ package org.jdownloader.extensions.eventscripter.sandboxobjects;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -220,6 +221,17 @@ public class CrawledLinkSandbox {
         } else {
             return null;
         }
+    }
+
+    protected static CrawledLinkSandbox[] wrapSandBox(Collection<CrawledLink> links) {
+        final List<CrawledLinkSandbox> ret = new ArrayList<CrawledLinkSandbox>();
+        if (links == null) {
+            return ret.toArray(new CrawledLinkSandbox[0]);
+        }
+        for (CrawledLink link : links) {
+            ret.add(new CrawledLinkSandbox(link));
+        }
+        return ret.toArray(new CrawledLinkSandbox[0]);
     }
 
     public String getDownloadHost() {

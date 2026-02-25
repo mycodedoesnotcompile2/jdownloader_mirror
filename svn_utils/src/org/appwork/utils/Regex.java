@@ -88,15 +88,23 @@ public class Regex {
     }
 
     public Regex(final Object data, final Pattern pattern) {
-        this(data instanceof CharSequence ? (CharSequence) data : StringUtils.valueOfOrNull(data), pattern);
+        this(data instanceof CharSequence ? (CharSequence) data : valueOfOrNull(data), pattern);
     }
 
     public Regex(final Object data, final String pattern) {
-        this(data instanceof CharSequence ? (CharSequence) data : StringUtils.valueOfOrNull(data), pattern);
+        this(data instanceof CharSequence ? (CharSequence) data : valueOfOrNull(data), pattern);
+    }
+
+    private final static String valueOfOrNull(Object object) {
+        if (object == null) {
+            return null;
+        } else {
+            return String.valueOf(object);
+        }
     }
 
     public Regex(final Object data, final String pattern, final int flags) {
-        this(data instanceof CharSequence ? (CharSequence) data : StringUtils.valueOfOrNull(data), pattern, flags);
+        this(data instanceof CharSequence ? (CharSequence) data : valueOfOrNull(data), pattern, flags);
     }
 
     public Regex(final String data, final Pattern pattern) {

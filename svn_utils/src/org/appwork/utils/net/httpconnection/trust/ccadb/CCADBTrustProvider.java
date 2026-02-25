@@ -48,7 +48,10 @@ import org.appwork.utils.net.httpconnection.trust.TrustUtils;
  *
  */
 public final class CCADBTrustProvider extends CustomTrustProvider {
-    private static final String ONLY_CAS_ACCEPTED_BY_AT_LEAST = "3";
+    /**
+     *
+     */
+    public static final String APPWORK_MERGED_PEM = "appwork-merged-cadb.3-no-rejected.pem";
 
     /**
      * https://www.ccadb.org/resources *
@@ -60,7 +63,7 @@ public final class CCADBTrustProvider extends CustomTrustProvider {
     private static X509Certificate[] loadCCADB() throws CertificateException, IOException {
         InputStream pemStream = null;
         try {
-            pemStream = CCADBTrustProvider.class.getResourceAsStream("appwork-merged-cadb.3-no-rejected.pem");
+            pemStream = CCADBTrustProvider.class.getResourceAsStream(APPWORK_MERGED_PEM);
             return TrustUtils.loadCertificatesFromPEM(pemStream);
         } finally {
             if (pemStream != null) {

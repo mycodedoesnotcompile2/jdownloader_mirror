@@ -118,10 +118,11 @@ public abstract class HttpServerTestBase extends AWTest {
         // Create HttpServer on a free port (0 = automatic)
         this.httpServer = new TestHttpServer(0);
         this.httpServer.setLocalhostOnly(true);
+        // Register dummy handler for CORS test paths FIRST so /connect/probe, /api/v1, etc. are handled before RemoteAPI
+        // (RemoteAPI throws 404 for unknown paths and never returns false, so CORS path handler must run first)
+        this.httpServer.registerRequestHandler(new DummyCorsTestPathHandler());
         // Register RemoteAPI as request handler
         this.httpServer.registerRequestHandler(this.remoteAPI);
-        // Register dummy handler for CORS test paths
-        this.httpServer.registerRequestHandler(new DummyCorsTestPathHandler());
         // Start server
         this.httpServer.start();
         this.serverPort = this.httpServer.getActualPort();

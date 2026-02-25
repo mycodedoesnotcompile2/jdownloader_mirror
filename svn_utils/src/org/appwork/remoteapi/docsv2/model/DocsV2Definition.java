@@ -2,10 +2,18 @@ package org.appwork.remoteapi.docsv2.model;
 
 import java.util.List;
 
-public class DocsV2Definition {
+import org.appwork.storage.Storable;
+
+public class DocsV2Definition implements Storable {
     private long              generatedAt;
     private List<EndpointDoc> endpoints;
     private List<TypeDoc>     types;
+
+    /**
+     *
+     */
+    public DocsV2Definition() {
+    }
 
     public long getGeneratedAt() {
         return generatedAt;
@@ -32,22 +40,21 @@ public class DocsV2Definition {
     }
 
     public static class EndpointDoc {
-        private String             namespace;
-        private String             methodName;
-        private String             path;
-        private String             description;
-        private String             availableSince;
-        private String             availableSinceMessage;
-        private String             deprecatedSince;
-        private String             deprecatedSinceMessage;
-        private List<String>       wikiLinks;
-        private String             returnType;
-        private String             returnJavaType;
+        private String              namespace;
+        private String              methodName;
+        private String              path;
+        private String              description;
+        private String              availableSince;
+        private String              availableSinceMessage;
+        private String              deprecatedSince;
+        private String              deprecatedSinceMessage;
+        private List<String>        wikiLinks;
+        private String              returnType;
+        private String              returnJavaType;
         private List<ReturnTypeDoc> returnTypes;
-        private List<ParameterDoc> parameters;
-        private List<ExceptionDoc> exceptions;
-        private List<AuthDoc>      auth;
-        private List<TagDoc>       tags;
+        private List<ParameterDoc>  parameters;
+        private List<ExceptionDoc>  exceptions;
+        private List<TagDoc>        tags;
 
         public String getNamespace() {
             return namespace;
@@ -159,14 +166,6 @@ public class DocsV2Definition {
 
         public void setExceptions(final List<ExceptionDoc> exceptions) {
             this.exceptions = exceptions;
-        }
-
-        public List<AuthDoc> getAuth() {
-            return auth;
-        }
-
-        public void setAuth(final List<AuthDoc> auth) {
-            this.auth = auth;
         }
 
         public List<TagDoc> getTags() {
@@ -331,27 +330,6 @@ public class DocsV2Definition {
         }
     }
 
-    public static class AuthDoc {
-        private String name;
-        private String doc;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(final String name) {
-            this.name = name;
-        }
-
-        public String getDoc() {
-            return doc;
-        }
-
-        public void setDoc(final String doc) {
-            this.doc = doc;
-        }
-    }
-
     public static class TagDoc {
         private String name;
         private String description;
@@ -383,18 +361,17 @@ public class DocsV2Definition {
     }
 
     public static class TypeDoc {
-        private String         javaType;
-        private String         name;
-        private String         kind;
-        private String         description;
-        private String         availableSince;
-        private String         availableSinceMessage;
-        private String         deprecatedSince;
-        private String         deprecatedSinceMessage;
-        private List<String>   wikiLinks;
-        private String         example;
-        private List<FieldDoc> fields;
-        private List<String>   enumValues;
+        private String             javaType;
+        private String             name;
+        private String             kind;
+        private String             description;
+        private String             availableSince;
+        private String             availableSinceMessage;
+        private String             deprecatedSince;
+        private String             deprecatedSinceMessage;
+        private List<String>       wikiLinks;
+        private List<FieldDoc>     fields;
+        private List<String>       enumValues;
         private List<EnumValueDoc> enumValueDocs;
 
         public String getJavaType() {
@@ -469,14 +446,6 @@ public class DocsV2Definition {
             this.wikiLinks = wikiLinks;
         }
 
-        public String getExample() {
-            return example;
-        }
-
-        public void setExample(final String example) {
-            this.example = example;
-        }
-
         public List<FieldDoc> getFields() {
             return fields;
         }
@@ -506,7 +475,6 @@ public class DocsV2Definition {
         private String       name;
         private String       description;
         private List<String> wikiLinks;
-        private String       example;
 
         public String getName() {
             return name;
@@ -531,14 +499,6 @@ public class DocsV2Definition {
         public void setWikiLinks(final List<String> wikiLinks) {
             this.wikiLinks = wikiLinks;
         }
-
-        public String getExample() {
-            return example;
-        }
-
-        public void setExample(final String example) {
-            this.example = example;
-        }
     }
 
     public static class FieldDoc {
@@ -551,7 +511,6 @@ public class DocsV2Definition {
         private String       deprecatedSince;
         private String       deprecatedSinceMessage;
         private List<String> wikiLinks;
-        private String       example;
 
         public String getName() {
             return name;
@@ -623,14 +582,6 @@ public class DocsV2Definition {
 
         public void setWikiLinks(final List<String> wikiLinks) {
             this.wikiLinks = wikiLinks;
-        }
-
-        public String getExample() {
-            return example;
-        }
-
-        public void setExample(final String example) {
-            this.example = example;
         }
     }
 }

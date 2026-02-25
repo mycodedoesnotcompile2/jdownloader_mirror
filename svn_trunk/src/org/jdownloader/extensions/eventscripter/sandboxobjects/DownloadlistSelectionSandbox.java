@@ -43,11 +43,7 @@ public class DownloadlistSelectionSandbox {
             return null;
         }
         final List<DownloadLink> childs = selectionInfo.getChildren();
-        final DownloadLinkSandBox[] ret = new DownloadLinkSandBox[childs.size()];
-        for (int i = 0; i < ret.length; i++) {
-            ret[i] = new DownloadLinkSandBox(childs.get(i));
-        }
-        return ret;
+        return DownloadLinkSandBox.wrapSandBox(childs);
     }
 
     public DownloadLinkSandBox[] getSelectedLinks(final FilePackageSandBox filePackageSandbox) {
@@ -56,17 +52,19 @@ public class DownloadlistSelectionSandbox {
         }
         for (PackageView<FilePackage, DownloadLink> packageView : selectionInfo.getPackageViews()) {
             if (packageView.getPackage() == filePackageSandbox.filePackage) {
-                final List<DownloadLinkSandBox> ret = new ArrayList<DownloadLinkSandBox>();
                 final List<DownloadLink> children = packageView.getSelectedChildren();
-                if (children != null) {
-                    for (DownloadLink child : children) {
-                        ret.add(new DownloadLinkSandBox(child));
-                    }
-                }
-                return ret.toArray(new DownloadLinkSandBox[0]);
+                return DownloadLinkSandBox.wrapSandBox(children);
             }
         }
         return null;
+    }
+
+    public FilePackageSelectionViewSandbox[] getView() {
+        List<FilePackageSelectionViewSandbox> ret = new ArrayList<FilePackageSelectionViewSandbox>();
+        for (PackageView<FilePackage, DownloadLink> packageView : selectionInfo.getPackageViews()) {
+            ret.add(new FilePackageSelectionViewSandbox(packageView));
+        }
+        return ret.toArray(new FilePackageSelectionViewSandbox[0]);
     }
 
     @Deprecated

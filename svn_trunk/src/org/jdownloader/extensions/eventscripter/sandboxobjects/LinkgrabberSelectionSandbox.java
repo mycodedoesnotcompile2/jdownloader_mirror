@@ -55,11 +55,7 @@ public class LinkgrabberSelectionSandbox {
             return null;
         }
         final List<CrawledLink> childs = selectionInfo.getChildren();
-        final CrawledLinkSandbox[] ret = new CrawledLinkSandbox[childs.size()];
-        for (int i = 0; i < ret.length; i++) {
-            ret[i] = new CrawledLinkSandbox(childs.get(i));
-        }
-        return ret;
+        return CrawledLinkSandbox.wrapSandBox(childs);
     }
 
     public CrawledLinkSandbox[] getSelectedLinks(final CrawledPackageSandbox filePackageSandbox) {
@@ -68,14 +64,8 @@ public class LinkgrabberSelectionSandbox {
         }
         for (PackageView<CrawledPackage, CrawledLink> packageView : selectionInfo.getPackageViews()) {
             if (packageView.getPackage() == filePackageSandbox.filePackage) {
-                final List<CrawledLinkSandbox> ret = new ArrayList<CrawledLinkSandbox>();
                 final List<CrawledLink> children = packageView.getSelectedChildren();
-                if (children != null) {
-                    for (CrawledLink child : children) {
-                        ret.add(new CrawledLinkSandbox(child));
-                    }
-                }
-                return ret.toArray(new CrawledLinkSandbox[0]);
+                return CrawledLinkSandbox.wrapSandBox(children);
             }
         }
         return null;
@@ -113,6 +103,14 @@ public class LinkgrabberSelectionSandbox {
             }
         }
         return ret.toArray(new CrawledPackageSandbox[0]);
+    }
+
+    public CrawledPackageSelectionViewSandbox[] getView() {
+        List<CrawledPackageSelectionViewSandbox> ret = new ArrayList<CrawledPackageSelectionViewSandbox>();
+        for (PackageView<CrawledPackage, CrawledLink> packageView : selectionInfo.getPackageViews()) {
+            ret.add(new CrawledPackageSelectionViewSandbox(packageView));
+        }
+        return ret.toArray(new CrawledPackageSelectionViewSandbox[0]);
     }
 
     public CrawledPackageSandbox getContextPackage() {

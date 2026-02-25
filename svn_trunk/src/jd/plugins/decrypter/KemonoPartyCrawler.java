@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -61,7 +63,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52353 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52383 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,13 +113,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?.+)?)(/post/[a-z0-9]+(/revision/(\\d+))?)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?.+)?)(/post/(p\\-)?[a-z0-9]+(/revision/(\\d+))?)?");
         }
         return ret.toArray(new String[0]);
     }
 
     private final String TYPE_PROFILE = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)(\\?.+)?$";
-    private final String TYPE_POST    = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)/post/([a-z0-9]+)(/revision/(\\d+))?$";
+    private final String TYPE_POST    = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)/post/((p\\-)?[a-z0-9]+)(/revision/(\\d+))?$";
     private KemonoParty  hostPlugin   = null;
     private CryptedLink  cl           = null;
 
@@ -457,9 +459,24 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 postTextContent = postTextContent.replaceAll("(?i)<a[^>]href\\s*=\\s*\"(.*?)\"[^>]*>\\s*\\1\\s*</a>(?:\\s*</p>[^>]*<p>)?\\s*(?:#|KEY:)\\s*([^< ]*)", "<a href=\"$1#$2\"</a>");
                 final List<CrawledLink> postTextContentLinks = getCrawler().find(getLinkCrawlerGeneration(), getCurrentLink(), postTextContent, br.getURL(), false, false);
                 if (postTextContentLinks != null) {
+                    /* Prepare URL filter if configured */
+                    final KemonoPartyConfig.PostTextLinkFilterMode filterMode = cfg.getPostTextLinkFilterMode();
+                    Pattern filterPattern = null;
+                    if (filterMode != KemonoPartyConfig.PostTextLinkFilterMode.DISABLED) {
+                        final String patternString = cfg.getPostTextLinkFilterPattern();
+                        if (!StringUtils.isEmpty(patternString)) {
+                            try {
+                                filterPattern = Pattern.compile(patternString, Pattern.CASE_INSENSITIVE);
+                            } catch (final PatternSyntaxException e) {
+                                logger.warning("Invalid filter pattern: " + patternString);
+                                logger.log(e);
+                            }
+                        }
+                    }
                     for (CrawledLink postTextContentLink : postTextContentLinks) {
+                        final String linkURL = postTextContentLink.getURL();
                         try {
-                            final URL url = new URL(postTextContentLink.getURL());
+                            final URL url = new URL(linkURL);
                             if (!dupes.add(url.getPath())) {
                                 // alread part of attachments
                                 continue;
@@ -467,7 +484,20 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                         } catch (final MalformedURLException e) {
                             logger.log(e);
                         }
-                        ret.add(this.createDownloadlink(postTextContentLink.getURL()));
+                        /* Apply URL filter if configured */
+                        if (filterPattern != null) {
+                            final boolean matches = filterPattern.matcher(linkURL).find();
+                            if (filterMode == KemonoPartyConfig.PostTextLinkFilterMode.WHITELIST && !matches) {
+                                /* Whitelist mode: skip non-matching URLs */
+                                logger.info("Skipping link (whitelist): " + linkURL);
+                                continue;
+                            } else if (filterMode == KemonoPartyConfig.PostTextLinkFilterMode.BLACKLIST && matches) {
+                                /* Blacklist mode: skip matching URLs */
+                                logger.info("Skipping link (blacklist): " + linkURL);
+                                continue;
+                            }
+                        }
+                        ret.add(this.createDownloadlink(linkURL));
                     }
                 }
             }
@@ -490,7 +520,33 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             final Map<String, Object> embedmap = (Map<String, Object>) postmap.get("embed");
             if (embedmap != null && embedmap.size() > 0) {
                 final String url = embedmap.get("url").toString();
-                ret.add(this.createDownloadlink(url));
+                /* Apply URL filter if configured */
+                boolean addEmbedLink = true;
+                final KemonoPartyConfig.PostTextLinkFilterMode filterMode = cfg.getPostTextLinkFilterMode();
+                if (filterMode != KemonoPartyConfig.PostTextLinkFilterMode.DISABLED) {
+                    final String patternString = cfg.getPostTextLinkFilterPattern();
+                    if (!StringUtils.isEmpty(patternString)) {
+                        try {
+                            final Pattern filterPattern = Pattern.compile(patternString, Pattern.CASE_INSENSITIVE);
+                            final boolean matches = filterPattern.matcher(url).find();
+                            if (filterMode == KemonoPartyConfig.PostTextLinkFilterMode.WHITELIST && !matches) {
+                                /* Whitelist mode: skip non-matching URLs */
+                                logger.info("Skipping embed link (whitelist): " + url);
+                                addEmbedLink = false;
+                            } else if (filterMode == KemonoPartyConfig.PostTextLinkFilterMode.BLACKLIST && matches) {
+                                /* Blacklist mode: skip matching URLs */
+                                logger.info("Skipping embed link (blacklist): " + url);
+                                addEmbedLink = false;
+                            }
+                        } catch (final PatternSyntaxException e) {
+                            logger.warning("Invalid filter pattern: " + patternString);
+                            logger.log(e);
+                        }
+                    }
+                }
+                if (addEmbedLink) {
+                    ret.add(this.createDownloadlink(url));
+                }
             }
         }
         final String username = this.findUsername(service, usernameOrUserID);
@@ -539,7 +595,12 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
          * Example: /fanbox/user/64937143/post/2095805
          */
         String filename = (String) filemap.get("name");
-        final String filepath = filemap.get("path").toString();
+        final Object filepathO = filemap.get("path");
+        if (filepathO == null) {
+            /* file map has no downloadable path (e.g. covers/thumbnail-only structure) */
+            return null;
+        }
+        final String filepath = filepathO.toString();
         String url = "https://" + this.getHost() + "/data" + filepath;
         if (filename != null) {
             final String nameExt = Files.getExtension(filename, true);

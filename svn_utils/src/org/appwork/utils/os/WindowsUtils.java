@@ -50,10 +50,10 @@ import static com.sun.jna.platform.win32.WinUser.SW_SHOW;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -62,6 +62,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import org.appwork.exceptions.WTFException;
@@ -79,6 +80,7 @@ import org.appwork.storage.StorableDoc;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.IO;
 import org.appwork.utils.IO.BOM;
 import org.appwork.utils.IO.SYNC;
@@ -2496,6 +2498,57 @@ public class WindowsUtils {
         }
     }
 
+    /**
+     * Called only when Java >= 8. Uses java.time via reflection so no java.time.* appears in this class's
+     * constant pool and WindowsUtils can load on JRE 6/7 (e.g. when Tests only call applyPermissions).
+     */
+    private static String[] formatTaskSchedulerBoundaryTimesJava8() {
+        try {
+            Class<?> zdt = Class.forName("java.time.ZonedDateTime");
+            Object now = zdt.getMethod("now").invoke(null);
+            Object start = zdt.getMethod("plusMinutes", long.class).invoke(now, Long.valueOf(1));
+            Object end = zdt.getMethod("plusMinutes", long.class).invoke(start, Long.valueOf(2));
+            Class<?> fmtClass = Class.forName("java.time.format.DateTimeFormatter");
+            Object fmt = fmtClass.getMethod("ofPattern", String.class).invoke(null, "yyyy-MM-dd'T'HH:mm:ssXXX");
+            Class<?> temporal = Class.forName("java.time.temporal.TemporalAccessor");
+            java.lang.reflect.Method formatMethod = fmtClass.getMethod("format", temporal);
+            String startStr = (String) formatMethod.invoke(fmt, start);
+            String endStr = (String) formatMethod.invoke(fmt, end);
+            return new String[] { startStr, endStr };
+        } catch (Exception e) {
+            throw new RuntimeException("java.time bridge failed", e);
+        }
+    }
+
+    /** Java 1.6 compatible path: Calendar + SimpleDateFormat. */
+    private static String[] formatTaskSchedulerBoundaryTimesLegacy() {
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US);
+        fmt.setTimeZone(TimeZone.getDefault());
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.MINUTE, 1);
+        String startTime = formatIso8601Offset(fmt.format(cal.getTime()));
+        cal.add(Calendar.MINUTE, 2);
+        String endTime = formatIso8601Offset(fmt.format(cal.getTime()));
+        return new String[] { startTime, endTime };
+    }
+
+    /**
+     * Converts SimpleDateFormat "Z" offset (+0100) to ISO-8601 style (+01:00) for Windows Task Scheduler XML.
+     * Java 1.6 compatible.
+     */
+    private static String formatIso8601Offset(String dateTimeWithZ) {
+        if (dateTimeWithZ == null || dateTimeWithZ.length() < 6) {
+            return dateTimeWithZ;
+        }
+        int len = dateTimeWithZ.length();
+        char last = dateTimeWithZ.charAt(len - 1);
+        char sign = dateTimeWithZ.charAt(len - 5);
+        if ((sign == '+' || sign == '-') && len >= 5 && Character.isDigit(last)) {
+            return dateTimeWithZ.substring(0, len - 2) + ":" + dateTimeWithZ.substring(len - 2);
+        }
+        return dateTimeWithZ;
+    }
+
     private static String escapeXml(String input) {
         if (input == null) {
             return "";
@@ -2536,11 +2589,18 @@ public class WindowsUtils {
         LogV3.info("Launch via Scheduler: " + binary + "  " + Arrays.toString(args) + " in " + workingDir);
         File file = Application.getResource("tmp/" + taskName + ".xml");
         file.delete();
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
-        ZonedDateTime start = ZonedDateTime.now().plusMinutes(1);
-        ZonedDateTime end = start.plusMinutes(2);
-        String startTime = fmt.format(start);
-        String endTime = fmt.format(end);
+        // Java-Weiche: Java 8+ use java.time; older use Calendar/SimpleDateFormat for 1.6 runtime compatibility
+        String startTime;
+        String endTime;
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_8)) {
+            String[] times = formatTaskSchedulerBoundaryTimesJava8();
+            startTime = times[0];
+            endTime = times[1];
+        } else {
+            String[] times = formatTaskSchedulerBoundaryTimesLegacy();
+            startTime = times[0];
+            endTime = times[1];
+        }
         String argumentsXMLNode = "";
         if (args.length > 0) {
             argumentsXMLNode = "<Arguments>" + escapeXml(ShellParser.createCommandLine(Style.WINDOWS, args)) + "</Arguments>\n";

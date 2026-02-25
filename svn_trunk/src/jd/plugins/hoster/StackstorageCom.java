@@ -15,7 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import org.appwork.utils.encoding.URLEncode;
+import java.io.IOException;
 
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
@@ -28,7 +28,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52341 $", interfaceVersion = 2, names = { "stackstorage.com" }, urls = { "" })
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@HostPlugin(revision = "$Revision: 52378 $", interfaceVersion = 2, names = { "stackstorage.com" }, urls = { "" })
 public class StackstorageCom extends PluginForHost {
     public StackstorageCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,6 +48,16 @@ public class StackstorageCom extends PluginForHost {
     @Override
     public String getAGBLink() {
         return "https://www.transip.nl/stack/";
+    }
+
+    @Override
+    public FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { FEATURE.FAVICON };
+    }
+
+    @Override
+    public Object getFavIcon(String host) throws IOException {
+        return "https://assets.tb-content.net/fh/v2.6.1-0-gc0bd5d92/favicon.ico";
     }
 
     @Override

@@ -216,9 +216,9 @@ public enum JavaVersion implements JavaVersionInterface {
             }
             return JavaVersion.UNKNOWN;
         } catch (final EOFException e) {
-            return JavaVersion.UNKNOWN;
+            throw e;
         } catch (final IOException e) {
-            return JavaVersion.UNKNOWN;
+            throw e;
         }
     }
 
