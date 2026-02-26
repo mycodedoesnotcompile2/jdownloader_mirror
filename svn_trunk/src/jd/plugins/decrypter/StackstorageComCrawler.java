@@ -21,7 +21,6 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
@@ -38,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.StackstorageCom;
 
-@DecrypterPlugin(revision = "$Revision: 52377 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([\\w\\-]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
+@DecrypterPlugin(revision = "$Revision: 52391 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([\\w\\-]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
 public class StackstorageComCrawler extends PluginForDecrypt {
     public StackstorageComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,9 +79,10 @@ public class StackstorageComCrawler extends PluginForDecrypt {
         br.setCookie(br.getURL(), "ShareSession", sharetoken);
         br.getHeaders().put("X-Sharetoken", sharetoken);
         br.getPage(apiurl);
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final String main_item_id = entries.get("id").toString();
-        if (Boolean.TRUE.equals(entries.get("dir"))) {
+        final Map<String, Object> main_node = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String main_node_id = main_node.get("id").toString();
+        final String main_name = main_node.get("name").toString();
+        if (Boolean.TRUE.equals(main_node.get("dir"))) {
             /* Folder */
             final int max_items_per_page = 100;
             int offset = 0;
@@ -91,65 +91,50 @@ public class StackstorageComCrawler extends PluginForDecrypt {
             query.appendEncoded("orderBy", "default");
             query.appendEncoded("reverse", "false");
             query.appendEncoded("namePrefixExclude", "");
-            query.appendEncoded("parentID", main_item_id);
+            query.appendEncoded("parentID", main_node_id);
             query.appendEncoded("search", "");
             query.appendEncoded("mediaType", "all");
             final String path = "/api/v2/share/" + folderID + "/nodes?";
             int page = 1;
+            int numberofFiles = 0;
+            int numberofFolders = 0;
+            /**
+             * TODO: Update FilePackage handling once subfolders are supported. <br>
+             * Do not forget to set relative file paths on DownloadLink items via DownloadLink.setRelativeDownloadFolderPath.
+             */
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(main_name);
+            fp.setPackageKey("stackstorage://node/" + main_node_id);
             pagination: do {
                 query.addAndReplace("offset", Integer.toString(offset));
                 br.getPage(path + query.toString());
                 Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Map<String, Object>> nodes = (List<Map<String, Object>>) entries2.get("nodes");
                 for (final Map<String, Object> node : nodes) {
-                    final String name = node.get("name").toString();
-                    String path_with_filename = (String) node.get("path");
+                    // String path_with_filename = (String) node.get("path");
                     final String node_id = node.get("id").toString();
                     final DownloadLink item;
                     if (Boolean.TRUE.equals(node.get("dir"))) {
                         /* Folder */
+                        // item = createDownloadlink(String.format("https://%s.stackstorage.com/s/%s?dir=%s&node-id=%s", subdomain,
+                        // folderID, URLEncode.encodeURIComponent(path_with_filename), node_id));
+                        numberofFolders++;
                         if (true) {
                             /* TODO: fix/implement subfolders */
+                            logger.warning("Stackstorage subfolders are not yet supported, skipping item with id: " + node_id);
                             continue;
                         }
-                        item = createDownloadlink(String.format("https://%s.stackstorage.com/s/%s?dir=%s&node-id=%s", subdomain, folderID, URLEncode.encodeURIComponent(path_with_filename), node_id));
                     } else {
                         /* File */
-                        item = createDownloadlink(String.format("https://stackstorage.com/fileid/%s", node_id));
-                        item.setDefaultPlugin(hosterplugin);
-                        item.setHost(this.getHost());
-                        /* Path also contains filename but we need to separate that and remove filename from path */
-                        final String path_without_filename;
-                        final String[] pathParts = path_with_filename.split("/");
-                        FilePackage fp = FilePackage.getInstance();
-                        if (pathParts.length > 1) {
-                            /* Remove filename from path */
-                            path_without_filename = path_with_filename.replace("/" + name, "");
-                        } else {
-                            /* Root */
-                            path_without_filename = folderID;
-                        }
-                        fp.setName(path_without_filename);
+                        item = nodeToDownloadLink(node, hosterplugin, subdomain, folderID, sharetoken, csrftoken, contenturl);
                         item._setFilePackage(fp);
-                        item.setContainerUrl(contenturl);
-                        /* There are no URLs for individual files! */
-                        item.setContentUrl(contenturl);
-                        item.setVerifiedFileSize(((Number) node.get("size")).longValue());
-                        item.setFinalFileName(name);
-                        item.setAvailable(true);
-                        item.setRelativeDownloadFolderPath(path_without_filename);
-                        item.setProperty(StackstorageCom.PROPERTY_SUBDOMAIN, subdomain);
-                        item.setProperty(StackstorageCom.PROPERTY_FOLDER_ID, folderID);
-                        item.setProperty(StackstorageCom.PROPERTY_SHARETOKEN, sharetoken);
-                        item.setProperty(StackstorageCom.PROPERTY_CSRFTOKEN, csrftoken);
-                        item.setProperty(StackstorageCom.PROPERTY_FILENAME, name);
-                        item.setProperty(StackstorageCom.PROPERTY_FILE_ID, node_id);
+                        numberofFiles++;
                     }
                     ret.add(item);
                     distribute(item);
                 }
                 final int total_numberof_items = ((Number) entries2.get("total")).intValue();
-                logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + total_numberof_items);
+                logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + total_numberof_items + " | Files: " + numberofFiles + " | Folders: " + numberofFolders);
                 if (ret.size() >= total_numberof_items) {
                     logger.info("Stopping because: Found all items: " + total_numberof_items);
                     break pagination;
@@ -160,22 +145,29 @@ public class StackstorageComCrawler extends PluginForDecrypt {
             } while (!this.isAbort());
         } else {
             /* Single file */
-            final String filename = entries.get("name").toString();
-            final DownloadLink file = createDownloadlink(String.format("https://stackstorage.com/fileid/%s", main_item_id));
-            file.setDefaultPlugin(hosterplugin);
-            file.setHost(this.getHost());
-            file.setFinalFileName(filename);
-            file.setVerifiedFileSize(((Number) entries.get("size")).longValue());
-            file.setAvailable(true);
-            file.setContainerUrl(contenturl);
-            file.setProperty(StackstorageCom.PROPERTY_SUBDOMAIN, subdomain);
-            file.setProperty(StackstorageCom.PROPERTY_FOLDER_ID, folderID);
-            file.setProperty(StackstorageCom.PROPERTY_SHARETOKEN, sharetoken);
-            file.setProperty(StackstorageCom.PROPERTY_CSRFTOKEN, csrftoken);
-            file.setProperty(StackstorageCom.PROPERTY_FILENAME, filename);
-            file.setProperty(StackstorageCom.PROPERTY_FILE_ID, main_item_id);
+            final DownloadLink file = nodeToDownloadLink(main_node, hosterplugin, subdomain, folderID, sharetoken, csrftoken, contenturl);
             ret.add(file);
         }
         return ret;
+    }
+
+    private DownloadLink nodeToDownloadLink(final Map<String, Object> node, final PluginForHost hosterplugin, final String subdomain, final String folderID, final String sharetoken, final String csrftoken, final String contenturl) {
+        final String filename = node.get("name").toString();
+        final String node_id = node.get("id").toString();
+        final DownloadLink file = createDownloadlink(String.format("https://stackstorage.com/fileid/%s", node_id));
+        file.setDefaultPlugin(hosterplugin);
+        file.setHost(this.getHost());
+        file.setFinalFileName(filename);
+        file.setVerifiedFileSize(((Number) node.get("size")).longValue());
+        file.setAvailable(true);
+        file.setContainerUrl(contenturl);
+        file.setContentUrl(contenturl);
+        file.setProperty(StackstorageCom.PROPERTY_SUBDOMAIN, subdomain);
+        file.setProperty(StackstorageCom.PROPERTY_FOLDER_ID, folderID);
+        file.setProperty(StackstorageCom.PROPERTY_SHARETOKEN, sharetoken);
+        file.setProperty(StackstorageCom.PROPERTY_CSRFTOKEN, csrftoken);
+        file.setProperty(StackstorageCom.PROPERTY_FILENAME, filename);
+        file.setProperty(StackstorageCom.PROPERTY_FILE_ID, node_id);
+        return file;
     }
 }

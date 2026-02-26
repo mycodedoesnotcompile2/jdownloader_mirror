@@ -49,6 +49,7 @@ public abstract class ChallengeSolver<T> {
     public enum ChallengeVetoReason {
         SOLVER_DISABLED,
         UNSUPPORTED_BY_SOLVER,
+        UNSUPPORTED_BY_SOLVER_ACCOUNT,
         UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS,
         UNSUPPORTED_BROWSER_NO_URL_OPEN,
         UNSUITABLE_FOR_SOLVER,

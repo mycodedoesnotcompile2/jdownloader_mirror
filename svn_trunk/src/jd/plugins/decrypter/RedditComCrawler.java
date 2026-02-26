@@ -20,8 +20,10 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -57,6 +59,7 @@ import jd.plugins.hoster.RedditCom;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.URLHelper;
@@ -72,7 +75,7 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52337 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52393 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -189,7 +192,8 @@ public class RedditComCrawler extends PluginForDecrypt {
         }
         String sorting = urlinfo.getMatch(2);
         if (sorting == null) {
-            sorting = "new";// default
+            /* No specific sort order = use server side default sort order which should be "best" */
+            sorting = "";
         }
         final String timeRange = UrlQuery.parse(contenturl).get("t");
         final int maxPagesToCrawl = PluginJsonConfig.get(RedditConfig.class).getSubredditCrawlerMaxPages();
@@ -199,7 +203,7 @@ public class RedditComCrawler extends PluginForDecrypt {
         }
         /* Crawl until we've reached the end. */
         final FilePackage fp = FilePackage.getInstance();
-        String url = "https://www." + this.getHost() + "/r/" + subredditSlug + "/" + sorting + "/.json";
+        String url = "https://www." + this.getHost() + "/r/" + subredditSlug + "/" + sorting + ".json";
         if (timeRange != null) {
             url = URLHelper.parseLocation(new URL(url), "&t=" + timeRange);
         }
@@ -252,8 +256,8 @@ public class RedditComCrawler extends PluginForDecrypt {
      *            Max. page to crawl. -1 = crawl all pages.
      */
     private ArrayList<DownloadLink> crawlPagination(final String url, final FilePackage fp, final int maxPage) throws Exception {
-        final ArrayList<DownloadLink> crawledLinks = new ArrayList<DownloadLink>();
-        final Set<String> lastItemDupes = new HashSet<String>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Set<String> nextPageTokenDupes = new HashSet<String>();
         final int maxItemsPerCall = 100;
         final UrlQuery query = new UrlQuery();
         // query.add("type", "links");
@@ -263,7 +267,8 @@ public class RedditComCrawler extends PluginForDecrypt {
         fp.setAllowMerge(true);
         fp.setAllowInheritance(true);
         fp.setCleanupPackageName(false);
-        Set<String> dupes = new HashSet<String>();
+        final Set<String> dupes = new LinkedHashSet<String>();
+        final List<String> ids = new ArrayList<String>();
         int dupeCounter = 0;
         do {
             final String requestURL = URLHelper.parseLocation(new URL(url), "&" + query.toString());
@@ -278,13 +283,17 @@ public class RedditComCrawler extends PluginForDecrypt {
             final List<DownloadLink> pageResults = this.crawlListing(root, fp);
             for (final DownloadLink pageResult : pageResults) {
                 if (dupes.add(pageResult.getPluginPatternMatcher())) {
-                    crawledLinks.add(pageResult);
+                    final String postID = pageResult.getStringProperty(RedditCom.PROPERTY_POST_ID);
+                    if (postID != null && !ids.contains(postID)) {
+                        ids.add(postID);
+                    }
+                    ret.add(pageResult);
                 } else {
                     dupeCounter++;
                 }
             }
             final String nextPageToken = (String) data.get("after");
-            logger.info("Crawled page " + page + " | " + "Found unique items so far: " + crawledLinks.size() + "(dupes:" + dupeCounter + ")| Walked through items so far: " + numberofItemsWalkedThrough + " | next nextPageToken: " + nextPageToken);
+            logger.info("Crawled page " + page + " | " + "Found unique items so far: " + ret.size() + "(dupes:" + dupeCounter + ")| Walked through items so far: " + numberofItemsWalkedThrough + " | next nextPageToken: " + nextPageToken);
             /* Multiple fail safes to prevent infinite loop. */
             if (StringUtils.isEmpty(nextPageToken)) {
                 /**
@@ -293,7 +302,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                  */
                 logger.info("Stopping because: nextPageToken is not given -> Looks like we've reached the last page: " + page + " | URL: " + br.getURL());
                 break;
-            } else if (!lastItemDupes.add(nextPageToken)) {
+            } else if (!nextPageTokenDupes.add(nextPageToken)) {
                 /* Additional fail-safe. This should not be needed. */
                 logger.info("Stopping because: We already know this nextPageToken");
                 break;
@@ -305,25 +314,33 @@ public class RedditComCrawler extends PluginForDecrypt {
                 page++;
             }
         } while (!this.isAbort());
-        return crawledLinks;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            Collections.sort(ids);
+            final StringBuilder sb = new StringBuilder();
+            for (String test : ids) {
+                sb.append(test);
+            }
+            System.out.println("Hash=" + Hash.getSHA256(sb.toString()));
+        }
+        return ret;
     }
 
     /** TODO: Try to use crawlPagination instead! */
     private ArrayList<DownloadLink> crawlUserSavedObjects(final CryptedLink param) throws Exception {
-        final ArrayList<DownloadLink> crawledLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         /* Login required */
-        final Account acc = AccountController.getInstance().getValidAccount(this.getHost());
-        if (acc == null) {
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account == null) {
             throw new AccountRequiredException();
         }
         /* Login */
         final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
-        ((jd.plugins.hoster.RedditCom) plugin).loginAPI(acc, false);
+        ((jd.plugins.hoster.RedditCom) plugin).loginAPI(account, false);
         final ArrayList<String> lastItemDupes = new ArrayList<String>();
         /* Prepare crawl process */
         final FilePackage fp = FilePackage.getInstance();
         fp.setAllowInheritance(true);
-        fp.setName("saved items of user" + acc.getUser());
+        fp.setName("saved items of user" + account.getUser());
         final int maxItemsPerCall = 100;
         final UrlQuery query = new UrlQuery();
         query.add("type", "links");
@@ -332,9 +349,9 @@ public class RedditComCrawler extends PluginForDecrypt {
         do {
             page++;
             logger.info("Crawling page: " + page);
-            getPage(br, getApiBaseOauth() + "/user/" + Encoding.urlEncode(acc.getUser()) + "/saved?" + query.toString());
+            getPage(br, getApiBaseOauth() + "/user/" + Encoding.urlEncode(account.getUser()) + "/saved?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            crawledLinks.addAll(this.crawlListing(entries, fp));
+            ret.addAll(this.crawlListing(entries, fp));
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             final String fullnameAfter = (String) data.get("after");
             final long numberofItems = JavaScriptEngineFactory.toLong(data.get("dist"), 0);
@@ -354,7 +371,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                 query.addAndReplace("after", fullnameAfter);
             }
         } while (!this.isAbort());
-        return crawledLinks;
+        return ret;
     }
 
     /** 2020-11-11: Currently does the same as {@link #crawlCommentURL()} */
@@ -373,7 +390,7 @@ public class RedditComCrawler extends PluginForDecrypt {
         if (commentID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final ArrayList<DownloadLink> crawledLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         getPage(br, "https://www." + this.getHost() + "/comments/" + commentID + "/.json");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -382,8 +399,8 @@ public class RedditComCrawler extends PluginForDecrypt {
         /* [0] = post/"first comment" */
         /* [1] = Comments */
         final Map<String, Object> entries = ressourcelist.get(0);
-        crawledLinks.addAll(this.crawlListing(entries, null));
-        return crawledLinks;
+        ret.addAll(this.crawlListing(entries, null));
+        return ret;
     }
 
     private ArrayList<DownloadLink> crawlListing(final Map<String, Object> entries, FilePackage fp) throws Exception {
@@ -613,7 +630,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 if (StringUtils.endsWithCaseInsensitive(filenameFromURL, ".gif")) {
                                     /*
                                      * Filename from URL contains .gif extension but this is a .mp4 file
-                                     * 
+                                     *
                                      * -> Correct that but keep .gif to signal source of the mp4
                                      */
                                     direct.setFinalFileName(this.applyFilenameExtension(filenameFromURL, ".gif.mp4"));

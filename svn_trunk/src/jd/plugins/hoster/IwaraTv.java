@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -40,7 +41,6 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
-import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 51229 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52392 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -116,7 +116,7 @@ public class IwaraTv extends PluginForHost {
     public static final String   PROPERTY_VIDEO_LABEL             = "video_label";
     public static final String   PROPERTY_EXPECTED_FILESIZE       = "expected_filesize";
     private final String         PROPERTY_ACCOUNT_ACCESS_TOKEN    = "access_token";
-    public static final String   WEBAPI_BASE                      = "https://api.iwara.tv";
+    public static final String   WEBAPI_BASE                      = "https://apiq.iwara.tv";
 
     @Override
     public String getAGBLink() {
@@ -203,7 +203,7 @@ public class IwaraTv extends PluginForHost {
         if (embedUrl != null) {
             /* This should never happen! */
             link.setProperty(PROPERTY_EMBED_URL, embedUrl);
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported embedded content");
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported embedded content? Go to Settings - Plugins - iwara - Disable 'Fast linkcheck', then re-add this item.");
         }
         String directurl = null;
         if (isVideo) {
@@ -216,8 +216,8 @@ public class IwaraTv extends PluginForHost {
                 if (expires == null || partOfPath == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                /* As described here: https://github.com/yt-dlp/yt-dlp/issues/6549#issuecomment-1473771047 */
-                final String specialHash = JDHash.getSHA1(partOfPath + "_" + expires + "_5nFp9kmbNnHdAFhaqMvt");
+                /* (0, u.q4) (c + '_' + o.expires + '_XYZ'); in mainxxx.js , search for X-Version */
+                final String specialHash = Hash.getSHA1(partOfPath + "_" + expires + "_mSvL05GfEmeEmsEYfGCnVpEjYgTJraJN");
                 final Browser brc = br.cloneBrowser();
                 brc.getHeaders().put("Origin", "https://www." + this.getHost());
                 brc.getHeaders().put("Referer", "https://www." + this.getHost() + "/");
@@ -305,7 +305,7 @@ public class IwaraTv extends PluginForHost {
                 final long size = ((Number) filemap.get("size")).longValue();
                 link.setDownloadSize(size);
                 link.setProperty(PROPERTY_EXPECTED_FILESIZE, size);
-                directurl = "https://files.iwara.tv/image/large/" + filemap.get("id") + "/" + Encoding.urlEncode(filemap.get("name").toString());
+                directurl = "https://filesq.iwara.tv/image/large/" + filemap.get("id") + "/" + Encoding.urlEncode(filemap.get("name").toString());
                 break;
             }
         }
@@ -386,8 +386,10 @@ public class IwaraTv extends PluginForHost {
     private Integer qualityModifierToHeight(final String qualityStr) {
         if (qualityStr == null) {
             return null;
-        }
-        if (qualityStr.equalsIgnoreCase("Source")) {
+        } else if (qualityStr.equalsIgnoreCase("Preview")) {
+            /* low fps preview */
+            return 180;
+        } else if (qualityStr.equalsIgnoreCase("Source")) {
             /* Best quality/original */
             return Integer.MAX_VALUE;
         } else if (qualityStr.matches("\\d+")) {

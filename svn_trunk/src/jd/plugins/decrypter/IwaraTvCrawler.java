@@ -22,12 +22,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.IwaraTvConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -44,7 +38,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.IwaraTv;
 
-@DecrypterPlugin(revision = "$Revision: 49127 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.IwaraTvConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 52387 $", interfaceVersion = 3, names = {}, urls = {})
 public class IwaraTvCrawler extends PluginForDecrypt {
     public IwaraTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,7 +132,7 @@ public class IwaraTvCrawler extends PluginForDecrypt {
         if (playlistID == null) {
             throw new IllegalArgumentException();
         }
-        final String url = "https://api.iwara.tv/playlist/" + playlistID;
+        final String url = "https://apiq.iwara.tv/playlist/" + playlistID;
         return crawlItemsPagination(url, new UrlQuery(), null);
     }
 

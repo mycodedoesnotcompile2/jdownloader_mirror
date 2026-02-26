@@ -35,6 +35,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return new PluginChallengeSolver<T>(plugin, account);
     }
 
+    private Challenge<?> c = null;
+
     /**
      * Constructor for the plugin.
      *
@@ -58,11 +60,36 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
+    /**
+     * Returns the list of captcha types supported by this solver. <br>
+     * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
+     * !
+     *
+     *
+     *
+     * @return List of supported captcha types
+     */
+    public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+
+    /** Returns list of captcha types supported by this account. */
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
+        return getSupportedCaptchaTypes();
+    }
+
     public List<FeedbackType> getSupportedFeedbackTypes() {
         return null;
     }
 
     public abstract String getBuyPremiumUrl();
+
+    /** Returns captcha challenge that this plugin is currently processing. */
+    public Challenge<?> getCurrentCaptchaChallenge() {
+        return this.c;
+    }
+
+    public void setCurrentCaptchaChallenge(Challenge<?> c) {
+        this.c = c;
+    }
 
     /**
      * Reports a captcha as invalid.
@@ -87,17 +114,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public boolean setUnused(final AbstractResponse<?> response, final Account account) throws Exception {
         return false;
     }
-
-    /**
-     * Returns the list of captcha types supported by this solver. <br>
-     * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
-     * !
-     *
-     *
-     *
-     * @return List of supported captcha types
-     */
-    public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
     public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes(final Account account) {
         final AccountInfo ai = account.getAccountInfo();
@@ -218,7 +234,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The challenge to check
      * @return null if this solver can handle the challenge, ChallengeVetoReason otherwise
      */
-    public final ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
+    public ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
         if (!account.isEnabled()) {
             return ChallengeVetoReason.ACCOUNT_DISABLED;
         }

@@ -39,7 +39,7 @@ public class DocsV2Definition implements Storable {
         this.types = types;
     }
 
-    public static class EndpointDoc {
+    public static class EndpointDoc implements Storable {
         private String              namespace;
         private String              methodName;
         private String              path;
@@ -55,6 +55,12 @@ public class DocsV2Definition implements Storable {
         private List<ParameterDoc>  parameters;
         private List<ExceptionDoc>  exceptions;
         private List<TagDoc>        tags;
+
+        /**
+         *
+         */
+        public EndpointDoc() {
+        }
 
         public String getNamespace() {
             return namespace;
@@ -177,9 +183,12 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class ReturnTypeDoc {
+    public static class ReturnTypeDoc implements Storable {
         private String type;
         private String javaType;
+
+        public ReturnTypeDoc() {
+        }
 
         public String getType() {
             return type;
@@ -198,7 +207,7 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class ParameterDoc {
+    public static class ParameterDoc implements Storable {
         private String       name;
         private String       type;
         private String       javaType;
@@ -206,6 +215,9 @@ public class DocsV2Definition implements Storable {
         private boolean      multi;
         private String       optionsEndpoint;
         private List<String> options;
+
+        public ParameterDoc() {
+        }
 
         public String getName() {
             return name;
@@ -264,7 +276,7 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class ExceptionDoc {
+    public static class ExceptionDoc implements Storable {
         private String       type;
         private String       simpleName;
         private String       http;
@@ -272,6 +284,9 @@ public class DocsV2Definition implements Storable {
         private List<String> wikiLinks;
         private String       dataType;
         private String       dataJavaType;
+
+        public ExceptionDoc() {
+        }
 
         public String getType() {
             return type;
@@ -330,10 +345,13 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class TagDoc {
+    public static class TagDoc implements Storable {
         private String name;
         private String description;
         private String icon;
+
+        public TagDoc() {
+        }
 
         public String getName() {
             return name;
@@ -360,7 +378,7 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class TypeDoc {
+    public static class TypeDoc implements Storable {
         private String             javaType;
         private String             name;
         private String             kind;
@@ -373,6 +391,9 @@ public class DocsV2Definition implements Storable {
         private List<FieldDoc>     fields;
         private List<String>       enumValues;
         private List<EnumValueDoc> enumValueDocs;
+
+        public TypeDoc() {
+        }
 
         public String getJavaType() {
             return javaType;
@@ -471,10 +492,13 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class EnumValueDoc {
+    public static class EnumValueDoc implements Storable {
         private String       name;
         private String       description;
         private List<String> wikiLinks;
+
+        public EnumValueDoc() {
+        }
 
         public String getName() {
             return name;
@@ -501,7 +525,7 @@ public class DocsV2Definition implements Storable {
         }
     }
 
-    public static class FieldDoc {
+    public static class FieldDoc implements Storable {
         private String       name;
         private String       type;
         private String       javaType;
@@ -511,6 +535,9 @@ public class DocsV2Definition implements Storable {
         private String       deprecatedSince;
         private String       deprecatedSinceMessage;
         private List<String> wikiLinks;
+
+        public FieldDoc() {
+        }
 
         public String getName() {
             return name;

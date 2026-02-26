@@ -1,18 +1,25 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigTwoCaptcha;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52168 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52385 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
+    private final Map<Account, Long> hcaptcha_disabled_accounts = new HashMap<Account, Long>();
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
@@ -47,6 +54,17 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         return types;
     }
 
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
+        /* Get list of all captcha types supported by this service. */
+        final List<CAPTCHA_TYPE> supported_captcha_types = this.getSupportedCaptchaTypes();
+        if (hcaptcha_disabled_accounts.get(account) != null) {
+            /* hCaptcha is not supported by this account. */
+            supported_captcha_types.remove(CAPTCHA_TYPE.HCAPTCHA);
+        }
+        return supported_captcha_types;
+    }
+
     protected String getApiBase() {
         return "https://api." + getHost();
     }
@@ -72,5 +90,23 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
     @Override
     public Class<? extends CaptchaSolverPluginConfigTwoCaptcha> getConfigInterface() {
         return CaptchaSolverPluginConfigTwoCaptcha.class;
+    }
+
+    @Override
+    protected void handleAPIErrors(final Map<String, Object> entries, final Account account) throws Exception {
+        /* Handle special case where hCaptcha is not supported. */
+        final int errorId = ((Number) entries.get("errorId")).intValue();
+        if (errorId == 0) {
+            /* No error */
+            return;
+        }
+        final String errorCode = entries.get("errorCode").toString();
+        if (this.getCurrentCaptchaChallenge() instanceof HCaptchaChallenge && errorId == 5 && "ERROR_METHOD_CALL".equalsIgnoreCase(errorCode)) {
+            /* Special hCaptcha handling */
+            /* Example response: {"errorId":5,"errorCode":"ERROR_METHOD_CALL","errorDescription":"Error"} */
+            logger.info("hCaptcha is not supported by this 2captcha API key");
+            hcaptcha_disabled_accounts.put(account, Time.systemIndependentCurrentJVMTimeMillis());
+        }
+        super.handleAPIErrors(entries, account);
     }
 }

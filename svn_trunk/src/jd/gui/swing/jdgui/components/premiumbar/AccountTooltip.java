@@ -146,7 +146,7 @@ public class AccountTooltip extends PanelToolTip {
                     continue;
                 }
                 final abstractPluginForCaptchaSolver captchaplugin = (abstractPluginForCaptchaSolver) plg;
-                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes();
+                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes(acc);
                 if (supported_captcha_types == null) {
                     continue;
                 }

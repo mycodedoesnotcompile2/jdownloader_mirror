@@ -19,18 +19,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -44,23 +32,35 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51928 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
+@HostPlugin(revision = "$Revision: 52391 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
-    public static final String PRESET_NAME_PROPERTY               = "preSetName";
-    public static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
-    public static final String PROPERTY_HEIGHT                    = "height";
-    public static final String PROPERTY_WIDTH                     = "width";
-    public static final String PROPERTY_BANDWIDTH                 = "hlsBandwidth";
-    public static final String PROPERTY_BANDWIDTH_AVERAGE         = "hlsBandwidthAverage";
-    public static final String PROPERTY_FRAME_RATE                = "framerate";
-    public static final String PROPERTY_M3U8_CODECS               = "m3u8_codecs";
-    public static final String PROPERTY_FFMPEG_CODECS             = "ffmpeg_codecs";
-    public static final String PROPERTY_M3U8_NAME                 = "m3u8_name";
-    public static final String PROPERTY_M3U8_AUDIO_GROUP          = "m3u8_audio_group";
-    public static final String PROPERTY_M3U8_AUDIO_LNG            = "m3u8_audio_lng";
-    public static final String PROPERTY_M3U8_AUDIO_NAME           = "m3u8_audio_name";
-    public static final String PROPERTY_DURATION_ESTIMATED_MILLIS = "duration_estimated_millis";
-    public static final String PROPERTY_CUSTOM_HOST               = "PROPERTY_CUSTOM_HOST";
+    public static final String  PRESET_NAME_PROPERTY               = "preSetName";
+    private static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
+    public static final String  PROPERTY_HEIGHT                    = "height";
+    public static final String  PROPERTY_WIDTH                     = "width";
+    public static final String  PROPERTY_BANDWIDTH                 = "hlsBandwidth";
+    public static final String  PROPERTY_BANDWIDTH_AVERAGE         = "hlsBandwidthAverage";
+    public static final String  PROPERTY_FRAME_RATE                = "framerate";
+    public static final String  PROPERTY_M3U8_CODECS               = "m3u8_codecs";
+    public static final String  PROPERTY_FFMPEG_CODECS             = "ffmpeg_codecs";
+    public static final String  PROPERTY_M3U8_NAME                 = "m3u8_name";
+    public static final String  PROPERTY_M3U8_AUDIO_GROUP          = "m3u8_audio_group";
+    public static final String  PROPERTY_M3U8_AUDIO_LNG            = "m3u8_audio_lng";
+    public static final String  PROPERTY_M3U8_AUDIO_NAME           = "m3u8_audio_name";
+    public static final String  PROPERTY_DURATION_ESTIMATED_MILLIS = "duration_estimated_millis";
+    public static final String  PROPERTY_CUSTOM_HOST               = "PROPERTY_CUSTOM_HOST";
 
     public GenericM3u8(PluginWrapper wrapper) {
         super(wrapper);
@@ -210,8 +210,9 @@ public class GenericM3u8 extends PluginForHost {
     public static void setFilename(Plugin plugin, final DownloadLink link, final boolean setFinalFilename) throws MalformedURLException {
         if (link.getFinalFileName() != null) {
             /**
-             * No not modify filename once final name has been set. </br> This e.g. allows other plugins/crawlers to set desired filenames
-             * telling this plugin not to use the default filenames down below.
+             * No not modify filename once final name has been set. </br>
+             * This e.g. allows other plugins/crawlers to set desired filenames telling this plugin not to use the default filenames down
+             * below.
              */
             return;
         }
@@ -254,7 +255,6 @@ public class GenericM3u8 extends PluginForHost {
                 }
             }
         }
-
         final StringBuilder details = new StringBuilder();
         if (videoHeight > 0) {
             if (!hasVideoCodec) {

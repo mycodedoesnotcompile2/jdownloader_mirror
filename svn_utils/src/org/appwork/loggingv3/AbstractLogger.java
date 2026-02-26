@@ -35,6 +35,7 @@ package org.appwork.loggingv3;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
@@ -47,8 +48,10 @@ import org.appwork.utils.logging2.LogInterface;
  */
 public abstract class AbstractLogger implements LogInterface {
     @AWTestValidateClassReference
-    public static final String  CLASS_ORG_APPWORK_UTILS_EXCEPTIONS = "org.appwork.utils.Exceptions";
-    private static final Method TO_STACKTRACE                      = getToStackTraceMethod();
+    public static final String                              CLASS_ORG_APPWORK_UTILS_EXCEPTIONS = "org.appwork.utils.Exceptions";
+    private static final Method                             TO_STACKTRACE                      = getToStackTraceMethod();
+    /** Cache: key = className + "#" + methodName, value = true if method has @NoLogSource (filter out). */
+    private static final ConcurrentHashMap<String, Boolean> NO_LOG_SOURCE_CACHE                = new ConcurrentHashMap<String, Boolean>();
 
     protected StackTraceElement getThrownAt() {
         final Exception e = new Exception();
@@ -106,6 +109,8 @@ public abstract class AbstractLogger implements LogInterface {
                 return true;
             } else if ("TRIGGER_BUILD_ERROR".equals(es.getMethodName())) {
                 return true;
+            } else if (isNoLogSource(es)) {
+                return true;
             } else {
                 new Exception("Extend Log Formater here to show the correct logging source").printStackTrace();
             }
@@ -114,7 +119,37 @@ public abstract class AbstractLogger implements LogInterface {
             return true;
         } else if (es.getMethodName().equals("log") || es.getMethodName().equals("info") || es.getMethodName().equals("messageLogged") || es.getMethodName().equals("fireMessageLoggedEvent") || es.getMethodName().equals("fireMessageLogged") || es.getMethodName().contains("Logger") || es.getMethodName().contains("logger")) {
             return true;
+        } else if (isNoLogSource(es)) {
+            return true;
         } else {
+            return false;
+        }
+    }
+
+    /**
+     * Returns true if the stack frame's method is annotated with {@link NoLogSource} (so it should not be used as "thrown at"). Results are
+     * cached by className#methodName for performance.
+     */
+    private static boolean isNoLogSource(final StackTraceElement es) {
+        final String key = es.getClassName() + "#" + es.getMethodName();
+        Boolean cached = NO_LOG_SOURCE_CACHE.get(key);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        try {
+            final Class<?> clazz = Class.forName(es.getClassName());
+            final Method[] methods = clazz.getDeclaredMethods();
+            for (int i = 0; i < methods.length; i++) {
+                final Method m = methods[i];
+                if (es.getMethodName().equals(m.getName()) && m.getAnnotation(NoLogSource.class) != null) {
+                    NO_LOG_SOURCE_CACHE.put(key, Boolean.TRUE);
+                    return true;
+                }
+            }
+            NO_LOG_SOURCE_CACHE.put(key, Boolean.FALSE);
+            return false;
+        } catch (Throwable t) {
+            NO_LOG_SOURCE_CACHE.put(key, Boolean.FALSE);
             return false;
         }
     }

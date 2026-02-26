@@ -58,7 +58,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        return plugin.getSupportedCaptchaTypes();
+        return plugin.getSupportedCaptchaTypes(account);
     }
 
     @Override
@@ -71,9 +71,14 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
         if (veto != null) {
             return veto;
-        } else {
-            return super.getChallengeVetoReason(c);
         }
+        final List<CAPTCHA_TYPE> all_supported_captcha_types = this.plugin.getSupportedCaptchaTypes();
+        final List<CAPTCHA_TYPE> account_supported_captcha_types = this.plugin.getSupportedCaptchaTypes(this.account);
+        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        if (ctype != null && all_supported_captcha_types != null && account_supported_captcha_types != null && all_supported_captcha_types.contains(ctype) && !account_supported_captcha_types.contains(ctype)) {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER_ACCOUNT;
+        }
+        return super.getChallengeVetoReason(c);
     }
 
     @Override
@@ -150,6 +155,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     public void solve(SolverJob<T> job) throws InterruptedException, SolverException, SkipException {
         final CESSolverJob<T> cesJob = new CESSolverJob<T>(job);
         try {
+            plugin.setCurrentCaptchaChallenge(job.getChallenge());
             plugin.solve(cesJob, account);
         } catch (final PluginException e) {
             // TODO: Set detailed failure feedback on SolverJob e.g. if failure was account related.
@@ -159,6 +165,8 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             e.printStackTrace();
         } finally {
             cesJob.hideBubble();
+            // TODO: Check if it's fine to nullify here
+            plugin.setCurrentCaptchaChallenge(null);
         }
     }
 }

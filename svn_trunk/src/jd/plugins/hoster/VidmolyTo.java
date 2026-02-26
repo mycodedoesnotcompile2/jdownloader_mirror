@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52211 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52390 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -105,11 +105,11 @@ public class VidmolyTo extends XFileSharingProBasic {
     }
 
     @Override
-    public String getFUIDFromURL(final DownloadLink dl) {
+    public String getFUIDFromURL(final DownloadLink link) {
         /* 2020-05-18: Special */
         try {
-            if (dl != null && dl.getPluginPatternMatcher() != null) {
-                final String result = new Regex(new URL(dl.getPluginPatternMatcher()).getPath(), "/(?:embed-|dl?/|w/)?([a-z0-9]{12})").getMatch(0);
+            if (link != null && link.getPluginPatternMatcher() != null) {
+                final String result = new Regex(new URL(link.getPluginPatternMatcher()).getPath(), "/(?:embed-|dl?/|w/)?([a-z0-9]{12})").getMatch(0);
                 return result;
             } else {
                 return null;

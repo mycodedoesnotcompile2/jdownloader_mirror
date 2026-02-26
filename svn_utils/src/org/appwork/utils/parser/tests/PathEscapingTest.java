@@ -9,8 +9,8 @@ import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestJREProvider;
 import org.appwork.testframework.TestJREProvider.JreOptions;
 import org.appwork.utils.Application;
-import org.appwork.utils.JavaVersion;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -117,11 +117,14 @@ public class PathEscapingTest extends AWTest {
             return;
         }
         TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_8).detailedVersion("1.8.0_312"), PathEscapingTest.class, "runPathEscapingTestsInThisJRE");
+        for (JavaVersion v : new JavaVersion[] { JavaVersion.JVM_1_8, JavaVersion.JVM_11_0 }) {
+            TestJREProvider.executeInJRE(JreOptions.version(v), PathEscapingTest.class, "runPathEscapingTestsInThisJRE");
+        }
     }
 
     /**
-     * Runs path escaping comparison tests in the current JRE. Requires at least JVM 1.8u312 (ProcessImpl API).
-     * Invoked via TestJREProvider so tests run with the correct JRE version.
+     * Runs path escaping comparison tests in the current JRE. Requires at least JVM 1.8u312 (ProcessImpl API). Invoked via TestJREProvider
+     * so tests run with the correct JRE version.
      */
     public void runPathEscapingTestsInThisJRE() throws Exception {
         // "java.exe" -version "c:\Pa th\\"

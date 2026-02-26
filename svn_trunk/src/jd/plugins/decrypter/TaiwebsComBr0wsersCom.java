@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50919 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52391 $", interfaceVersion = 3, names = {}, urls = {})
 public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
     public TaiwebsComBr0wsersCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,10 +109,14 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
         brx.setFollowRedirects(false);
         final ArrayList<String> pwlist = new ArrayList<String>();
         pwlist.add("taiwebs.com");
+        int numberofOfflineItems = 0;
+        int index = -1;
         for (final String link : links) {
+            index++;
             if (!dupes.add(link)) {
                 continue;
             }
+            logger.info("Crawling item " + (index + 1) + "/" + links.length);
             final String gdriveFileIDEncoded = new Regex(link, "(?i)dl/goo/[^/]+/([a-zA-Z0-9_/\\+\\=\\-%]+)").getMatch(0);
             final String encodedURL;
             final DownloadLink result;
@@ -126,6 +130,10 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
             } else {
                 /* http request required to find final URL */
                 brx.getPage(link);
+                if (brx.getHttpConnection().getResponseCode() == 400 || brx.getHttpConnection().getResponseCode() == 404) {
+                    numberofOfflineItems++;
+                    continue;
+                }
                 final String redirect = brx.getRedirectLocation();
                 if (redirect == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -138,6 +146,14 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
             }
             ret.add(result);
             distribute(result);
+            if (this.isAbort()) {
+                /* Aborted by user */
+                throw new InterruptedException();
+            }
+        }
+        if (ret.isEmpty() && numberofOfflineItems > 0) {
+            /* Assume that all items are offline */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return ret;
     }

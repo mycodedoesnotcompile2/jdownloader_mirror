@@ -169,7 +169,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             /* Submit captcha */
             final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBase() + "/createTask", postdata);
             br.getPage(req_createTask);
-            Map<String, Object> entries = this.handleAPIErrors(br, getCurrentAccount());
+            Map<String, Object> entries = this.handleAPIErrors(br, account);
             final String id = entries.get("taskId").toString();
             final Map<String, Object> postdata_getTaskResult = new HashMap<String, Object>();
             postdata_getTaskResult.put("clientKey", apikey);
@@ -180,7 +180,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 checkInterruption();
                 final PostRequest req_getTaskResult = br.createJSonPostRequest(this.getApiBase() + "/getTaskResult", postdata_getTaskResult);
                 br.getPage(req_getTaskResult);
-                entries = this.handleAPIErrors(br, getCurrentAccount());
+                entries = this.handleAPIErrors(br, account);
                 logger.info(br.getRequest().getHtmlCode());
                 final String status = entries.get("status").toString();
                 if (status.equalsIgnoreCase("processing")) {
@@ -282,7 +282,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     }
 
     /** See docs: https://2captcha.com/api-docs/error-codes */
-    private Map<String, Object> handleAPIErrors(final Browser br, final Account account) throws Exception {
+    protected Map<String, Object> handleAPIErrors(final Browser br, final Account account) throws Exception {
         Map<String, Object> entries = null;
         try {
             /* 2024-11-21: Hotfix for API returning invalid json: "1{"val" (string starts with "1" and not with "{". */
@@ -293,6 +293,11 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             final long wait = 1 * 60 * 1000;
             throw new AccountUnavailableException(msg, wait);
         }
+        handleAPIErrors(entries, account);
+        return entries;
+    }
+
+    protected void handleAPIErrors(final Map<String, Object> entries, final Account account) throws Exception {
         final HashSet<String> accountErrorsPermament = new HashSet<String>();
         accountErrorsPermament.add("ERROR_KEY_DOES_NOT_EXIST");
         accountErrorsPermament.add("ERROR_ZERO_BALANCE");
@@ -319,7 +324,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         final int errorId = ((Number) entries.get("errorId")).intValue();
         if (errorId == 0) {
             /* No error */
-            return entries;
+            return;
         }
         final String errorCode = entries.get("errorCode").toString();
         final String errorDescription = entries.get("errorDescription").toString();

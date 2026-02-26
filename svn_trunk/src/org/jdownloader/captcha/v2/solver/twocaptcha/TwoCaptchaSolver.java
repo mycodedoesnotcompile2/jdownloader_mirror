@@ -42,7 +42,7 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     private static final TwoCaptchaSolver     INSTANCE                  = new TwoCaptchaSolver();
     private String                            accountStatusString;
     protected final TwoCaptchaConfigInterface config;
-    private AtomicLong                        timestamp_hcaptcha_failed = new AtomicLong(-1);
+    private final AtomicLong                  timestamp_hcaptcha_failed = new AtomicLong(-1);
     protected final LogSource                 logger;
 
     public static TwoCaptchaSolver getInstance() {

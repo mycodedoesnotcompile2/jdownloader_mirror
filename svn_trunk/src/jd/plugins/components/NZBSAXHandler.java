@@ -85,15 +85,15 @@ public class NZBSAXHandler extends DefaultHandler {
     private String                              date              = null;
     private boolean                             isyEnc            = false;
     private final Comparator<UsenetFileSegment> segmentComparator = new Comparator<UsenetFileSegment>() {
-        public int compare(int x, int y) {
-            return (x < y) ? -1 : ((x == y) ? 0 : 1);
-        }
+                                                                      public int compare(int x, int y) {
+                                                                          return (x < y) ? -1 : ((x == y) ? 0 : 1);
+                                                                      }
 
-        @Override
-        public int compare(UsenetFileSegment o1, UsenetFileSegment o2) {
-            return compare(o1.getIndex(), o2.getIndex());
-        }
-    };
+                                                                      @Override
+                                                                      public int compare(UsenetFileSegment o1, UsenetFileSegment o2) {
+                                                                          return compare(o1.getIndex(), o2.getIndex());
+                                                                      }
+                                                                  };
 
     public NZBSAXHandler(ArrayList<DownloadLink> downloadLinks) {
         this.downloadLinks = downloadLinks;
@@ -199,12 +199,13 @@ public class NZBSAXHandler extends DefaultHandler {
             date = attributes.getValue("date");
             final String subject = attributes.getValue("subject");
             // XXXXX - "Filename.jpg" [XX/XX] 52,44 MB yEnc (1/41)
-            String nameBySubject = new Regex(subject, "( |^)\"([^\"]*?\\.[a-z0-9]{2,4})\"").getMatch(1);
+            String nameBySubject = new Regex(subject, "( |^)\"([^\"]+?\\.[a-z0-9]{2,4})\"").getMatch(1);
             if (nameBySubject == null) {
-                nameBySubject = new Regex(subject, "( \"|^\"?)([^\"]*?\\.[a-z0-9]{2,4})\"").getMatch(1);
+                nameBySubject = new Regex(subject, "( \"|^\"?)([^\"]+?\\.[a-z0-9]{2,4})\"").getMatch(1);
                 if (nameBySubject == null) {
                     // XXX - NNNNNNNN - XXX XXX - NNNNNN - [0001 of 0100] - XX - 100.52 Kb - Filename.jpg (1/1)
-                    nameBySubject = new Regex(subject, "(.+ |^)(.*?)\\s*\\(\\s*[0]*1\\s*/\\s*\\d+").getMatch(1);
+                    // Filename.jpg (1/1)
+                    nameBySubject = new Regex(subject, "(.+ |^)(.+?)\\s*\\(\\s*[0]*1\\s*/\\s*\\d+").getMatch(1);
                 }
             }
             if (nameBySubject == null) {

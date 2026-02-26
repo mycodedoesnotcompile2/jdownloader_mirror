@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 52371 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 52391 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -290,12 +290,17 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         final String edison_page_name = regex_edison_page_name(br);
         if (StringUtils.equals(edison_page_name, "scl_oboe_file")) {
             /* Looks like we got a single file */
-            final DownloadLink singleFile = createSingleFileDownloadLink(br.getURL());
-            setDownloadPasswordProperties(singleFile, passCode, passwordCookieValue);
+            final DownloadLink file = createSingleFileDownloadLink(br.getURL());
+            setDownloadPasswordProperties(file, passCode, passwordCookieValue);
             if (cfg.isEnableFastLinkcheckForSingleFiles()) {
-                singleFile.setAvailable(true);
+                file.setAvailable(true);
+                /* Set file_id as temporary filename if it looks like the link itself doesn't contain a filename. */
+                final String file_id = new Regex(br.getURL(), "fi/([a-z0-9]+)/($|\\?.+)").getMatch(0);
+                if (file_id != null) {
+                    file.setName(file_id);
+                }
             }
-            ret.add(singleFile);
+            ret.add(file);
             return ret;
         }
         /**

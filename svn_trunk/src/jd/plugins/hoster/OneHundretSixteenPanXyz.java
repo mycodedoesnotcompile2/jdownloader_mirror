@@ -23,6 +23,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -40,13 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 52376 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52384 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,6 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         ret.add(new String[] { "116pan.xyz", "116pan.com" }); // formerly known as 116pan.com
         return ret;
     }
-
     // @Override
     // public String rewriteHost(final String host) {
     // if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -216,7 +215,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         if (internal_file_id == null) {
             internal_file_id = (String) file.get("file_id");
         }
-        if (internal_file_id == null) {
+        if (StringUtils.isEmpty(internal_file_id)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         link.setProperty(PROPERTY_INTERNAL_FILE_ID, internal_file_id);

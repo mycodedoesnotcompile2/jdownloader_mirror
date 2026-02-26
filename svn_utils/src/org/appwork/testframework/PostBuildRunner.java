@@ -489,8 +489,37 @@ public class PostBuildRunner {
                     throw new Exception("Failed test with classloader error although it is marked with -force in the build.xml: " + cls.getName());
                 }
                 String missingResource = new Regex(result.getStdOutString(), "not in JAR\\:\\s*([^\r\n]+)").getMatch(0);
+                if (missingResource == null) {
+                    missingResource = new Regex(result.getErrOutString(), "not in JAR\\:\\s*([^\r\n]+)").getMatch(0);
+                }
+                boolean fromNotInJar = missingResource != null && (result.getStdOutString().contains("not in JAR") || result.getErrOutString().contains("not in JAR"));
+                if (missingResource == null) {
+                    // Subprocess prints "Add @TestDependency({\"className\"}) to TestClass" to stderr on exit 4/5
+                    missingResource = new Regex(result.getErrOutString(), "Add @TestDependency\\(\\{\"([^\"]+)\"\\}\\)").getMatch(0);
+                }
+                if (missingResource == null) {
+                    // Fallback: first non-empty line from stderr or stdout that might contain the missing class or error
+                    String err = result.getErrOutString().trim();
+                    String out = result.getStdOutString().trim();
+                    if (err.length() > 0) {
+                        String firstLine = new Regex(err, "([^\r\n]+)").getMatch(0);
+                        if (firstLine != null && firstLine.length() > 0) {
+                            missingResource = firstLine.length() > 200 ? firstLine.substring(0, 197) + "..." : firstLine;
+                        }
+                    }
+                    if (missingResource == null && out.length() > 0) {
+                        String firstLine = new Regex(out, "([^\r\n]+)").getMatch(0);
+                        if (firstLine != null && firstLine.length() > 0) {
+                            missingResource = firstLine.length() > 200 ? firstLine.substring(0, 197) + "..." : firstLine;
+                        }
+                    }
+                }
                 if (missingResource != null) {
-                    LogV3.info("  >>" + header("skipped") + "Missing Test Resource: " + missingResource);
+                    if (fromNotInJar) {
+                        LogV3.info("  >>" + header("skipped") + "Missing Test Resource: " + missingResource);
+                    } else {
+                        LogV3.info("  >>" + header("skipped") + "Classloader Error: " + missingResource);
+                    }
                 } else {
                     LogV3.info("  >>" + header("skipped") + "Classloader Error.");
                 }

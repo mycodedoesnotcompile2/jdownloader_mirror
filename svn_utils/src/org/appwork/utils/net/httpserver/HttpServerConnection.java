@@ -47,7 +47,8 @@ import java.util.regex.Pattern;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
+import org.appwork.remoteapi.exceptions.FileNotFound404Exception;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Joiner;
@@ -786,8 +787,8 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
         return this.outputStreamInUse;
     }
 
-    protected void onUnhandled(final HttpRequest request, final HttpResponse response) throws IOException {
-        response.setResponseCode(ResponseCode.SERVERERROR_NOT_IMPLEMENTED);
+    protected void onUnhandled(final HttpRequest request, final HttpResponse response) throws BasicRemoteAPIException {
+        throw new FileNotFound404Exception();
     }
 
     protected RequestMethod parseConnectionType(final String requestLine) throws IOException {

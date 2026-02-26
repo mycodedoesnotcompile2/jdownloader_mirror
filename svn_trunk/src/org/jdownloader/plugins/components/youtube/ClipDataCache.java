@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
 
@@ -79,6 +78,7 @@ public class ClipDataCache {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final List<HTTPProxy> proxyListNew = helper.getBr().selectProxies(new URL("https://youtube.com"));
+        boolean refreshedFlag = false;
         while (true) {
             CachedClipData cachedData = get(cachedID);
             if (cachedData != null) {
@@ -99,6 +99,12 @@ public class ClipDataCache {
                         check(helper, cachedData);
                         return cachedData;
                     }
+                    if (refreshedFlag) {
+                        helper.getLogger().info("use invalid/incomplete CachedClipData:" + cachedID);
+                        cachedData.clipData.copyTo(vid);
+                        check(helper, cachedData);
+                        return cachedData;
+                    }
                 }
             }
             CachedClipData newCachedData = null;
@@ -114,6 +120,7 @@ public class ClipDataCache {
                     try {
                         helper.getLogger().info("refresh CachedClipData:" + cachedID);
                         helper.loadVideo(cachedData.clipData);
+                        refreshedFlag = true;
                     } finally {
                         cachedData.notifyAll();
                     }
@@ -125,38 +132,37 @@ public class ClipDataCache {
     }
 
     private static void check(YoutubeHelper helper, CachedClipData cachedData) throws PluginException {
-        if (cachedData.clipData.streams == null || StringUtils.isNotEmpty(cachedData.clipData.error)) {
-            if (StringUtils.equalsIgnoreCase(cachedData.clipData.error, "This video is unavailable.") || StringUtils.equalsIgnoreCase(cachedData.clipData.error, "This video is not available.")) {
+        final String error = cachedData.clipData.error;
+        if (cachedData.clipData.streams == null || StringUtils.isNotEmpty(error)) {
+            if (StringUtils.equalsIgnoreCase(error, "This video is unavailable.") || StringUtils.equalsIgnoreCase(error, "This video is not available.") || StringUtils.equalsIgnoreCase(error, "Video unavailable")) {
                 // this is not region issue, its just not available.
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, cachedData.clipData.error);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, error);
             }
-            if (StringUtils.containsIgnoreCase(cachedData.clipData.error, "This video has been removed")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, cachedData.clipData.error);
+            if (StringUtils.containsIgnoreCase(error, "This video has been removed")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, error);
             }
             // private video.. login is required! assumption that account hasn't been used.. or wrong account has been used...
-            if (StringUtils.containsIgnoreCase(cachedData.clipData.error, "This Video is Private")) {
+            if (StringUtils.containsIgnoreCase(error, "This Video is Private")) {
                 if (helper.getAccountLoggedIn() != null) {
                     // wrong account used?? try next??
                     // TODO: confirm with jiaz that this this type of exception will try the next account
                 }
-                throw new AccountRequiredException(cachedData.clipData.error); // .localizedMessage(_JDT.T.AccountRequiredException_createCandidateResult());
+                throw new AccountRequiredException(error); // .localizedMessage(_JDT.T.AccountRequiredException_createCandidateResult());
             }
-            if (cachedData.clipData.error != null) {
-                String lc = cachedData.clipData.error.toLowerCase(Locale.ENGLISH);
-                if (lc.contains("is not available in your country") || lc.contains("geo blocked due to copyright grounds")) {
+            if (error != null) {
+                if (StringUtils.containsIgnoreCase(error, "is not available in your country") || StringUtils.containsIgnoreCase(error, "geo blocked due to copyright grounds")) {
                     // 18.04.2016
                     // „Unfortunately, this video is not available in Germany because it may contain music for which GEMA has not
                     // granted the respective music rights.”
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY).localizedMessage(_JDT.T.CountryIPBlockException_createCandidateResult());
-                }
-                if (lc.contains("content is not available in")) {
+                } else if (StringUtils.containsIgnoreCase(error, "content is not available in")) {
                     // „Unfortunately, this UMG-music-content is not available in Germany because GEMA has not granted the
                     // respective music publishing rights.”
                     // 18.04.2016
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY).localizedMessage(_JDT.T.CountryIPBlockException_createCandidateResult());
                 }
             }
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, cachedData.clipData.error);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, error);
         }
     }
 

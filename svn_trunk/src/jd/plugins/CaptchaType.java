@@ -593,7 +593,7 @@ public class CaptchaType {
             return false;
         }
         final abstractPluginForCaptchaSolver captchaSolverPlugin = (abstractPluginForCaptchaSolver) plg;
-        final List<CAPTCHA_TYPE> supportedTypes = captchaSolverPlugin.getSupportedCaptchaTypes();
+        final List<CAPTCHA_TYPE> supportedTypes = captchaSolverPlugin.getSupportedCaptchaTypes(acc);
         if (supportedTypes == null) {
             return false;
         }

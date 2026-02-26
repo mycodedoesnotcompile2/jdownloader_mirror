@@ -431,6 +431,13 @@ public class TestJREProvider {
         if (methodName == null || methodName.isEmpty()) {
             throw new IllegalArgumentException("methodName must not be null or empty");
         }
+        if (System.getProperty(PostBuildRunner.POSTBUILDTEST) != null) {
+            final boolean needMinimalRunner = getClassVersionForJava(options.getVersion()) < getClassFileVersion(JREMethodRunner.class);
+            if (needMinimalRunner) {
+                LogV3.info("Skipping TestJREProvider execution in PostBuild mode (no source available for " + MinimalMethodRunner.class.getSimpleName() + " compilation).");
+                return;
+            }
+        }
         final JreResult jreResult = findOrDownloadJRE(options);
         executeMethodInJRE(jreResult.getJavaBinary(), jreResult.getCacheFolder(), options.getJvmArgs(), clazz, methodName, params, options.getVersion(), jreResult.getBitness());
     }
@@ -1058,7 +1065,8 @@ public class TestJREProvider {
      */
     private static Thread createOutputForwarder(final InputStream inputStream, final boolean isError, final JavaVersion jreVersion, final Bitness bitness) {
         final String bitSuffix = bitness == Bitness.BIT_64 ? "_64" : "_32";
-        final String prefix = "[JRE" + getFeatureVersion(jreVersion) + bitSuffix + "] ";
+        final String versionStr = jreVersion != null && jreVersion != JavaVersion.UNKNOWN ? jreVersion.getVersionString() : String.valueOf(getFeatureVersion(jreVersion));
+        final String prefix = "[JRE" + versionStr + bitSuffix + "] ";
         return new Thread("JRETask-" + (isError ? "stderr" : "stdout")) {
             @Override
             public void run() {

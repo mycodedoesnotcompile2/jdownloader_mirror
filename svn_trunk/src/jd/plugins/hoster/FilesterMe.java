@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -37,7 +33,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52338 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 52389 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesterMe extends PluginForHost {
     public FilesterMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -148,10 +148,21 @@ public class FilesterMe extends PluginForHost {
         final String fid = this.getFID(link);
         final Browser brc = br.cloneBrowser();
         brc.getPage("https://filester.me/js/file_dl.js?ver=1.0.5");
-        final String dl_host = brc.getRegex("const CDN_URL = '(https?://[^'/]+)';").getMatch(0);
-        if (StringUtils.isEmpty(dl_host)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find dl_host");
+        String dl_host = brc.getRegex("const CDN_URL\\s*=\\s*'(https?://[^'/]+)';").getMatch(0);
+        if (dl_host == null) {
+            final String dl_hosts = brc.getRegex("const CDN_URLS\\s*=\\s*(\\[.*?\\])\\s*;").getMatch(0);
+            if (dl_hosts != null) {
+                final String cdnURLs[] = restoreFromString(dl_hosts.replace("'", "\""), TypeRef.STRING_ARRAY);
+                dl_host = cdnURLs == null ? null : cdnURLs[(int) (Math.floor(Math.random() * cdnURLs.length))];
+            }
+            if (dl_host == null) {
+                dl_host = brc.getRegex("const CDN_URLS\\s*=\\s*\\[\\s*'(https?://[^'/]+)'").getMatch(0);
+            }
+            if (StringUtils.isEmpty(dl_host)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find dl_host");
+            }
         }
+
         brc.postPageRaw("/api/public/download", "{\"file_slug\":\"" + fid + "\"}");
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         String dllink = entries.get("download_url").toString();
