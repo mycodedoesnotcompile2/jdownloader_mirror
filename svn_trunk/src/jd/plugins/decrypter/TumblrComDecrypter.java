@@ -51,7 +51,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.TumblrCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 52014 $", interfaceVersion = 3, names = { "tumblr.com" }, urls = { "https?://(?![a-z0-9]+\\.media\\.tumblr\\.com/.+)[\\w\\.-]+tumblr\\.com/.*" })
+@DecrypterPlugin(revision = "$Revision: 52396 $", interfaceVersion = 3, names = { "tumblr.com" }, urls = { "https?://(?![a-z0-9]+\\.media\\.tumblr\\.com/.+)[\\w\\.-]+tumblr\\.com/.*" })
 public class TumblrComDecrypter extends PluginForDecrypt {
     public TumblrComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,6 +89,11 @@ public class TumblrComDecrypter extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         if (contenturl.matches(TYPE_INVALID)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (contenturl.equalsIgnoreCase("https://www.tumblr.com/")) {
+            /* Special case: Invalid link that we do not want to cover via regex */
+            logger.info("Invalid link: " + contenturl);
+            // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            return new ArrayList<DownloadLink>();
         }
         String blog = null;
         String puid = null;
@@ -142,8 +147,10 @@ public class TumblrComDecrypter extends PluginForDecrypt {
                 this.getAndSetAnonymousApikey(this.br);
                 return crawlUserAPI(param, blog);
             } else {
+                /* In this case it is very hard to cover only allowed links via plugin pattern so this case can happen. */
                 logger.warning("Unsupported URL");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                return new ArrayList<DownloadLink>();
             }
         }
     }

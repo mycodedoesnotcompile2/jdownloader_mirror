@@ -6,20 +6,22 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.WeakHashMap;
 
 import javax.swing.Icon;
 
 import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.PackageController;
 import jd.plugins.DownloadLink;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JsonKeyValueStorage;
 import org.appwork.storage.Storable;
+import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.reflection.Clazz;
 import org.jdownloader.api.linkcollector.v2.CrawledLinkAPIStorableV2;
@@ -260,19 +262,40 @@ public class CrawledLinkSandbox {
     }
 
     public boolean remove() {
-        if (this.link != null) {
-            final CrawledPackage pkg = this.link.getParentNode();
-            if (pkg != null) {
-                final PackageController<CrawledPackage, CrawledLink> controller = pkg.getControlledBy();
-                if (controller != null) {
-                    final ArrayList<CrawledLink> children = new ArrayList<CrawledLink>();
-                    children.add(link);
-                    controller.removeChildren(children);
-                    return true;
+        return remove(new CrawledLinkSandbox[] { this });
+    }
+
+    public boolean remove(final CrawledLinkSandbox[] remove) {
+        final Map<CrawledPackage, List<CrawledLink>> removeMap = new HashMap<CrawledPackage, List<CrawledLink>>();
+        return Boolean.TRUE.equals(LinkCollector.getInstance().getQueue().addWait(new QueueAction<Boolean, RuntimeException>() {
+
+            @Override
+            protected Boolean run() throws RuntimeException {
+                for (CrawledLinkSandbox entry : remove) {
+                    final CrawledLink crawledLink = entry.link;
+                    if (crawledLink == null) {
+                        continue;
+                    }
+                    final CrawledPackage filePackage = crawledLink.getParentNode();
+                    if (filePackage == null || filePackage.getControlledBy() == null) {
+                        continue;
+                    }
+                    List<CrawledLink> list = removeMap.get(filePackage);
+                    if (list == null) {
+                        list = new ArrayList<CrawledLink>();
+                        removeMap.put(filePackage, list);
+                    }
+                    list.add(crawledLink);
                 }
+                if (removeMap.size() == 0) {
+                    return false;
+                }
+                for (final Entry<CrawledPackage, List<CrawledLink>> removeEntry : removeMap.entrySet()) {
+                    LinkCollector.getInstance().removeChildren(removeEntry.getKey(), removeEntry.getValue(), true);
+                }
+                return true;
             }
-        }
-        return false;
+        }));
     }
 
     public void setSessionProperty(final String key, final Object value) {

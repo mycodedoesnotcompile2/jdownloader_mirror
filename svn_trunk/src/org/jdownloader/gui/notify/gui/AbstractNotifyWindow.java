@@ -44,6 +44,7 @@ import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.ColorUtils;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.images.TransparentIcon;
@@ -102,7 +103,7 @@ public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel>
     public AbstractNotifyWindow(AbstractBubbleSupport bubbleSupport, String caption, T comp) {
         super();
         this.bubbleSupport = bubbleSupport;
-        if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
             this.setType(java.awt.Window.Type.POPUP);
         }
         bounds = new Rectangle();

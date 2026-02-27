@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import jd.SecondLevelLaunch;
+import jd.controlling.TaskQueue;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.DownloadLinkCandidate;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
@@ -51,6 +52,7 @@ import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -511,14 +513,16 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
     }
 
     public void save(final List<ScriptEntry> tableData) {
-        new Thread() {
+        TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+
             @Override
-            public void run() {
+            protected Void run() throws RuntimeException {
                 final ArrayList<ScriptEntry> entries = new ArrayList<ScriptEntry>(tableData);
                 setupRemoteAPIListener(entries);
                 getSettings().setScripts(entries);
+                return null;
             }
-        }.start();
+        });
     }
 
     public void runTestCompile(EventTrigger eventTrigger, String script) {

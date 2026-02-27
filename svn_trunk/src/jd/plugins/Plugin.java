@@ -105,6 +105,7 @@ import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.UserIOProgress;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -1178,7 +1179,9 @@ public abstract class Plugin implements ActionListener {
             final PluginHost anno = cls.getAnnotation(PluginHost.class);
             if (anno != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 final org.jdownloader.plugins.config.Type pluginType;
-                if (Plugin.this instanceof PluginForDecrypt) {
+                if (Plugin.this instanceof abstractPluginForCaptchaSolver) {
+                    pluginType = org.jdownloader.plugins.config.Type.CAPTCHA;
+                } else if (Plugin.this instanceof PluginForDecrypt) {
                     pluginType = org.jdownloader.plugins.config.Type.CRAWLER;
                 } else if (Plugin.this instanceof PluginForHost) {
                     pluginType = org.jdownloader.plugins.config.Type.HOSTER;

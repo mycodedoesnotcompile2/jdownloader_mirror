@@ -3,6 +3,15 @@ package org.jdownloader.plugins.components.captchasolver;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaType;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.PluginForHost;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -16,15 +25,6 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.CaptchaType;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.PluginForHost;
-
 /**
  * Abstract base class for captcha solver plugins.
  */
@@ -34,8 +34,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         plugin.setBrowser(plugin.createNewBrowserInstance());
         return new PluginChallengeSolver<T>(plugin, account);
     }
-
-    private Challenge<?> c = null;
 
     /**
      * Constructor for the plugin.
@@ -83,6 +81,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public abstract String getBuyPremiumUrl();
 
     /** Returns captcha challenge that this plugin is currently processing. */
+    private Challenge<?> c = null;
+
     public Challenge<?> getCurrentCaptchaChallenge() {
         return this.c;
     }
@@ -247,26 +247,29 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return null;
     }
 
+    @Override
+    public Class<? extends CaptchaSolverPluginConfig> getConfigInterface() {
+        return (Class<? extends CaptchaSolverPluginConfig>) super.getConfigInterface();
+    }
+
     private CaptchaSolverPluginConfig getDefaultConfig() {
         /*
          * TODO: Maybe ensure that every captcha solver plugin has a config or throw exception <br> Every captcha solver plugin should have
          * a config.
          */
-        final Object cfgO = this.getConfigInterface();
-        if (cfgO == null) {
+        final Class<? extends CaptchaSolverPluginConfig> configInterfaceClass = this.getConfigInterface();
+        final CaptchaSolverPluginConfig cfg;
+        if (configInterfaceClass == null) {
             // TODO: Remove this fallback
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 logger.warning("Solver has no config");
-                return PluginJsonConfig.get(CaptchaSolverPluginConfig.class);
+                cfg = PluginJsonConfig.get(CaptchaSolverPluginConfig.class);
             } else {
                 throw new IllegalArgumentException("Solver has no config");
             }
+        } else {
+            cfg = PluginJsonConfig.get(configInterfaceClass);
         }
-        if (!(cfgO instanceof CaptchaSolverPluginConfig)) {
-            /* Developer mistake */
-            throw new IllegalArgumentException("Unexpected solver config type");
-        }
-        final CaptchaSolverPluginConfig cfg = (CaptchaSolverPluginConfig) cfgO;
         return cfg;
     }
 

@@ -21,6 +21,8 @@ import javax.swing.SwingUtilities;
 
 import jd.http.Browser;
 
+import org.appwork.controlling.StateMachine;
+import org.appwork.controlling.StateMachineInterface;
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
@@ -50,18 +52,26 @@ import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.UniqueTag;
 import org.mozilla.javascript.tools.shell.Global;
 
-public class ScriptThread extends Thread implements JSShutterDelegate {
-    private final ScriptEntry                  script;
-    private final Map<String, Object>          props;
-    private Global                             scope;
-    private Context                            cx;
-    private final LogSource                    logger;
-    private final EventScripterExtension       extension;
-    private boolean                            checkPermissions   = true;
-    private boolean                            disableOnException = true;
-    private boolean                            notifyOnException  = true;
-    private boolean                            advancedAlert      = false;
-    private final List<ReentrantReadWriteLock> locks              = new ArrayList<ReentrantReadWriteLock>();
+public class ScriptThread extends Thread implements JSShutterDelegate, StateMachineInterface {
+    public static final org.appwork.controlling.State IDLE_STATE         = new org.appwork.controlling.State("IDLE");
+    public static final org.appwork.controlling.State RUNNING_STATE      = new org.appwork.controlling.State("RUNNING");
+    public static final org.appwork.controlling.State STOPPED_STATE      = new org.appwork.controlling.State("STOPPED");
+    static {
+        IDLE_STATE.addChildren(RUNNING_STATE);
+        RUNNING_STATE.addChildren(STOPPED_STATE);
+    }
+    private final ScriptEntry                         script;
+    private final Map<String, Object>                 props;
+    private Global                                    scope;
+    private Context                                   cx;
+    private final LogSource                           logger;
+    private final EventScripterExtension              extension;
+    private boolean                                   checkPermissions   = true;
+    private boolean                                   disableOnException = true;
+    private boolean                                   notifyOnException  = true;
+    private boolean                                   advancedAlert      = false;
+    private final List<ReentrantReadWriteLock>        locks              = new ArrayList<ReentrantReadWriteLock>();
+    private final StateMachine                        stateMachine       = new StateMachine(this, IDLE_STATE, STOPPED_STATE);
 
     public boolean isNotifyOnException() {
         return notifyOnException;
@@ -348,7 +358,12 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
     }
 
     private void evalUNtrusted(String script) {
-        cx.evaluateString(getScope(), script, "", 1, null);
+        getStateMachine().setStatus(RUNNING_STATE);
+        try {
+            cx.evaluateString(getScope(), script, "", 1, null);
+        } finally {
+            getStateMachine().setStatus(STOPPED_STATE);
+        }
     }
 
     public Object evalTrusted(String preloadClasses) {
@@ -510,5 +525,10 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
             final EcmaError ret = ScriptRuntime.constructError("Security Violation", "Security Violation " + className);
             throw ret;
         }
+    }
+
+    @Override
+    public StateMachine getStateMachine() {
+        return stateMachine;
     }
 }

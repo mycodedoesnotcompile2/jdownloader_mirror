@@ -88,6 +88,7 @@ import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.appwork.utils.processes.ProcessOutput;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
+import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -1176,13 +1177,19 @@ public class ScriptEnvironment {
     }
 
     @ScriptAPI(description = "Show a Notification", parameters = { "Map: notification settings(title, message, iconKey, timeout)" }, example = "displayNotification({\"title\":\"Ping\",\"message\":\"Nice\",\"iconKey\":\"stop\",\"timeout\":1000})")
-    public static void displayNotification(final Map<String, Object> notification) {
+    public static NotifyWindowSandbox displayNotification(final Map<String, Object> notification) {
         if (Application.isHeadless()) {
-            return;
+            return null;
         }
+        final ScriptThread env = getScriptThread();
+        final AtomicReference<BasicNotify> ref = new AtomicReference<BasicNotify>();
         BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
+
             @Override
             public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
+                if (env.getStateMachine().isFinal()) {
+                    return null;
+                }
                 final String title = StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(notification.get("title")));
                 final String text = StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(notification.get("message")));
                 final String iconKey = StringUtils.valueOfOrNull(notification.get("iconKey"));
@@ -1191,10 +1198,24 @@ public class ScriptEnvironment {
                 if (timeout != null) {
                     ret.setTimeout(timeout.intValue());
                 }
-                return ret;
+                ref.set(ret);
+                env.getStateMachine().executeOnceOnState(new Runnable() {
 
+                    @Override
+                    public void run() {
+                        new EDTRunner() {
+
+                            @Override
+                            protected void runInEDT() {
+                                ret.setVisible(false);
+                            }
+                        };
+                    }
+                }, ScriptThread.STOPPED_STATE);
+                return ret;
             }
         });
+        return new NotifyWindowSandbox(ref);
     }
 
     @ScriptAPI(description = "Show a Input Dialog", parameters = { "inputDialogMap" }, example = "showInputDialog({\"message\":\"Are you a bot?\",\"multiLine\":false,\"default\":\"yes\"})")

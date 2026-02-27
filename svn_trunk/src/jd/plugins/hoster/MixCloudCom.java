@@ -17,10 +17,6 @@ package jd.plugins.hoster;
 
 import java.net.URL;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Cookies;
 import jd.http.requests.PostRequest;
@@ -37,9 +33,12 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.decrypter.MixCloudComCrawler;
 
-@HostPlugin(revision = "$Revision: 49846 $", interfaceVersion = 3, names = { "mixcloud.com" }, urls = { "https?://stream\\d+\\.mixcloud\\.com/.+|https://thumbnailer\\.mixcloud\\.com/unsafe/.+" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52403 $", interfaceVersion = 3, names = { "mixcloud.com" }, urls = { "https?://stream\\d+\\.mixcloud\\.com/.+|https://thumbnailer\\.mixcloud\\.com/unsafe/.+" })
 public class MixCloudCom extends PluginForHost {
     public MixCloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +141,6 @@ public class MixCloudCom extends PluginForHost {
             br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
-            String csrftoken = null;
             if (cookies != null) {
                 logger.info("Attempting cookie login");
                 this.br.setCookies(this.getHost(), cookies);
@@ -151,7 +149,6 @@ public class MixCloudCom extends PluginForHost {
                     return false;
                 }
                 br.getPage("https://" + this.getHost() + "/");
-                csrftoken = MixCloudComCrawler.findCsrftoken(br);
                 PostRequest request = br.createJSonPostRequest("https://app.mixcloud.com/graphql", "{\"id\":\"q33\",\"query\":\"query DashboardStatsCardQuery {viewer {id,...F1}} fragment F0 on Stats {comments {totalCount},favorites {totalCount},reposts {totalCount},plays {totalCount},minutes {totalCount},__typename} fragment F1 on Viewer {me {username,hasProFeatures,isUploader,stats {...F0},id},id}\",\"variables\":{}}");
                 br.getPage(request);
                 final String username = PluginJSonUtils.getJson(br, "username");
@@ -168,11 +165,6 @@ public class MixCloudCom extends PluginForHost {
             }
             logger.info("Performing full login");
             br.getPage("https://" + this.getHost() + "/");
-            csrftoken = MixCloudComCrawler.findCsrftoken(br);
-            if (csrftoken == null) {
-                logger.warning("Failed to find csrftoken");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
             final PostRequest request = br.createPostRequest("https://app.mixcloud.com/authentication/email-login/", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/x-www-form-urlencoded; charset=UTF-8");
             request.getHeaders().put("Accept", "*/*");

@@ -339,7 +339,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     void setPlaylistCrawlMode202404(final PlaylistCrawlMode bookCrawlerMode);
 
     @AboutConfig
-    @SpinnerValidator(min = 0, max = 100000, step = 100)
+    @SpinnerValidator(min = 0, max = 1000000, step = 100)
     @DefaultIntValue(100)
     @Order(60)
     int getSearchTermCrawlerMaxResultsLimit();

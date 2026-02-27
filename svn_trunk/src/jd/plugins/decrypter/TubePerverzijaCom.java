@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 51351 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52396 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubePerverzijaCom extends PluginForDecrypt {
     public TubePerverzijaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,7 +97,14 @@ public class TubePerverzijaCom extends PluginForDecrypt {
             }
         }
         if (ret.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /**
+             * Examples for invalid links: <br>
+             * https://tube.perverzija.com/advanced-search/ <br>
+             * https://tube.perverzija.com/contact/ <br>
+             * https://tube.perverzija.com/wp-admin/
+             */
+            logger.info("Failed to find any supported links -> Link unsupported or plugin problem");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return ret;
     }

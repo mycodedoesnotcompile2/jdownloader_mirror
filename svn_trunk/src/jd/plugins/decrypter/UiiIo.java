@@ -27,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 51739 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52397 $", interfaceVersion = 3, names = {}, urls = {})
 public class UiiIo extends MightyScriptAdLinkFly {
     public UiiIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,6 +45,10 @@ public class UiiIo extends MightyScriptAdLinkFly {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("szs.pw");
         deadDomains.add("wordcounter.icu");
+        /* 2026-02-26 */
+        deadDomains.add("passgen.icu");
+        deadDomains.add("pwrpa.cc");
+        deadDomains.add("wordcount.im");
         return deadDomains;
     }
 

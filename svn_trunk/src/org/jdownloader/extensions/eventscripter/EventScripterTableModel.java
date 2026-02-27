@@ -6,6 +6,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.WeakHashMap;
 
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.Icon;
@@ -28,8 +29,6 @@ import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.dialog.ProgressDialog;
-import org.appwork.utils.swing.dialog.ProgressDialog.ProgressGetter;
 import org.appwork.utils.swing.renderer.RenderLabel;
 import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.jdownloader.gui.IconKey;
@@ -165,40 +164,44 @@ public class EventScripterTableModel extends ExtTableModel<ScriptEntry> implemen
             {
                 editorBtn = new JButton("");
                 editorBtn.addActionListener(new ActionListener() {
+                    private final WeakHashMap<ScriptEntry, Boolean> openEditors = new WeakHashMap<ScriptEntry, Boolean>();
+
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        if (editing != null) {
-                            ProgressDialog p = new ProgressDialog(new ProgressGetter() {
-                                @Override
-                                public void run() throws Exception {
+                        final ScriptEntry ref = editing;
+                        if (ref != null) {
+                            synchronized (openEditors) {
+                                if (openEditors.containsKey(ref)) {
+                                    return;
                                 }
-
-                                @Override
-                                public String getString() {
-                                    return null;
-                                }
-
-                                @Override
-                                public int getProgress() {
-                                    return -1;
-                                }
-
-                                @Override
-                                public String getLabelString() {
-                                    return null;
-                                }
-                            }, 0, T.T.loading_editor_title(), "", null);
-                            UIOManager.I().show(null, p);
-                            JavaScriptEditorDialog d = new JavaScriptEditorDialog(extension, editing);
-                            UIOManager.I().show(null, d);
-                            if (d.getCloseReason() == CloseReason.OK) {
-                                String script = d.getScript();
-                                if (script != null) {
-                                    editing.setEventTriggerSettings(d.getEventTriggerSetup());
-                                    editing.setScript(script);
-                                    extension.save(getTableData());
-                                }
+                                openEditors.put(ref, Boolean.TRUE);
                             }
+                            new Thread() {
+                                {
+                                    setDaemon(true);
+                                }
+
+                                @Override
+                                public void run() {
+                                    try {
+                                        final JavaScriptEditorDialog d = new JavaScriptEditorDialog(extension, ref);
+                                        UIOManager.I().show(null, d);
+                                        if (d.getCloseReason() == CloseReason.OK) {
+                                            final String script = d.getScript();
+                                            if (script != null) {
+                                                ref.setEventTriggerSettings(d.getEventTriggerSetup());
+                                                ref.setScript(script);
+                                                extension.save(getTableData());
+                                            }
+
+                                        }
+                                    } finally {
+                                        synchronized (openEditors) {
+                                            openEditors.remove(ref);
+                                        }
+                                    }
+                                }
+                            }.start();
                         }
                     }
                 });

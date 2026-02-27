@@ -1,5 +1,6 @@
 package org.jdownloader.extensions.eventscripter;
 
+import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
@@ -60,6 +61,11 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
         this.extension = extension;
         setLocator(new RememberAbsoluteDialogLocator(getClass().getSimpleName()));
         setDimensor(new RememberLastDialogDimension(getClass().getSimpleName()));
+    }
+
+    @Override
+    public ModalityType getModalityType() {
+        return ModalityType.MODELESS;
     }
 
     @Override

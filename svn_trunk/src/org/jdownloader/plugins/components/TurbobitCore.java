@@ -49,6 +49,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
@@ -57,7 +58,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52348 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52401 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -734,13 +735,18 @@ public abstract class TurbobitCore extends PluginForHost {
                 brc.getPage("/api/captcha");
                 final Map<String, Object> captchainfo = this.checkErrorsWebsiteV2(brc, link, account);
                 final String driver = captchainfo.get("driver").toString();
-                if (!StringUtils.startsWithCaseInsensitive(driver, "recaptcha")) {
+                final String captchaIndex = captchainfo.get("index").toString();
+                final String captchaResponse;
+                if (StringUtils.startsWithCaseInsensitive(driver, "recaptcha")) {
+                    final String captchaKey = captchainfo.get("publicKey").toString();
+                    captchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, brc, captchaKey).getToken();
+                } else if (StringUtils.startsWithCaseInsensitive(driver, "turnstile")) {
+                    final String captchaKey = captchainfo.get("publicKey").toString();
+                    captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, brc, captchaKey).getToken();
+                } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha:" + driver);
                 }
-                final String reCaptchaIndex = captchainfo.get("index").toString();
-                final String reCaptchaKey = captchainfo.get("publicKey").toString();
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc, reCaptchaKey).getToken();
-                brc.postPageRaw("/api/download/free/captcha", "{\"fileId\":\"" + fid + "\",\"captchaResponse\":\"" + recaptchaV2Response + "\",\"captchaIndex\":" + reCaptchaIndex + "}");
+                brc.postPageRaw("/api/download/free/captcha", "{\"fileId\":\"" + fid + "\",\"captchaResponse\":\"" + captchaResponse + "\",\"captchaIndex\":" + captchaIndex + "}");
                 final Map<String, Object> delaymap = this.checkErrorsWebsiteV2(brc, link, account);
                 final int waitSeconds = ((Number) delaymap.get("delay")).intValue();
                 this.sleep(waitSeconds * 1000, link);

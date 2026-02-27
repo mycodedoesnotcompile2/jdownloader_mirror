@@ -38,7 +38,7 @@ import jd.plugins.hoster.GenericM3u8;
  * @author butkovip
  *
  */
-@DecrypterPlugin(revision = "$Revision: 52391 $", interfaceVersion = 2, urls = {}, names = {})
+@DecrypterPlugin(revision = "$Revision: 52396 $", interfaceVersion = 2, urls = {}, names = {})
 public class TopkySk extends PluginForDecrypt {
     public TopkySk(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,7 @@ public class TopkySk extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:[\\w\\-]+\\.)?" + buildHostsPatternPart(domains) + "/cl?/(\\d+)/(\\d+)/([a-zA-Z0-9-]+)");
+            ret.add("https?://(?:[\\w\\-]+\\.)?" + buildHostsPatternPart(domains) + "/cl?/(\\d+)/((\\d+)/)?([a-zA-Z0-9-]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -84,7 +84,11 @@ public class TopkySk extends PluginForDecrypt {
         }
         final String urlSlug = br.getURL().substring(br.getURL().lastIndexOf("/") + 1);
         final String title = urlSlug.replace("-", " ").trim();
-        final String contentID = new Regex(contenturl, this.getSupportedLinks()).getMatch(1);
+        final Regex urlinfo = new Regex(contenturl, this.getSupportedLinks());
+        String contentID = urlinfo.getMatch(2);
+        if (contentID == null) {
+            contentID = urlinfo.getMatch(0);
+        }
         // extract img.zoznam.sk like vids
         String[][] links = br.getRegex("fo\\.addVariable[(]\"file\", \"(.*?)\"[)]").getMatches();
         if (null != links && 0 < links.length) {
@@ -94,8 +98,8 @@ public class TopkySk extends PluginForDecrypt {
                 }
             }
         }
-        // extract youtube links
-        links = br.getRegex("<PARAM NAME=\"movie\" VALUE=\"http://www.youtube.com/v/(.*?)&").getMatches();
+        // extract youtube video-ids
+        links = br.getRegex("\"https?://www\\.youtube\\.com/(?:v|embed)/([\\w\\-]+)").getMatches();
         if (null != links && 0 < links.length) {
             for (String[] link : links) {
                 if (null != link && 1 == link.length && null != link[0] && 0 < link[0].length()) {
@@ -110,7 +114,14 @@ public class TopkySk extends PluginForDecrypt {
                 ret.add(createDownloadlink(instagramlink));
             }
         }
-        // extract topky.sk http vids
+        // extract selfhosted images
+        final String[] imgs = br.getRegex("\"(https?://img\\.[^/]+/spuntik/big/[^\"]+)\"").getColumn(0);
+        if (imgs != null && imgs.length > 0) {
+            for (final String img : imgs) {
+                ret.add(createDownloadlink(DirectHTTP.createURLForThisPlugin(img)));
+            }
+        }
+        // extract selfhosted progressive video streams
         final String finallink = br.getRegex("<source src=\"(http[^<>\"]*?)\"").getMatch(0);
         if (finallink != null) {
             ret.add(createDownloadlink(DirectHTTP.createURLForThisPlugin(finallink)));
