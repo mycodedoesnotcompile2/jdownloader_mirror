@@ -43,7 +43,7 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
      * @see org.appwork.utils.net.httpconnection.trust.TrustProviderInterface#verifyHostname(javax.net.ssl.SSLSession, java.lang.String)
      */
     @Override
-    public void verifyHostname(SSLSession session, String host, Object context) throws IllegalSSLHostnameException {
+    public void verifyHostname(TrustResult result, SSLSession session, String host, Object context) throws IllegalSSLHostnameException {
         try {
             // Do not use the connection's HostnameVerifier when context is HttpsURLConnection:
             // that verifier delegates back to this trust provider, which would cause infinite recursion.
@@ -59,13 +59,13 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
                 throw new IllegalSSLHostnameException(host, "Failed");
             }
         } catch (IllegalSSLHostnameException e) {
-            throw e.setTrustResult(latestTrustResult);
+            result.setException(e);
+            throw e.setTrustResult(result);
         } catch (IOException e) {
-            throw new IllegalSSLHostnameException(host, e).setTrustResult(latestTrustResult);
+            result.setException(e);
+            throw new IllegalSSLHostnameException(host, e).setTrustResult(result);
         }
     }
-
-    protected TrustResult latestTrustResult = null;
 
     /**
      * Creates SSLTrustInfo from a certificate chain. Extracts subject, serial number, and SHA-256 hash.
@@ -80,7 +80,7 @@ public abstract class AbstractTrustProvider implements TrustProviderInterface {
         if (chain == null || chain.length == 0) {
             throw new WTFException();
         }
-        return latestTrustResult = new TrustResult(this, chain, e, type);
+        return new TrustResult(this, chain, e, type);
     }
 
     @Override

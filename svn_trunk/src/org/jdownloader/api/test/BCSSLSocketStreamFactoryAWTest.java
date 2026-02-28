@@ -88,9 +88,9 @@ public class BCSSLSocketStreamFactoryAWTest extends AWTest {
             final TrustResult tr = conn.getTrustResult();
             assertTrue(tr != null, "TrustResult must be set when using BCSSLSocketStreamFactory");
             assertTrue(tr.isTrusted(), "TrustResult must be trusted when using TrustAllProvider and BCSSLSocketStreamFactory");
-            try (InputStream is = conn.getInputStream()) {
-                assertTrue(is != null, "InputStream must be available");
-            }
+            InputStream is = conn.getInputStream();
+            assertTrue(is != null, "InputStream must be available");
+            is.close();
         } finally {
             conn.disconnect();
         }
@@ -126,9 +126,9 @@ public class BCSSLSocketStreamFactoryAWTest extends AWTest {
             final TrustResult tr = conn.getTrustResult();
             assertTrue(tr != null, "TrustResult must be set when using AutoBCSSLSocketStreamFactory (BC path)");
             assertTrue(tr.isTrusted(), "TrustResult must be trusted when using TrustAllProvider and AutoBC (BC path)");
-            try (InputStream is = conn.getInputStream()) {
-                assertTrue(is != null, "InputStream must be available");
-            }
+            InputStream is = conn.getInputStream();
+            assertTrue(is != null, "InputStream must be available");
+            is.close();
         } finally {
             conn.disconnect();
         }
@@ -152,9 +152,9 @@ public class BCSSLSocketStreamFactoryAWTest extends AWTest {
                 final TrustResult tr = conn.getTrustResult();
                 assertTrue(tr != null, "TrustResult must be set when using NativeHTTPConnectionImpl with AutoBCSSLSocketStreamFactory");
                 assertTrue(tr.isTrusted(), "TrustResult must be trusted when using TrustAllProvider");
-                try (InputStream is = conn.getInputStream()) {
-                    assertTrue(is != null, "InputStream must be available");
-                }
+                InputStream is = conn.getInputStream();
+                assertTrue(is != null, "InputStream must be available");
+                is.close();
             } finally {
                 conn.disconnect();
             }

@@ -102,11 +102,14 @@ public class TrustResult {
     /**
      * @param e
      */
-    public void exception(Exception e) {
-        if (exception == null) {
+    public TrustResult exception(Exception e) {
+        if (exception == e) {
+            return this;
+        } else if (exception == null) {
             exception = e;
         } else {
             Exceptions.addSuppressed(exception, e);
         }
+        return this;
     }
 }

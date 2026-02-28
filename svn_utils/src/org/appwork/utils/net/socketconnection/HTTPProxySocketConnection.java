@@ -55,6 +55,8 @@ import org.appwork.utils.net.httpconnection.ProxyEndpointConnectException;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
@@ -130,15 +132,44 @@ public class HTTPProxySocketConnection extends SocketConnection {
         return SocketConnection.getHostName(endPointAddress);
     }
 
+    protected TrustResult trustResult = null;
+
+    protected void setTrustResult(TrustResult trustResult) {
+        this.trustResult = trustResult;
+    }
+
+    public TrustResult getTrustResult() {
+        return this.trustResult;
+    }
+
     @Override
     protected SocketStreamInterface connectProxySocket(SocketStreamInterface proxySocket, final SocketAddress endPoint, final StringBuffer logger) throws IOException {
         final HTTPProxy proxy = getProxy();
         if (HTTPProxy.TYPE.HTTPS.equals(proxy.getType())) {
             try {
+                final TrustCallback trustCallback = new TrustCallback() {
+                    private final TrustProviderInterface trustProviderInterface = HTTPProxySocketConnection.this.getTrustProvider();
+                    private final KeyManager[]           keyManager             = HTTPProxySocketConnection.this.getKeyManagers();
+
+                    @Override
+                    public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+                        HTTPProxySocketConnection.this.setTrustResult(result);
+                    }
+
+                    @Override
+                    public TrustProviderInterface getTrustProvider() {
+                        return trustProviderInterface;
+                    }
+
+                    @Override
+                    public KeyManager[] getKeyManager() {
+                        return keyManager;
+                    }
+                };
                 final SSLSocketStreamFactory factory = getSSLSocketStreamFactory();
                 // TODO: add SSLSocketStreamOptions cache
                 final String id = proxy.getHost() + ":" + proxy.getPort();
-                proxySocket = factory.create(proxySocket, "", proxy.getPort(), true, new SSLSocketStreamOptions(id), getTrustProvider(), getKeyManagers());
+                proxySocket = factory.create(proxySocket, "", proxy.getPort(), true, new SSLSocketStreamOptions(id), trustCallback);
             } catch (final IOException e) {
                 // TODO: add SSLSocketStreamOptions.retry support
                 throw new ProxyConnectException(e, proxy);

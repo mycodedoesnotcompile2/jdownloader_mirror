@@ -1176,14 +1176,14 @@ public class ScriptEnvironment {
         }
     }
 
-    @ScriptAPI(description = "Show a Notification", parameters = { "Map: notification settings(title, message, iconKey, timeout)" }, example = "displayNotification({\"title\":\"Ping\",\"message\":\"Nice\",\"iconKey\":\"stop\",\"timeout\":1000})")
+    @ScriptAPI(description = "Show a Notification", parameters = { "Map: notification settings(title, message, iconKey, timeout, autoClose)" }, example = "displayNotification({\"title\":\"Ping\",\"message\":\"Nice\",\"iconKey\":\"stop\",\"timeout\":1000,\"autoClose\":true})")
     public static NotifyWindowSandbox displayNotification(final Map<String, Object> notification) {
         if (Application.isHeadless()) {
             return null;
         }
         final ScriptThread env = getScriptThread();
         final AtomicReference<BasicNotify> ref = new AtomicReference<BasicNotify>();
-        BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
+        final boolean addedFlag = BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
 
             @Override
             public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
@@ -1199,23 +1199,29 @@ public class ScriptEnvironment {
                     ret.setTimeout(timeout.intValue());
                 }
                 ref.set(ret);
-                env.getStateMachine().executeOnceOnState(new Runnable() {
+                if (Boolean.TRUE.equals(notification.get("autoClose"))) {
+                    env.getStateMachine().executeOnceOnState(new Runnable() {
 
-                    @Override
-                    public void run() {
-                        new EDTRunner() {
+                        @Override
+                        public void run() {
+                            new EDTRunner() {
 
-                            @Override
-                            protected void runInEDT() {
-                                ret.setVisible(false);
-                            }
-                        };
-                    }
-                }, ScriptThread.STOPPED_STATE);
+                                @Override
+                                protected void runInEDT() {
+                                    ret.setVisible(false);
+                                }
+                            };
+                        }
+                    }, ScriptThread.STOPPED_STATE);
+                }
                 return ret;
             }
         });
-        return new NotifyWindowSandbox(ref);
+        if (addedFlag) {
+            return new NotifyWindowSandbox(ref);
+        } else {
+            return new NotifyWindowSandbox(null);
+        }
     }
 
     @ScriptAPI(description = "Show a Input Dialog", parameters = { "inputDialogMap" }, example = "showInputDialog({\"message\":\"Are you a bot?\",\"multiLine\":false,\"default\":\"yes\"})")

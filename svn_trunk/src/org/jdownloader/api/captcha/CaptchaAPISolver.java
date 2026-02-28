@@ -7,7 +7,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
-import org.appwork.remoteapi.RemoteAPI;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink;
+
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.remoteapi.exceptions.InternalApiException;
@@ -30,11 +34,6 @@ import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserSolver;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
-
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink;
 
 public class CaptchaAPISolver extends ChallengeSolver<Object> implements CaptchaAPI, ChallengeResponseListener {
     private static final CaptchaAPISolver INSTANCE = new CaptchaAPISolver();
@@ -158,7 +157,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         }
         try {
             final Challenge<?> challenge = job.getChallenge();
-            final OutputStream out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), true);
+            final OutputStream out = MyJDownloaderController.getOutputStream(response, request);
             try {
                 final HashMap<String, Object> captchaResponseData = new HashMap<String, Object>();
                 captchaResponseData.put("data", challenge.getAPIStorable(format));

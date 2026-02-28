@@ -21,18 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.EpornerComConfig;
-import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -51,7 +43,16 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51262 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.EpornerComConfig;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52413 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -535,6 +536,10 @@ public class EPornerCom extends PluginForHost {
             }
             logger.info("Performing full login");
             br.getPage("https://www." + getHost());
+            final String csrfToken = br.getRegex("EP\\.user\\.csrfToken\\s*=\\s*'([a-f0-9]+)").getMatch(0);
+            if (csrfToken == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             final Form loginform = new Form();
             loginform.setMethod(MethodType.POST);
             loginform.setAction("/xhr/login/");
@@ -544,7 +549,10 @@ public class EPornerCom extends PluginForHost {
             loginform.put("pass", Encoding.urlEncode(account.getPass()));
             loginform.put("googleToken", "");
             loginform.put("ref", "/");
-            br.submitForm(loginform);
+            final Request request = br.createFormRequest(loginform);
+            request.getHeaders().put("X-CSRF-TOKEN", csrfToken);
+            br.getPage(request);
+            // {"status":1,"url":"\/profile\/USERNAME\/","user_hash":"HASH","user_id":USERID,"user_verified":1,"user_agever":1}
             /* 2020-05-26: E.g. login failed: {"status":0,"msg_head":"Login failed.","msg_body":"Bad login\/password"} */
             br.getPage("/");
             if (!isLoggedin()) {

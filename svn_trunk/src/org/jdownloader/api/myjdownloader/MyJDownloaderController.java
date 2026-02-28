@@ -3,10 +3,13 @@ package org.jdownloader.api.myjdownloader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import org.appwork.console.AbstractConsole;
@@ -14,6 +17,7 @@ import org.appwork.console.ConsoleDialog;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.shutdown.ExceptionShutdownRequest;
@@ -27,6 +31,7 @@ import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -46,7 +51,9 @@ import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.bouncycastle.tls.TlsNoCloseNotifyException;
 import org.jdownloader.api.RemoteAPIConfig;
+import org.jdownloader.api.RemoteAPIController;
 import org.jdownloader.api.myjdownloader.MyJDownloaderSettings.MyJDownloaderError;
 import org.jdownloader.api.myjdownloader.api.MyJDownloaderAPI;
 import org.jdownloader.api.myjdownloader.event.MyJDownloaderEvent;
@@ -54,8 +61,6 @@ import org.jdownloader.api.myjdownloader.event.MyJDownloaderEventSender;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.myjdownloader.client.exceptions.MyJDownloaderException;
 import org.jdownloader.myjdownloader.client.exceptions.UnconnectedException;
-import org.jdownloader.myjdownloader.client.json.MyCaptchaChallenge;
-import org.jdownloader.myjdownloader.client.json.MyCaptchaSolution;
 import org.jdownloader.myjdownloader.client.json.MyCaptchaSolution.RESULT;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
 import org.jdownloader.translate._JDT;
@@ -128,25 +133,33 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
         }
     }
 
+    @Override
+    public boolean onException(Throwable e, HttpRequest request, HttpResponse response) throws IOException {
+        if (Exceptions.containsInstanceOf(e, SocketException.class, TlsNoCloseNotifyException.class)) {
+            // TLS socket already closed
+            return true;
+        } else {
+            return super.onException(e, request, response);
+        }
+    }
+
     public final boolean isAlwaysConnectRequired() {
         final RemoteAPIConfig remoteAPIConfig = JsonConfig.create(RemoteAPIConfig.class);
         return Application.isHeadless() && (remoteAPIConfig.isHeadlessMyJDownloaderMandatory() || !remoteAPIConfig.isDeprecatedApiEnabled());
     }
 
-    @Deprecated
-    public static OutputStream getOutputStream(final RemoteAPIResponse response, final RemoteAPIRequest request, final boolean gzip, final boolean wrapJQuery) throws IOException {
+    public static OutputStream getOutputStream(final RemoteAPIResponse response, final RemoteAPIRequest request) throws IOException {
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "no-store, no-cache"));
-        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json"));
-        // HttpLimitProviderInputStream server = HttpConnection.getInputStreamByType(request.getInputStream(),
-        // HttpLimitProviderInputStream.class);
-        // final HTTPBridge bridge = response.getRemoteAPI().getHTTPBridge(request, response);
+        response.getResponseHeaders().addIfAbsent(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json"));
         final boolean chunked;
-        if (request.getHttpRequest().getServer().isChunkedEncodedResponseAllowed(request.getHttpRequest(), response.getHttpResponse())) {
+        if (RemoteAPI.chunked(request.getHttpRequest())) {
             chunked = true;
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
         } else {
             chunked = false;
         }
+        final boolean wrapJQuery = StringUtils.containsIgnoreCase(response.getResponseHeaders().getValue(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE), "application/json") && request != null && request.getJqueryCallback() != null;
+        final boolean gzip = RemoteAPI.gzip(request);
         if (gzip) {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING, "gzip"));
         }
@@ -166,8 +179,8 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
             uos = os;
         }
         return new OutputStream() {
-            boolean wrapperHeader = wrapJQuery && request != null && request.getJqueryCallback() != null;
-            boolean wrapperEnd    = wrapJQuery && request != null && request.getJqueryCallback() != null;
+            boolean wrapperHeader = wrapJQuery;
+            boolean wrapperEnd    = wrapJQuery;
 
             @Override
             public void close() throws IOException {
@@ -213,11 +226,14 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
         };
     }
 
+    private final List<HttpRequestHandler> requestHandler = new ArrayList<HttpRequestHandler>();
+
     private MyJDownloaderController() {
         super("my.jdownloader");
         logger = LogController.getInstance().getLogger(MyJDownloaderController.class.getName());
         eventSender = new MyJDownloaderEventSender();
         configureBasics();
+        requestHandler.add(RemoteAPIController.getInstance().getRequestHandler());
         if (isAlwaysConnectRequired() || CFG_MYJD.AUTO_CONNECT_ENABLED.isEnabled()) {
             start();
         }
@@ -230,11 +246,12 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
         HashMap<String, String> forbidden = new HashMap<String, String>();
         HeaderValidationRules header = new HeaderValidationRules(mandatory, forbidden);
         setHeaderValidationRules(header);
-        CorsHandler cors = new CorsHandler() {
+        final CorsHandler cors = new CorsHandler() {
             {
                 setMaxAge(TimeUnit.MINUTES.toMillis(30));
                 setAllowMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS);
                 setAllowHeadersFromRequest(true);
+                addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
             }
 
             @Override
@@ -541,49 +558,6 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
         }
     }
 
-    public MyCaptchaSolution pushChallenge(MyCaptchaChallenge ch) throws MyJDownloaderException {
-        final MyJDownloaderConnectThread th = getConnectThread();
-        if (th == null) {
-            throw new UnconnectedException();
-        } else {
-            if (th.isAlive()) {
-                switch (th.getConnectionStatus()) {
-                case CONNECTED:
-                case PENDING:
-                    return th.pushChallenge(ch);
-                default:
-                    return null;
-                }
-            } else {
-                return null;
-            }
-        }
-    }
-
-    public boolean isRemoteCaptchaServiceEnabled() {
-        final MyJDownloaderConnectThread th = getConnectThread();
-        return th != null && th.isChallengeExchangeEnabled();
-    }
-
-    public MyCaptchaSolution getChallengeResponse(String id) throws MyJDownloaderException {
-        final MyJDownloaderConnectThread th = getConnectThread();
-        if (th == null) {
-            throw new UnconnectedException();
-        } else {
-            if (th.isAlive()) {
-                switch (th.getConnectionStatus()) {
-                case CONNECTED:
-                case PENDING:
-                    return th.getChallengeResponse(id);
-                default:
-                    return null;
-                }
-            } else {
-                return null;
-            }
-        }
-    }
-
     public boolean isSessionValid(final String sessionToken) {
         final MyJDownloaderConnectThread ct = getConnectThread();
         return ct != null && ct.isSessionValid(sessionToken);
@@ -617,11 +591,6 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
 
     @Override
     public List<HttpRequestHandler> getHandler() {
-        return null;
-    }
-
-    @Override
-    public boolean isChunkedEncodedResponseAllowed(HttpRequest httpRequest, HttpResponse httpResponse) {
-        return true;
+        return requestHandler;
     }
 }

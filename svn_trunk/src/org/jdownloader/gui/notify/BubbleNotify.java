@@ -6,10 +6,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.swing.JFrame;
 
+import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.PluginsC;
+
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.windowmanager.WindowManager;
 import org.appwork.utils.swing.windowmanager.WindowManager.WindowExtendedState;
@@ -24,9 +28,6 @@ import org.jdownloader.gui.notify.gui.BubbleNotifyConfigPanel;
 import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
 import org.jdownloader.gui.notify.linkcrawler.LinkCrawlerBubbleSupport;
 import org.jdownloader.gui.notify.reconnect.ReconnectBubbleSupport;
-
-import jd.gui.swing.jdgui.JDGui;
-import jd.plugins.PluginsC;
 
 public class BubbleNotify {
     private static final BubbleNotify INSTANCE = new BubbleNotify();
@@ -177,26 +178,29 @@ public class BubbleNotify {
         };
     }
 
-    public void show(final AbstractNotifyWindowFactory factory) {
+    public boolean show(final AbstractNotifyWindowFactory factory) {
         if (ballooner == null) {
-            return;
+            return false;
         } else if (factory == null) {
-            return;
+            return false;
         }
-        new EDTRunner() {
+        return Boolean.TRUE.equals(new EDTHelper<Boolean>() {
+
             @Override
-            protected void runInEDT() {
+            public Boolean edtRun() {
                 boolean added = false;
                 AbstractNotifyWindow<?> notifyWindow = null;
                 try {
                     if (!isBubbleNotificationEnabled()) {
-                        return;
+                        return false;
                     }
                     notifyWindow = factory.buildAbstractNotifyWindow();
-                    if (notifyWindow != null) {
-                        ballooner.add(notifyWindow);
-                        added = true;
+                    if (notifyWindow == null) {
+                        return false;
                     }
+                    ballooner.add(notifyWindow);
+                    added = true;
+                    return true;
                 } finally {
                     if (added == false && notifyWindow != null) {
                         /*
@@ -206,7 +210,7 @@ public class BubbleNotify {
                     }
                 }
             }
-        };
+        }.getReturnValue());
     }
 
     public void hide(final AbstractNotifyWindow notify) {

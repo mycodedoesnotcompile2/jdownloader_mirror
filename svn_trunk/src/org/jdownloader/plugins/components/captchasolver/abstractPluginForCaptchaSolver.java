@@ -249,27 +249,12 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
 
     @Override
     public Class<? extends CaptchaSolverPluginConfig> getConfigInterface() {
-        return (Class<? extends CaptchaSolverPluginConfig>) super.getConfigInterface();
+        return CaptchaSolverPluginConfig.class;
     }
 
     private CaptchaSolverPluginConfig getDefaultConfig() {
-        /*
-         * TODO: Maybe ensure that every captcha solver plugin has a config or throw exception <br> Every captcha solver plugin should have
-         * a config.
-         */
         final Class<? extends CaptchaSolverPluginConfig> configInterfaceClass = this.getConfigInterface();
-        final CaptchaSolverPluginConfig cfg;
-        if (configInterfaceClass == null) {
-            // TODO: Remove this fallback
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                logger.warning("Solver has no config");
-                cfg = PluginJsonConfig.get(CaptchaSolverPluginConfig.class);
-            } else {
-                throw new IllegalArgumentException("Solver has no config");
-            }
-        } else {
-            cfg = PluginJsonConfig.get(configInterfaceClass);
-        }
+        final CaptchaSolverPluginConfig cfg = PluginJsonConfig.get(configInterfaceClass);
         return cfg;
     }
 

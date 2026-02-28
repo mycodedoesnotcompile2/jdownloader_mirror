@@ -55,6 +55,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
@@ -98,9 +99,17 @@ public class TrustUtils {
         case WINDOWS:
             return WindowsTrustProvider.getInstance();
         case LINUX:
-            return TrustLinuxProvider.getInstance();
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                return TrustLinuxProvider.getInstance();
+            } else {
+                return CurrentJRETrustProvider.getInstance();
+            }
         case MAC:
-            return ExperimentalMacTrustProvider.getInstance();
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                return ExperimentalMacTrustProvider.getInstance();
+            } else {
+                return CurrentJRETrustProvider.getInstance();
+            }
         default:
             return CurrentJRETrustProvider.getInstance();
         }
@@ -150,7 +159,7 @@ public class TrustUtils {
     }
 
     /**
-     * Parses the keys (SHA-256 fingerprints) from a JSON object stream of the form {@code {"fingerprint":"reason", ...}}. Used by
+     * Parses the keys (SHA-256 fingerprints) from a JSON object stream of the form {@code "fingerprint":"reason", ...} . Used by
      * {@link #loadCertificatesFromPEM(InputStream, InputStream)} to obtain the set of rejected fingerprints. Keys are normalized to 64
      * lowercase hex characters; only keys matching that format are included.
      *

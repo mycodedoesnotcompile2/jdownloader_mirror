@@ -82,8 +82,8 @@ public class TrustBridge extends X509ExtendedTrustManager {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkServerTrusted(chain, authType, null);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkServerTrusted(chain, authType, null);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }
@@ -94,8 +94,8 @@ public class TrustBridge extends X509ExtendedTrustManager {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkClientTrusted(chain, authType, null);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkClientTrusted(chain, authType, null);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }
@@ -106,8 +106,8 @@ public class TrustBridge extends X509ExtendedTrustManager {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkServerTrusted(chain, authType, engine);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkServerTrusted(chain, authType, engine);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }
@@ -118,8 +118,8 @@ public class TrustBridge extends X509ExtendedTrustManager {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkServerTrusted(chain, authType, socket);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkServerTrusted(chain, authType, socket);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }
@@ -130,8 +130,8 @@ public class TrustBridge extends X509ExtendedTrustManager {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkClientTrusted(chain, authType, engine);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkClientTrusted(chain, authType, engine);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }
@@ -142,8 +142,8 @@ public class TrustBridge extends X509ExtendedTrustManager {
         if (provider == null) {
             throw new CertificateException(Java1_6TrustBridge.NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkClientTrusted(chain, authType, socket);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkClientTrusted(chain, authType, socket);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }

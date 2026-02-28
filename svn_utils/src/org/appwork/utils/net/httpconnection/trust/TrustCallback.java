@@ -34,8 +34,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection.trust;
 
-import java.security.cert.X509Certificate;
-
 import javax.net.ssl.KeyManager;
 
 import org.appwork.utils.net.httpconnection.TrustResult;
@@ -52,7 +50,7 @@ public interface TrustCallback {
      * @param authType
      * @param trust
      */
-    void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result);
+    void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result);
 
     TrustProviderInterface getTrustProvider();
 

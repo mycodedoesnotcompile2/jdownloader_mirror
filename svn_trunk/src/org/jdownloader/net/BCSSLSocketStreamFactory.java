@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
@@ -221,19 +222,20 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
         private final boolean                sniEnabled;
         private final SSLSocketStreamOptions options;
         private final TrustProviderInterface trustProvider;
-        private final TrustResult[]          resultStore;
-        private final X509Certificate[][]    chainStore;
 
-        private BCTLSSocketStreamTlsClient(final String hostName, final boolean sniEnabled, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider, final TrustResult[] resultStore, final X509Certificate[][] chainStore) {
+        private BCTLSSocketStreamTlsClient(final String hostName, final boolean sniEnabled, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider) {
             super(new BcTlsCrypto(new SecureRandom()));
             this.hostName = hostName;
             this.enabledCipherSuites = modifyCipherSuites(CIPHERSUITES, options);
             this.sniEnabled = sniEnabled;
             this.options = options;
             this.trustProvider = trustProvider;
-            this.resultStore = resultStore;
-            this.chainStore = chainStore;
         }
+
+        protected void verifyHostname(TrustResult result) throws IllegalSSLHostnameException {
+            final javax.net.ssl.SSLSession session = new BCSSLSessionWrapper(result.getChain());
+            trustProvider.verifyHostname(result, session, hostName, null);
+        };
 
         @Override
         public ProtocolVersion[] getProtocolVersions() {
@@ -318,25 +320,33 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
                 @Override
                 public void notifyServerCertificate(TlsServerCertificate serverCertificate) throws IOException {
-                    if (trustProvider != null && resultStore != null && chainStore != null) {
-                        try {
-                            final org.bouncycastle.tls.Certificate cert = serverCertificate.getCertificate();
-                            final int len = cert.getLength();
-                            final X509Certificate[] chain = new X509Certificate[len];
-                            final CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                            for (int i = 0; i < len; i++) {
-                                final TlsCertificate tc = cert.getCertificateAt(i);
-                                chain[i] = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(tc.getEncoded()));
-                            }
-                            chainStore[0] = chain;
-                            resultStore[0] = trustProvider.checkServerTrusted(chain, "RSA", null);
-                        } catch (Exception e) {
-                            throw new IOException(e);
-                        }
-                    }
+                    checkTrust(serverCertificate, true);
                 }
             };
             return auth;
+        }
+
+        protected TrustResult checkTrust(TlsServerCertificate certificate, boolean isServerCertificate) throws IOException {
+            if (trustProvider == null) {
+                return null;
+            }
+            try {
+                final org.bouncycastle.tls.Certificate cert = certificate.getCertificate();
+                final int len = cert.getLength();
+                final X509Certificate[] chain = new X509Certificate[len];
+                final CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                for (int i = 0; i < len; i++) {
+                    final TlsCertificate tc = cert.getCertificateAt(i);
+                    chain[i] = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(tc.getEncoded()));
+                }
+                if (isServerCertificate) {
+                    return trustProvider.checkServerTrusted(chain, "RSA", null);
+                } else {
+                    return trustProvider.checkClientTrusted(chain, "RSA", null);
+                }
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
         }
 
         protected int             selectedCipherSuite = -1;
@@ -385,38 +395,47 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String hostName, final int port, final boolean autoclose, final SSLSocketStreamOptions options, TrustProviderInterface trustProvider, final javax.net.ssl.KeyManager[] keyManagers) throws IOException {
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String hostName, final int port, final boolean autoclose, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider, final javax.net.ssl.KeyManager[] keyManagers) throws IOException {
+        return create(socketStream, hostName, port, autoclose, options, new TrustCallback() {
+
+            @Override
+            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustProvider;
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManagers;
+            }
+        });
+    }
+
+    @Override
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String hostName, final int port, final boolean autoclose, final SSLSocketStreamOptions options, final TrustCallback trustCallback) throws IOException {
         final boolean sniEnabled = !StringUtils.isEmpty(hostName) && (options == null || options.isSNIEnabled());
-        final TrustResult[] resultStore = new TrustResult[] { null };
-        final X509Certificate[][] chainStore = new X509Certificate[][] { null };
-        final TrustProviderInterface tp = trustProvider != null ? trustProvider : TrustUtils.getDefaultProvider();
         final TlsClientProtocol protocol = new TlsClientProtocol(socketStream.getInputStream(), socketStream.getOutputStream());
-        final BCTLSSocketStreamTlsClient client = new BCTLSSocketStreamTlsClient(hostName, sniEnabled, options, tp, resultStore, chainStore);
+        final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
+        final AtomicReference<TrustResult> trustResult = new AtomicReference<TrustResult>();
+        final BCTLSSocketStreamTlsClient client = new BCTLSSocketStreamTlsClient(hostName, sniEnabled, options, trustProvider) {
+            @Override
+            protected TrustResult checkTrust(TlsServerCertificate certificate, boolean isServerCertificate) throws IOException {
+                final TrustResult ret = super.checkTrust(certificate, isServerCertificate);
+                trustResult.set(ret);
+                trustCallback.onTrustResult(trustProvider, "RSA", ret);
+                return ret;
+            }
+        };
         protocol.connect(client);
+        client.verifyHostname(trustResult.get());
         final Integer selectedCipherSuite = client.getSelectedCipherSuite();
         final String selectedCipherSuiteName = getCipherSuiteName(selectedCipherSuite);
-        final TrustResult trustResult = resultStore[0];
-        if (tp != null && chainStore[0] != null) {
-            final javax.net.ssl.SSLSession session = new BCSSLSessionWrapper(chainStore[0]);
-            try {
-                tp.verifyHostname(session, hostName, null);
-            } catch (IllegalSSLHostnameException e) {
-                e.setTrustResult(trustResult);
-                if (e.getTrustResult() != null) {
-                    e.getTrustResult().exception(e);
-                }
-                throw e;
-            } catch (RuntimeException e) {
-                final IllegalSSLHostnameException thr = new IllegalSSLHostnameException(hostName, e);
-                thr.setTrustResult(trustResult);
-                if (thr.getTrustResult() != null) {
-                    thr.getTrustResult().exception(e);
-                }
-                throw thr;
-            }
-        }
         return new BCSSLSocketStreamInterface() {
-            final InputStream is = new InputStream() {
+            final KeyManager[] keyManager = trustCallback.getKeyManager();
+            final InputStream  is         = new InputStream() {
                 final InputStream is = protocol.getInputStream();
 
                 @Override
@@ -512,12 +531,24 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
             @Override
             public TrustResult getTrustResult() {
-                return trustResult;
+                final TrustResult ret = trustResult.get();
+                DebugMode.breakIf(ret == null);
+                return ret;
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustProvider;
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManager;
             }
         };
     }
 
-    private static final class BCSSLSessionWrapper implements javax.net.ssl.SSLSession {
+    private final class BCSSLSessionWrapper implements javax.net.ssl.SSLSession {
         private final X509Certificate[] peerCerts;
 
         BCSSLSessionWrapper(final X509Certificate[] peerCerts) {
@@ -526,15 +557,16 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
         @Override
         public Certificate[] getPeerCertificates() throws SSLPeerUnverifiedException {
+            if (peerCerts == null || peerCerts.length == 0) {
+                throw new SSLPeerUnverifiedException("peer not verified");
+            }
             return peerCerts != null ? peerCerts : new java.security.cert.Certificate[0];
         }
 
         @Override
         @SuppressWarnings("deprecation")
         public javax.security.cert.X509Certificate[] getPeerCertificateChain() throws SSLPeerUnverifiedException {
-            if (peerCerts == null || peerCerts.length == 0) {
-                throw new SSLPeerUnverifiedException("peer not verified");
-            }
+            final Certificate[] peerCerts = getPeerCertificates();
             try {
                 final javax.security.cert.X509Certificate[] chain = new javax.security.cert.X509Certificate[peerCerts.length];
                 for (int i = 0; i < peerCerts.length; i++) {
@@ -693,16 +725,21 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, KeyManager[] keyManagers, TrustCallback trustCallback) throws IOException {
+    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, final KeyManager[] keyManagers, final TrustCallback trustCallback) throws IOException {
         final TrustCallback cb = trustCallback != null ? trustCallback : new TrustCallback() {
             @Override
-            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                 // no-op when no callback
             }
 
             @Override
             public TrustProviderInterface getTrustProvider() {
                 return TrustUtils.getDefaultProvider();
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManagers;
             }
         };
         final TrustManager trustBridge = org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory.generateTrustManagerDelegate(cb);
@@ -714,4 +751,5 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
             throw new SSLException(e);
         }
     }
+
 }

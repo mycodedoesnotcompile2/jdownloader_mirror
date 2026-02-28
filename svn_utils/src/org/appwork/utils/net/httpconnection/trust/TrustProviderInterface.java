@@ -66,5 +66,5 @@ public interface TrustProviderInterface {
      * @param context
      *            may be the native urlconnection
      */
-    void verifyHostname(SSLSession session, String host, Object context) throws IllegalSSLHostnameException;
+    void verifyHostname(TrustResult trustResult, SSLSession session, String host, Object context) throws IllegalSSLHostnameException;
 }

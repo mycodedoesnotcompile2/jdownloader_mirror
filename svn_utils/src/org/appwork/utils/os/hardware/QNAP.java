@@ -37,7 +37,6 @@ import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.net.URL;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Pattern;
@@ -71,9 +70,9 @@ public abstract class QNAP implements HardwareTypeInterface {
         if (CrossSystem.isLinux()) {
             /*
              * /sbin/getcfg system version
-             * 
+             *
              * /sbin/getcfg system model
-             * 
+             *
              * /sbin/get_display_name
              */
             final boolean hasShellCommands = new File("/sbin/get_display_name").isFile() || new File("/sbin/getcfg").isFile();
@@ -100,7 +99,7 @@ public abstract class QNAP implements HardwareTypeInterface {
                         if (connection instanceof HttpsURLConnection) {
                             ((HttpsURLConnection) connection).setSSLSocketFactory(JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, url.getHost(), null, new TrustCallback() {
                                 @Override
-                                public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                                public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                                 }
 
                                 @Override

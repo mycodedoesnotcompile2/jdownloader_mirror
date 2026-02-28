@@ -31,12 +31,16 @@ public class AllTrustProvider implements TrustProviderInterface {
 
     @Override
     public TrustResult checkServerTrusted(final X509Certificate[] chain, final String authType, final Object context) {
-        return new TrustResult(this, chain != null ? chain : new X509Certificate[0], null, TrustType.SERVER);
+        return createTrustResult(chain, TrustType.SERVER);
     }
 
     @Override
     public TrustResult checkClientTrusted(final X509Certificate[] chain, final String authType, final Object context) {
-        return new TrustResult(this, chain != null ? chain : new X509Certificate[0], null, TrustType.CLIENT);
+        return createTrustResult(chain, TrustType.CLIENT);
+    }
+
+    private TrustResult createTrustResult(final X509Certificate[] chain, TrustType trustType) {
+        return new TrustResult(this, chain != null ? chain : new X509Certificate[0], null, trustType);
     }
 
     @Override
@@ -48,7 +52,7 @@ public class AllTrustProvider implements TrustProviderInterface {
      * TrustAllProvider accepts all hostnames without verification.
      */
     @Override
-    public void verifyHostname(final SSLSession session, final String host, final Object context) throws IllegalSSLHostnameException {
+    public void verifyHostname(TrustResult result, final SSLSession session, final String host, final Object context) throws IllegalSSLHostnameException {
         // Accept all hostnames - no verification
     }
 

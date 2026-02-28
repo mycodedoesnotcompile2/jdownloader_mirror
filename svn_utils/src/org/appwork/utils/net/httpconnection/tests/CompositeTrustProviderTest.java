@@ -35,11 +35,12 @@ package org.appwork.utils.net.httpconnection.tests;
 import java.security.cert.X509Certificate;
 import java.util.List;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.utils.net.httpconnection.CompositeTrustResult;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.CompositeTrustResult;
 import org.appwork.utils.net.httpconnection.trust.CurrentJRETrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustLinuxProvider;
 import org.appwork.utils.net.httpconnection.trust.WindowsTrustProvider;
@@ -66,8 +67,11 @@ public class CompositeTrustProviderTest extends SSLTrustProviderTestBase {
     }
 
     private void testCompositeTrustProvider() throws Exception {
-        final CompositeTrustProvider emptyComposite = new CompositeTrustProvider();
-        assertTrue(emptyComposite.getDelegates().length == 0, "Empty CompositeTrustProvider has no delegates");
+        try {
+            final CompositeTrustProvider emptyComposite = new CompositeTrustProvider();
+            throw new WTFException("Empty CompositeTrustProvider must throw IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+        }
         final CompositeTrustProvider singleComposite = new CompositeTrustProvider(AllTrustProvider.getInstance());
         assertTrue(singleComposite.getDelegates().length == 1, "Single-provider composite has one delegate");
         if (CrossSystem.isWindows()) {
@@ -125,6 +129,6 @@ public class CompositeTrustProviderTest extends SSLTrustProviderTestBase {
         assertTrue(firstSucceedsInfo instanceof CompositeTrustResult, "Should return CompositeSSLTrustInfo even when first provider succeeds");
         final CompositeTrustResult firstSucceedsComposite = (CompositeTrustResult) firstSucceedsInfo;
         assertTrue(trustAllProvider.equals(firstSucceedsComposite.getSuccess().getTrustProvider()), "First provider should succeed");
-        assertFalse(firstSucceedsComposite.getFails().size() > 0, "No providers should have failed when first succeeds");
+        assertTrue(jreProvider.equals(firstSucceedsComposite.getFails().get(0).getTrustProvider()));
     }
 }

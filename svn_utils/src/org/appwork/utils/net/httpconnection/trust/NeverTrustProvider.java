@@ -32,12 +32,20 @@ public class NeverTrustProvider implements TrustProviderInterface {
 
     @Override
     public TrustResult checkServerTrusted(final X509Certificate[] chain, final String authType, final Object context) {
-        return new TrustResult(this, chain != null ? chain : new X509Certificate[0], new CertificateException("TrustNeverProvider rejects all certificates"), TrustType.SERVER);
+        return createTrustResult(chain, null, TrustType.SERVER);
     }
 
     @Override
     public TrustResult checkClientTrusted(final X509Certificate[] chain, final String authType, final Object context) {
-        return new TrustResult(this, chain != null ? chain : new X509Certificate[0], new CertificateException("TrustNeverProvider rejects all certificates"), TrustType.CLIENT);
+        return createTrustResult(chain, null, TrustType.CLIENT);
+    }
+
+    private TrustResult createTrustResult(final X509Certificate[] chain, final Exception e, final TrustType trustType) {
+        if (e == null) {
+            return new TrustResult(this, chain != null ? chain : new X509Certificate[0], new CertificateException("TrustNeverProvider rejects all certificates"), trustType);
+        } else {
+            return new TrustResult(this, chain != null ? chain : new X509Certificate[0], e, trustType);
+        }
     }
 
     @Override
@@ -46,8 +54,10 @@ public class NeverTrustProvider implements TrustProviderInterface {
     }
 
     @Override
-    public void verifyHostname(final SSLSession session, final String host, final Object context) throws IllegalSSLHostnameException {
-        throw new IllegalSSLHostnameException(host, "TrustNeverProvider does not verify hostnames");
+    public void verifyHostname(TrustResult result, final SSLSession session, final String host, final Object context) throws IllegalSSLHostnameException {
+        final IllegalSSLHostnameException e = new IllegalSSLHostnameException(host, "TrustNeverProvider does not verify hostnames");
+        result.exception(e);
+        throw e.setTrustResult(result);
     }
 
     @Override

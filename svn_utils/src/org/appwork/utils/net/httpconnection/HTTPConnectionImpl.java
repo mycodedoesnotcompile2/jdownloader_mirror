@@ -54,7 +54,6 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -120,7 +119,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         }
     }
 
-    protected static enum SSL_STATE {
+    public static enum SSL_STATE {
         NA,
         PROXY,
         ENDPOINT
@@ -635,7 +634,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         this.ranges = null;
         this.lastConnection = null;
         this.lastConnectionPort = -1;
-        setTrustResult(null);
+        setTrustResult(null, null);
     }
 
     protected InetAddress getBindInetAddress(InetAddress dest, HTTPProxy proxy) throws IOException {
@@ -1069,8 +1068,8 @@ public class HTTPConnectionImpl implements HTTPConnection {
                                 private final KeyManager[]           keyManager             = HTTPConnectionImpl.this.getKeyManagers();
 
                                 @Override
-                                public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
-                                    HTTPConnectionImpl.this.setTrustResult(result);
+                                public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+                                    HTTPConnectionImpl.this.setTrustResult(result, SSL_STATE.ENDPOINT);
                                 }
 
                                 @Override
@@ -1108,7 +1107,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                             ee = cause;
                         }
                     } catch (IOException e) {
-                        e = mapExceptions(e);
+                        e = mapExceptions(e, SSL_STATE.ENDPOINT);
                         final String retrySSL;
                         try {
                             retrySSL = sslSocketStreamOptions != null ? (sslSocketStreamOptions = sslSocketStreamOptions.clone()).retry(factory, e) : null;
@@ -1161,12 +1160,12 @@ public class HTTPConnectionImpl implements HTTPConnection {
      * @param e
      * @return
      */
-    protected IOException mapExceptions(IOException e) {
+    protected IOException mapExceptions(IOException e, SSL_STATE state) {
         TrustResultProvider trp = Exceptions.getInstanceof(e, TrustResultProvider.class);
         if (trp != null) {
             TrustResult tr = trp.getTrustResult();
             DebugMode.breakIf(getTrustResult() != null && getTrustResult() != tr);
-            setTrustResult(tr);
+            setTrustResult(tr, state);
         }
         RejectedByTrustProviderException rejectedByTrust = Exceptions.getInstanceof(e, RejectedByTrustProviderException.class);
         if (rejectedByTrust != null) {
@@ -1182,8 +1181,10 @@ public class HTTPConnectionImpl implements HTTPConnection {
     /**
      * @param trustResult
      */
-    protected void setTrustResult(TrustResult trustResult) {
-        this.trustResult = trustResult;
+    protected void setTrustResult(TrustResult trustResult, SSL_STATE state) {
+        if (SSL_STATE.ENDPOINT.equals(state) || state == null) {
+            this.trustResult = trustResult;
+        }
     }
 
     protected SSLSocketStreamFactory getSSLSocketStreamFactory(final SSLSocketStreamOptions sslSocketStreamOptions) {

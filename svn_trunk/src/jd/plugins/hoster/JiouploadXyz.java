@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52404 $", interfaceVersion = 3, names = {}, urls = {})
 public class JiouploadXyz extends PluginForHost {
     public JiouploadXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class JiouploadXyz extends PluginForHost {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         /* Similar to: SwiftuploadsCom */
-        ret.add(new String[] { "jioupload.xyz", "ajdown.space" });
+        ret.add(new String[] { "jioupload.xyz", "ajdown.space", "domesy.lol" });
         return ret;
     }
 

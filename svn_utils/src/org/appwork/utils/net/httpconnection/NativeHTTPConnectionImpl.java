@@ -50,7 +50,6 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -117,7 +116,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         @Override
         public boolean verify(String host, SSLSession sslSession) {
             try {
-                getTrustProvider().verifyHostname(sslSession, urlHost, scon);
+                getTrustProvider().verifyHostname(getTrustResult(), sslSession, urlHost, scon);
                 return true;
             } catch (IllegalSSLHostnameException e) {
                 NativeHTTPConnectionImpl.this.illegalSSLHostnameException = e;
@@ -464,7 +463,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                     private final KeyManager[]           keyManager             = NativeHTTPConnectionImpl.this.getKeyManagers();
 
                     @Override
-                    public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                    public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                         NativeHTTPConnectionImpl.this.setTrustResult(result);
                     }
 

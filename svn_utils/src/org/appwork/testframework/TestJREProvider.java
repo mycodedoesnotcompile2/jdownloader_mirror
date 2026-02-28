@@ -34,7 +34,6 @@
 package org.appwork.testframework;
 
 import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -648,8 +647,8 @@ public class TestJREProvider {
     }
 
     /**
-     * Ensures a MinimalMethodRunner compatible with the target JRE is available. If the in-repo MinimalMethodRunner.class is too new
-     * (e.g. project compiled with Java 8 but target is Java 7), compiles MinimalMethodRunner.java for the target version.
+     * Ensures a MinimalMethodRunner compatible with the target JRE is available. If the in-repo MinimalMethodRunner.class is too new (e.g.
+     * project compiled with Java 8 but target is Java 7), compiles MinimalMethodRunner.java for the target version.
      *
      * @return Directory containing the compatible MinimalMethodRunner.class, or null to use the class from the classpath
      */
@@ -869,6 +868,7 @@ public class TestJREProvider {
             } catch (final Error e) {
                 needsRecompile.add(clazz);
             } catch (final Exception e) {
+                e.printStackTrace();
                 // Skip classes that can't be loaded or read
             }
         }
@@ -877,8 +877,8 @@ public class TestJREProvider {
     }
 
     /**
-     * Reads the class file major version from the classloader resource (no Class.forName). Returns -1 if not readable.
-     * Reads only the first 8 bytes (magic + minor + major) so unknown future Java versions are still compared correctly.
+     * Reads the class file major version from the classloader resource (no Class.forName). Returns -1 if not readable. Reads only the first
+     * 8 bytes (magic + minor + major) so unknown future Java versions are still compared correctly.
      */
     private static int getClassFileVersionFromClassName(final String className, final ClassLoader loader) throws IOException {
         final String path = className.replace('.', '/') + ".class";
@@ -887,14 +887,7 @@ public class TestJREProvider {
             return -1;
         }
         try {
-            final DataInputStream dis = new DataInputStream(is);
-            final byte[] header = new byte[8];
-            dis.readFully(header);
-            // Class file: magic 0-3, minor 4-5, major 6-7 (big-endian)
-            if (header[0] == (byte) 0xCA && header[1] == (byte) 0xFE && header[2] == (byte) 0xBA && header[3] == (byte) 0xBE) {
-                return (header[6] & 0xFF) << 8 | (header[7] & 0xFF);
-            }
-            return -1;
+            return JavaVersion.readClassJVMVersion(is).classID;
         } finally {
             is.close();
         }

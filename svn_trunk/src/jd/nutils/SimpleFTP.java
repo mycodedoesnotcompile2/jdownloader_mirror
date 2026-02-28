@@ -54,6 +54,10 @@ import java.util.StringTokenizer;
 import java.util.TimeZone;
 import java.util.WeakHashMap;
 
+import javax.net.ssl.KeyManager;
+
+import jd.plugins.Plugin;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -66,13 +70,15 @@ import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import org.appwork.utils.net.httpconnection.TrustResult;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
+import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 import org.jdownloader.auth.AuthenticationController;
 import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
-
-import jd.plugins.Plugin;
 
 /**
  * SimpleFTP is a simple package that implements a Java FTP client. With SimpleFTP, you can connect to an FTP server and upload multiple
@@ -369,7 +375,22 @@ public abstract class SimpleFTP {
         case EXPLICIT_REQUIRED_CC_DC:
             try {
                 // TODO: add SSLSocketStream options support, caching + retry + trustAll
-                return getSSLSocketStreamFactory().create(ret, address.getAddress().getHostAddress(), address.getPort(), true, null, null, null);
+                return getSSLSocketStreamFactory().create(ret, address.getAddress().getHostAddress(), address.getPort(), true, null, new TrustCallback() {
+
+                    @Override
+                    public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+                    }
+
+                    @Override
+                    public TrustProviderInterface getTrustProvider() {
+                        return TrustUtils.getDefaultProvider();
+                    }
+
+                    @Override
+                    public KeyManager[] getKeyManager() {
+                        return null;
+                    }
+                });
             } catch (IOException e) {
                 socket.close();
                 throw e;
@@ -841,7 +862,22 @@ public abstract class SimpleFTP {
         final String response = readLines(new int[] { RESPONSE_CODE.OK_234.code(), RESPONSE_CODE.FAILED_500.code(), RESPONSE_CODE.FAILED_502.code(), RESPONSE_CODE.FAILED_504.code(), RESPONSE_CODE.FAILED_530.code(), RESPONSE_CODE.FAILED_534.code() }, "AUTH_TLS FAILED");
         if (StringUtils.startsWithCaseInsensitive(response, "234")) {
             // TODO: add SSLSocketStream options support, caching + retry + trustAll
-            socket = getSSLSocketStreamFactory().create(getControlSocket(), "", getPort(), true, null, null, null);
+            socket = getSSLSocketStreamFactory().create(getControlSocket(), "", getPort(), true, null, new TrustCallback() {
+
+                @Override
+                public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+                }
+
+                @Override
+                public TrustProviderInterface getTrustProvider() {
+                    return TrustUtils.getDefaultProvider();
+                }
+
+                @Override
+                public KeyManager[] getKeyManager() {
+                    return null;
+                }
+            });
             return true;
         } else {
             return false;

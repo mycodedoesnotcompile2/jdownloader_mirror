@@ -79,8 +79,8 @@ public class Java1_6TrustBridge implements X509TrustManager {
         }
         // not tested yet
         DebugMode.debugger();
-        TrustResult trust = provider.checkClientTrusted(chain, authType, null);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkClientTrusted(chain, authType, null);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }
@@ -91,8 +91,8 @@ public class Java1_6TrustBridge implements X509TrustManager {
         if (provider == null) {
             throw new CertificateException(NO_TRUSTPROVIDER_AVAILABLE);
         }
-        TrustResult trust = provider.checkServerTrusted(chain, authType, null);
-        trustCallback.onTrustResult(provider, chain, authType, trust);
+        final TrustResult trust = provider.checkServerTrusted(chain, authType, null);
+        trustCallback.onTrustResult(provider, authType, trust);
         if (!trust.isTrusted()) {
             throw new RejectedByTrustProviderException(trust);
         }

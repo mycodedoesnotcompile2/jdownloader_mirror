@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51093 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52404 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2TabootubeXxx extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2TabootubeXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +51,17 @@ public class KernelVideoSharingComV2TabootubeXxx extends KernelVideoSharingComV2
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultNoVideosNoFUID(getPluginDomains());
+        // return KernelVideoSharingComV2.buildAnnotationUrlsDefaultNoVideosNoFUID(getPluginDomains());
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            /**
+             * 2026-02-27: pattern has changed, old items remain working, examples: <br>
+             * old: /tatum-christine-feed-me-daddy-blowjob2/ <br>
+             * new: /video/tatum-christine-feed-me-daddy-blowjob2/
+             */
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(embed/\\d+/?|video/[\\w\\-]+|[\\w\\-]+/?)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -61,7 +71,7 @@ public class KernelVideoSharingComV2TabootubeXxx extends KernelVideoSharingComV2
 
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
-        return generateContentURLDefaultNoVideosNoFUID(host, urlSlug);
+        return generateContentURLDefaultVideoNoFUID(host, urlSlug);
     }
 
     @Override

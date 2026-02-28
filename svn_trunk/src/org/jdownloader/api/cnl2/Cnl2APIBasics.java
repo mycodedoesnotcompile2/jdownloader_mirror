@@ -59,6 +59,6 @@ public interface Cnl2APIBasics extends RemoteAPIInterface, FlashGotAPI {
      *
      * @param response
      */
-    @APIParameterNames({ "response" })
-    public void favicon(RemoteAPIResponse response) throws InternalApiException;
+    @APIParameterNames({ "response", "request" })
+    public void favicon(RemoteAPIResponse response, RemoteAPIRequest request) throws InternalApiException;
 }

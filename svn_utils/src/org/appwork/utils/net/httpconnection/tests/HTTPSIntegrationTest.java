@@ -90,24 +90,7 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
 
     @Override
     public void runTest() throws Exception {
-        if (!CrossSystem.isWindows()) {
-            return;
-        }
         try {
-            setupProxyServers();
-            createTestCertificates();
-            List<CertListEntry> list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, org.appwork.utils.net.httpconnection.tests.SSLTrustProviderTestBase.APP_WORK_AW_TEST_CA, null, null);
-            for (CertListEntry c : list) {
-                removeCertificateWithAutoConfirm(c.thumbprint, TargetKeyStore.CURRENT_USER);
-            }
-            boolean isInUserStore = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
-            boolean isInLocalSystem = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.LOCAL_MACHINE);
-            assertFalse(isInLocalSystem);
-            if (isInUserStore) {
-                LogV3.info("Removing existing certificate from user store (with auto-confirm)");
-                removeCertificateWithAutoConfirm(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
-                assertFalse(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER));
-            }
             // Test various certificate scenarios over all connection variants
             for (final HTTPProxy proxy : getConnectionVariants()) {
                 LogV3.info("badssl / public HTTPS tests via " + proxy);
@@ -126,10 +109,27 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
                 new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://rsa4096.badssl.com/");
                 testPublicHttpsWithValidCertificateForProxy(proxy);
                 testPublicHttpsByIpForProxy(proxy);
+                testNativeHttpsURLConnectionWithTrustProvider();
+                testAllProvidersWithRealHTTPS();
+            }
+            if (!CrossSystem.isWindows()) {
+                return;
+            }
+            setupProxyServers();
+            createTestCertificates();
+            List<CertListEntry> list = WindowsCertUtils.listCertificates(TargetKeyStore.CURRENT_USER, org.appwork.utils.net.httpconnection.tests.SSLTrustProviderTestBase.APP_WORK_AW_TEST_CA, null, null);
+            for (CertListEntry c : list) {
+                removeCertificateWithAutoConfirm(c.thumbprint, TargetKeyStore.CURRENT_USER);
+            }
+            boolean isInUserStore = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+            boolean isInLocalSystem = WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.LOCAL_MACHINE);
+            assertFalse(isInLocalSystem);
+            if (isInUserStore) {
+                LogV3.info("Removing existing certificate from user store (with auto-confirm)");
+                removeCertificateWithAutoConfirm(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER);
+                assertFalse(WindowsCertUtils.isCertificateInstalled(caCertificateFingerPrint, WindowsCertUtils.TargetKeyStore.CURRENT_USER));
             }
             testLocalServerBy127_0_0_1();
-            testNativeHttpsURLConnectionWithTrustProvider();
-            testAllProvidersWithRealHTTPS();
             LogV3.info("HTTPS integration tests completed successfully");
         } finally {
             teardownProxyServers();
@@ -154,11 +154,6 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
             assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
         }
         {
-            final RequestContext jreOk = new HttpClient().proxy(proxy).trust(new JNAWindowsTrustProvider()).get(url);
-            assertTrue(jreOk.getTrustResult().getTrustProvider() instanceof JNAWindowsTrustProvider);
-            assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
-        }
-        {
             final RequestContext ccadbOk = new HttpClient().proxy(proxy).trust(new CCADBTrustProvider()).get(url);
             assertTrue(ccadbOk.getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
             assertTrue(ccadbOk.getTrustResult().isTrusted(), "CCADBTrustProvider must accept valid CA-signed cert for " + url + " via " + proxy + (ccadbOk.getTrustResult().getException() != null ? ": " + ccadbOk.getTrustResult().getException().getMessage() : ""));
@@ -174,6 +169,11 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
             assertTrue(combinedOk.getTrustResult().isTrusted(), "CompositeTrustProvider (JRE+Linux) must accept valid CA-signed cert for " + url + " via " + proxy + (combinedOk.getTrustResult().getException() != null ? ": " + combinedOk.getTrustResult().getException().getMessage() : ""));
         }
         if (CrossSystem.isWindows()) {
+            {
+                final RequestContext jreOk = new HttpClient().proxy(proxy).trust(new JNAWindowsTrustProvider()).get(url);
+                assertTrue(jreOk.getTrustResult().getTrustProvider() instanceof JNAWindowsTrustProvider);
+                assertTrue(jreOk.getTrustResult().isTrusted(), "TrustCurrentJREProvider must accept valid CA-signed cert for " + url + " via " + proxy + (jreOk.getTrustResult().getException() != null ? ": " + jreOk.getTrustResult().getException().getMessage() : ""));
+            }
             {
                 final RequestContext windowsOk = new HttpClient().proxy(proxy).trust(WindowsTrustProvider.getInstance()).get(url);
                 assertTrue(windowsOk.getTrustResult().getTrustProvider() instanceof WindowsTrustProvider);

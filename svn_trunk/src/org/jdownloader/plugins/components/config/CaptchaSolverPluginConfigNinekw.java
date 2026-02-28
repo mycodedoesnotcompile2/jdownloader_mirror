@@ -8,7 +8,7 @@ import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "9kw.eu", type = Type.HOSTER)
+@PluginHost(host = "9kw.eu", type = Type.CAPTCHA)
 public interface CaptchaSolverPluginConfigNinekw extends CaptchaSolverPluginConfig {
     @AboutConfig
     @DefaultBooleanValue(false)

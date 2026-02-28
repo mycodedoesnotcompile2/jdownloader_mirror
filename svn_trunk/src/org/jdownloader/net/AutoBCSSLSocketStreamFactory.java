@@ -41,15 +41,67 @@ public class AutoBCSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     @Override
-    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, final SSLSocketStreamOptions options, TrustProviderInterface trustProvider, KeyManager[] keyManagers) throws IOException {
-        final SSLSocketStreamInterface ret;
-        if (preferBC(options)) {
-            ret = bc.create(socketStream, host, port, autoclose, options, trustProvider, keyManagers);
+    public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoclose, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider, final KeyManager[] keyManagers) throws IOException {
+        return create(socketStream, host, port, autoclose, options, new TrustCallback() {
+
+            @Override
+            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+            }
+
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustProvider;
+            }
+
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManagers;
+            }
+        });
+    }
+
+    @Override
+    public String retry(SSLSocketStreamOptions options, Exception e) {
+        final String jsseRetry = jsse.retry(options, e);
+        if (jsseRetry != null) {
+            options.getCustomFactorySettings().remove(BC_FACTORY);
+            return jsseRetry;
         } else {
-            ret = jsse.create(socketStream, host, port, autoclose, options, trustProvider, keyManagers);
+            final String bcRetry = bc.retry(options, e);
+            if (bcRetry != null) {
+                options.getCustomFactorySettings().add(BC_FACTORY);
+                return bcRetry;
+            } else if (!options.getCustomFactorySettings().contains(BC_FACTORY)) {
+                options.getCustomFactorySettings().add(BC_FACTORY);
+                return options.addRetryReason("fallback BouncyCastle");
+            } else {
+                return null;
+            }
         }
-        final SSLSocketStreamInterface inner = ret;
+    }
+
+    @Override
+    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, KeyManager[] keyManagers, TrustCallback trustCallback) throws IOException {
+        if (preferBC(options)) {
+            return bc.getSSLSocketFactory(options, sniHostName, keyManagers, trustCallback);
+        } else {
+            return jsse.getSSLSocketFactory(options, sniHostName, keyManagers, trustCallback);
+        }
+
+    }
+
+    @Override
+    public SSLSocketStreamInterface create(SocketStreamInterface socketStream, String host, int port, boolean autoclose, final SSLSocketStreamOptions options, final TrustCallback trustCallback) throws IOException {
+        final SSLSocketStreamInterface inner;
+        if (preferBC(options)) {
+            inner = bc.create(socketStream, host, port, autoclose, options, trustCallback);
+        } else {
+            inner = jsse.create(socketStream, host, port, autoclose, options, trustCallback);
+        }
         return new AutoSwitchSSLSocketStreamInterface() {
+            final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
+            final KeyManager[]           keyManager    = trustCallback.getKeyManager();
+
             @Override
             public Socket getSocket() {
                 return getInternalSSLSocketStreamInterface().getSocket();
@@ -104,35 +156,16 @@ public class AutoBCSSLSocketStreamFactory implements SSLSocketStreamFactory {
             public TrustResult getTrustResult() {
                 return inner.getTrustResult();
             }
-        };
-    }
 
-    @Override
-    public String retry(SSLSocketStreamOptions options, Exception e) {
-        final String jsseRetry = jsse.retry(options, e);
-        if (jsseRetry != null) {
-            options.getCustomFactorySettings().remove(BC_FACTORY);
-            return jsseRetry;
-        } else {
-            final String bcRetry = bc.retry(options, e);
-            if (bcRetry != null) {
-                options.getCustomFactorySettings().add(BC_FACTORY);
-                return bcRetry;
-            } else if (!options.getCustomFactorySettings().contains(BC_FACTORY)) {
-                options.getCustomFactorySettings().add(BC_FACTORY);
-                return options.addRetryReason("fallback BouncyCastle");
-            } else {
-                return null;
+            @Override
+            public TrustProviderInterface getTrustProvider() {
+                return trustProvider;
             }
-        }
-    }
 
-    @Override
-    public SSLSocketFactory getSSLSocketFactory(final SSLSocketStreamOptions options, final String sniHostName, KeyManager[] keyManagers, TrustCallback trustCallback) throws IOException {
-        if (preferBC(options)) {
-            return bc.getSSLSocketFactory(options, sniHostName, keyManagers, trustCallback);
-        } else {
-            return jsse.getSSLSocketFactory(options, sniHostName, keyManagers, trustCallback);
-        }
+            @Override
+            public KeyManager[] getKeyManager() {
+                return keyManager;
+            }
+        };
     }
 }

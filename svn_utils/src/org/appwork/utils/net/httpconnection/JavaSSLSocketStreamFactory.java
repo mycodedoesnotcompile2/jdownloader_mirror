@@ -42,7 +42,6 @@ import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -103,7 +102,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         try {
             final SSLContext context = getSSLContext(null, generateTrustManagerDelegate(new TrustCallback() {
                 @Override
-                public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                     // ignore
                 }
 
@@ -132,7 +131,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     protected X509TrustManager bridge(final X509TrustManagerBridge trustManagerBridge) throws SSLException {
-        if (JVMVersion.isAtLeast(JavaVersion.JVM_1_8)) {
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_8)) {
             return SSLSocketStreamFactory18.bridge(trustManagerBridge);
         } else {
             return new X509TrustManager() {
@@ -285,7 +284,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
             if (sslContext == null) {
                 TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {
                     @Override
-                    public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+                    public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                         // ignore
                     }
 
@@ -462,7 +461,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String host, final int port, final boolean autoClose, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider, final KeyManager[] keyManagers) throws IOException {
         return create(socketStream, host, port, autoClose, options, new TrustCallback() {
             @Override
-            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
             }
 
             @Override
@@ -543,9 +542,9 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         final AtomicReference<TrustResult> trustResult = new AtomicReference<TrustResult>();
         final TrustManager trustBridge = generateTrustManagerDelegate(new TrustCallback() {
             @Override
-            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                 trustResult.set(result);
-                trustCallback.onTrustResult(provider, chain, authType, result);
+                trustCallback.onTrustResult(provider, authType, result);
             }
 
             @Override
@@ -562,18 +561,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         final SSLSocketFactory sslFactory = getSSLSocketFactory(sslContext, options, sniEnabled ? host : null);
         final SSLSocket sslSocket = (SSLSocket) sslFactory.createSocket(socketStream.getSocket(), sniEnabled ? host : "", port, autoClose);
         sslSocket.startHandshake();
-        try {
-            trustProvider.verifyHostname(sslSocket.getSession(), host, this);
-        } catch (IllegalSSLHostnameException e) {
-            e.setTrustResult(trustResult.get());
-            e.getTrustResult().exception(e);
-            throw e;
-        } catch (RuntimeException e) {
-            IllegalSSLHostnameException thr = new IllegalSSLHostnameException(host, e);
-            thr.setTrustResult(trustResult.get());
-            thr.getTrustResult().exception(e);
-            throw thr;
-        }
+        trustProvider.verifyHostname(trustResult.get(), sslSocket.getSession(), host, this);
         return new JSSESSLSocketStreamInterface() {
             final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
             final KeyManager[]           keyManager    = trustCallback.getKeyManager();

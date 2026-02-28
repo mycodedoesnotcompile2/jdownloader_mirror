@@ -15,12 +15,9 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -30,23 +27,23 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
 @HostPlugin(revision = "$Revision: 52404 $", interfaceVersion = 3, names = {}, urls = {})
-public class FappicCom extends XFileSharingProBasic {
-    public FappicCom(final PluginWrapper wrapper) {
+public class ImgpvCom extends XFileSharingProBasic {
+    public ImgpvCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(super.getPurchasePremiumURL());
+        // this.enablePremium(super.getPurchasePremiumURL());
     }
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2020-03-19: null<br />
+     * captchatype-info: null 4dignum, reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fappic.com" });
+        ret.add(new String[] { "imgpv.com" });
         return ret;
     }
 
@@ -60,46 +57,36 @@ public class FappicCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return buildAnnotationUrls(getPluginDomains());
-    }
-
-    private final Pattern PATTERN_THUMBNAIL = Pattern.compile("(https?://img\\d+\\.[^/]+)?/i/\\d+/([a-z0-9]{12})_t\\.jpg");
-
-    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : pluginDomains) {
-            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[a-z0-9]{12}(/[^/#]+)?";
-            regex += "|https?://img\\d+\\." + buildHostsPatternPart(domains) + "/i/\\d+/[a-z0-9]{12}_t\\.jpg";
-            ret.add(regex);
-        }
-        return ret.toArray(new String[0]);
+        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return false;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return true;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return false;
+            return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
     }
 
     @Override
     public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return 1;
+            return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
 
@@ -120,39 +107,6 @@ public class FappicCom extends XFileSharingProBasic {
 
     @Override
     protected boolean isImagehoster() {
-        /* 2020-03-19: Special */
         return true;
-    }
-
-    @Override
-    protected String getFUID(final String url, URL_TYPE type) {
-        if (url != null && type == null) {
-            try {
-                return new Regex(new URL(url).getPath(), PATTERN_THUMBNAIL).getMatch(1);
-            } catch (final Throwable e) {
-            }
-            return null;
-        } else {
-            return super.getFUID(url, type);
-        }
-    }
-
-    @Override
-    public String getLoginURL() {
-        // 2024-07-22
-        return getMainPage() + "/?op=login";
-    }
-
-    @Override
-    protected String getContentURL(final DownloadLink link) {
-        if (link == null) {
-            return null;
-        }
-        final String fuid = this.getFUIDFromURL(link);
-        if (fuid != null) {
-            return "https://" + getHost() + "/" + fuid;
-        } else {
-            return super.getContentURL(link);
-        }
     }
 }

@@ -16,6 +16,23 @@ import java.util.List;
 
 import javax.swing.Icon;
 
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcollector.LinkOriginDetails;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkModifiers;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.UnknownCrawledLinkHandler;
+import jd.controlling.linkcrawler.modifier.CommentModifier;
+import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
+import jd.controlling.linkcrawler.modifier.PackageNameModifier;
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
+import jd.utils.JDUtilities;
+import net.sf.image4j.codec.ico.ICOEncoder;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
@@ -42,23 +59,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
 
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcollector.LinkOriginDetails;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkModifiers;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.UnknownCrawledLinkHandler;
-import jd.controlling.linkcrawler.modifier.CommentModifier;
-import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
-import jd.controlling.linkcrawler.modifier.PackageNameModifier;
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.utils.JDUtilities;
-import net.sf.image4j.codec.ico.ICOEncoder;
-
 public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     private final static String jdpath = JDUtilities.getJDHomeDirectoryFromEnvironment().getAbsolutePath() + File.separator + "JDownloader.jar";
 
@@ -82,14 +82,17 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     private void writeString(RemoteAPIResponse response, RemoteAPIRequest request, String string, boolean wrapCallback) throws InternalApiException {
         OutputStream out = null;
         try {
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/html", false));
-            out = MyJDownloaderController.getOutputStream(response, request, false, true);
+
             if (wrapCallback && request.getJqueryCallback() != null) {
+                response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json", false));
                 if (string == null) {
                     string = "";
                 }
                 string = "{\"content\": \"" + string.trim() + "\"}";
+            } else {
+                response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/html", false));
             }
+            out = MyJDownloaderController.getOutputStream(response, request);
             out.write(string.getBytes("UTF-8"));
         } catch (Throwable e) {
             throw new InternalApiException(e);
@@ -588,11 +591,11 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         writeString(response, request, "JDownloader\r\n", true);
     }
 
-    public void favicon(RemoteAPIResponse response) throws InternalApiException {
+    public void favicon(RemoteAPIResponse response, RemoteAPIRequest request) throws InternalApiException {
         OutputStream out = null;
         try {
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/x-icon", false));
-            out = MyJDownloaderController.getOutputStream(response, null, false, false);
+            out = MyJDownloaderController.getOutputStream(response, request);
             Icon logo = new AbstractIcon(IconKey.ICON_LOGO_JD_LOGO_128_128, 32);
             ICOEncoder.write(IconIO.toBufferedImage(logo), out);
         } catch (Throwable e) {

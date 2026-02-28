@@ -90,13 +90,12 @@ import com.sun.jna.ptr.PointerByReference;
  */
 public class JNAWindowsTrustProvider implements TrustProviderInterface {
     /**
-     * Windows policy for SSL/TLS server certificate chain verification. Passed to CertVerifyCertificateChainPolicy();
-     * ensures the chain is valid for server authentication (usage, revocation, trusted root). Value 4 = (LPCSTR)4 in wincrypt.h.
+     * Windows policy for SSL/TLS server certificate chain verification. Passed to CertVerifyCertificateChainPolicy(); ensures the chain is
+     * valid for server authentication (usage, revocation, trusted root). Value 4 = (LPCSTR)4 in wincrypt.h.
      */
     private static final int                     CERT_CHAIN_POLICY_SSL = 4;
     private static final int                     CERT_STORE_ADD_ALWAYS = 4;
     private static final JNAWindowsTrustProvider INSTANCE              = new JNAWindowsTrustProvider();
-    protected JNAWindowsTrustResult              latestTrustResult     = null;
 
     public static JNAWindowsTrustProvider getInstance() {
         return INSTANCE;
@@ -138,7 +137,7 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
     }
 
     @Override
-    public void verifyHostname(final SSLSession session, final String host, final Object context) throws IllegalSSLHostnameException {
+    public void verifyHostname(TrustResult result, final SSLSession session, final String host, final Object context) throws IllegalSSLHostnameException {
         try {
             HostnameVerifier nativeVerifier = null;
             if (context instanceof HttpsURLConnection) {
@@ -151,9 +150,11 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
                 throw new IllegalSSLHostnameException(host, "Failed");
             }
         } catch (final IllegalSSLHostnameException e) {
-            throw e.setTrustResult(latestTrustResult);
+            result.setException(e);
+            throw e.setTrustResult(result);
         } catch (final IOException e) {
-            throw new IllegalSSLHostnameException(host, e).setTrustResult(latestTrustResult);
+            result.setException(e);
+            throw new IllegalSSLHostnameException(host, e).setTrustResult(result);
         }
     }
 
@@ -170,7 +171,7 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
         if (chain == null || chain.length == 0) {
             throw new org.appwork.exceptions.WTFException();
         }
-        return latestTrustResult = new JNAWindowsTrustResult(this, chain, e, type, trustedRoot);
+        return new JNAWindowsTrustResult(this, chain, e, type, trustedRoot);
     }
 
     /**
@@ -179,8 +180,9 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
      *
      * <h4>JNA / Windows API flow</h4>
      * <ol>
-     * <li><b>CertCreateCertificateContext</b> ({@link WindowsCertChainCrypt32Api}): Builds a Windows CERT_CONTEXT from the leaf cert's DER bytes. The context is
-     * not stored anywhere; it is only used as input for the chain builder. Must be freed with CertFreeCertificateContext.</li>
+     * <li><b>CertCreateCertificateContext</b> ({@link WindowsCertChainCrypt32Api}): Builds a Windows CERT_CONTEXT from the leaf cert's DER
+     * bytes. The context is not stored anywhere; it is only used as input for the chain builder. Must be freed with
+     * CertFreeCertificateContext.</li>
      * <li><b>openMemoryStoreAndAddIntermediates</b>: Optionally creates an in-memory store (CERT_STORE_PROV_MEMORY) and adds chain[1..n-1]
      * so CertGetCertificateChain can resolve the full chain. If this fails or is skipped, Windows may still build the chain using AIA or
      * only the leaf (and fail if the root is not in ROOT).</li>
@@ -314,8 +316,8 @@ public class JNAWindowsTrustProvider implements TrustProviderInterface {
      * <ul>
      * <li><b>CertOpenStore</b> (Crypt32): Opens a store with provider CERT_STORE_PROV_MEMORY (name "Memory"). No persistent storage; certs
      * are only in process memory. pvPara is null.</li>
-     * <li><b>CertAddEncodedCertificateToStore</b> ({@link WindowsCertChainCrypt32Api}): Adds each intermediate's DER bytes to the store with CERT_STORE_ADD_ALWAYS
-     * so duplicates do not cause errors. ppCertContext is null (we don't need the created context back).</li>
+     * <li><b>CertAddEncodedCertificateToStore</b> ({@link WindowsCertChainCrypt32Api}): Adds each intermediate's DER bytes to the store
+     * with CERT_STORE_ADD_ALWAYS so duplicates do not cause errors. ppCertContext is null (we don't need the created context back).</li>
      * </ul>
      * <p>
      * The caller must call CertCloseStore(hStore, 0) when done (done in validateChainViaWindows finally).

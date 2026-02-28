@@ -10,6 +10,7 @@ import java.io.PushbackInputStream;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -36,6 +37,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.handler.StorageHandler;
 import org.appwork.utils.Application;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
@@ -48,7 +50,6 @@ import org.appwork.utils.net.httpserver.HttpConnectionRunnable;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.HttpServerConnection;
-import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 import org.appwork.utils.net.httpserver.ReferrerPolicy;
@@ -93,6 +94,7 @@ import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsCredentialedDecryptor;
 import org.bouncycastle.tls.TlsCredentialedSigner;
 import org.bouncycastle.tls.TlsExtensionsUtils;
+import org.bouncycastle.tls.TlsNoCloseNotifyException;
 import org.bouncycastle.tls.TlsServerProtocol;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsCryptoParameters;
@@ -253,7 +255,12 @@ public class DeprecatedAPIServer extends HttpServer {
 
     @Override
     public boolean onException(Throwable e, HttpRequest request, HttpResponse response) throws IOException {
-        return super.onException(e, request, response);
+        if (Exceptions.containsInstanceOf(e, SocketException.class, TlsNoCloseNotifyException.class)) {
+            // TLS socket already closed
+            return true;
+        } else {
+            return super.onException(e, request, response);
+        }
     }
 
     @Override
@@ -427,12 +434,12 @@ public class DeprecatedAPIServer extends HttpServer {
                 }
                 guessProtocolBuffer[index] = (byte) read;
             }
-            final HttpConnectionType httpConnectionType = HttpConnectionType.get(guessProtocolBuffer);
+            final RequestMethod httpConnectionType = RequestMethod.get(guessProtocolBuffer);
             final PushbackInputStream clientSocketIS = new PushbackInputStream(is, 8);
             clientSocketIS.unread(guessProtocolBuffer, 0, index);
             final InputStream httpIS;
             final OutputStream httpOS;
-            if (!HttpConnectionType.UNKNOWN.equals(httpConnectionType)) {
+            if (!RequestMethod.UNKNOWN.equals(httpConnectionType)) {
                 // http
                 httpIS = clientSocketIS;
                 httpOS = clientSocket.getOutputStream();

@@ -7,7 +7,6 @@ import java.io.OutputStream;
 import javax.swing.Icon;
 
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.remoteapi.exceptions.InternalApiException;
@@ -32,7 +31,7 @@ public class ContentAPIImpl implements ContentAPI {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request);
             ImageProvider.writeImage(IconIO.toBufferedImage(favIcon), "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
@@ -53,7 +52,7 @@ public class ContentAPIImpl implements ContentAPI {
             /* we force content type to image/png and allow caching of the image */
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "public,max-age=60", false));
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/png", false));
-            out = MyJDownloaderController.getOutputStream(response, request, RemoteAPI.gzip(request), false);
+            out = MyJDownloaderController.getOutputStream(response, request);
             ImageProvider.writeImage(IconIO.toBufferedImage(CrossSystem.getMime().getFileIcon(extension, 16, 16)), "png", out);
         } catch (IOException e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);

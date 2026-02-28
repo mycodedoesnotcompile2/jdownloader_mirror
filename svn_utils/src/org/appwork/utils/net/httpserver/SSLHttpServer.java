@@ -140,7 +140,7 @@ public class SSLHttpServer extends HttpServer {
         final KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(serverKeystore, serverKeystorePassword);
         final TrustCallback callback = new TrustCallback() {
-            public void onTrustResult(final TrustProviderInterface provider, final X509Certificate[] chain, final String authType, final TrustResult result) {
+            public void onTrustResult(final TrustProviderInterface provider, final String authType, final TrustResult result) {
                 if (holder != null && result != null) {
                     holder.set(result);
                 }

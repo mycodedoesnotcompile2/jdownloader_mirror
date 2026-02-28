@@ -40,8 +40,12 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.URL;
 
+import javax.net.ssl.KeyManager;
+
 import org.appwork.utils.Time;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.appwork.utils.net.httpconnection.trust.TrustCallback;
+import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.socketconnection.SocketConnection;
 import org.appwork.utils.net.socketconnection.SocksSocketConnection;
 import org.appwork.utils.net.socketconnection.SocksSocketConnection.DESTTYPE;
@@ -132,9 +136,27 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
                         if (sslSocketStreamOptions == null) {
                             sslSocketStreamOptions = getSSLSocketStreamOptions(hostName, port);
                         }
+                        final TrustCallback trustCallback = new TrustCallback() {
+                            private final TrustProviderInterface trustProviderInterface = AbstractSocksHTTPConnection.this.getTrustProvider();
+                            private final KeyManager[]           keyManager             = AbstractSocksHTTPConnection.this.getKeyManagers();
+
+                            @Override
+                            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
+                                AbstractSocksHTTPConnection.this.setTrustResult(result, SSL_STATE.ENDPOINT);
+                            }
+
+                            @Override
+                            public TrustProviderInterface getTrustProvider() {
+                                return trustProviderInterface;
+                            }
+
+                            @Override
+                            public KeyManager[] getKeyManager() {
+                                return keyManager;
+                            }
+                        };
                         factory = getSSLSocketStreamFactory(sslSocketStreamOptions);
-                        this.connectionSocket = factory.create(sockssocket, hostName, port, true, sslSocketStreamOptions, getTrustProvider(), getKeyManagers());
-                        setTrustResult(((TrustResultProvider) connectionSocket).getTrustResult());
+                        this.connectionSocket = factory.create(sockssocket, hostName, port, true, sslSocketStreamOptions, trustCallback);
                     } catch (final IOException e) {
                         final String retrySSL;
                         try {
@@ -163,7 +185,7 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
                 this.sendRequest();
                 return;
             } catch (IOException e) {
-                e = mapExceptions(e);
+                e = mapExceptions(e, SSL_STATE.ENDPOINT);
                 final String retrySSL;
                 try {
                     retrySSL = sslSocketStreamOptions != null ? (sslSocketStreamOptions = sslSocketStreamOptions.clone()).retry(factory, e) : null;
@@ -288,7 +310,7 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
         final Socket socket = socketStream.getSocket();
         final SocksSocketConnection socksSocket = ((SocksSocketConnection) socket);
         this.endPointInetSocketAddress = buildConnectEndPointSocketAddress(socksSocket);
-        return socketStream;
+        return socksSocket;
     }
 
     @Override

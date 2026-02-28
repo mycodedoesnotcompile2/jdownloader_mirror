@@ -42,7 +42,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
-import java.security.cert.X509Certificate;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLSocket;
@@ -161,7 +160,7 @@ public abstract class SimpleUseNet {
     protected SSLSocketFactory getSSLSocketFactory(final String sniHostName) throws IOException {
         return JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, sniHostName, null, new TrustCallback() {
             @Override
-            public void onTrustResult(TrustProviderInterface provider, X509Certificate[] chain, String authType, TrustResult result) {
+            public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
             }
 
             @Override

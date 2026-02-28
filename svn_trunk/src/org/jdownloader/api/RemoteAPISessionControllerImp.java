@@ -7,8 +7,8 @@ import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.HttpServerConnection.ConnectionHook;
-import org.appwork.utils.net.httpserver.HttpServerConnection.HttpConnectionType;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 import org.appwork.utils.net.httpserver.handler.ExtendedHttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
@@ -32,9 +32,13 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
         checkDirectConnectionToken(request);
     }
 
+    @Override
+    public void onBeforeSendHeaders(HttpResponse response) {
+    }
+
     protected void checkDirectConnectionToken(HttpRequest request) throws BasicRemoteAPIException {
         final RawHttpConnectionInterface connection = request.getConnection();
-        if (connection instanceof MyJDownloaderDirectHttpConnection && request.getHttpConnectionType() != HttpConnectionType.OPTIONS) {
+        if (connection instanceof MyJDownloaderDirectHttpConnection && request.getRequestMethod() != RequestMethod.OPTIONS) {
             final MyJDownloaderDirectHttpConnection myConnection = (MyJDownloaderDirectHttpConnection) connection;
             final String sessionToken = myConnection.getRequestConnectToken();
             if (!MyJDownloaderController.getInstance().isSessionValid(sessionToken)) {
@@ -61,15 +65,6 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
     }
 
     @Override
-    public void onBeforeSendHeaders(HttpResponse response) {
-        final HttpRequest request = response.getConnection().getRequest();
-        final String pna = request.getRequestHeaders().getValue(HTTPConstants.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK);
-        if (pna != null) {
-            response.getResponseHeaders().addIfAbsent(new HTTPHeader(HTTPConstants.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, pna));
-        }
-    }
-
-    @Override
     public void onAfterRequestException(HttpRequest request, HttpResponse response, Throwable e) {
     }
 
@@ -88,7 +83,7 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
     @Override
     protected RemoteAPISession newSession(RemoteAPIRequest request, final String username, final String password) {
         if (!"wron".equals(password)) {
-            RemoteAPISession session = new RemoteAPISession(this);
+            final RemoteAPISession session = new RemoteAPISession(this);
             synchronized (this.sessions) {
                 this.sessions.put(session.getSessionID(), session);
             }
@@ -112,4 +107,5 @@ public class RemoteAPISessionControllerImp extends HttpSessionController<RemoteA
             return true;
         }
     }
+
 }

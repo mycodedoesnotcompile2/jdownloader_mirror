@@ -185,7 +185,7 @@ public abstract class SSLTrustProviderTestBase extends AWTest {
         public javax.net.ssl.TrustManager[] getTrustManagersForProvider(final org.appwork.utils.net.httpconnection.trust.TrustProviderInterface provider) throws Exception {
             return new javax.net.ssl.TrustManager[] { generateTrustManagerDelegate(new org.appwork.utils.net.httpconnection.trust.TrustCallback() {
                 @Override
-                public void onTrustResult(org.appwork.utils.net.httpconnection.trust.TrustProviderInterface provider, X509Certificate[] chain, String authType, org.appwork.utils.net.httpconnection.TrustResult result) {
+                public void onTrustResult(org.appwork.utils.net.httpconnection.trust.TrustProviderInterface provider, String authType, org.appwork.utils.net.httpconnection.TrustResult result) {
                 }
 
                 @Override
