@@ -20,18 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.XtremestreamCoConfig;
-import org.jdownloader.plugins.components.config.XtremestreamCoConfig.DownloadMode;
-import org.jdownloader.plugins.components.config.XtremestreamCoConfig.Quality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
@@ -44,7 +32,19 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50179 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.XtremestreamCoConfig;
+import org.jdownloader.plugins.components.config.XtremestreamCoConfig.DownloadMode;
+import org.jdownloader.plugins.components.config.XtremestreamCoConfig.Quality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52420 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,6 +54,7 @@ public class XtremestreamCo extends PluginForHost {
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
+
     /* DEV NOTES */
     // Tags: Porn plugin
     // other:
@@ -138,9 +139,9 @@ public class XtremestreamCo extends PluginForHost {
         final String referer = link.getReferrerUrl();
         final Browser br2 = br.cloneBrowser();
         final String fid = getFID(link);
-        String data_folderid = null;
-        String data_xtremestream = null;
-        String dltoken = null;
+        final String data_folderid;
+        final String data_xtremestream;
+        String dltoken;
         if (referer != null) {
             br2.getPage(referer);
             data_folderid = br2.getRegex("data-folderid=\"([^\"]+)").getMatch(0);
@@ -200,13 +201,11 @@ public class XtremestreamCo extends PluginForHost {
             }
         }
         logger.info("Official download is not possible");
-        String hlsMaster = br.getRegex("var m3u8_loader_url = `(https://[^<>\"']+data=)`;").getMatch(0);
-        if (hlsMaster == null) {
+        final String data = br.getRegex("const\\s*query\\s*=\\s*\"(.*?)\"").getMatch(0);
+        if (data == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (!hlsMaster.endsWith(fid)) {
-            hlsMaster += fid;
-        }
+        final String hlsMaster = "https://xporn.xtremestream.xyz/player/xs1.php?" + data;
         br.getPage(hlsMaster);
         final List<HlsContainer> qualities = HlsContainer.getHlsQualities(this.br);
         final HlsContainer bestQuality = HlsContainer.findBestVideoByBandwidth(qualities);

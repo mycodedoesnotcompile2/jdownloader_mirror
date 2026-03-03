@@ -44,11 +44,11 @@ import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Time;
 import org.appwork.utils.Timeout;
+import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 
 import com.sun.jna.platform.win32.Advapi32Util.Account;
-import com.sun.jna.platform.win32.WinDef.INT_PTR;
 
 /**
  * Test suite for WindowsUtils class. Tests all functionality of the WindowsUtils utility class.
@@ -136,13 +136,13 @@ public class TestWindowsUtils extends AWTest {
         }
         // Dialog.I().showMessageDialog("The TestWindowUtils Test will now try to start cmd.exe via UAC");
         logInfoAnyway("The TestWindowUtils Test will now try to start cmd.exe via UAC");
-        // Test startElevatedProcess
+        // Test startElevatedProcess (returns JNAProcessInfo with handle, commandLine, workingDirectory)
         long started = Time.now();
         Timeout timeout = new Timeout(60 * 60000l);
-        INT_PTR processHandle = null;
+        org.appwork.utils.os.JNAProcessInfo processInfo = null;
         while (true) {
             try {
-                processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "appwork.org" }, null, false);
+                processInfo = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "appwork.org" }, null, false);
                 break;
             } catch (com.sun.jna.platform.win32.Win32Exception e) {
                 if (timeout.isAlive() && 1223 == e.getErrorCode()) {
@@ -154,29 +154,37 @@ public class TestWindowsUtils extends AWTest {
                 }
             }
         }
-        assertNotNull(processHandle);
-        assertTrue(Time.now() - started > 1000);
-        // Test getProcessId
-        int pid = WindowsUtils.getProcessId(processHandle);
-        Integer exitCode = WindowsUtils.waitForPID(pid, 2000);
-        assertNull(exitCode);
-        assertTrue(pid > 0);
-        // Verify process exists
-        List<ProcessInfo> processes = ProcessHandlerFactory.getProcessHandler().listByPids(pid);
-        assertEquals(processes.size(), 1);
-        // Test isProcessElevated
-        boolean isElevated = WindowsUtils.isProcessElevated(pid);
-        assertTrue(isElevated);
-        // Wait a bit to see the process
-        Thread.sleep(1000);
-        // Test terminateProcess
-        boolean killed = WindowsUtils.terminateProcess(processHandle, 5);
-        assertTrue(killed);
-        exitCode = WindowsUtils.waitForPID(pid, -1);
-        assertEquals(5, exitCode);
-        // Verify process is gone
-        List<ProcessInfo> processesAfter = ProcessHandlerFactory.getProcessHandler().listByPids(pid);
-        assertTrue(processesAfter.isEmpty());
+        org.appwork.processes.ProcessHandler handler = ProcessHandlerFactory.getProcessHandler();
+        try {
+            assertTrue(processInfo.getPid() > 0);
+            assertTrue(processInfo.getCommandLine() != null && processInfo.getCommandLine().length() > 0);
+            assertTrue(Time.now() - started > 1000);
+            // Process still running: waitForExit with short timeout should return non-empty
+            List<ProcessInfo> stillRunning = handler.waitForExit(TimeSpan.fromMillis(2000), processInfo);
+            assertTrue(stillRunning.size() > 0);
+            int pid = processInfo.getPid();
+            // Verify process exists
+            List<ProcessInfo> processes = ProcessHandlerFactory.getProcessHandler().listByPids(pid);
+            assertEquals(processes.size(), 1);
+            // Test isProcessElevated
+            boolean isElevated = WindowsUtils.isProcessElevated(pid);
+            assertTrue(isElevated);
+            // Wait a bit to see the process
+            Thread.sleep(1000);
+            // Test terminateForced via handler (closes handle)
+            boolean killed = handler.terminateForced(processInfo, 5);
+            assertTrue(killed);
+            // Process and handle are gone; get exit code via PID
+            Integer exitCode = WindowsUtils.waitForPID(pid, -1);
+            assertEquals(Integer.valueOf(5), exitCode);
+            // Verify process is gone
+            List<ProcessInfo> processesAfter = ProcessHandlerFactory.getProcessHandler().listByPids(pid);
+            assertTrue(processesAfter.isEmpty());
+        } finally {
+            if (!processInfo.isClosed()) {
+                processInfo.close();
+            }
+        }
     }
 
     /**

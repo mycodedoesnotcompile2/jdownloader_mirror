@@ -36,6 +36,7 @@ package org.appwork.utils.net.httpconnection;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.net.InetAddress;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -231,4 +232,18 @@ public interface HTTPConnection {
      * @return the profiler
      */
     HTTPConnectionProfilerInterface getProfiler();
+
+    /**
+     * Set a custom DNS resolver for this connection. When set, it is used to resolve the URL host to IPs instead of the
+     * default system DNS. Host header and SSL SNI still use the URL host. Must be called before connect().
+     *
+     * @param resolver
+     *            custom resolver, or null to use default resolution
+     */
+    void setDNSResolver(DNSResolver resolver);
+
+    /**
+     * @return the custom DNS resolver, or null if default resolution is used
+     */
+    DNSResolver getDNSResolver();
 }

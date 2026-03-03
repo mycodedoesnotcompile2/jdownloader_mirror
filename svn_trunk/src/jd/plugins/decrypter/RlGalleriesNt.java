@@ -25,6 +25,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -32,6 +33,7 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -40,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52290 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,6 +103,38 @@ public class RlGalleriesNt extends PluginForDecrypt {
             brc.getPage(contenturl);
             if (brc.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final Form form = brc.getForm(0);
+            if (form != null) {
+                final String previous_path = brc._getURL().getPath();
+                final Browser old_br = this.br;
+                this.setBrowser(brc);
+                try {
+                    /* Small hack: Set current browser as plugin browser so that captcha handling can extract siteURL */
+                    this.setBrowser(brc);
+                    final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, brc).getToken();
+                    form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                } finally {
+                    this.setBrowser(old_br);
+                }
+                brc.submitForm(form);
+                final String redirect = brc.getRedirectLocation();
+                if (redirect == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                /* Check for redirect on previous URL which will then reidrect to final URL. */
+                if (redirect.contains(previous_path)) {
+                    logger.info("Handling double-redirect");
+                    brc.getPage(redirect);
+                }
+                String finallink = brc.getRegex("var u = \"(https?://[^\"]+)").getMatch(0);
+                if (finallink == null) {
+                    finallink = brc.getRegex("<a href=\"(https?://[^\"]+)\">\\s*If you are not redirected, click here").getMatch(0);
+                }
+                if (finallink != null) {
+                    ret.add(this.createDownloadlink(finallink));
+                    return ret;
+                }
             }
             final String redirect = brc.getRedirectLocation();
             if (redirect == null) {
@@ -263,10 +297,12 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 } else if (nextpage == null || !dupes.add(nextpage)) {
                     logger.info("Stopping because: Reached last page?");
                     break;
-                } else {
-                    br.getPage(nextpage);
-                    page++;
+                } else if (this.isAbort()) {
+                    throw new InterruptedException();
                 }
+                /* Continue to next page */
+                br.getPage(nextpage);
+                page++;
             } while (!this.isAbort());
             if (ret.isEmpty()) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -316,6 +352,10 @@ public class RlGalleriesNt extends PluginForDecrypt {
 
     @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
+        if (new Regex(link.getCryptedUrl(), PATTERN_SINGLE_REDIRECT).patternFind()) {
+            /* 2026-03-02: Captcha required */
+            return true;
+        }
         return false;
     }
 }

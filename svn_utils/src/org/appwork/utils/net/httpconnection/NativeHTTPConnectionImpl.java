@@ -1118,6 +1118,16 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     public void setProfiler(HTTPConnectionProfilerInterface profiler) {
     }
 
+    @Override
+    public void setDNSResolver(org.appwork.utils.net.httpconnection.DNSResolver resolver) {
+        /* not supported for native implementation */
+    }
+
+    @Override
+    public org.appwork.utils.net.httpconnection.DNSResolver getDNSResolver() {
+        return null;
+    }
+
     /**
      * @see org.appwork.utils.net.httpconnection.HTTPConnection#getProfiler()
      */

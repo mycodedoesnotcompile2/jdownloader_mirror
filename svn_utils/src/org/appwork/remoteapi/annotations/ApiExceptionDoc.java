@@ -4,13 +4,13 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
- *         Spalter Strasse 58
- *         91183 Abenberg
+ *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
+ *         Schwabacher Straße 117
+ *         90763 Fürth
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
@@ -19,11 +19,11 @@
  *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: e-mail@appwork.org
+ *     Contact AppWork for further details: <e-mail@appwork.org>
  * === Non-Commercial Usage ===
  *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
@@ -31,58 +31,21 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.socketconnection;
+package org.appwork.remoteapi.annotations;
 
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
-
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * @author daniel
- * @date Jul 6, 2022
- *
+ * Documents when a specific exception is thrown by a method. Use as type annotation on exception types in the throws clause (Java 8+).
+ * Example: <code>void foo() throws @ApiExceptionDoc("When the namespace is unknown.") UnknownNamespaceException;</code>
+ * Requires Java 8+ (ElementType.TYPE_USE). For Java 6/7 compatible API docs use {@link ApiDoc} on the method only.
  */
-public abstract class SocksSocketConnection extends SocketConnection implements SocketStreamInterface {
-    protected final DESTTYPE destType;
-
-    public SocksSocketConnection(HTTPProxy proxy, DESTTYPE destType) {
-        super(proxy);
-        this.destType = initSocksSocketConnection(proxy, destType);
-    }
-
-    protected abstract DESTTYPE initSocksSocketConnection(HTTPProxy proxy, DESTTYPE destType);
-
-    public static enum AUTH {
-        PLAIN,
-        NONE
-    }
-
-    public static enum DESTTYPE {
-        AUTO,
-        IPV4,
-        IPV6,
-        DOMAIN;
-    }
-
-    public boolean isSupported(DESTTYPE destType) {
-        return destType != null && supportedDestType.contains(destType);
-    }
-
-    protected final Set<DESTTYPE> supportedDestType = new CopyOnWriteArraySet<DESTTYPE>();
-
-    public DESTTYPE getDestType() {
-        return destType;
-    }
-    
-    
-    @Override
-    public Socket getSocket() {
-      return this;
-    }
-
-    public abstract DESTTYPE getDestType(final SocketAddress endpoint);
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE_USE)
+public @interface ApiExceptionDoc {
+    /** Description of when this exception is thrown (e.g. "When the namespace has no repository."). */
+    String value();
 }

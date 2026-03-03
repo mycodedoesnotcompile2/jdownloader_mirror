@@ -7,7 +7,6 @@
  *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
- *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -32,33 +31,90 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.processes.jna.tests;
+package org.appwork.testframework;
 
-import javax.swing.JLabel;
-
-import org.appwork.app.gui.BasicGui;
-import org.appwork.utils.Application;
-import org.appwork.utils.os.CrossSystem;
+import org.appwork.storage.Storable;
+import org.appwork.storage.StorableDoc;
 
 /**
- * @author thomas
- * @date 19.11.2024
- *
+ * Info file stored in the post-build test status cache dir (cache-info.json). Describes the build/project this cache belongs to. Written
+ * and updated when PostBuildRunner runs with -buildid or baseHash.
  */
-public class TestApp {
-    public static void main(String[] args) {
-        Application.setApplication(".testapp");
-        final BasicGui bg = new BasicGui("Test-" + args[0]) {
-            @Override
-            protected void layoutPanel() {
-                getFrame().add(new JLabel("PID: " + CrossSystem.getPID()));
-            }
+@StorableDoc("Cache metadata: build id, base path, project info. Stored in status cache dir as cache-info.json.")
+public class PostBuildCacheInfo implements Storable {
+    /**
+     * Default constructor for Storable deserialization.
+     */
+    public PostBuildCacheInfo() {
+    }
 
-            @Override
-            protected void requestExit() {
-                System.out.println("Received Request Exit");
-                System.exit(0);
-            }
-        };
+    private String buildId;
+    /** Absolute path of the BASE test directory. */
+    private String basePath;
+    /** Optional project or build description (e.g. project name, setup). */
+    private String projectInfo;
+    /** Timestamp (ms) when this cache was last used/updated. */
+    private long   lastUpdated;
+    /** Java version string (System.getProperty("java.version")). */
+    private String javaVersion;
+    /** User name (System.getProperty("user.name")). */
+    private String userName;
+    /** Cache key used for this directory (buildId or baseHash). */
+    private String cacheKey;
+
+    public String getBuildId() {
+        return buildId;
+    }
+
+    public void setBuildId(String buildId) {
+        this.buildId = buildId;
+    }
+
+    public String getBasePath() {
+        return basePath;
+    }
+
+    public void setBasePath(String basePath) {
+        this.basePath = basePath;
+    }
+
+    public String getProjectInfo() {
+        return projectInfo;
+    }
+
+    public void setProjectInfo(String projectInfo) {
+        this.projectInfo = projectInfo;
+    }
+
+    public long getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(long lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
+
+    public String getJavaVersion() {
+        return javaVersion;
+    }
+
+    public void setJavaVersion(String javaVersion) {
+        this.javaVersion = javaVersion;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getCacheKey() {
+        return cacheKey;
+    }
+
+    public void setCacheKey(String cacheKey) {
+        this.cacheKey = cacheKey;
     }
 }

@@ -78,6 +78,7 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
 import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
+import org.appwork.utils.net.httpconnection.DNSResolver;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.RequestMethod;
@@ -109,6 +110,7 @@ public class HttpClient {
         private volatile boolean        executed        = false;
         private int                     redirectCounter = 0;
         private HashMap<String, String> requestHeaders;
+        private DNSResolver             dnsResolver;
 
         public TrustResult getTrustResult() {
             if (connection == null) {
@@ -428,6 +430,27 @@ public class HttpClient {
         }
 
         /**
+         * Set a custom DNS resolver for this request. When set, it is used to resolve the URL host to IPs instead of
+         * default DNS. See {@link HTTPConnection#setDNSResolver(DNSResolver)}. Context resolver overrides client-level
+         * resolver.
+         *
+         * @param resolver
+         *            custom resolver, or null for default
+         * @return this
+         */
+        public RequestContext setDNSResolver(final DNSResolver resolver) {
+            this.dnsResolver = resolver;
+            return this;
+        }
+
+        /**
+         * @return the custom DNS resolver for this request, or null
+         */
+        public DNSResolver getDNSResolver() {
+            return this.dnsResolver;
+        }
+
+        /**
          * Adds a custom header that will only apply to this specific request. Request-specific headers override global headers set on the
          * HttpClient instance.
          *
@@ -607,6 +630,7 @@ public class HttpClient {
     private boolean                         verboseLog           = false;
     private TrustProviderInterface          trustProvider        = null;
     private KeyManager[]                    keyManagers          = null;
+    private DNSResolver                     dnsResolver         = null;
 
     public HttpClient() {
         this.requestHeader = new HashMap<String, String>();
@@ -752,6 +776,11 @@ public class HttpClient {
             if (isVerboseLog()) {
                 LogV3.fine("HttpClient.createHTTPConnection: keyManagers is null, not setting on connection");
             }
+        }
+        if (context.getDNSResolver() != null) {
+            connection.setDNSResolver(context.getDNSResolver());
+        } else if (this.getDNSResolver() != null) {
+            connection.setDNSResolver(this.getDNSResolver());
         }
         context.setConnection(connection);
         return connection;
@@ -1334,6 +1363,24 @@ public class HttpClient {
      */
     public KeyManager[] getKeyManagers() {
         return this.keyManagers;
+    }
+
+    /**
+     * Set a custom DNS resolver for all requests made with this client. Can be overridden per request via
+     * {@link RequestContext#setDNSResolver(DNSResolver)}.
+     *
+     * @param resolver
+     *            custom resolver, or null for default DNS
+     */
+    public void setDNSResolver(final DNSResolver resolver) {
+        this.dnsResolver = resolver;
+    }
+
+    /**
+     * @return the custom DNS resolver set on this client, or null
+     */
+    public DNSResolver getDNSResolver() {
+        return this.dnsResolver;
     }
 
     /*

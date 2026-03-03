@@ -1,6 +1,7 @@
 package org.appwork.remoteapi.docsv2;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Array;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
@@ -35,6 +36,7 @@ import org.appwork.remoteapi.annotations.APITagDefinition;
 import org.appwork.remoteapi.annotations.APIParameterNames;
 import org.appwork.remoteapi.annotations.APIParameterOptions;
 import org.appwork.remoteapi.annotations.ApiDoc;
+import org.appwork.remoteapi.annotations.ApiExceptionDoc;
 import org.appwork.remoteapi.annotations.ApiDocExample;
 import org.appwork.remoteapi.annotations.HiddenForHelpDocs;
 import org.appwork.remoteapi.docsv2.model.DocsV2Definition;
@@ -295,12 +297,22 @@ public class DocsV2DefinitionBuilder {
                     }
                 }
                 endpoint.setExceptions(new ArrayList<ExceptionDoc>());
-                for (final Class<?> exceptionClass : method.getExceptionTypes()) {
-                    addExceptionDocIfMissing(endpoint.getExceptions(), exceptionClass, schemaClasses, provider);
+                final Class<?>[] exceptionTypes = method.getExceptionTypes();
+                final AnnotatedType[] annotatedExceptionTypes = method.getAnnotatedExceptionTypes();
+                for (int i = 0; i < exceptionTypes.length; i++) {
+                    final Class<?> exceptionClass = exceptionTypes[i];
+                    String whenThrown = null;
+                    if (annotatedExceptionTypes != null && i < annotatedExceptionTypes.length) {
+                        final ApiExceptionDoc exceptionDoc = annotatedExceptionTypes[i].getAnnotation(ApiExceptionDoc.class);
+                        if (exceptionDoc != null && StringUtils.isNotEmpty(exceptionDoc.value())) {
+                            whenThrown = exceptionDoc.value();
+                        }
+                    }
+                    addExceptionDocIfMissing(endpoint.getExceptions(), exceptionClass, schemaClasses, provider, whenThrown);
                 }
-                addExceptionDocIfMissing(endpoint.getExceptions(), InternalApiException.class, schemaClasses, provider);
-                addExceptionDocIfMissing(endpoint.getExceptions(), BadParameterException.class, schemaClasses, provider);
-                addExceptionDocIfMissing(endpoint.getExceptions(), BadRequestException.class, schemaClasses, provider);
+                addExceptionDocIfMissing(endpoint.getExceptions(), InternalApiException.class, schemaClasses, provider, null);
+                addExceptionDocIfMissing(endpoint.getExceptions(), BadParameterException.class, schemaClasses, provider, null);
+                addExceptionDocIfMissing(endpoint.getExceptions(), BadRequestException.class, schemaClasses, provider, null);
                 endpoints.add(endpoint);
             }
         }
@@ -363,6 +375,10 @@ public class DocsV2DefinitionBuilder {
     }
 
     private void addExceptionDocIfMissing(final List<ExceptionDoc> target, final Class<?> exceptionClass, final Set<Class<?>> schemaClasses, final DocsV2ProjectDataProvider provider) {
+        addExceptionDocIfMissing(target, exceptionClass, schemaClasses, provider, null);
+    }
+
+    private void addExceptionDocIfMissing(final List<ExceptionDoc> target, final Class<?> exceptionClass, final Set<Class<?>> schemaClasses, final DocsV2ProjectDataProvider provider, final String whenThrownFromMethod) {
         if (target == null || exceptionClass == null) {
             return;
         }
@@ -376,7 +392,11 @@ public class DocsV2DefinitionBuilder {
         exception.setType(typeName);
         exception.setSimpleName(exceptionClass.getSimpleName());
         final DocInfo exceptionDocInfo = extractDocInfo(exceptionClass, provider);
-        exception.setDescription(exceptionDocInfo.text);
+        if (StringUtils.isNotEmpty(whenThrownFromMethod)) {
+            exception.setDescription(whenThrownFromMethod);
+        } else {
+            exception.setDescription(exceptionDocInfo.text);
+        }
         exception.setWikiLinks(exceptionDocInfo.wikiLinks);
         if (BasicRemoteAPIException.class.isAssignableFrom(exceptionClass)) {
             try {

@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,6 +81,9 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<title>404 Not Found")) {
+            /* Error 404 with response code 200 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Regex regex_chapter = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER);

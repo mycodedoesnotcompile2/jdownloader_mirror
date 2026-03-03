@@ -19,10 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.AbortException;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,7 +34,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 48310 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.AbortException;
+
+@DecrypterPlugin(revision = "$Revision: 52414 $", interfaceVersion = 2, names = {}, urls = {})
 public class MirroredTo extends PluginForDecrypt {
     private String                  userAgent      = null;
     private ArrayList<DownloadLink> decryptedLinks = null;
@@ -232,7 +232,10 @@ public class MirroredTo extends PluginForDecrypt {
             // not redirects but final download link in html.
             String finallink = br2.getRegex("<a href=(http[^ ]+)\\s*(?:TARGET\\s*=\\s*'_blank')?>Your").getMatch(0);
             if (finallink == null) {
-                finallink = br2.getRegex("<div class=\"[^\"]*highlight[^\"]*\"\\s*>\\s*<a\\s*href\\s*=\\s*\"?(.*?)\"?\\s*(target|<)").getMatch(0);
+                finallink = br2.getRegex("<div class\\s*=\\s*\"[^\"]*highlight[^\"]*\"[^>]*>\\s*<a\\s*href\\s*=\\s*\"?(.*?)\"?\\s*(target|<)").getMatch(0);
+            }
+            if (finallink == null) {
+                finallink = br2.getRegex("<code>\\s*(https?://.*?)\\s*</code>").getMatch(0);
             }
             if (finallink == null) {
                 finallink = br2.getRegex("<META HTTP\\-EQUIV=\"Refresh\" CONTENT=\"\\d+; URL=https?://[^=]+=(http[^\"]+)\">").getMatch(0);

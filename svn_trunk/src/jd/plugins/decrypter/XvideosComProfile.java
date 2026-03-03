@@ -54,7 +54,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52419 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class XvideosComProfile extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xvideos.com", "xvideos.es", "xvideos2.com", "xvideos2.es", "xvideos3.com", "xvideos3.es", "xvideos4.com", "xvideos5.com", "xvideos.red", "haysex.biz" });
+        ret.add(new String[] { "xvideos.com", "xvideos.es", "xvideos2.com", "xvideos2.es", "xvideos3.com", "xvideos3.es", "xvideos4.com", "xvideos5.com", "xvideos.red", "haysex.biz", "xvv1deos.com" });
         return ret;
     }
 
@@ -139,7 +139,7 @@ public class XvideosComProfile extends PluginForDecrypt {
          * domain for such cases
          */
         final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
-        final String contenturl = getContentURL(param, plg);
+        String contenturl = getContentURL(param, plg);
         final boolean accountRequired = this.requiresAccount(param);
         final boolean premiumAccountRequired = this.requiresPremiumAccount(param);
         br.addAllowedResponseCodes(new int[] { 400 });
@@ -157,6 +157,14 @@ public class XvideosComProfile extends PluginForDecrypt {
         }
         XvideosCom.disableAutoTranslation(this, Browser.getHost(contenturl), br);
         br.getPage(contenturl);
+        if (br._getURL().getHost().startsWith("amp.")) {
+            final String canonical = br.getRegex("<link rel=\"canonical\" href=\"(https?://.*?)\"").getMatch(0);
+            if (canonical != null && canHandle(canonical)) {
+                contenturl = canonical;
+                XvideosCom.disableAutoTranslation(this, Browser.getHost(contenturl), br);
+                br.getPage(contenturl);
+            }
+        }
         if (br.getHttpConnection().getResponseCode() == 403) {
             /* E.g. no permission to access private favorites list of another user. */
             throw new AccountRequiredException();

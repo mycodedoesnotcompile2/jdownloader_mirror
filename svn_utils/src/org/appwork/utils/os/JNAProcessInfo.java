@@ -31,58 +31,68 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.socketconnection;
+package org.appwork.utils.os;
 
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
+import org.appwork.processes.ProcessInfo;
 
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+import com.sun.jna.Pointer;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 
 /**
- * @author daniel
- * @date Jul 6, 2022
+ * ProcessInfo for a process started with a JNA handle (e.g. from {@link WindowsUtils#startElevatedProcess}). Holds the OS handle for stable
+ * reference; use {@link #close()} when done or let ProcessHandler close it via terminateForced / waitForExit.
  *
+ * @author thomas
  */
-public abstract class SocksSocketConnection extends SocketConnection implements SocketStreamInterface {
-    protected final DESTTYPE destType;
+public class JNAProcessInfo extends ProcessInfo {
+    private final HANDLE     handle;
+    private volatile boolean closed;
 
-    public SocksSocketConnection(HTTPProxy proxy, DESTTYPE destType) {
-        super(proxy);
-        this.destType = initSocksSocketConnection(proxy, destType);
+    /**
+     * Package-private: created by {@link WindowsUtils#startElevatedProcess}.
+     *
+     * @param h
+     *            valid process handle (e.g. from ShellExecuteEx with SEE_MASK_NOCLOSEPROCESS)
+     */
+    public JNAProcessInfo(HANDLE h) {
+        super(Kernel32.INSTANCE.GetProcessId(h));
+        this.handle = h;
+        this.closed = false;
     }
 
-    protected abstract DESTTYPE initSocksSocketConnection(HTTPProxy proxy, DESTTYPE destType);
-
-    public static enum AUTH {
-        PLAIN,
-        NONE
+    /**
+     * Returns the OS process handle for use by ProcessHandler (wait, terminate). Do not close the handle directly; use {@link #close()} or
+     * let the handler close it.
+     *
+     * @return the process handle (never null)
+     */
+    public HANDLE getHandle() {
+        return handle;
     }
 
-    public static enum DESTTYPE {
-        AUTO,
-        IPV4,
-        IPV6,
-        DOMAIN;
+    /**
+     * Release the OS handle. Call when done if ProcessHandler did not already use it (e.g. terminateForced / waitForExit close it).
+     */
+    public void close() {
+        if (closed) {
+            return;
+        }
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
+            if (handle != null && Pointer.nativeValue(handle.getPointer()) != 0) {
+                Kernel32.INSTANCE.CloseHandle(handle);
+            }
+            closed = true;
+        }
     }
 
-    public boolean isSupported(DESTTYPE destType) {
-        return destType != null && supportedDestType.contains(destType);
+    /**
+     * @return true if {@link #close()} has been called
+     */
+    public boolean isClosed() {
+        return closed;
     }
-
-    protected final Set<DESTTYPE> supportedDestType = new CopyOnWriteArraySet<DESTTYPE>();
-
-    public DESTTYPE getDestType() {
-        return destType;
-    }
-    
-    
-    @Override
-    public Socket getSocket() {
-      return this;
-    }
-
-    public abstract DESTTYPE getDestType(final SocketAddress endpoint);
 }

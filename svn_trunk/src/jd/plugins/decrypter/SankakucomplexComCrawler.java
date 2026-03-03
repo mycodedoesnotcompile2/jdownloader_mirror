@@ -21,15 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +39,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52422 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -167,8 +168,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br>
-         * API may return http response code 429 if we try regardless. <br>
+         * Some items are only visible for logged in users and are never returned via API. </br> API may return http response code 429 if we
+         * try regardless. <br>
          * For this reason, some user may prefer website mode.
          */
         if (tagsCount > 3 && account == null) {
@@ -179,43 +180,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         } else {
             return crawlTagsPostsWebsite(account, param, tags, language);
         }
-    }
-
-    private String removeDiv(String input, String divStart) {
-        if (divStart == null) {
-            return input;
-        }
-        final int startIndex = input.indexOf(divStart);
-        if (startIndex == -1) {
-            return input;
-        }
-        int nextDivIndex = startIndex;
-        int divCount = 1;
-        while (true) {
-            int nextOpen = input.indexOf("<div", nextDivIndex);
-            int nextClose = input.indexOf("</div>", nextDivIndex);
-            if (nextOpen == -1) {
-                break;
-            }
-            if (nextOpen < nextClose) {
-                divCount++;
-                nextDivIndex = nextOpen + 1;
-            } else if (nextClose < nextOpen) {
-                divCount--;
-                nextDivIndex = nextClose + "</div>".length();
-            }
-            if (divCount == 1) {
-                break;
-            }
-        }
-        if (startIndex == nextDivIndex) {
-            return input;
-        }
-        // String removeThis= input.substring(startIndex, nextDivIndex);
-        final StringBuilder sb = new StringBuilder(input);
-        logger.info("removeDiv:" + divStart);
-        sb.replace(startIndex, nextDivIndex, "");
-        return sb.toString();
     }
 
     private ArrayList<DownloadLink> crawlTagsPostsWebsite(final Account account, final CryptedLink param, final String tags, final String language) throws Exception {
@@ -275,10 +239,10 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
              * Remove unwanted items / ads from html source. Typically this is only relevant for the html code of the first page. </br>
              * Typically this removes two kinds of items: Popular/Recommended items and ads for "Create your own ai art"
              */
-            html = removeDiv(html, new Regex(html, "(<div[^>]*id\\s*=\\s*\"popular-preview\"[^>]*>)").getMatch(0));
-            html = removeDiv(html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*news-carousel\"[^>]*>)").getMatch(0));
-            html = removeDiv(html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*topbar-carousel\"[^>]*>)").getMatch(0));
-            html = removeDiv(html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*carousel-data-companion\"[^>]*>)").getMatch(0));
+            html = XFileSharingProBasic.removeDiv(this, html, new Regex(html, "(<div[^>]*id\\s*=\\s*\"popular-preview\"[^>]*>)").getMatch(0));
+            html = XFileSharingProBasic.removeDiv(this, html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*news-carousel\"[^>]*>)").getMatch(0));
+            html = XFileSharingProBasic.removeDiv(this, html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*topbar-carousel\"[^>]*>)").getMatch(0));
+            html = XFileSharingProBasic.removeDiv(this, html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*carousel-data-companion\"[^>]*>)").getMatch(0));
             final String[] postIDs = new Regex(html, "(?i)PostModeMenu.click\\('([A-Za-z0-9]+)'\\)").getColumn(0);
             if (postIDs == null || postIDs.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

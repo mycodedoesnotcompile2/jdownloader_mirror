@@ -26,11 +26,13 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SPEEDUNIT;
 
 public class AggregatedNumbers {
     protected static final boolean FORCED_MIRROR_CASE_INSENSITIVE = CrossSystem.isWindows() || JsonConfig.create(GeneralSettings.class).isForceMirrorDetectionCaseInsensitive();
     private final long             totalBytes;
     private static final SIZEUNIT  maxSizeUnit                    = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit();
+    private static final SPEEDUNIT maxSpeedUnit                   = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSpeedUnit();
     private final NumberFormat     formatter;
 
     public final String getFinishedString(final boolean inclDisabled) {
@@ -90,7 +92,7 @@ public class AggregatedNumbers {
     }
 
     public String getDownloadSpeedString() {
-        return SIZEUNIT.formatValue(maxSizeUnit, formatter, downloadSpeed) + "/s";
+        return SPEEDUNIT.formatValue(maxSpeedUnit, formatter, downloadSpeed) + "/s";
     }
 
     public String getEtaString() {

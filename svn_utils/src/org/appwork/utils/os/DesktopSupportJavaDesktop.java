@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.SocketAddress;
 
 /**
  * @author daniel
@@ -160,6 +161,11 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
     @Override
     public boolean reboot(boolean force, int waitms) throws InterruptedException {
         return false;
+    }
+
+    @Override
+    public int getPIDForRemoteAddress(final SocketAddress adr) throws InterruptedException, NotSupportedException {
+       throw new NotSupportedException("OS not supported");
     }
 
 }

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -35,6 +35,7 @@ package org.appwork.utils.os;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
 
@@ -74,5 +75,19 @@ public interface DesktopSupport {
      * @throws InterruptedException
      */
     boolean reboot(boolean force, int waitms) throws InterruptedException;
+
+    /**
+     * Resolves the process ID of the peer for a TCP connection. Given the remote (peer) socket address from this process's
+     * perspective (e.g. {@code socket.getRemoteSocketAddress()} on the server side), returns the PID of the process that owns
+     * the peer's side of the connection. Use case: server wants the client's PID (e.g. browser) to resolve the executable path.
+     * Not supported on all platforms; returns -1 when not available.
+     *
+     * @param adr
+     *            remote socket address of the peer (e.g. client address from server's view)
+     * @return PID of the peer process, or -1 if not found or not supported
+     * @throws InterruptedException
+     * @throws NotSupportedException 
+     */
+    int getPIDForRemoteAddress(SocketAddress adr) throws InterruptedException, NotSupportedException;
 
 }

@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50406 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2TheclassicpornCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2TheclassicpornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -59,7 +60,7 @@ public class KernelVideoSharingComV2TheclassicpornCom extends KernelVideoSharing
     }
 
     @Override
-    protected void checkErrorsLastResort(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+    protected void checkErrorsLastResort(final Browser br, final DownloadLink link, final Account account) throws PluginException, IOException {
         if (br.containsHTML("class=\"button-tab jsLoginFloatOpen\" title=\"Download")) {
             throw new AccountRequiredException();
         }

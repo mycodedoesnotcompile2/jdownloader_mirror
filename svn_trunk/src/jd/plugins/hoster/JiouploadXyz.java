@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52404 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
 public class JiouploadXyz extends PluginForHost {
     public JiouploadXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,8 +63,14 @@ public class JiouploadXyz extends PluginForHost {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         /* Similar to: SwiftuploadsCom */
-        ret.add(new String[] { "jioupload.xyz", "ajdown.space", "domesy.lol" });
+        ret.add(new String[] { "zoroly.lol", "jioupload.xyz", "ajdown.space", "domesy.lol" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-03-02: main domain changed from jioupload.xyz to zoroly.lol */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

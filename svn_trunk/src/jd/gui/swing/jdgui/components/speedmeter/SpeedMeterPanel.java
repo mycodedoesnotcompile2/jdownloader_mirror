@@ -18,26 +18,29 @@ package jd.gui.swing.jdgui.components.speedmeter;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.locale._AWU;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.Graph;
 import org.appwork.utils.swing.graph.Limiter;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SPEEDUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.controlling.downloadcontroller.DownloadWatchDog;
 
 public class SpeedMeterPanel extends Graph {
     private static final long     serialVersionUID = 5571694800446993879L;
     private final Limiter         speedLimiter;
     private final GeneralSettings config;
     private final DecimalFormat   decimalFormat;
+    private final SPEEDUNIT       maxSpeedUnit;
 
     @Override
     protected NumberFormat getNumberFormat() {
@@ -50,6 +53,7 @@ public class SpeedMeterPanel extends Graph {
         this.setCapacity((CFG_GUI.CFG.getSpeedMeterTimeFrame() * fps) / 1000);
         this.setInterval(1000 / fps);
         decimalFormat = new DecimalFormat("0.00");
+        maxSpeedUnit = CFG_GUI.CFG.getMaxSpeedUnit();
         setCurrentColorTop(LAFOptions.getInstance().getColorForSpeedmeterCurrentTop());
         setCurrentColorBottom(LAFOptions.getInstance().getColorForSpeedmeterCurrentBottom());
         setAverageColor(LAFOptions.getInstance().getColorForSpeedMeterAverage());
@@ -97,12 +101,30 @@ public class SpeedMeterPanel extends Graph {
     }
 
     protected String createTooltipText() {
-        int limit = -1;
+        final int limit;
         if (config.isDownloadSpeedLimitEnabled() && (limit = config.getDownloadSpeedLimit()) > 0) {
-            return getAverageSpeedString() + "  " + getSpeedString() + "\r\n" + _GUI.T.SpeedMeterPanel_createTooltipText_(SizeFormatter.formatBytes(decimalFormat, limit));
+            return getAverageSpeedString() + "  " + getSpeedString() + "\r\n" + _GUI.T.SpeedMeterPanel_createTooltipText_(maxSpeedUnit.formatValue(maxSpeedUnit, getNumberFormat(), limit));
         } else {
             return getAverageSpeedString() + "  " + getSpeedString();
         }
+    }
+
+    @Override
+    public String getAverageSpeedString() {
+        final long all = this.all;
+        if (all <= 0) {
+            return null;
+        } else {
+            return _AWU.T.AppWorkUtils_Graph_getAverageSpeedString2(maxSpeedUnit.formatValue(maxSpeedUnit, getNumberFormat(), this.average / all));
+        }
+    }
+
+    @Override
+    public String getSpeedString() {
+        if (this.all <= 0) {
+            return null;
+        }
+        return _AWU.T.AppWorkUtils_Graph_getSpeedString(maxSpeedUnit.formatValue(maxSpeedUnit, getNumberFormat(), this.value));
     }
 
     @Override

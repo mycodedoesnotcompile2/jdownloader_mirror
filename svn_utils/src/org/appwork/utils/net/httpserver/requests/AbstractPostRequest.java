@@ -413,4 +413,4 @@ public abstract class AbstractPostRequest extends HttpRequest {
      * @return
      */
     public abstract RequestMethod getRequestMethod();
- }
+}

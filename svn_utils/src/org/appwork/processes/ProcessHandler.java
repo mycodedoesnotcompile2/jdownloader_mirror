@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -120,10 +120,11 @@ public interface ProcessHandler {
 
     /**
      * Returns a list of processes that are locking the specified file.
-     * 
+     *
      * @param file
      *            The file to check for locking processes
-     * @return List of ProcessInfo objects representing processes that are locking the file. Empty list if no processes are locking the file.
+     * @return List of ProcessInfo objects representing processes that are locking the file. Empty list if no processes are locking the
+     *         file.
      * @throws NotSupportedException
      *             If the operation is not supported on the current platform (e.g., Windows versions before Vista)
      * @throws IOException

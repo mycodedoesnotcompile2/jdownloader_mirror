@@ -43,7 +43,7 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.DownloadPluginProgress;
 import org.jdownloader.premium.PremiumInfoDialog;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SPEEDUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 public class SpeedColumn extends ExtTextColumn<AbstractNode> {
@@ -55,7 +55,7 @@ public class SpeedColumn extends ExtTextColumn<AbstractNode> {
     private final Icon          warningIcon;
     private final AtomicBoolean speedLimiterEnabled = new AtomicBoolean(false);
     private final DecimalFormat formatter;
-    private final SIZEUNIT      maxSizeUnit;
+    private final SPEEDUNIT     maxSpeedUnit;
 
     public SpeedColumn() {
         super(_GUI.T.SpeedColumn_SpeedColumn());
@@ -82,11 +82,7 @@ public class SpeedColumn extends ExtTextColumn<AbstractNode> {
             }
         }, false);
         this.formatter = new DecimalFormat("0.00");
-        if (JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit().isIECPrefix()) {
-            maxSizeUnit = SIZEUNIT.MiB;
-        } else {
-            maxSizeUnit = SIZEUNIT.MB;
-        }
+        maxSpeedUnit = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSpeedUnit();
         this.setRowSorter(new ExtDefaultRowSorter<AbstractNode>() {
             @Override
             public int compare(final AbstractNode o1, final AbstractNode o2) {
@@ -232,13 +228,13 @@ public class SpeedColumn extends ExtTextColumn<AbstractNode> {
             if (pluginProgress instanceof DownloadPluginProgress) {
                 final long speed = ((DownloadPluginProgress) pluginProgress).getSpeed();
                 if (speed >= 0) {
-                    return SIZEUNIT.formatValue(maxSizeUnit, formatter, speed) + "/s";
+                    return SPEEDUNIT.formatValue(maxSpeedUnit, formatter, speed) + "/s";
                 }
             }
         } else if (value instanceof FilePackage) {
             final long speed = DownloadWatchDog.getInstance().getDownloadSpeedbyFilePackage((FilePackage) value);
             if (speed >= 0) {
-                return SIZEUNIT.formatValue(maxSizeUnit, formatter, speed) + "/s";
+                return SPEEDUNIT.formatValue(maxSpeedUnit, formatter, speed) + "/s";
             }
         }
         return null;

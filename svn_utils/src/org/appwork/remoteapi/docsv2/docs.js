@@ -85,9 +85,12 @@
     return { 'X-TOKEN': t };
   }
 
-  async function callApi(path, args, expectBinary) {
+  async function callApi(path, args, expectBinary, options) {
     const body = JSON.stringify(Array.isArray(args) ? args : []);
     const headers = Object.assign({ 'Content-Type': 'application/json;charset=UTF-8' }, authHeaders());
+    if (options && options.polling) {
+      headers['X-Docs-Polling'] = '1';
+    }
     const url = path.startsWith('/') ? path : ('/' + path);
     const resp = await fetch(url, { method: 'POST', headers, body });
     if (!resp.ok) {
@@ -207,7 +210,7 @@
   function renderWikiLinks(links) {
     const list = Array.isArray(links) ? links.filter((x) => !!x) : [];
     if (!list.length) return '';
-    let html = '<div class="muted" style="margin-top:6px">Related links (more docs/details): ';
+    let html = '<div class="muted" style="margin-top:6px">';
     list.forEach((url, idx) => {
       if (idx > 0) html += ' | ';
       html += '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Docs &amp; details</a>';
@@ -1399,11 +1402,11 @@
     const aliveEl = by('remoteAlive');
     const statusEl = by('remoteStatusText');
     try {
-      const alive = await callApi('connect/isAlive', []);
+      const alive = await callApi('connect/isAlive', [], false, { polling: true });
       const aliveValue = alive.data === true || String(alive.data).toLowerCase() === 'true';
       if (aliveEl) aliveEl.innerHTML = statusPill(aliveValue, aliveValue ? 'Connected' : 'Disconnected');
       if (globalAliveEl) globalAliveEl.innerHTML = statusPill(aliveValue, aliveValue ? 'Connected' : 'Disconnected');
-      const stateRes = await callApi('connect/getState', []);
+      const stateRes = await callApi('connect/getState', [], false, { polling: true });
       const connectState = stateRes.data || {};
       setPre('remoteConnectState', JSON.stringify(connectState, null, 2));
       const statusText = String(connectState.statusText || connectState.message || connectState.guiStatusText || '-');

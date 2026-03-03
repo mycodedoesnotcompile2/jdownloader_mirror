@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -36,6 +36,8 @@ package org.appwork.utils.os;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -45,6 +47,8 @@ import java.util.Locale;
 
 import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.appwork.utils.processes.ProcessOutput;
+import org.appwork.utils.Regex;
+import org.appwork.utils.Application;
 
 /**
  * @author daniel
@@ -379,5 +383,53 @@ public class DesktopSupportLinux implements DesktopSupport {
             org.appwork.loggingv3.LogV3.log(e);
         }
         return true;
+    }
+
+    /**
+     * Experimental: resolves peer PID from TCP connection table via {@code ss -tpn} (or netstat). Only active when running in
+     * IDE (not from jar); in production returns -1.
+     * @throws NotSupportedException 
+     */
+    @Override
+    public int getPIDForRemoteAddress(final SocketAddress adr) throws InterruptedException, NotSupportedException {
+        if (adr == null || !(adr instanceof InetSocketAddress)) {
+            return -1;
+        }
+        if (Application.isJared(null)) {
+            throw new NotSupportedException("OS not supported");
+        }
+        try {
+            final InetSocketAddress inetAdr = (InetSocketAddress) adr;
+            final String peerHost = inetAdr.getAddress().getHostAddress();
+            final int port = inetAdr.getPort();
+            final String peerKey = peerHost + ":" + port;
+            final ProcessOutput out = ProcessBuilderFactory.runCommand(new String[] { "ss", "-tpn" });
+            final String str = out.getStdOutString();
+            if (str == null) {
+                return -1;
+            }
+            for (final String line : Regex.getLines(str)) {
+                final String trimmed = line.trim();
+                if (trimmed.length() == 0) {
+                    continue;
+                }
+                final String[] tokens = trimmed.split("\\s+");
+                if (tokens.length < 5) {
+                    continue;
+                }
+                if (!peerKey.equals(tokens[3])) {
+                    continue;
+                }
+                final String[] pidMatch = new Regex(trimmed, "pid=(\\d+)").getRow(0);
+                if (pidMatch != null && pidMatch.length >= 1) {
+                    return Integer.parseInt(pidMatch[0], 10);
+                }
+            }
+        } catch (InterruptedException e) {
+            throw e;
+        } catch (Throwable e) {
+            log(e);
+        }
+        return -1;
     }
 }

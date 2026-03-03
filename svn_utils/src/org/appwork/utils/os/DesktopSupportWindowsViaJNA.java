@@ -2,14 +2,16 @@ package org.appwork.utils.os;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 
 import org.appwork.builddecision.BuildDecisionRequired;
-import org.appwork.exceptions.WTFException;
-import org.appwork.jna.windows.Iphlpapi;
+import org.appwork.utils.os.DesktopSupportForWindowsIphlpapi;
+import org.appwork.utils.os.DesktopSupportForWindowsMIB_TCP6ROW2;
+import org.appwork.utils.os.DesktopSupportForWindowsMIB_TCP6TABLE2;
 import org.appwork.jna.windows.MIB_TCPROW2;
 import org.appwork.jna.windows.MIB_TCPTABLE2;
 import org.appwork.loggingv3.LogV3;
@@ -63,6 +65,21 @@ public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
     }
 
     /**
+     * Converts 16-byte IPv6 address (e.g. from DesktopSupportForWindowsMIB_TCP6ROW2) to InetAddress.
+     */
+    public static InetAddress getInetAddressFromIPv6Bytes(final byte[] bytes) {
+        if (bytes == null || bytes.length != 16) {
+            return null;
+        }
+        try {
+            return InetAddress.getByAddress(bytes);
+        } catch (final UnknownHostException e) {
+            LogV3.log(e);
+        }
+        return null;
+    }
+
+    /**
      * @see org.appwork.utils.os.DesktopSupportWindows#openFile(java.io.File, boolean)
      */
     @Override
@@ -79,37 +96,108 @@ public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
 
     @Override
     public int getPIDForRemoteAddress(final SocketAddress adr) throws InterruptedException {
+        final InetSocketAddress inetAdr = (InetSocketAddress) adr;
+        final InetAddress requestingAddress = inetAdr.getAddress();
+        final int port = inetAdr.getPort();
+        if (requestingAddress instanceof Inet6Address) {
+            final int pid = findPidFromTcpTableIPv6(requestingAddress, port);
+            if (pid >= 0) {
+                return pid;
+            }
+            LogV3.fine("Get PID By socket(JNA IPv6): " + adr + " -> NONE. try fallback.");
+            return super.getPIDForRemoteAddress(adr);
+        }
+        final int pid = findPidFromTcpTableIPv4(requestingAddress, port);
+        if (pid >= 0) {
+            return pid;
+        }
+        LogV3.fine("Get PID By socket(JNA): " + adr + " -> NONE. try fallback.");
+        return super.getPIDForRemoteAddress(adr);
+    }
+
+    /**
+     * Finds the owning PID for the connection row where local address = peer (IPv4). Returns -1 if not found or on error.
+     */
+    private int findPidFromTcpTableIPv4(final InetAddress peerAddress, final int peerPort) {
         try {
-            final InetAddress requestingAddress = ((InetSocketAddress) adr).getAddress();
-            final int port = ((InetSocketAddress) adr).getPort();
             final IntByReference psize = new IntByReference(0);
             psize.setValue(0);
             final boolean sort = true;
-            MIB_TCPTABLE2 table = null;
-            if (Iphlpapi.INSTANCE.GetTcpTable2(null, psize, sort) == WinError.ERROR_INSUFFICIENT_BUFFER) {
-                Memory mem;
-                if (Iphlpapi.INSTANCE.GetTcpTable2(mem = new Memory(psize.getValue()), psize, sort) != WinError.NO_ERROR) {
-                    throw new WTFException("ERROR");
-                }
-                table = new MIB_TCPTABLE2(mem);
-            } else {
-                throw new WTFException();
+            if (DesktopSupportForWindowsIphlpapi.INSTANCE.GetTcpTable2(null, psize, sort) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+                return -1;
             }
-            // LogV3.info("Table Size: " + table.table.length + "/" + table.dwNumEntries.intValue());
+            final Memory mem = new Memory(psize.getValue());
+            if (DesktopSupportForWindowsIphlpapi.INSTANCE.GetTcpTable2(mem, psize, sort) != WinError.NO_ERROR) {
+                return -1;
+            }
+            final MIB_TCPTABLE2 table = new MIB_TCPTABLE2(mem);
             for (int i = 0; i < table.dwNumEntries.intValue(); i++) {
-                final MIB_TCPROW2 e = table.table[i];
-                if (e != null) {
-                    if (requestingAddress.equals(getInetAdress(e.dwLocalAddr)) && switchbytes(e.dwLocalPort) == port) {
-                        final long ret = e.dwOwningPid.longValue();
-                        // LogV3.fine("Get PID By socket(JNA): " + adr + " -> " + ret);
-                        return (int) ret;
-                    }
+                final MIB_TCPROW2 row = table.table[i];
+                if (row == null) {
+                    continue;
                 }
+                if (!peerAddress.equals(getInetAdress(row.dwLocalAddr))) {
+                    continue;
+                }
+                if (switchbytes(row.dwLocalPort) != peerPort) {
+                    continue;
+                }
+                final long ret = row.dwOwningPid.longValue();
+                if (ret > 0) {
+                    return (int) ret;
+                }
+                LogV3.fine("GetTcpTable2 returned PID 0 for matching row (unknown owner), try fallback");
+                return -1;
             }
         } catch (final Throwable e) {
             LogV3.log(e);
         }
-        LogV3.fine("Get PID By socket(JNA): " + adr + " -> NONE. try fallback.");
-        return super.getPIDForRemoteAddress(adr);
+        return -1;
+    }
+
+    /**
+     * Finds the owning PID for the connection row where local address = peer (IPv6). Returns -1 if not found or on error.
+     * GetTcp6Table2 is only available on Windows Vista and later; on older Windows we return -1 so the caller can fall back to netstat.
+     */
+    private int findPidFromTcpTableIPv6(final InetAddress peerAddress, final int peerPort) {
+        if (!CrossSystem.OS.isMinimum(CrossSystem.OperatingSystem.WINDOWS_VISTA)) {
+            LogV3.fine("GetTcp6Table2 requires Windows Vista or later, skipping JNA IPv6 (fallback to netstat)");
+            return -1;
+        }
+        try {
+            final IntByReference psize = new IntByReference(0);
+            psize.setValue(0);
+            final boolean sort = true;
+            if (DesktopSupportForWindowsIphlpapi.INSTANCE.GetTcp6Table2(null, psize, sort) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+                return -1;
+            }
+            final Memory mem = new Memory(psize.getValue());
+            if (DesktopSupportForWindowsIphlpapi.INSTANCE.GetTcp6Table2(mem, psize, sort) != WinError.NO_ERROR) {
+                return -1;
+            }
+            final DesktopSupportForWindowsMIB_TCP6TABLE2 table = new DesktopSupportForWindowsMIB_TCP6TABLE2(mem);
+            for (int i = 0; i < table.dwNumEntries.intValue(); i++) {
+                final DesktopSupportForWindowsMIB_TCP6ROW2 row = table.table[i];
+                if (row == null) {
+                    continue;
+                }
+                final InetAddress rowLocal = getInetAddressFromIPv6Bytes(row.LocalAddr);
+                if (!peerAddress.equals(rowLocal)) {
+                    continue;
+                }
+                if (switchbytes(row.dwLocalPort) != peerPort) {
+                    continue;
+                }
+                final long pid = row.dwOwningPid.longValue();
+                if (pid > 0) {
+                    return (int) pid;
+                }
+                LogV3.fine("GetTcp6Table2 returned PID 0 for matching row (unknown owner), try fallback");
+                return -1;
+            }
+        } catch (final Throwable e) {
+            LogV3.log(e);
+        }
+        return -1;
     }
 }

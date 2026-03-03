@@ -320,7 +320,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     public static void assertEqualsDeep(final Object a, final Object b) throws Exception {
         if (!CompareUtils.equalsDeep(a, b)) {
-            throw new Exception("a does not equal b. " + Deser.toString(a, SC.LOG_SINGLELINE) + "!=" + Deser.toString(b, SC.LOG_SINGLELINE));
+            throw new Exception("a does not equal b. \r\n" + Deser.toString(a, SC.LOG_SINGLELINE) + "\r\n!=\r\n" + Deser.toString(b, SC.LOG_SINGLELINE));
         }
     }
 

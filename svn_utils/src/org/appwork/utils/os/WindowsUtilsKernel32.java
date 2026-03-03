@@ -37,8 +37,12 @@ package org.appwork.utils.os;
 import org.appwork.jna.windows.Kernel32Ext;
 
 import com.sun.jna.Native;
+import com.sun.jna.Pointer;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.W32APIOptions;
+
+import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinDef.DWORD;
 
 /**
  * @author thomas
@@ -95,4 +99,11 @@ public interface WindowsUtilsKernel32 extends Kernel32Ext {
 
     /** File type: disk file (for GetFileType inherited from Kernel32). */
     int FILE_TYPE_DISK = 0x0001;
+
+    /**
+     * CreateProcessW with mutable lpCommandLine (char[]). The Windows API may modify this buffer; passing a Java
+     * String to the standard CreateProcess can cause the process to exit immediately. Use this overload when starting
+     * long-running processes.
+     */
+    boolean CreateProcess(Pointer lpApplicationName, char[] lpCommandLine, WinBase.SECURITY_ATTRIBUTES lpProcessAttributes, WinBase.SECURITY_ATTRIBUTES lpThreadAttributes, boolean bInheritHandles, DWORD dwCreationFlags, Pointer lpEnvironment, String lpCurrentDirectory, WinBase.STARTUPINFO lpStartupInfo, WinBase.PROCESS_INFORMATION lpProcessInformation);
 }

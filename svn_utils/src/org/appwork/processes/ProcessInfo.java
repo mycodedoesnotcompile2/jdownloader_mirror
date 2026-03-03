@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -194,6 +194,46 @@ public class ProcessInfo {
     }
 
     /**
+     * Optional working directory (e.g. from startElevatedProcess).
+     */
+    private String workingDirectory;
+
+    /**
+     * Exit code after the process has exited (set by ProcessHandler.waitForExit). Null while still running or unknown.
+     */
+    private Integer exitCode;
+
+    /**
+     * @return the working directory, or null
+     */
+    public String getWorkingDirectory() {
+        return workingDirectory;
+    }
+
+    /**
+     * @param workingDirectory
+     *            the working directory to set
+     */
+    public void setWorkingDirectory(String workingDirectory) {
+        this.workingDirectory = workingDirectory;
+    }
+
+    /**
+     * @return the exit code after the process exited, or null if still running or unknown
+     */
+    public Integer getExitCode() {
+        return exitCode;
+    }
+
+    /**
+     * @param exitCode
+     *            the exit code to set (e.g. by ProcessHandler.waitForExit when process has exited)
+     */
+    public void setExitCode(Integer exitCode) {
+        this.exitCode = exitCode;
+    }
+
+    /**
      * @see java.lang.Object#toString()
      */
     @Override
@@ -210,5 +250,7 @@ public class ProcessInfo {
         this.creationTime = processInfo.getCreationTime();
         this.applicationType = processInfo.getApplicationType();
         this.readableName = processInfo.getReadableName();
+        this.workingDirectory = processInfo.getWorkingDirectory();
+        this.exitCode = processInfo.getExitCode();
     }
 }

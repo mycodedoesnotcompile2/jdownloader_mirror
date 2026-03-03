@@ -193,6 +193,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
     protected volatile int                                       readTimeout             = 30000;
     protected volatile int                                       requestedConnectTimeout = 30000;
     protected IPVERSION                                          ipVersion               = null;
+    protected DNSResolver                                        dnsResolver             = null;
 
     public IPVERSION getIPVersion() {
         return ipVersion;
@@ -834,7 +835,24 @@ public class HTTPConnectionImpl implements HTTPConnection {
         return this.hostName != null;
     }
 
+    @Override
+    public void setDNSResolver(final DNSResolver resolver) {
+        this.dnsResolver = resolver;
+    }
+
+    @Override
+    public DNSResolver getDNSResolver() {
+        return this.dnsResolver;
+    }
+
     protected InetAddress[] resolvHostIP(final String host) throws IOException {
+        if (this.dnsResolver != null) {
+            final InetAddress[] resolved = this.dnsResolver.resolveDomain(host);
+            if (resolved == null || resolved.length == 0) {
+                throw new UnknownHostException("DNSResolver returned no address for:" + host);
+            }
+            return resolved;
+        }
         return HTTPConnectionUtils.resolvHostIP(host, getIPVersion());
     }
 
@@ -1417,7 +1435,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     } else if (HTTPConstants.ResponseCode.SUCCESS_NO_CONTENT.matches(getResponseCode())) {
                         /*
                          * https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204
-                         * 
+                         *
                          * Although this status code is intended to describe a response with no body, servers may erroneously include data
                          * following the headers.
                          */

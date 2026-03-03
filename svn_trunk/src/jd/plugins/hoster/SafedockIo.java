@@ -18,8 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
@@ -27,7 +25,10 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52299 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 52423 $", interfaceVersion = 3, names = {}, urls = {})
 public class SafedockIo extends XFileSharingProBasic {
     public SafedockIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -99,6 +100,13 @@ public class SafedockIo extends XFileSharingProBasic {
         } else {
             return super.regExTrafficLeft(br);
         }
+    }
+
+    @Override
+    public String[] scanInfo(String html, String[] fileInfo) {
+        // remove premium ads
+        html = removeDiv(this, html, new Regex(html, "(<div[^>]*id\\s*=\\s*\"Prem_traffic\"[^>]*>)").getMatch(0));
+        return super.scanInfo(html, fileInfo);
     }
 
     @Override

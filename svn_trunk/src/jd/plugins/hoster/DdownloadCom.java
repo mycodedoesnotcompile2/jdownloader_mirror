@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52190 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -346,14 +346,15 @@ public class DdownloadCom extends XFileSharingProBasic {
     @Override
     protected void fetchAccountInfoWebsiteTraffic(Browser br, Account account, AccountInfo ai) throws Exception {
         super.fetchAccountInfoWebsiteTraffic(br, account, ai);
-        final String trafficLeftMB = br.getRegex("data-traffic=\"(\\d+)\"").getMatch(0);
+        /* 2026-03-02: Traffic can be negative. */
+        final String trafficLeftMB = br.getRegex("data-traffic=\"(-?\\d+)\"").getMatch(0);
         if (trafficLeftMB != null) {
             ai.setTrafficLeft(Long.parseLong(trafficLeftMB) * 1000 * 1000);
         } else {
             logger.warning("Special trafficleft regexes failed -> Website has changed?"); /* Fallback to template handling */
             final String trafficleftStr = super.regExTrafficLeft(br);
             if (trafficleftStr != null) {
-                ai.setTrafficLeft(SizeFormatter.getSize(trafficleftStr));
+                ai.setTrafficLeft(SizeFormatter.getSize(trafficleftStr, true, true));
             }
         }
         if (ai.getTrafficLeft() > 0) {

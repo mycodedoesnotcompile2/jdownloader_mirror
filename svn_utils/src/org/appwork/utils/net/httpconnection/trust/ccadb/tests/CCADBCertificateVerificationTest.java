@@ -157,12 +157,12 @@ public class CCADBCertificateVerificationTest extends AWTest {
             }
         }
         if (needHttp) {
-            LogV3.info("HTTP to crt.sh required – running revoked validation first.");
+            AWTest.logInfoAnyway("HTTP to crt.sh required – running revoked validation first.");
             runRevokedValidationTests();
         } else {
-            LogV3.info("All crt.sh lookups from cache – revoked tests skipped.");
+            AWTest.logInfoAnyway("All crt.sh lookups from cache – revoked tests skipped.");
         }
-        LogV3.info("Loaded " + certs.length + " certificates from " + PEM_RESOURCE + ", verifying " + toCheck + " against crt.sh (persisted cache: " + getCacheFile() + ") ...");
+        AWTest.logInfoAnyway("Loaded " + certs.length + " certificates from " + PEM_RESOURCE + ", verifying " + toCheck + " against crt.sh (persisted cache: " + getCacheFile() + ") ...");
         final AtomicInteger found = new AtomicInteger(0);
         final AtomicInteger notFound = new AtomicInteger(0);
         for (int i = 0; i < toCheck; i++) {
@@ -175,14 +175,14 @@ public class CCADBCertificateVerificationTest extends AWTest {
             final CrtshInfo info = fetchAndParseCrtsh(sha256);
             if (info != null) {
                 found.incrementAndGet();
-                LogV3.info("[" + (i + 1) + "/" + toCheck + "] FOUND  " + subject);
-                LogV3.info("  crt.sh: " + info.toString());
+                AWTest.logInfoAnyway("[" + (i + 1) + "/" + toCheck + "] FOUND  " + subject);
+                AWTest.logInfoAnyway("  crt.sh: " + info.toString());
             } else {
                 notFound.incrementAndGet();
-                LogV3.info("[" + (i + 1) + "/" + toCheck + "] not in crt.sh: " + subject + " sha256=" + sha256);
+                AWTest.logInfoAnyway("[" + (i + 1) + "/" + toCheck + "] not in crt.sh: " + subject + " sha256=" + sha256);
             }
         }
-        LogV3.info("Verification result: " + found.get() + " found on crt.sh, " + notFound.get() + " not found (of " + toCheck + " checked)");
+        AWTest.logInfoAnyway("Verification result: " + found.get() + " found on crt.sh, " + notFound.get() + " not found (of " + toCheck + " checked)");
         assertTrue(notFound.get() == 0, "All CAs must be validatable via crt.sh; " + notFound.get() + " not validated.");
     }
 
@@ -230,7 +230,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
         }
         final String url = CRTSH_BASE + sha256Hex;
         try {
-            LogV3.info("crt.sh request: GET " + url);
+            AWTest.logInfoAnyway("crt.sh request: GET " + url);
             final RequestContext body = httpGet(url);
             if (body == null) {
                 LogV3.warning("crt.sh request failed (no response): " + url);
@@ -242,9 +242,9 @@ public class CCADBCertificateVerificationTest extends AWTest {
             if (info != null) {
                 PERSISTED_FOUND.put(sha256Hex, Long.valueOf(now));
                 saveToPersistedCache(sha256Hex, now);
-                LogV3.info("crt.sh response: " + sha256Hex + " -> " + (info.revocationStatus != null && (info.revocationStatus.toLowerCase().contains("revoked") && !info.revocationStatus.toLowerCase().contains("not revoked")) ? "revoked" : "ok"));
+                AWTest.logInfoAnyway("crt.sh response: " + sha256Hex + " -> " + (info.revocationStatus != null && (info.revocationStatus.toLowerCase().contains("revoked") && !info.revocationStatus.toLowerCase().contains("not revoked")) ? "revoked" : "ok"));
             } else {
-                LogV3.info("crt.sh response: " + sha256Hex + " -> not found / parse error");
+                AWTest.logInfoAnyway("crt.sh response: " + sha256Hex + " -> not found / parse error");
             }
             return info;
         } catch (final Exception e) {
@@ -270,7 +270,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
             http.setConnectTimeout(60000);
             final RequestContext ctx = http.trust(CurrentJRETrustProvider.getInstance()).get(url);
             final int code = ctx != null ? ctx.getCode() : -1;
-            LogV3.info("crt.sh HTTP " + (code > 0 ? Integer.valueOf(code) : "error") + " " + url + (i > 0 ? " (retry " + i + ")" : ""));
+            AWTest.logInfoAnyway("crt.sh HTTP " + (code > 0 ? Integer.valueOf(code) : "error") + " " + url + (i > 0 ? " (retry " + i + ")" : ""));
             if (ctx != null && ctx.getCode() == 200) {
                 return ctx;
             }
@@ -328,7 +328,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
         final CrtshInfo revokedInfo = fetchAndParseCrtshNoCache(REVOKED_TEST_SHA256);
         assertNotNull(revokedInfo, "Known revoked cert must be found on crt.sh: " + CRTSH_BASE + REVOKED_TEST_SHA256);
         assertTrue(revokedInfo.revocationStatus != null && revokedInfo.revocationStatus.toLowerCase().contains("revoked"), "Revocation status must be detected as Revoked for " + REVOKED_TEST_SHA256 + ", got: " + revokedInfo.revocationStatus);
-        LogV3.info("Revoked-cert check passed: " + REVOKED_TEST_SHA256 + " -> " + revokedInfo.revocationStatus);
+        AWTest.logInfoAnyway("Revoked-cert check passed: " + REVOKED_TEST_SHA256 + " -> " + revokedInfo.revocationStatus);
         if (DELAY_MS_BETWEEN_REQUESTS > 0) {
             Thread.sleep(DELAY_MS_BETWEEN_REQUESTS);
         }
@@ -336,7 +336,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
         assertNotNull(revokedIntermediateInfo, "Known revoked intermediate must be found on crt.sh: " + CRTSH_BASE + REVOKED_INTERMEDIATE_CA_TEST_SHA256);
         assertTrue(revokedIntermediateInfo.revocationStatus != null && revokedIntermediateInfo.revocationStatus.toLowerCase().contains("revoked"), "Revocation status must be Revoked for revoked intermediate " + REVOKED_INTERMEDIATE_CA_TEST_SHA256 + ", got: " + revokedIntermediateInfo.revocationStatus);
         assertTrue(revokedIntermediateInfo.summary != null && (revokedIntermediateInfo.summary.equalsIgnoreCase("Intermediate certificate") || revokedIntermediateInfo.summary.toLowerCase().contains("intermediate")), "Revoked test subject must be an intermediate certificate, got summary: " + revokedIntermediateInfo.summary);
-        LogV3.info("Revoked-intermediate check passed: " + REVOKED_INTERMEDIATE_CA_TEST_SHA256 + " (" + revokedIntermediateInfo.summary + ") -> " + revokedIntermediateInfo.revocationStatus);
+        AWTest.logInfoAnyway("Revoked-intermediate check passed: " + REVOKED_INTERMEDIATE_CA_TEST_SHA256 + " (" + revokedIntermediateInfo.summary + ") -> " + revokedIntermediateInfo.revocationStatus);
     }
 
     /** Load fingerprint -> timestamp from user.home/.tests/crtsh-verified.txt (one line per entry: sha256\\ttimestamp). */

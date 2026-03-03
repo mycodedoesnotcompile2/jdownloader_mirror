@@ -18,8 +18,7 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.utils.Exceptions;
+import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -27,7 +26,9 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52243 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Exceptions;
+
+@HostPlugin(revision = "$Revision: 52418 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -150,6 +151,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "lesbian8.com" });
         ret.add(new String[] { "justporn.com" });
         ret.add(new String[] { "w4nkr.com" });
+        ret.add(new String[] { "fullpornxxx.net" });
         return ret;
     }
 
@@ -190,6 +192,18 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         } catch (PluginException e) {
             throw Exceptions.addSuppressed(exception, e);
         }
+    }
+
+    @Override
+    protected String handleQualitySelection(Browser br, DownloadLink link, Map<Integer, String> qualityMap) {
+        if (qualityMap == null || qualityMap.isEmpty()) {
+            return null;
+        }
+        final Map<Integer, String> qualityMapNew = handleOkRuGenerateMp4(br);
+        if (qualityMapNew != null) {
+            return super.handleQualitySelection(br, link, qualityMapNew);
+        }
+        return super.handleQualitySelection(br, link, qualityMap);
     }
 
     @Override

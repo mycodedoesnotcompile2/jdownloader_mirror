@@ -957,7 +957,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 LogV3.fine("HttpConnection.run: Request built in " + (beforeValidateTime - requestStartTime) + "ms, calling validateRequest");
             }
             // throw exception on Cors validation error
-            server.validateRequest(request);
+            server.validateRequest(request, response);
             final long afterValidateTime = Time.systemIndependentCurrentJVMTimeMillis();
             if (isVerboseLogEnabled()) {
                 LogV3.fine("HttpConnection.run: validateRequest completed in " + (afterValidateTime - beforeValidateTime) + "ms");
@@ -969,7 +969,12 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 if (request instanceof OptionsRequest) {
                     if (server.getCorsHandler().answerOptionsRequest((OptionsRequest) request, response)) {
                         // CORS is configured and origin is allowed - OPTIONS preflight request handled
-                        // Response is already prepared by answerOptionsRequest()
+                        // Notify extended handlers so they can log/capture the request (e.g. browser dev mode)
+                        for (final HttpRequestHandler handler : this.getHandler()) {
+                            if (handler instanceof ExtendedHttpRequestHandler) {
+                                ((ExtendedHttpRequestHandler) handler).onAfterRequest(request, response, true);
+                            }
+                        }
                         response.getOutputStream(true).flush();
                         closeConnection = true;
                         return;

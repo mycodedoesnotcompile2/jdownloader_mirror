@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -36,13 +36,13 @@ package org.appwork.utils.os;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
@@ -491,29 +491,117 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
     }
 
     /**
-     * @param i
-     * @return
+     * Resolves the process ID of the peer for a connection. Given the <b>remote (peer) socket address</b> from this process's
+     * perspective (e.g. {@code socket.getRemoteSocketAddress()} on the server side), returns the PID of the process that owns
+     * the peer's side of the connection (i.e. the row where local address = peer address). Use case: server wants the client's
+     * PID (e.g. browser) to resolve the executable path.
+     *
+     * @param adr
+     *            remote socket address of the peer (e.g. client address from server's view)
+     * @return PID of the peer process, or -1 if not found
      * @throws InterruptedException
      */
-    public int getPIDForRemoteAddress(SocketAddress adr) throws InterruptedException {
+    @Override
+    public int getPIDForRemoteAddress(final SocketAddress adr) throws InterruptedException {
+        if (!(adr instanceof InetSocketAddress)) {
+            return -1;
+        }
         try {
-            final ProcessOutput result = ProcessBuilderFactory.runCommand("cmd", "/c", "netstat", "-o", "-n", "-a", "|", "findstr", ((InetSocketAddress) adr).getAddress().getHostAddress() + ":" + ((InetSocketAddress) adr).getPort());
-            final String str = result.getStdOutString();
-            for (String line : Regex.getLines(str)) {
-                line = line.trim();
-                final String pid = new Regex(line, "^(?:TCP|UDP)\\s+" + Pattern.quote(((InetSocketAddress) adr).getAddress().getHostAddress()) + "\\:" + ((InetSocketAddress) adr).getPort() + "\\s+.*?(\\d+)$").getMatch(0);
+            final InetSocketAddress inetAdr = (InetSocketAddress) adr;
+            final InetAddress targetAddress = inetAdr.getAddress();
+            final int port = inetAdr.getPort();
+            final String netstatOutput = runNetstatWithPortFilter(port);
+            final int pid = findPidFromNetstatOutput(netstatOutput, targetAddress, port);
+            if (pid >= 0) {
                 LogV3.fine("Get PID By socket(netstat): " + adr + " -> " + pid);
-                if (pid != null) {
-                    return Integer.parseInt(pid);
-                }
+            } else {
+                LogV3.fine("Get PID By socket(netstat): " + adr + " -> NONE");
             }
+            return pid;
         } catch (InterruptedException iEx) {
             throw iEx;
+        } catch (IOException ioEx) {
+            throw new WTFException(ioEx);
         } catch (Throwable e) {
             throw new WTFException(e);
         }
-        LogV3.fine("Get PID By socket(netstat): " + adr + " -> NONE");
+    }
+
+    /**
+     * Runs netstat -o -n -a and filters lines containing the given port (e.g. ":12345").
+     */
+    private static String runNetstatWithPortFilter(final int port) throws InterruptedException, java.io.IOException {
+        final String findstrPattern = ":" + port;
+        final ProcessOutput result = ProcessBuilderFactory.runCommand("cmd", "/c", "netstat", "-o", "-n", "-a", "|", "findstr", findstrPattern);
+        final String str = result.getStdOutString();
+        return str != null ? str : "";
+    }
+
+    /**
+     * Parses netstat output and returns the PID of the row where the <b>local</b> address matches the peer (targetAddress:port).
+     * Peer's connection row has local=peer; we do not match foreign column (that would be our own row).
+     */
+    private static int findPidFromNetstatOutput(final String netstatOutput, final InetAddress targetAddress, final int targetPort) {
+        for (final String line : Regex.getLines(netstatOutput)) {
+            final String trimmed = line.trim();
+            final String[] groups = new Regex(trimmed, "^(?:TCP|UDP)\\s+(\\S+)\\s+(\\S+)\\s+\\S+\\s+(\\d+)$").getRow(0);
+            if (groups != null && groups.length >= 3) {
+                final String localPart = groups[0];
+                final String pidStr = groups[2];
+                final int pid = Integer.parseInt(pidStr, 10);
+                if (pid <= 0) {
+                    continue;
+                }
+                if (parseNetstatAddressPort(localPart, targetAddress, targetPort)) {
+                    return pid;
+                }
+            }
+        }
         return -1;
+    }
+
+    /**
+     * Parses netstat address:port string (e.g. "127.0.0.1:1234" or "[::1]:1234" or "[0:0:0:0:0:0:0:1]:1234") and returns true if it matches
+     * the given address and port. InetAddress comparison normalizes IPv6 forms.
+     */
+    private static boolean parseNetstatAddressPort(final String part, final InetAddress targetAddress, final int targetPort) {
+        if (part == null || part.length() == 0) {
+            return false;
+        }
+        String hostStr;
+        int port;
+        if (part.startsWith("[")) {
+            final int bracketEnd = part.indexOf("]:");
+            if (bracketEnd < 0) {
+                return false;
+            }
+            hostStr = part.substring(1, bracketEnd);
+            try {
+                port = Integer.parseInt(part.substring(bracketEnd + 2), 10);
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        } else {
+            final int lastColon = part.lastIndexOf(':');
+            if (lastColon < 0) {
+                return false;
+            }
+            hostStr = part.substring(0, lastColon);
+            try {
+                port = Integer.parseInt(part.substring(lastColon + 1), 10);
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        if (port != targetPort) {
+            return false;
+        }
+        try {
+            final InetAddress parsed = InetAddress.getByName(hostStr);
+            return targetAddress != null && parsed != null && targetAddress.equals(parsed);
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     public static String getProgramFiles(LogInterface logger) {

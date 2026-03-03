@@ -240,12 +240,12 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      * This method should be called before processing any request to ensure security policies are enforced. It throws exceptions if
      * validation fails.
      * </p>
-     *
+     * @param response TODO
      * @param requestMethod
-     *
      * @param headerCollection
      *            The request to validate. Must implement CorsRequestInterface and provide getRequestMethod(), getRequestedURL() or
      *            getRequestURI(), and getRemoteAddress()
+     *
      * @throws ForbiddenHeaderException
      *             if header validation fails
      * @throws HttpMethodNotAllowedException
@@ -253,7 +253,7 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      * @throws ForbiddenOriginException
      *             if the origin is not allowed (CORS validation fails)
      */
-    public void validateRequest(HttpRequest request) throws IOException, ForbiddenHeaderException, ForbiddenOriginException {
+    public void validateRequest(HttpRequest request, HttpResponse response) throws IOException, ForbiddenHeaderException, ForbiddenOriginException {
         final long validateStartTime = org.appwork.utils.Time.systemIndependentCurrentJVMTimeMillis();
         if (this.isVerboseLogEnabled()) {
             LogV3.fine("validateRequest: Starting validation for " + request.getRequestMethod() + " " + request.getRequestedURL());

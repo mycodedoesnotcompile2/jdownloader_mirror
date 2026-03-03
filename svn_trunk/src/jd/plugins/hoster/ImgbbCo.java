@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -36,7 +32,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52421 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgbbCo extends PluginForHost {
     public ImgbbCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class ImgbbCo extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "imgbb.com", "ibb.co" });
+        ret.add(new String[] { "imgbb.com", "ibb.co", "i.ibb.co" });
         return ret;
     }
 

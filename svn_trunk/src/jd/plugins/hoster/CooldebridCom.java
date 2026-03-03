@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52342 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static final String          API_BASE     = "https://cooldebrid.com/api/v1";
@@ -440,6 +440,8 @@ public class CooldebridCom extends PluginForHost {
             }
             final String status = host_info.get("status").toString();
             if ("degraded".equalsIgnoreCase(status)) {
+                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+            } else if ("offline".equalsIgnoreCase(status)) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             } else if (!isPremium && Boolean.TRUE.equals(host_info.get("premium_only"))) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
@@ -464,7 +466,7 @@ public class CooldebridCom extends PluginForHost {
     }
 
     private Map<String, Object> handleAPIErrors(final Account account, final DownloadLink link) throws Exception {
-        Map<String, Object> entries = null;
+        final Map<String, Object> entries;
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
@@ -502,7 +504,8 @@ public class CooldebridCom extends PluginForHost {
         /* Host-related errors */
         if ("HOST_NOT_SUPPORTED".equals(code) || "HOST_OFFLINE".equals(code) || "DAILY_LINK_LIMIT".equals(code) || "DAILY_BW_LIMIT".equals(code) || "HOST_DAILY_LIMIT".equals(code) || "HOST_COUNT_LIMIT".equals(code)) {
             mhm.putError(account, link, 5 * 60 * 1000l, message);
-            return null;
+            /* This code should never be reached. */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* All other errors */
         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);

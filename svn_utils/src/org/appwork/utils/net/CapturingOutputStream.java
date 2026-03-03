@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
- *         Spalter Strasse 58
- *         91183 Abenberg
+ *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
+ *         Schwabacher Straße 117
+ *         90763 Fürth
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,56 +31,107 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpconnection;
+package org.appwork.utils.net;
 
 import java.io.IOException;
-import java.net.Inet4Address;
-import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.UnknownHostException;
-
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.appwork.utils.net.socketconnection.Socks4SocketConnection;
-import org.appwork.utils.net.socketconnection.SocksSocketConnection;
-import org.appwork.utils.net.socketconnection.SocksSocketConnection.DESTTYPE;
+import java.io.OutputStream;
 
 /**
- * @author daniel
- *
+ * OutputStream that delegates every write to multiple target streams (tee). All targets receive the same bytes. Use e.g. with a socket
+ * stream and a ByteArrayOutputStream to capture a copy of the response while sending it to the client. When this stream is closed, all
+ * target streams are closed.
  */
-public class Socks4HTTPConnectionImpl extends AbstractSocksHTTPConnection {
-    public Socks4HTTPConnectionImpl(URL url, HTTPProxy proxy, DESTTYPE destType) {
-        super(url, proxy, destType);
-    }
+public class CapturingOutputStream extends OutputStream {
+    private final OutputStream[] targets;
 
-    public Socks4HTTPConnectionImpl(URL url, HTTPProxy proxy) {
-        super(url, proxy);
+    /**
+     * @param targets
+     *            one or more streams to which all writes are forwarded. All are closed when this stream is closed.
+     */
+    public CapturingOutputStream(final OutputStream... targets) {
+        if (targets == null || targets.length == 0) {
+            throw new IllegalArgumentException("at least one target stream required");
+        }
+        this.targets = targets.clone();
     }
 
     @Override
-    protected IPVERSION getEndPointIPVersion() {
-        // Socks4 only supports IPv4
-        return IPVERSION.IPV4_ONLY;
-    }
-
-    @Override
-    protected InetSocketAddress buildConnectEndPointSocketAddress(SocksSocketConnection socksSocketConnection) throws IOException {
-        final InetSocketAddress ret = super.buildConnectEndPointSocketAddress(socksSocketConnection);
-        if (HTTPProxy.TYPE.SOCKS4.equals(getProxy().getType())) {
-            if (ret.isUnresolved()) {
-                throw new UnknownHostException("Socks4 only supports IPv4 but is not resolved(" + getEndPointIPVersion() + "):" + getHostname());
-            } else if (!(ret.getAddress() instanceof Inet4Address)) {
-                throw new UnknownHostException("Socks4 only supports IPv4 but is resolved IPv6(" + getEndPointIPVersion() + "):" + getHostname());
-            } else {
-                return ret;
+    public void write(final int b) throws IOException {
+        IOException first = null;
+        for (int i = 0; i < targets.length; i++) {
+            try {
+                targets[i].write(b);
+            } catch (IOException e) {
+                if (first == null) {
+                    first = e;
+                }
             }
-        } else {
-            return ret;
+        }
+        if (first != null) {
+            throw first;
         }
     }
 
     @Override
-    protected Socks4SocketConnection buildSocksSocketConnection() {
-        return new Socks4SocketConnection(this.getProxy(), getDestType());
+    public void write(final byte[] b) throws IOException {
+        write(b, 0, b.length);
+    }
+
+    @Override
+    public void write(final byte[] b, final int off, final int len) throws IOException {
+        IOException first = null;
+        for (int i = 0; i < targets.length; i++) {
+            try {
+                targets[i].write(b, off, len);
+            } catch (IOException e) {
+                if (first == null) {
+                    first = e;
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
+        }
+    }
+
+    @Override
+    public void flush() throws IOException {
+        IOException first = null;
+        for (int i = 0; i < targets.length; i++) {
+            try {
+                targets[i].flush();
+            } catch (IOException e) {
+                if (first == null) {
+                    first = e;
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        IOException first = null;
+        for (int i = 0; i < targets.length; i++) {
+            try {
+                targets[i].close();
+            } catch (IOException e) {
+                if (first == null) {
+                    first = e;
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
+        }
+    }
+
+    /**
+     * @return
+     */
+    public OutputStream[] getDelegateStreams() {
+        return targets;
     }
 }

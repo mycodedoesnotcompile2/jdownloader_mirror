@@ -233,7 +233,7 @@ public class SSLHttpServer extends HttpServer {
             if (trustResult == null && clientCertChain != null && clientCertChain.length > 0) {
                 trustResult = new TrustResult(null, clientCertChain, null, TrustResult.TrustType.CLIENT);
             }
-            return new HttpServerConnection(this, sslSocket, sslSocket.getInputStream(), sslSocket.getOutputStream(), true, trustResult);
+            return createSSLHttpServerConnection(sslSocket, trustResult);
         } catch (final SocketException e) {
             // Client closed/aborted (e.g. browser cancelled connection, TLS abort, recv failed)
             closeQuietly(sslSocket);
@@ -247,6 +247,16 @@ public class SSLHttpServer extends HttpServer {
             }
             throw e;
         }
+    }
+
+    /**
+     * @param sslSocket
+     * @param trustResult
+     * @return
+     * @throws IOException
+     */
+    protected HttpConnectionRunnable createSSLHttpServerConnection(final SSLSocket sslSocket, TrustResult trustResult) throws IOException {
+        return new HttpServerConnection(this, sslSocket, sslSocket.getInputStream(), sslSocket.getOutputStream(), true, trustResult);
     }
 
     private static void closeQuietly(final SSLSocket sslSocket) {

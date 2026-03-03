@@ -80,10 +80,10 @@ import org.appwork.storage.StorableDoc;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
-import org.appwork.utils.JavaVersion;
 import org.appwork.utils.IO;
 import org.appwork.utils.IO.BOM;
 import org.appwork.utils.IO.SYNC;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.UniqueAlltimeID;
@@ -626,7 +626,8 @@ public class WindowsUtils {
      *            The working directory (can be null)
      * @param showWindow
      *            Whether to show the window (true) or hide it (false)
-     * @return The process handle if successful
+     * @return JNAProcessInfo with PID, handle, commandLine and workingDirectory; use ProcessHandler or {@link JNAProcessInfo#close()} when
+     *         done
      * @throws Win32Exception
      *             if the process cannot be started
      * @throws IllegalArgumentException
@@ -634,7 +635,7 @@ public class WindowsUtils {
      * @throws UnsupportedOperationException
      *             if not running on Windows
      */
-    public static INT_PTR startElevatedProcess(String[] command, String workingDir, boolean showWindow) throws Win32Exception {
+    public static JNAProcessInfo startElevatedProcess(String[] command, String workingDir, boolean showWindow) throws Win32Exception {
         if (!CrossSystem.isWindows()) {
             throw new UnsupportedOperationException("This operation is only supported on Windows");
         }
@@ -662,39 +663,12 @@ public class WindowsUtils {
         if (!Shell32.INSTANCE.ShellExecuteEx(sei)) {
             throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
         }
-        return new INT_PTR(Pointer.nativeValue(sei.hProcess.getPointer()));
+        JNAProcessInfo info = new JNAProcessInfo(sei.hProcess);
+        info.setCommandLine(args.length() > 0 ? finalCommand + " " + args : finalCommand);
+        info.setWorkingDirectory(workingDir);
+        return info;
     }
 
-    /**
-     * Terminates a process using its handle.
-     *
-     * @param processHandle
-     *            The handle of the process to terminate
-     * @param exitCode
-     *            The exit code to set (typically 0 for normal termination)
-     * @return true if the process was terminated successfully
-     * @throws Win32Exception
-     *             if the termination fails
-     * @throws UnsupportedOperationException
-     *             if not running on Windows
-     */
-    public static boolean terminateProcess(INT_PTR processHandle, int exitCode) throws Win32Exception {
-        if (!CrossSystem.isWindows()) {
-            throw new UnsupportedOperationException("This operation is only supported on Windows");
-        }
-        if (processHandle == null) {
-            throw new IllegalArgumentException("Process handle cannot be null");
-        }
-        HANDLE handle = new HANDLE(Pointer.createConstant(processHandle.longValue()));
-        // First try to get the process ID to verify the handle is valid
-        int pid = getProcessId(processHandle);
-        System.out.println("Terminating process with PID: " + pid);
-        boolean result = Kernel32.INSTANCE.TerminateProcess(handle, exitCode);
-        if (!result) {
-            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
-        }
-        return result;
-    }
 
     /**
      * Gets the security descriptor for a file.
@@ -2499,8 +2473,8 @@ public class WindowsUtils {
     }
 
     /**
-     * Called only when Java >= 8. Uses java.time via reflection so no java.time.* appears in this class's
-     * constant pool and WindowsUtils can load on JRE 6/7 (e.g. when Tests only call applyPermissions).
+     * Called only when Java >= 8. Uses java.time via reflection so no java.time.* appears in this class's constant pool and WindowsUtils
+     * can load on JRE 6/7 (e.g. when Tests only call applyPermissions).
      */
     private static String[] formatTaskSchedulerBoundaryTimesJava8() {
         try {
@@ -2533,8 +2507,7 @@ public class WindowsUtils {
     }
 
     /**
-     * Converts SimpleDateFormat "Z" offset (+0100) to ISO-8601 style (+01:00) for Windows Task Scheduler XML.
-     * Java 1.6 compatible.
+     * Converts SimpleDateFormat "Z" offset (+0100) to ISO-8601 style (+01:00) for Windows Task Scheduler XML. Java 1.6 compatible.
      */
     private static String formatIso8601Offset(String dateTimeWithZ) {
         if (dateTimeWithZ == null || dateTimeWithZ.length() < 6) {

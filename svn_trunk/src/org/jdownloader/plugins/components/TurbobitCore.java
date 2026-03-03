@@ -58,7 +58,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52401 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52416 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -142,12 +142,50 @@ public abstract class TurbobitCore extends PluginForHost {
 
     protected abstract boolean allowWebsiteV2Handling();
 
-    /**
-     * 2019-05-11: There is also an API-version of this but it seems like it only returns online/offline - no filename/filesize:
-     * https://hitfile.net/linkchecker/api
-     */
     @Override
     public boolean checkLinks(final DownloadLink[] urls) {
+        final List<DownloadLink> linksForDeepCheck = new ArrayList<DownloadLink>();
+        try {
+            if (allowWebsiteV2Handling()) {
+                return checkLinksWebsite_V2(urls, linksForDeepCheck);
+            } else {
+                return checkLinksWebsite_V1(urls, linksForDeepCheck);
+            }
+        } finally {
+            for (final DownloadLink link : linksForDeepCheck) {
+                logger.info("Performing deep linkcheck for: " + link.getPluginPatternMatcher());
+                try {
+                    final AvailableStatus availableStatus = requestFileInformation_Website(link, null);
+                    link.setAvailableStatus(availableStatus);
+                } catch (PluginException e) {
+                    logger.log(e);
+                    final AvailableStatus availableStatus;
+                    switch (e.getLinkStatus()) {
+                    case LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE:
+                    case LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE:
+                        availableStatus = AvailableStatus.UNCHECKABLE;
+                        break;
+                    case LinkStatus.ERROR_FILE_NOT_FOUND:
+                        availableStatus = AvailableStatus.FALSE;
+                        break;
+                    case LinkStatus.ERROR_PREMIUM:
+                        if (e.getValue() == PluginException.VALUE_ID_PREMIUM_ONLY) {
+                            availableStatus = AvailableStatus.UNCHECKABLE;
+                            break;
+                        }
+                    default:
+                        availableStatus = AvailableStatus.UNCHECKABLE;
+                        break;
+                    }
+                    link.setAvailableStatus(availableStatus);
+                } catch (final Throwable e) {
+                    logger.log(e);
+                }
+            }
+        }
+    }
+
+    public boolean checkLinksWebsite_V2(final DownloadLink[] urls, List<DownloadLink> linksForDeepCheck) {
         if (urls == null || urls.length == 0) {
             return false;
         }
@@ -157,9 +195,88 @@ public abstract class TurbobitCore extends PluginForHost {
          * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
          * short amount of time!
          */
-        final boolean fastLinkcheck = isFastLinkcheckEnabled();
-        final List<DownloadLink> linksForDeepCheck = new ArrayList<DownloadLink>();
         try {
+            final boolean fastLinkcheck = isFastLinkcheckEnabled();
+            final Browser brc = createNewBrowserInstance();
+            prepBrowserWebsiteV2(brc);
+            brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            brc.setCookiesExclusive(true);
+            final StringBuilder sb = new StringBuilder();
+            final Map<String, DownloadLink> linksMap = new HashMap<String, DownloadLink>();
+            int index = 0;
+            while (true) {
+                linksMap.clear();
+                sb.delete(0, sb.capacity());
+                sb.append("links=");
+                while (true) {
+                    /* we test 50 links at once */
+                    if (index == urls.length || linksMap.size() > 49) {
+                        break;
+                    }
+                    final DownloadLink link = urls[index];
+                    final String file_id = getFUID(link);
+                    sb.append(Encoding.urlEncode(this.getContentURL(link)));
+                    sb.append("%0A");
+                    linksMap.put(file_id, link);
+                    index++;
+                }
+                /* remove last %0A */
+                sb.delete(sb.length() - 3, sb.length());
+                brc.postPage(getWebsiteV2Base() + "/api/links/check", sb.toString());
+                final List<HashMap<String, Object>> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.LIST_HASHMAP);
+                for (Map<String, Object> entry : response) {
+                    final DownloadLink link = linksMap.get(entry.get("id"));
+                    if (link == null) {
+                        continue;
+                    }
+                    final String name = (String) entry.get("name");
+                    if (name != null) {
+                        link.setFinalFileName(name);
+                    }
+                    if ("active".equals(entry.get("status"))) {
+                        link.setAvailable(true);
+                        final boolean checkedBeforeAlready = link.getBooleanProperty(PROPERTY_DOWNLOADLINK_checked_atleast_onetime, false);
+                        if (link.getKnownDownloadSize() < 0 && (checkedBeforeAlready || !fastLinkcheck)) {
+                            linksForDeepCheck.add(link);
+                        }
+                        /* Allows it to look for the filesize on 2nd linkcheck. */
+                        link.setProperty(PROPERTY_DOWNLOADLINK_checked_atleast_onetime, true);
+                    } else if ("inactive".equals(entry.get("status"))) {
+                        link.setAvailable(false);
+                    }
+                }
+                for (final DownloadLink link : linksMap.values()) {
+                    link.setAvailableStatus(AvailableStatus.UNCHECKED);
+                    logger.warning("Unable to check link: " + link.getPluginPatternMatcher());
+                }
+                if (index == urls.length) {
+                    break;
+                }
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 2019-05-11: There is also an API-version of this but it seems like it only returns online/offline - no filename/filesize:
+     * https://hitfile.net/linkchecker/api
+     */
+    @Deprecated
+    public boolean checkLinksWebsite_V1(final DownloadLink[] urls, List<DownloadLink> linksForDeepCheck) {
+        if (urls == null || urls.length == 0) {
+            return false;
+        }
+        /**
+         * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
+         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
+         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
+         * short amount of time!
+         */
+        try {
+            final boolean fastLinkcheck = isFastLinkcheckEnabled();
             final Browser brc = createNewBrowserInstance();
             prepBrowserWebsiteV1(brc);
             brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -226,37 +343,6 @@ public abstract class TurbobitCore extends PluginForHost {
         } catch (final Exception e) {
             logger.log(e);
             return false;
-        } finally {
-            for (final DownloadLink link : linksForDeepCheck) {
-                logger.info("Performing deep linkcheck for: " + link.getPluginPatternMatcher());
-                try {
-                    final AvailableStatus availableStatus = requestFileInformation_Website(link, null);
-                    link.setAvailableStatus(availableStatus);
-                } catch (PluginException e) {
-                    logger.log(e);
-                    final AvailableStatus availableStatus;
-                    switch (e.getLinkStatus()) {
-                    case LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE:
-                    case LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE:
-                        availableStatus = AvailableStatus.UNCHECKABLE;
-                        break;
-                    case LinkStatus.ERROR_FILE_NOT_FOUND:
-                        availableStatus = AvailableStatus.FALSE;
-                        break;
-                    case LinkStatus.ERROR_PREMIUM:
-                        if (e.getValue() == PluginException.VALUE_ID_PREMIUM_ONLY) {
-                            availableStatus = AvailableStatus.UNCHECKABLE;
-                            break;
-                        }
-                    default:
-                        availableStatus = AvailableStatus.UNCHECKABLE;
-                        break;
-                    }
-                    link.setAvailableStatus(availableStatus);
-                } catch (final Throwable e) {
-                    logger.log(e);
-                }
-            }
         }
         return true;
     }
@@ -266,7 +352,7 @@ public abstract class TurbobitCore extends PluginForHost {
         if (prefer_single_linkcheck_via_mass_linkchecker && supports_mass_linkcheck()) {
             return requestFileInformation_Mass_Linkchecker(link);
         } else {
-            return requestFileInformation_WebsiteV1(link, null);
+            return requestFileInformation_Website(link, null);
         }
     }
 
