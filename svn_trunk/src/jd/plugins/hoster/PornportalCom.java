@@ -64,11 +64,11 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 51468 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52425 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www." + getHost());
+        this.enablePremium(getPornportalMainURL(getHost()));
     }
 
     @Override
@@ -121,6 +121,8 @@ public class PornportalCom extends PluginForHost {
         ret.add(new String[] { "adultmobile.com" });
         ret.add(new String[] { "mygf.com" });
         ret.add(new String[] { "letsdoeit.com" });
+        /* 2026-03-03: Special, see function "correctDomain" */
+        ret.add(new String[] { "site-ma.touchmywife.com" });
         return ret;
     }
 
@@ -186,32 +188,32 @@ public class PornportalCom extends PluginForHost {
      * Debug function: Can be used to quickly find the currently used pornportal version of all supported websites and compare against
      * previously set expected version value.
      */
-    public static void checkUsedVersions(final Plugin plg) {
+    public void checkUsedVersions() {
         final String target_version = "4.35.2";
-        plg.getLogger().info("Target version: " + target_version);
-        final Browser br = plg.createNewBrowserInstance();
+        this.getLogger().info("Target version: " + target_version);
+        final Browser br = this.createNewBrowserInstance();
         final String[] supportedSites = getAnnotationNames();
         for (final String host : supportedSites) {
             try {
-                getPage(br, getPornportalMainURL(host));
+                getPage(br, getPornportalMainURL(this.getHost()));
                 final String usedVersion = PluginJSonUtils.getJson(br, "appVersion");
-                plg.getLogger().info("***********************************");
-                plg.getLogger().info("Site: " + host);
+                this.getLogger().info("***********************************");
+                this.getLogger().info("Site: " + host);
                 if (StringUtils.isEmpty(usedVersion)) {
-                    plg.getLogger().info("Used version: Unknown");
+                    this.getLogger().info("Used version: Unknown");
                 } else {
-                    plg.getLogger().info("Used version: " + usedVersion);
+                    this.getLogger().info("Used version: " + usedVersion);
                     if (usedVersion.equals(target_version)) {
-                        plg.getLogger().info("Expected version: OK");
+                        this.getLogger().info("Expected version: OK");
                     } else {
-                        plg.getLogger().info("Expected version: NOK");
+                        this.getLogger().info("Expected version: NOK");
                     }
                 }
             } catch (final Throwable e) {
-                plg.getLogger().info("!BROWSER ERROR!");
+                this.getLogger().info("!BROWSER ERROR!");
             }
         }
-        plg.getLogger().info("***********************************");
+        this.getLogger().info("***********************************");
     }
 
     /* Tries to find new websites based on current account! This only works if you are logged in an account! */
@@ -245,10 +247,11 @@ public class PornportalCom extends PluginForHost {
         }
     }
 
-    public static String getPornportalMainURL(final String host) {
-        if (host == null) {
+    public String getPornportalMainURL(String domain) {
+        if (domain == null) {
             return null;
         }
+        domain = correctDomain(domain);
         /*
          * TODO: Move away from static method to e.g. support sites like: https://bbw-channel.pornportal.com/,
          * https://ebony-channel.pornportal.com/, https://latina-channel.pornportal.com/, https://cosplay-channel.pornportal.com/login,
@@ -256,7 +259,18 @@ public class PornportalCom extends PluginForHost {
          * https://lesbian-channel.pornportal.com, https://anal-channel.pornportal.com, https://milf-channel.pornportal.com,
          * https://teen-channel.pornportal.com/login
          */
-        return "https://site-ma." + host;
+        return "https://site-ma." + domain;
+    }
+
+    public static String correctDomain(String domain) {
+        /**
+         * Special workaround for touchmywife.com running pornportal and evilangel versions parallel. <br>
+         * Problem: We need two different unique plugin domains, one for each system. <br>
+         * Solution/workaround: Leave the old evilangel stuff untouched and add site via plugin domain "site-ma.touchmywife.com", then
+         * remove the "site-me" subdomain at all places where we need only "touchmywife.com".
+         */
+        domain = domain.replace("site-ma.", "");
+        return domain;
     }
 
     public static String getAPIBase() {
@@ -808,13 +822,13 @@ public class PornportalCom extends PluginForHost {
         return br.getCookie(br.getHost(), login_cookie_key, Cookies.NOTDELETEDPATTERN);
     }
 
-    public static boolean prepareBrAPI(final Plugin plg, final Browser br, final Account acc) throws PluginException {
+    public boolean prepareBrAPI(final Plugin plg, final Browser br, final Account account) throws PluginException {
         final Map<String, Object> entries = getJsonJuanEawInstance(br);
-        return prepareBrAPI(plg, br, acc, entries);
+        return prepareBrAPI(plg, br, account, entries);
     }
 
     /** Sets required API headers based on data given in json. */
-    public static boolean prepareBrAPI(final Plugin plg, final Browser br, final Account acc, Map<String, Object> entries) throws PluginException {
+    public boolean prepareBrAPI(final Plugin plg, final Browser br, final Account acc, Map<String, Object> entries) throws PluginException {
         final String plugin_host = plg.getHost();
         final String hostname;
         String ip = null;

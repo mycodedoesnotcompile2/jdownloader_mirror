@@ -31,6 +31,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -42,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52426 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +80,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
 
     public static final Pattern PATTERN_GALLERY         = Pattern.compile("/[\\w\\-]+.+");
     public static final Pattern PATTERN_SINGLE_REDIRECT = Pattern.compile("/dl?/([0-9]+)/?");
+    public static Object        LOCK                    = new Object();
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -94,54 +96,75 @@ public class RlGalleriesNt extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contenturl = param.getCryptedUrl().replace("http://", "https://");
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (new Regex(contenturl, PATTERN_SINGLE_REDIRECT).patternFind()) {
             /* Crawl single redirect link */
-            final Browser brc = br.cloneBrowser();
-            brc.setFollowRedirects(false);
-            brc.getPage(contenturl);
-            if (brc.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final Form form = brc.getForm(0);
-            if (form != null) {
-                final String previous_path = brc._getURL().getPath();
-                final Browser old_br = this.br;
-                this.setBrowser(brc);
-                try {
-                    /* Small hack: Set current browser as plugin browser so that captcha handling can extract siteURL */
-                    this.setBrowser(brc);
-                    final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, brc).getToken();
-                    form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
-                } finally {
-                    this.setBrowser(old_br);
+            synchronized (LOCK) {
+                final Browser brc = br.cloneBrowser();
+                brc.setFollowRedirects(false);
+                final String property_PHPSESSID = "PHPSESSID";
+                final String phpsessid = this.getPluginConfig().getStringProperty(property_PHPSESSID);
+                if (phpsessid != null) {
+                    /* Re-use session cookie otherwise we might need to solve a captcha for each link. */
+                    brc.setCookie(this.getHost(), "PHPSESSID", phpsessid);
                 }
-                brc.submitForm(form);
-                final String redirect = brc.getRedirectLocation();
-                if (redirect == null) {
+                brc.getPage(contenturl);
+                if (brc.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final Form form = brc.getForm(0);
+                String finallink = null;
+                findFinallink: if (form != null) {
+                    finallink = findFinallink(brc);
+                    if (finallink != null) {
+                        logger.info("Found finallink without captcha");
+                        break findFinallink;
+                    }
+                    final String previous_path = brc._getURL().getPath();
+                    final Browser old_br = this.br;
+                    this.setBrowser(brc);
+                    try {
+                        /* Small hack: Set current browser as plugin browser so that captcha handling can extract siteURL */
+                        this.setBrowser(brc);
+                        final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, brc).getToken();
+                        form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                    } finally {
+                        this.setBrowser(old_br);
+                    }
+                    brc.submitForm(form);
+                    final String redirect = brc.getRedirectLocation();
+                    if (redirect == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    /* Check for redirect on previous URL which will then reidrect to final URL. */
+                    if (redirect.contains(previous_path)) {
+                        logger.info("Handling double-redirect");
+                        brc.getPage(redirect);
+                    }
+                    finallink = findFinallink(brc);
+                    if (finallink == null) {
+                        logger.info("Failed to fina finallink in html code -> Website might have changed and plugin is broken?");
+                    }
+                }
+                if (finallink == null) {
+                    finallink = brc.getRedirectLocation();
+                }
+                if (finallink == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                /* Check for redirect on previous URL which will then reidrect to final URL. */
-                if (redirect.contains(previous_path)) {
-                    logger.info("Handling double-redirect");
-                    brc.getPage(redirect);
+                ret.add(this.createDownloadlink(finallink));
+                final String phpsessid_new = brc.getCookie(brc.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN);
+                if (!StringUtils.isEmpty(phpsessid_new)) {
+                    if (phpsessid == null || !phpsessid_new.equals(phpsessid)) {
+                        logger.info("Remembering new phpsessid cookie: " + phpsessid_new);
+                        this.getPluginConfig().setProperty(property_PHPSESSID, phpsessid_new);
+                    }
+                } else {
+                    logger.warning("Failed to find PHPSESSID cookie");
                 }
-                String finallink = brc.getRegex("var u = \"(https?://[^\"]+)").getMatch(0);
-                if (finallink == null) {
-                    finallink = brc.getRegex("<a href=\"(https?://[^\"]+)\">\\s*If you are not redirected, click here").getMatch(0);
-                }
-                if (finallink != null) {
-                    ret.add(this.createDownloadlink(finallink));
-                    return ret;
-                }
+                return ret;
             }
-            final String redirect = brc.getRedirectLocation();
-            if (redirect == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            ret.add(this.createDownloadlink(redirect));
-            return ret;
         }
         String galleryID = new Regex(contenturl, "(?i)https?://[^/]+/[^/]+/(\\d+)").getMatch(0);
         if (galleryID == null) {
@@ -344,6 +367,14 @@ public class RlGalleriesNt extends PluginForDecrypt {
             ret.add(this.createDownloadlink(finallink));
             return ret;
         }
+    }
+
+    private String findFinallink(final Browser brc) {
+        String finallink = brc.getRegex("var u = \"(https?://[^\"]+)").getMatch(0);
+        if (finallink == null) {
+            finallink = brc.getRegex("<a href=\"(https?://[^\"]+)\">\\s*If you are not redirected, click here").getMatch(0);
+        }
+        return finallink;
     }
 
     private boolean isOffline(final Browser br) {

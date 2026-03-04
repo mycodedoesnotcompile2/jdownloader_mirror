@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52427 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2TheclassicpornCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2TheclassicpornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,6 +57,11 @@ public class KernelVideoSharingComV2TheclassicpornCom extends KernelVideoSharing
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
+    }
+
+    @Override
+    protected boolean preferTitleHTML() {
+        return true;
     }
 
     @Override

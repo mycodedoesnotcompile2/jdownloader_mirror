@@ -87,7 +87,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52427 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1168,25 +1168,43 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return ret;
     }
 
+    protected String filterPossibleTitle(final Browser br, final String possibleTitle) {
+        if ("Related Videos".equalsIgnoreCase(possibleTitle)) {
+            return null;
+        }
+        return possibleTitle;
+    }
+
     protected String regexNormalTitleWebsite(final Browser br) {
         String best = null;
-        final String header = br.getRegex("<h(1|2)[^>]*>\\s*(.*?)\\s*</h\\1>").getMatch(1);
+        final Set<String> titles = new HashSet();
+        final String header = filterPossibleTitle(br, br.getRegex("<h(1|2)[^>]*>\\s*(.*?)\\s*</h\\1>").getMatch(1));
+        if (header != null) {
+            titles.add(header);
+        }
         if (StringUtils.isNotEmpty(header)) {
             best = header;
         }
-        final String videoInfo = br.getRegex("\"title-panel clearfix\"\\s*>\\s*<h\\d+>\\s*(.*?)\\s*</h\\d+>").getMatch(0);
+        final String videoInfo = filterPossibleTitle(br, br.getRegex("\"title-panel clearfix\"\\s*>\\s*<h\\d+>\\s*(.*?)\\s*</h\\d+>").getMatch(0));
+        if (videoInfo != null) {
+            titles.add(videoInfo);
+        }
         if (best == null || (videoInfo != null && videoInfo.length() < best.length())) {
             best = videoInfo;
         }
-        final String ogTitle = HTMLSearch.searchMetaTag(br, "og:title");
+        final String ogTitle = filterPossibleTitle(br, HTMLSearch.searchMetaTag(br, "og:title"));
+        if (ogTitle != null) {
+            titles.add(ogTitle);
+        }
         if (best == null || (ogTitle != null && ogTitle.length() < best.length())) {
             best = ogTitle;
         }
-        String title = br.getRegex("<title[^>]*>([^<]+)</title>").getMatch(0);
+        String title = filterPossibleTitle(br, br.getRegex("<title[^>]*>\\s*([^<]+)\\s*</title>").getMatch(0));
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
             /* Remove "mytitle - domain.tld" and similar */
             title = title.replaceAll("(?i)\\s+[\\-/]\\s+" + Pattern.quote(br.getHost()), "");
+            titles.add(title);
         }
         if (best == null || (title != null && title.length() < best.length())) {
             best = title;

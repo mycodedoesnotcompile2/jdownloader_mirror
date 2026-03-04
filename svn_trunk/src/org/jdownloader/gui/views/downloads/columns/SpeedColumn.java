@@ -82,7 +82,7 @@ public class SpeedColumn extends ExtTextColumn<AbstractNode> {
             }
         }, false);
         this.formatter = new DecimalFormat("0.00");
-        maxSpeedUnit = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSpeedUnit();
+        maxSpeedUnit = CFG_GUI.CFG.getMaxSpeedUnit();
         this.setRowSorter(new ExtDefaultRowSorter<AbstractNode>() {
             @Override
             public int compare(final AbstractNode o1, final AbstractNode o2) {

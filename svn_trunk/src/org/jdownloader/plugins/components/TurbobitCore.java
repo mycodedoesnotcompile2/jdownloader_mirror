@@ -58,7 +58,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52416 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52427 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -225,7 +225,7 @@ public abstract class TurbobitCore extends PluginForHost {
                 brc.postPage(getWebsiteV2Base() + "/api/links/check", sb.toString());
                 final List<HashMap<String, Object>> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.LIST_HASHMAP);
                 for (Map<String, Object> entry : response) {
-                    final DownloadLink link = linksMap.get(entry.get("id"));
+                    final DownloadLink link = linksMap.remove(entry.get("id"));
                     if (link == null) {
                         continue;
                     }
@@ -243,6 +243,8 @@ public abstract class TurbobitCore extends PluginForHost {
                         link.setProperty(PROPERTY_DOWNLOADLINK_checked_atleast_onetime, true);
                     } else if ("inactive".equals(entry.get("status"))) {
                         link.setAvailable(false);
+                    } else {
+                        link.setAvailableStatus(AvailableStatus.UNCHECKED);
                     }
                 }
                 for (final DownloadLink link : linksMap.values()) {

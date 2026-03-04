@@ -31,6 +31,23 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -59,24 +76,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52327 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52430 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -108,9 +108,11 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
-         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br>
+         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
+         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br>
+         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -443,11 +445,14 @@ public class XHamsterCom extends PluginForHost {
         } else {
             br.getPage(contentURL);
         }
-        final String fidAfter = getFID(br.getURL());
-        if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
-            // video link redirects to another video, eg shorter video, maybe uploaded longer version
-            logger.info("VideoID has changed: Old: " + fidBefore + " | New: " + fidAfter);
-            link.setProperty(PROPERTY_VIDEOID, fidAfter);
+        if (this.canHandle(br.getURL())) {
+            /* Check if video_id has changed and store new video_id. */
+            final String fidAfter = getFID(br.getURL());
+            if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
+                // video link redirects to another video, eg shorter video, maybe uploaded longer version
+                logger.info("VideoID has changed: Old: " + fidBefore + " | New: " + fidAfter);
+                link.setProperty(PROPERTY_VIDEOID, fidAfter);
+            }
         }
         if (StringUtils.containsIgnoreCase(br.getURL(), "/site/error")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -1482,14 +1487,18 @@ public class XHamsterCom extends PluginForHost {
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
         final String fidBefore = getFID(link);
         requestFileInformation(link, account);
-        final String fidAfter = getFID(br.getURL());
-        if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
-            // video link redirects to another video, eg shorter video, maybe uploaded longer version
-            // retry to make sure all checks (eg mirror, file exists) are done prior to starting the download
-            throw new PluginException(LinkStatus.ERROR_RETRY, "VideoID has changed, retry!");
-        }
         final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
         final boolean isPremiumURL = this.isPremiumURL(contentURL);
+        if (!isPremiumURL && this.canHandle(br.getURL())) {
+            /* Check if video_id has changed */
+            // TODO: Remove this?
+            final String fidAfter = getFID(br.getURL());
+            if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
+                // video link redirects to another video, eg shorter video, maybe uploaded longer version
+                // retry to make sure all checks (eg mirror, file exists) are done prior to starting the download
+                throw new PluginException(LinkStatus.ERROR_RETRY, "VideoID has changed, retry!");
+            }
+        }
         if (StringUtils.isEmpty(dllink) && !isPremiumURL) {
             // Access the page again to get a new direct link because by checking the availability the first linkisn't valid anymore
             if (isPasswordProtected(br)) {
@@ -1988,9 +1997,10 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
-             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
-             * user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br>
+             * Redirects to mainpage if cookies are invalid. </br>
+             * Return json if cookies are valid. </br>
+             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

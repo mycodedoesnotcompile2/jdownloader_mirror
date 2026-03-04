@@ -8,16 +8,6 @@ import javax.swing.JSpinner.DefaultEditor;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 
-import org.appwork.storage.config.ValidationException;
-import org.appwork.storage.config.swing.models.ConfigIntSpinnerModel;
-import org.appwork.swing.components.ExtCheckBox;
-import org.appwork.swing.components.SizeSpinner;
-import org.appwork.utils.locale._AWU;
-import org.appwork.utils.swing.EDTRunner;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-
 import jd.controlling.downloadcontroller.DownloadLinkCandidate;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -26,14 +16,27 @@ import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
 import net.miginfocom.swing.MigLayout;
 
+import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.swing.models.ConfigIntSpinnerModel;
+import org.appwork.swing.components.ExtCheckBox;
+import org.appwork.swing.components.SizeSpinner;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SPEEDUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 public class SpeedlimitEditor extends MenuEditor implements DownloadWatchdogListener {
     /**
      *
      */
-    private static final long serialVersionUID = 5406904697287119514L;
-    private JLabel            lbl;
-    private SizeSpinner       spinner;
-    private ExtCheckBox       checkbox;
+    private static final long      serialVersionUID = 5406904697287119514L;
+    private JLabel                 lbl;
+    private SizeSpinner            spinner;
+    private ExtCheckBox            checkbox;
+    private static final SPEEDUNIT maxSpeedUnit     = CFG_GUI.CFG.getMaxSpeedUnit();
 
     public SpeedlimitEditor() {
         this(false);
@@ -68,18 +71,32 @@ public class SpeedlimitEditor extends MenuEditor implements DownloadWatchdogList
             private static final long serialVersionUID = 1L;
 
             @Override
-            protected Object textToObject(String text) {
-                if (text != null && text.trim().matches("^[0-9]+$")) {
-                    return super.textToObject(text + " kb/s");
+            protected Object textToObject(final String input) {
+                String text = input;
+                if (text != null) {
+                    text = text.replaceFirst("(?i)/s(ec|secound)?\\s*$", "");
                 }
-                return super.textToObject(text);
+                final boolean isBit = text != null && text.matches("(?i).+bit\\s*$");
+                if (text != null) {
+                    text = text.replaceFirst("(?i)it\\s*$", "");
+                }
+                Object ret;
+                if (text != null && text.trim().matches("^[0-9]+$")) {
+                    ret = text + " kb";
+                }
+                final boolean kibi = text != null && (text.contains("i") || text.contains("I"));
+                ret = SizeFormatter.getSize(numberFormat, text, kibi, true);
+                if (ret instanceof Number && isBit) {
+                    ret = ((Number) ret).intValue() / 8;
+                }
+                return ret;
             }
 
             protected String longToText(long longValue) {
                 if (longValue <= 0) {
-                    return _GUI.T.SpeedlimitEditor_format(_AWU.T.literally_kibibyte("0"));
+                    return _GUI.T.SpeedlimitEditor_format(SPEEDUNIT.formatValue(maxSpeedUnit, numberFormat, 0));
                 } else {
-                    return _GUI.T.SpeedlimitEditor_format(super.longToText(longValue));
+                    return _GUI.T.SpeedlimitEditor_format(SPEEDUNIT.formatValue(maxSpeedUnit, numberFormat, longValue));
                 }
             }
         };

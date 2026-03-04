@@ -103,7 +103,7 @@ public class SpeedMeterPanel extends Graph {
     protected String createTooltipText() {
         final int limit;
         if (config.isDownloadSpeedLimitEnabled() && (limit = config.getDownloadSpeedLimit()) > 0) {
-            return getAverageSpeedString() + "  " + getSpeedString() + "\r\n" + _GUI.T.SpeedMeterPanel_createTooltipText_(maxSpeedUnit.formatValue(maxSpeedUnit, getNumberFormat(), limit));
+            return getAverageSpeedString() + "  " + getSpeedString() + "\r\n" + _GUI.T.SpeedMeterPanel_createTooltipText_(SPEEDUNIT.formatValue(maxSpeedUnit, getNumberFormat(), limit));
         } else {
             return getAverageSpeedString() + "  " + getSpeedString();
         }
@@ -115,7 +115,7 @@ public class SpeedMeterPanel extends Graph {
         if (all <= 0) {
             return null;
         } else {
-            return _AWU.T.AppWorkUtils_Graph_getAverageSpeedString2(maxSpeedUnit.formatValue(maxSpeedUnit, getNumberFormat(), this.average / all));
+            return _AWU.T.AppWorkUtils_Graph_getAverageSpeedString2(SPEEDUNIT.formatValue(maxSpeedUnit, getNumberFormat(), this.average / all));
         }
     }
 
@@ -124,7 +124,7 @@ public class SpeedMeterPanel extends Graph {
         if (this.all <= 0) {
             return null;
         }
-        return _AWU.T.AppWorkUtils_Graph_getSpeedString(maxSpeedUnit.formatValue(maxSpeedUnit, getNumberFormat(), this.value));
+        return _AWU.T.AppWorkUtils_Graph_getSpeedString(SPEEDUNIT.formatValue(maxSpeedUnit, getNumberFormat(), this.value));
     }
 
     @Override

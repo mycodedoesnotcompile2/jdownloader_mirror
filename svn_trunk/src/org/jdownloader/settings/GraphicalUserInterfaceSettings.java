@@ -18,6 +18,7 @@ import org.appwork.storage.config.annotations.DefaultFactory;
 import org.appwork.storage.config.annotations.DefaultIntArrayValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultLongValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.EnumLabel;
@@ -439,6 +440,8 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @AboutConfig
     @RequiresRestart("A JDownloader Restart is Required")
+    @DefaultEnumValue("MiB")
+    @DefaultOnNull
     SPEEDUNIT getMaxSpeedUnit();
 
     void setMaxSpeedUnit(SPEEDUNIT speedUnit);
@@ -695,6 +698,8 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @AboutConfig
     @RequiresRestart("A JDownloader Restart is Required")
+    @DefaultEnumValue("TiB")
+    @DefaultOnNull
     SIZEUNIT getMaxSizeUnit();
 
     void setMaxSizeUnit(SIZEUNIT sizeUnit);

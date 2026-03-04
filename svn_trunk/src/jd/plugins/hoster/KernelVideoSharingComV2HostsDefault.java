@@ -27,8 +27,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
 import org.appwork.utils.Exceptions;
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
 
-@HostPlugin(revision = "$Revision: 52418 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52427 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -163,6 +165,14 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
     }
 
     @Override
+    public Class<? extends KVSConfig> getConfigInterface() {
+        if ("fullpornxxx.net".equals(getHost())) {
+            return KVSConfigFullpornxxx.class;
+        }
+        return null;
+    }
+
+    @Override
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
         PluginException exception = null;
         try {
@@ -217,7 +227,8 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
 
     @Override
     protected boolean preferTitleHTML() {
-        if ("bigwank.com".equals(getHost()) || "fpo.xxx".equals(getHost()) | "cluset.com".equals(getHost())) {
+        final String host = getHost();
+        if ("bigwank.com".equals(host) || "fpo.xxx".equals(host) || "cluset.com".equals(host) || "fullpornxxx.net".equals(host)) {
             /* cluset.com example with bad title in URL: /videos/10824/100038/ */
             return true;
         } else {

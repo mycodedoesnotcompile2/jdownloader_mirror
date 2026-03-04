@@ -20,18 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -44,17 +32,30 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52420 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
+@HostPlugin(revision = "$Revision: 52431 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    public static final String PROPERTY_TITLE = "title";
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
-
     /* DEV NOTES */
     // Tags: Porn plugin
     // other:
@@ -105,8 +106,13 @@ public class XtremestreamCo extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final String ext = ".mp4";
+        final String pre_set_title = link.getStringProperty(PROPERTY_TITLE);
         if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + ext);
+            if (pre_set_title != null) {
+                link.setName(pre_set_title + ext);
+            } else {
+                link.setName(this.getFID(link) + ext);
+            }
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
@@ -122,12 +128,16 @@ public class XtremestreamCo extends PluginForHost {
             /* Empty page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("var video_title = .([^\"]*?)`;").getMatch(0);
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename);
-            filename = filename.trim();
-            filename = this.correctOrApplyFileNameExtension(filename, ext, null);
-            link.setFinalFileName(filename);
+        String title = br.getRegex("var video_title = .([^\"]*?)`;").getMatch(0);
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+        } else {
+            /* Use pre-set title if available */
+            title = pre_set_title;
+        }
+        if (title != null) {
+            title = this.correctOrApplyFileNameExtension(title, ext, null);
+            link.setFinalFileName(title);
         }
         return AvailableStatus.TRUE;
     }
@@ -140,7 +150,7 @@ public class XtremestreamCo extends PluginForHost {
         final Browser br2 = br.cloneBrowser();
         final String fid = getFID(link);
         final String data_folderid;
-        final String data_xtremestream;
+        String data_xtremestream;
         String dltoken;
         if (referer != null) {
             br2.getPage(referer);
@@ -161,6 +171,7 @@ public class XtremestreamCo extends PluginForHost {
             final DownloadMode mode = cfg.getDownloadMode();
             if (mode == DownloadMode.STREAM_DOWNLOAD) {
                 /* User prefers stream download */
+                logger.info("User prefers stream download");
                 break officialVideoDownload;
             }
             boolean allowAutoFallbackToStreamDownload = mode == DownloadMode.AUTO;
@@ -200,12 +211,19 @@ public class XtremestreamCo extends PluginForHost {
                 logger.info("Official download failed -> Fallback to stream download");
             }
         }
-        logger.info("Official download is not possible");
-        final String data = br.getRegex("const\\s*query\\s*=\\s*\"(.*?)\"").getMatch(0);
-        if (data == null) {
+        logger.info("Attempting stream download");
+        String query = br.getRegex("const\\s*query\\s*=\\s*\"(.*?)\"").getMatch(0);
+        if (query == null && fid != null) {
+            query = "data=" + fid;
+        }
+        if (data_xtremestream == null) {
+            logger.warning("Failed to find cdn subdomain -> Fallback to default which could mean that we will only get one (= the lowest) resolution");
+            data_xtremestream = "xporn";
+        }
+        if (query == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String hlsMaster = "https://xporn.xtremestream.xyz/player/xs1.php?" + data;
+        final String hlsMaster = "https://" + data_xtremestream + ".xtremestream.xyz/player/xs1.php?" + query;
         br.getPage(hlsMaster);
         final List<HlsContainer> qualities = HlsContainer.getHlsQualities(this.br);
         final HlsContainer bestQuality = HlsContainer.findBestVideoByBandwidth(qualities);

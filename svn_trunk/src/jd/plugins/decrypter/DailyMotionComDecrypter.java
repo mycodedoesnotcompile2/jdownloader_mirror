@@ -59,7 +59,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52268 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52427 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,7 +115,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             checkErrors(br);
             /* video == 'video_item', user == 'user_home' */
             String username = null;
-            final Regex profileregex1 = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/(user/([A-Za-z0-9_\\-]+)/\\d+|([^/]+)/videos)");
+            final Regex profileregex1 = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/(user/([A-Za-z0-9_\\-]+)(?:/\\d+|([^/]+)/videos|/playlists))");
             if (profileregex1.patternFind()) {
                 username = profileregex1.getMatch(2);
                 if (username == null) {

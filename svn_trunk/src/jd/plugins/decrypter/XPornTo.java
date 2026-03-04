@@ -21,6 +21,8 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -28,9 +30,9 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
+import jd.plugins.hoster.XtremestreamCo;
 
-@DecrypterPlugin(revision = "$Revision: 50714 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52426 $", interfaceVersion = 3, names = {}, urls = {})
 public class XPornTo extends PluginForDecrypt {
     public XPornTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,34 +68,44 @@ public class XPornTo extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://" + buildHostsPatternPart(domains) + "/video/[\\w\\-]+/?");
+            ret.add("https?://" + buildHostsPatternPart(domains) + "/video/([\\w\\-]+)/?");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final PluginForHost plg = this.getNewPluginForHostInstance("xtremestream.co");
+        String title = br.getRegex("class=\"single-video__title entry-title\"[^>]*>([^<]+)</h1>").getMatch(0);
+        if (title == null) {
+            /* Fallback */
+            final String slug = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+            title = slug.replace("-", " ").trim();
+        }
+        title = Encoding.htmlDecode(title).trim();
+        final XtremestreamCo xtremestream_plugin = (XtremestreamCo) this.getNewPluginForHostInstance(XtremestreamCo.getPluginDomains().get(0)[0]);
         String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         for (final String singleLink : links) {
-            if (plg.canHandle(singleLink)) {
-                final DownloadLink dl = createDownloadlink(singleLink);
+            if (xtremestream_plugin.canHandle(singleLink)) {
+                final DownloadLink video = createDownloadlink(singleLink);
                 /* Required in order to access embedded content later. */
-                dl.setReferrerUrl(this.br.getURL());
-                ret.add(dl);
+                video.setReferrerUrl(this.br.getURL());
+                video.setProperty(XtremestreamCo.PROPERTY_TITLE, title);
+                ret.add(video);
             }
         }
-        if (ret.isEmpty()) {
-            /* Search for iframe embedded items e.g. from playhydrax.com */
-            links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
-            if (links != null && links.length > 0) {
-                for (final String singleLink : links) {
-                    ret.add(createDownloadlink(singleLink));
-                }
+        if (!ret.isEmpty()) {
+            return ret;
+        }
+        /* Search for iframe embedded items e.g. from playhydrax.com */
+        links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
+        if (links != null && links.length > 0) {
+            for (final String singleLink : links) {
+                ret.add(createDownloadlink(singleLink));
             }
         }
         if (ret.isEmpty()) {

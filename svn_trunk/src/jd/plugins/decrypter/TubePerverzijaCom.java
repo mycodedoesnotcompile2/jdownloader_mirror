@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 52396 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52426 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubePerverzijaCom extends PluginForDecrypt {
     public TubePerverzijaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,19 +81,20 @@ public class TubePerverzijaCom extends PluginForDecrypt {
         String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         for (final String singleLink : links) {
             if (plg.canHandle(singleLink)) {
-                final DownloadLink dl = createDownloadlink(singleLink);
+                final DownloadLink video = createDownloadlink(singleLink);
                 /* Required in order to access embedded content later. */
-                dl.setReferrerUrl(br.getURL());
-                ret.add(dl);
+                video.setReferrerUrl(br.getURL());
+                ret.add(video);
             }
         }
-        if (ret.isEmpty()) {
-            /* Search for iframe embedded items e.g. from playhydrax.com */
-            links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
-            if (links != null && links.length > 0) {
-                for (final String url : links) {
-                    ret.add(createDownloadlink(url));
-                }
+        if (!ret.isEmpty()) {
+            return ret;
+        }
+        /* Search for iframe embedded items e.g. from playhydrax.com */
+        links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
+        if (links != null && links.length > 0) {
+            for (final String url : links) {
+                ret.add(createDownloadlink(url));
             }
         }
         if (ret.isEmpty()) {

@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.StackstorageCom;
 
-@DecrypterPlugin(revision = "$Revision: 52391 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([\\w\\-]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
+@DecrypterPlugin(revision = "$Revision: 52426 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([\\w\\-_]+)\\.stackstorage\\.com/s/([A-Za-z0-9\\-_]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
 public class StackstorageComCrawler extends PluginForDecrypt {
     public StackstorageComCrawler(PluginWrapper wrapper) {
         super(wrapper);
