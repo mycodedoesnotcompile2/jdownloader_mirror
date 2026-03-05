@@ -474,9 +474,9 @@ public class JavaScriptEngineFactory {
                 /*
                  * script may use Java primitive wrapper type objects (such as java.lang.Integer, java.lang.Boolean etc) explicitly. If we
                  * unwrap, then these script objects will become script primitive types. For example,
-                 *
+                 * 
                  * var x = new java.lang.Double(3.0); print(typeof x);
-                 *
+                 * 
                  * will print 'number'. We don't want that to happen.
                  */
                 Object obj = njb.unwrap();
@@ -1215,13 +1215,13 @@ public class JavaScriptEngineFactory {
                      * Get Object from LinkedHashMap from desired position - this is a rare case but good to have it covered here in this
                      * way! Example: "mapOne/{mapTwo}/{0}<-Not an ArrayList but we want the first map which we do not know the name of"
                      */
-                    final Map<String, Object> tmp_linkedmap = (Map<String, Object>) currentObject;
-                    final Iterator<Entry<String, Object>> it = tmp_linkedmap.entrySet().iterator();
+                    final Map<Object, Object> tmp_linkedmap = (Map<Object, Object>) currentObject;
+                    final Iterator<Entry<Object, Object>> it = tmp_linkedmap.entrySet().iterator();
                     int position = 0;
                     /* Did it find the desired value or not */
                     boolean success = false;
                     while (it.hasNext()) {
-                        final Entry<String, Object> entry = it.next();
+                        final Entry<Object, Object> entry = it.next();
                         if (crawlentry_number >= 0 && position == crawlentry_number) {
                             currentObject = entry.getValue();
                             success = true;
@@ -1233,8 +1233,17 @@ public class JavaScriptEngineFactory {
                         currentObject = null;
                     }
                 } else if (currentObject instanceof Map) {
-                    final Map<String, Object> tmp_map = (Map<String, Object>) currentObject;
-                    currentObject = tmp_map.get(crawlpart);
+                    final Map<Object, Object> tmp_map = (Map<Object, Object>) currentObject;
+                    if (tmp_map.containsKey(crawlpart)) {
+                        // String key
+                        currentObject = tmp_map.get(crawlpart);
+                    } else if (crawlpart.matches("^\\d+$")) {
+                        // Integer key
+                        currentObject = tmp_map.get(Integer.parseInt(crawlpart));
+                    } else {
+                        // unsupported key type
+                        currentObject = null;
+                    }
                 } else if (currentObject instanceof List) {
                     if (crawlentry_number == -2) {
                         /* crawlpart does not match the DataType we have --> Return null */

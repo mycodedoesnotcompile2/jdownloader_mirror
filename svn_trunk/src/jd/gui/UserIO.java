@@ -471,9 +471,9 @@ public class UserIO {
      *
      * @return indices of selected options or null if user canceled
      */
-    public int[] requestMultiSelectionDialog(final int flag, final String title, final String question, final Object[] options, final Icon icon, final String okText, final String cancelText, final ListCellRenderer renderer) {
+    public int[] requestMultiSelectionDialog(final int flag, final String title, final String question, final Object[] options, final int[] preSelection, final Icon icon, final String okText, final String cancelText, final ListCellRenderer renderer) {
         try {
-            MultiSelectionDialogInterface d = UIOManager.I().show(MultiSelectionDialogInterface.class, new MultiSelectionDialog(flag, title, question, options, icon, okText, cancelText, renderer) {
+            MultiSelectionDialogInterface d = UIOManager.I().show(MultiSelectionDialogInterface.class, new MultiSelectionDialog(flag, title, question, options, preSelection, icon, okText, cancelText, renderer) {
                 @Override
                 public boolean isRemoteAPIEnabled() {
                     return true;

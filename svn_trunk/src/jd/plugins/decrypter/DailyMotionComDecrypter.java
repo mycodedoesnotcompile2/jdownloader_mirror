@@ -59,7 +59,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52427 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,6 +92,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         // embedded video player -> rewrite URL
         contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player/[a-z0-9]+.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
         contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player\\.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
+        contenturl = contenturl.replaceFirst("(?i)https?://dailymotion.com", "https://www.dailymotion.com");// avoid required redirect
         br.setFollowRedirects(true);
         DailyMotionCom.prepBrowser(this.br);
         synchronized (ctrlLock) {
@@ -140,7 +141,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         }
     }
 
-    private void checkErrors(final Browser br) throws PluginException {
+    private void checkErrors(final Browser br) throws PluginException, DecrypterRetryException {
         /* 404 */
         if (br.containsHTML("(<title>Dailymotion \\– 404 Not Found</title>|url\\(/images/404_background\\.jpg)") || this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -148,6 +149,10 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Dailymotion is currently offline for unplanned maintenance.\\s*<")) {
+            throw new DecrypterRetryException(RetryReason.HOST, "Dailymotion is currently offline for unplanned maintenance");
+        } else if (br.getHttpConnection().getResponseCode() == 503) {
+            throw new DecrypterRetryException(RetryReason.HOST);
         }
     }
 
@@ -168,6 +173,9 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
+        if (SubConfiguration.getConfig(this.getHost()).getBooleanProperty(DailyMotionCom.USER_PACKAGE, false)) {
+            fp.setAllowInheritance(true);
+        }
         boolean has_more = false;
         int page = 0;
         int numberofVideos = -1;

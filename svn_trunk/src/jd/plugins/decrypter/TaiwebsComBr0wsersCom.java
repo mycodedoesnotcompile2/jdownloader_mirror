@@ -25,6 +25,7 @@ import org.appwork.utils.parser.UrlQuery;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -36,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52431 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52432 $", interfaceVersion = 3, names = {}, urls = {})
 public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
     public TaiwebsComBr0wsersCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,7 +134,7 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
                 logger.info("Crawling item " + (index + 1) + "/" + urls.length);
                 final String gdriveFileIDEncoded = new Regex(url, "(?i)dl/goo/[^/]+/([a-zA-Z0-9_/\\+\\=\\-%]+)").getMatch(0);
                 final String encodedURL;
-                final DownloadLink result;
+                DownloadLink result = null;
                 if (gdriveFileIDEncoded != null) {
                     final String gdriveFileID = Encoding.Base64Decode(Encoding.htmlDecode(gdriveFileIDEncoded.trim()));
                     result = createDownloadlink(GoogleDriveCrawler.generateFileURL(gdriveFileID));
@@ -143,31 +144,58 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
                     result = createDownloadlink(decodedURL);
                 } else {
                     /* http request required to find final URL */
-                    brx.getPage(url);
-                    if (brx.getHttpConnection().getResponseCode() == 400 || brx.getHttpConnection().getResponseCode() == 404) {
-                        numberofOfflineItems++;
-                        continue;
+                    URLConnectionAdapter con = null;
+                    try {
+                        con = brx.openGetConnection(url);
+                        /* Check if we have a single file. */
+                        if (this.looksLikeDownloadableContent(con)) {
+                            result = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(con.getURL().toExternalForm()));
+                            if (con.getCompleteContentLength() > 0) {
+                                if (con.isContentDecoded()) {
+                                    result.setDownloadSize(con.getCompleteContentLength());
+                                } else {
+                                    result.setVerifiedFileSize(con.getCompleteContentLength());
+                                }
+                            }
+                            result.setFinalFileName(getFileNameFromConnection(con));
+                            result.setAvailable(true);
+                        } else {
+                            brx.followConnection();
+                        }
+                    } finally {
+                        try {
+                            con.disconnect();
+                        } catch (final Throwable e) {
+                        }
                     }
-                    final String redirect = brx.getRedirectLocation();
-                    if (redirect == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    if (result == null) {
+                        if (brx.getHttpConnection().getResponseCode() == 400 || brx.getHttpConnection().getResponseCode() == 404) {
+                            numberofOfflineItems++;
+                            continue;
+                        }
+                        final String redirect = brx.getRedirectLocation();
+                        if (redirect == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        result = createDownloadlink(DirectHTTP.createURLForThisPlugin(redirect));
                     }
-                    result = createDownloadlink(DirectHTTP.createURLForThisPlugin(redirect));
                 }
                 result.setSourcePluginPasswordList(pwlist);
-                result._setFilePackage(fp);
+                if (urls.length > 1) {
+                    result._setFilePackage(fp);
+                }
                 ret.add(result);
                 distribute(result);
                 if (this.isAbort()) {
                     /* Aborted by user */
                     throw new InterruptedException();
                 }
-                if (ret.isEmpty() && numberofOfflineItems > 0) {
-                    /* Assume that all items are offline */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                return ret;
             }
+            if (ret.isEmpty() && numberofOfflineItems > 0) {
+                /* Assume that all items are offline */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            return ret;
         }
         /* 2026-03-03: e.g. externally hosted applications, example: /blog/detail/malwarebytes-adwcleaner-1132-6806.html */
         urls = brc.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*onclick=\"myfunctions_").getColumn(0);
@@ -178,7 +206,9 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
                     continue;
                 }
                 final DownloadLink result = this.createDownloadlink(url);
-                result._setFilePackage(fp);
+                if (urls.length > 1) {
+                    result._setFilePackage(fp);
+                }
                 ret.add(result);
             }
         }

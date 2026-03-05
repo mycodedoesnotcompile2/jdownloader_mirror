@@ -4,9 +4,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -20,7 +17,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51142 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +85,8 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                 break pagination;
             }
             int numberofNewItemsThisPage = 0;
-            for (final String post : posts) {
+            for (String post : posts) {
+                post = post.replace("&#91;", "[");// replace for later removal of broken tags
                 final String postID = new Regex(post, "name\\s*=\\s*\"post(\\d+)").getMatch(0);
                 final ArrayList<DownloadLink> thisCrawledLinks = new ArrayList<DownloadLink>();
                 // Get all post content and then filter it for the href links
@@ -101,6 +103,7 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                         complexTitle = complexTitle.replaceAll("<[^>]*>", "");
                         complexTitle = complexTitle.replaceAll("[\r\n\t]+", " ");
                         complexTitle = complexTitle.replaceAll("^\\s+", "");
+                        complexTitle = Encoding.htmlOnlyDecode(complexTitle);
                         complexTitle = complexTitle.replaceAll("\\s+&", "");
                         if (StringUtils.isNotEmpty(complexTitle)) {
                             title = complexTitle;
@@ -136,11 +139,11 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     /* For older/broken posts containing plain-text. */
                     results = HTMLParser.getHttpLinks(postContent, br.getURL());
                 }
-                for (final String result : results) {
+                for (String result : results) {
+                    result = result.replaceFirst("https?://\\[img](https?://.*?)\\[/img\\]", "$1");// remove broken tags
                     if (!dupes.add(result)) {
                         continue;
                     } else if (this.canHandle(result)) {
-                        /* Do not allow links that would be crawled by the viper.to crawler. */
                         continue;
                     }
                     numberofNewItemsThisPage++;
@@ -148,7 +151,7 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     if (fp != null) {
                         link._setFilePackage(fp);
                     }
-                    if (targetPostID == null) {
+                    if (targetPostID == null && !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         /* We aren't looking for a specific post -> Return all results instantly. */
                         distribute(link);
                     }

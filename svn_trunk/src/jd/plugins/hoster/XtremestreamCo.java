@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52431 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52434 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +79,7 @@ public class XtremestreamCo extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://\\w+\\." + buildHostsPatternPart(domains) + "/player/index\\.php\\?data=([a-f0-9]{32})");
+            ret.add("https?://(\\w+)\\." + buildHostsPatternPart(domains) + "/player/index\\.php\\?data=([a-f0-9]{32})");
         }
         return ret.toArray(new String[0]);
     }
@@ -91,16 +91,16 @@ public class XtremestreamCo extends PluginForHost {
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String linkid = getFID(link);
-        if (linkid != null) {
-            return this.getHost() + "://" + linkid;
+        final String file_id = getFID(link);
+        if (file_id != null) {
+            return this.getHost() + "://" + file_id;
         } else {
             return super.getLinkID(link);
         }
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
     }
 
     @Override
@@ -216,14 +216,19 @@ public class XtremestreamCo extends PluginForHost {
         if (query == null && fid != null) {
             query = "data=" + fid;
         }
-        if (data_xtremestream == null) {
+        final String subdomain_from_added_url = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String subdomain = data_xtremestream;
+        if (subdomain == null && subdomain_from_added_url != null && !subdomain_from_added_url.equalsIgnoreCase("www")) {
+            subdomain = subdomain_from_added_url;
+        }
+        if (subdomain == null) {
             logger.warning("Failed to find cdn subdomain -> Fallback to default which could mean that we will only get one (= the lowest) resolution");
-            data_xtremestream = "xporn";
+            subdomain = "xporn";
         }
         if (query == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String hlsMaster = "https://" + data_xtremestream + ".xtremestream.xyz/player/xs1.php?" + query;
+        final String hlsMaster = "https://" + subdomain + ".xtremestream.xyz/player/xs1.php?" + query;
         br.getPage(hlsMaster);
         final List<HlsContainer> qualities = HlsContainer.getHlsQualities(this.br);
         final HlsContainer bestQuality = HlsContainer.findBestVideoByBandwidth(qualities);

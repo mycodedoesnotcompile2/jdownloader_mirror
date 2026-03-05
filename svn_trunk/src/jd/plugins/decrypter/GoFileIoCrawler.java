@@ -33,7 +33,7 @@ import org.appwork.utils.Time;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.parser.UrlQuery;
 
-@DecrypterPlugin(revision = "$Revision: 52429 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 52440 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -48,6 +48,14 @@ public class GoFileIoCrawler extends PluginForDecrypt {
     protected static AtomicReference<String> WEBSITE_TOKEN           = new AtomicReference<String>();
     protected static AtomicLong              WEBSITE_TOKEN_TIMESTAMP = new AtomicLong(-1);
     protected final static long              WEBSITE_TOKEN_EXPIRE    = 30 * 60 * 1000l;
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader " + this.getVersion());
+        br.setFollowRedirects(true);
+        return br;
+    }
 
     public String getWebsiteToken(final Browser br) throws Exception {
         synchronized (WEBSITE_TOKEN) {

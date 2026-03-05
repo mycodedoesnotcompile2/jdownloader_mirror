@@ -1,6 +1,8 @@
 package org.jdownloader.captcha.v2;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
@@ -156,4 +158,34 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     int getPollingIntervalSeconds();
 
     void setPollingIntervalSeconds(int seconds);
+
+    /** TODO: Remove all methods down below, they're only temporary dummy items. */
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @Deprecated
+    boolean isBlackWhiteListingEnabled();
+
+    @Deprecated
+    void setBlackWhiteListingEnabled(boolean b);
+
+    @AboutConfig
+    @Deprecated
+    Map<String, Integer> getWaitForMap();
+
+    @Deprecated
+    void setWaitForMap(Map<String, Integer> map);
+
+    @AboutConfig
+    @Deprecated
+    ArrayList<String> getBlacklistEntries();
+
+    @AboutConfig
+    @Deprecated
+    ArrayList<String> getWhitelistEntries();
+
+    @Deprecated
+    void setBlacklistEntries(ArrayList<String> list);
+
+    @Deprecated
+    void setWhitelistEntries(ArrayList<String> list);
 }

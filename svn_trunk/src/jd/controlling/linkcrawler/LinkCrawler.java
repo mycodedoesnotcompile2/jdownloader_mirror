@@ -34,6 +34,8 @@ import java.util.regex.Pattern;
 
 import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcollector.LinkOriginDetails;
 import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
 import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
 import jd.http.AuthenticationFactory;
@@ -2924,7 +2926,12 @@ public class LinkCrawler {
             cryptedLink.setLazyC(lazyC);
             final CrawledLink link = crawledLinkFactorybyCryptedLink(cryptedLink);
             forwardCrawledLinkInfos(source, link, modifier, null, null);
-            if ((source.getUrlLink() == null || StringUtils.equals(source.getUrlLink(), link.getURL())) && (source.getDownloadLink() == null || source.getDownloadLink().getProperties().isEmpty())) {
+            rewrite: if ((source.getUrlLink() == null || StringUtils.equals(source.getUrlLink(), link.getURL())) && (source.getDownloadLink() == null || source.getDownloadLink().getProperties().isEmpty())) {
+                final LinkOriginDetails origin = source.getOrigin();
+                if (source.getDownloadLink() != null && origin != null && LinkOrigin.FLASHGOT.equals(origin.getOrigin()) && source.getSourceLink() == null && StringUtils.contains(source.getURL(), "#")) {
+                    // keep first CrawledLink(with DownloadLink) from FlashGot as it contains #
+                    break rewrite;
+                }
                 // modify sourceLink because link arise from source(getMatchingLinks)
                 //
                 // keep DownloadLinks with non empty properties
@@ -3137,7 +3144,7 @@ public class LinkCrawler {
                     if (current.getMatchingRule() == null || current.getMatchingRule() != previous.getMatchingRule()) {
                         final String previousURL = sources.get(sources.size() - 1);
                         if (!StringUtils.equals(currentURL, previousURL)) {
-                            sources.add(currentURL);
+                            sources.add(0, currentURL);
                         }
                     }
                 }
@@ -3146,7 +3153,7 @@ public class LinkCrawler {
         }
         link.setSourceUrls(null);
         final String customSourceUrl = getReferrerUrl(link);
-        if (customSourceUrl != null) {
+        if (customSourceUrl != null && !sources.contains(customSourceUrl)) {
             sources.add(customSourceUrl);
         }
         if (sources.size() == 0) {

@@ -109,7 +109,7 @@ public class AddLinksProgress extends AbstractDialog<Object> {
                     new EDTRunner() {
                         @Override
                         protected void runInEDT() {
-                            if (isInitialized()) {
+                            if (isInitialized() && !isDisposed()) {
                                 setReturnmask(true);
                                 dispose();
                             }

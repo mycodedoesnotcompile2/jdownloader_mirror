@@ -6,9 +6,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,8 +30,8 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
-import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.HttpServer;
+import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
 import org.appwork.utils.net.httpserver.XFrameOptions;
@@ -254,12 +252,12 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     public void onBeforeRequest(HttpRequest request, HttpResponse response) {
         // OLD: response.setHook(this); (set ConnectionHook to enable onBeforeSendHeaders())
         // OLD: onBeforeSendHeaders() manually set headers:
-        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
-        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_FRAME_OPTIONS, "SAMEORIGIN"));
-        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_XSS_PROTECTION, "1; mode=block"));
-        //      - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
+        // - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
+        // - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_FRAME_OPTIONS, "SAMEORIGIN"));
+        // - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_XSS_PROTECTION, "1; mode=block"));
+        // - response.getResponseHeaders().add(new HTTPHeader(HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
         // NEW: Headers are now configured via server configuration (configureServerForBrowserReference()),
-        //      not per-request hooks - more efficient and maintainable
+        // not per-request hooks - more efficient and maintainable
         // do not do any origin filter. All origins are allowed
     }
 
@@ -394,7 +392,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                         try {
                             final int delay = Math.max(0, config.getAutoClickDelay());
                             if (delay > 0) {
-                                getLogger().info("Delay AutoClick:" + delay);
+                                getLogger().info("Delay AutoClick millis:" + delay);
                                 Thread.sleep(delay);
                             }
                         } catch (InterruptedException e) {
@@ -516,14 +514,14 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
 
     /**
      * Configures the HTTPServer for BrowserReference with special CORS and Security Header settings.
-     * 
+     *
      * <p>
-     * This method overrides the default configuration from DeprecatedAPIServer with
-     * BrowserReference-specific settings. BrowserReference is used locally to display
-     * CAPTCHA challenges in a browser window.
+     * This method overrides the default configuration from DeprecatedAPIServer with BrowserReference-specific settings. BrowserReference is
+     * used locally to display CAPTCHA challenges in a browser window.
      * </p>
-     * 
-     * @param server The HTTPServer to configure
+     *
+     * @param server
+     *            The HTTPServer to configure
      */
     private void configureServerForBrowserReference(HttpServer server) {
         // CORS configuration for BrowserReference: Allow local server address
@@ -537,8 +535,9 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
             serverAddress = "127.0.0.1:" + server.getActualPort();
         }
         allowedOrigins.add(new OriginRule("http://" + serverAddress));
-        // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" + getServerAddress()));
-        //      (manually set in onBeforeSendHeaders() hook with dynamic server address)
+        // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN, "http://" +
+        // getServerAddress()));
+        // (manually set in onBeforeSendHeaders() hook with dynamic server address)
         // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization
         corsHandler.setAllowedOrigins(allowedOrigins);
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
@@ -547,15 +546,14 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
         // Private Network Access: Allow for local server address
         corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
         server.setCorsHandler(corsHandler);
-
         // Security Headers for BrowserReference: SAMEORIGIN for local browser window
         ResponseSecurityHeaders securityHeaders = new ResponseSecurityHeaders();
         // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_FRAME_OPTIONS, "SAMEORIGIN"));
-        //      (manually set in onBeforeSendHeaders() hook)
+        // (manually set in onBeforeSendHeaders() hook)
         // NEW: Set via ResponseSecurityHeaders API - allow same-origin framing for local browser window
         securityHeaders.setXFrameOptions(XFrameOptions.SAMEORIGIN);
         // OLD: response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS, "nosniff"));
-        //      (manually set in onBeforeSendHeaders() hook)
+        // (manually set in onBeforeSendHeaders() hook)
         // NEW: Set via ResponseSecurityHeaders API - prevent MIME-sniffing attacks
         securityHeaders.setXContentTypeOptions(XContentTypeOptions.NOSNIFF);
         // OLD: No CSP header was set (commented out CSP code in onBeforeSendHeaders())

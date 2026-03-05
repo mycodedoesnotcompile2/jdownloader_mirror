@@ -35,7 +35,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -86,7 +85,6 @@ import org.jdownloader.updatev2.gui.LAFOptions;
 public class FavIcons {
     private static final int                                                     BASE_SIZE       = 16;
     private static final ThreadPoolExecutor                                      THREAD_POOL;
-    private static final AtomicInteger                                           THREADCOUNTER   = new AtomicInteger(0);
     private static final Object                                                  LOCK            = new Object();
     private static final LinkedHashMap<String, java.util.List<FavIconRequestor>> QUEUE           = new LinkedHashMap<String, java.util.List<FavIconRequestor>>();
     private static final HashMap<String, ImageIcon>                              FAILED_ICONS    = new HashMap<String, ImageIcon>();
@@ -102,13 +100,23 @@ public class FavIcons {
             public Thread newThread(Runnable r) {
                 Thread t = new Thread(r);
                 t.setDaemon(true);
-                t.setName("FavIconLoader:" + THREADCOUNTER.incrementAndGet());
+                t.setName("FavIconLoader: idle");
                 return t;
             }
         }, new ThreadPoolExecutor.AbortPolicy()) {
+
+            @Override
+            protected void afterExecute(Runnable r, Throwable t) {
+                super.afterExecute(r, t);
+                Thread.currentThread().setName("FavIconLoader: idle");
+            }
+
             @Override
             protected void beforeExecute(Thread t, Runnable r) {
                 super.beforeExecute(t, r);
+                if (r instanceof FavIconsRunnable) {
+                    Thread.currentThread().setName("FavIconLoader: " + ((FavIconsRunnable) r).host);
+                }
                 /*
                  * WORKAROUND for stupid SUN /ORACLE way of "how a threadpool should work" !
                  */
@@ -262,6 +270,14 @@ public class FavIcons {
         return existingHostPlugin;
     }
 
+    private static abstract class FavIconsRunnable implements Runnable {
+        private final String host;
+
+        private FavIconsRunnable(final String host) {
+            this.host = host;
+        }
+    }
+
     private static ImageIcon add(final String host, FavIconRequestor requestor) {
         final LogSource logger = getLogger(host, requestor);
         final AtomicReference<LogSource> loggerReference = new AtomicReference<LogSource>();
@@ -293,7 +309,7 @@ public class FavIcons {
                 }
                 if (enqueueFavIcon) {
                     loggerReference.getAndSet(null);
-                    THREAD_POOL.execute(new Runnable() {
+                    THREAD_POOL.execute(new FavIconsRunnable(host) {
                         public void run() {
                             try {
                                 final CopyOnWriteArrayList<String> tryHosts = new CopyOnWriteArrayList<String>();

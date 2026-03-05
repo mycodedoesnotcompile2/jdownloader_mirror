@@ -4,6 +4,7 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.captcha.v2.ChallengeSolverConfig;
 
 public interface BrowserCaptchaSolverConfig extends ChallengeSolverConfig {
@@ -14,6 +15,7 @@ public interface BrowserCaptchaSolverConfig extends ChallengeSolverConfig {
     void setAutoClickEnabled(boolean b);
 
     @DefaultIntValue(500)
+    @SpinnerValidator(min = 0, max = 10000, step = 500)
     @DescriptionForConfigEntry("Delay to auto click the captcha challenge in milliseconds")
     @AboutConfig
     int getAutoClickDelay();
@@ -21,6 +23,7 @@ public interface BrowserCaptchaSolverConfig extends ChallengeSolverConfig {
     void setAutoClickDelay(int delay);
 
     @DefaultIntValue(1000)
+    @SpinnerValidator(min = 1000, max = 45000, step = 1000)
     @DescriptionForConfigEntry("Delay to auto open the captcha challenge in browser")
     @AboutConfig
     int getAutoOpenDelay();
@@ -40,29 +43,11 @@ public interface BrowserCaptchaSolverConfig extends ChallengeSolverConfig {
     void setBrowserCommandline(String[] cmd);
 
     @DefaultIntValue(24613)
+    @SpinnerValidator(min = 0, max = 65535, step = 1)
     @AboutConfig
     int getLocalHttpPort();
 
     void setLocalHttpPort(int port);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("If enabled, JD will use your default browser to improve the captcha detection.")
-    boolean isBrowserLoopEnabled();
-
-    void setBrowserLoopEnabled(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry("If enabled, JD will use the browserloop even if it is in silentmode")
-    boolean isBrowserLoopDuringSilentModeEnabled();
-
-    void setBrowserLoopDuringSilentModeEnabled(boolean b);
-
-    @DefaultBooleanValue(false)
-    boolean isBrowserLoopUserConfirmed();
-
-    void setBrowserLoopUserConfirmed(boolean b);
 
     @AboutConfig
     @DescriptionForConfigEntry("Easier Captchas: Get your current google.com SID and HSID Cookie value from your default browser and enter id here.")
@@ -75,10 +60,4 @@ public interface BrowserCaptchaSolverConfig extends ChallengeSolverConfig {
     void setGoogleComCookieValueSID(String s);
 
     void setGoogleComCookieValueHSID(String s);
-    // @AboutConfig
-    // @DefaultBooleanValue(false)
-    //
-    // boolean isRecaptcha2Enabled();
-    //
-    // void setRecaptcha2Enabled(boolean b);
 }

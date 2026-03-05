@@ -52,7 +52,7 @@ import org.jdownloader.plugins.components.config.SerienStreamToConfig.SeasonCraw
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 52427 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -222,7 +222,7 @@ public class SerienStreamTo extends PluginForDecrypt {
                 for (int i = 0; i < seasonNumbersFinal.size(); i++) {
                     userOptions[i] = "Staffel " + seasonNumbersFinal.get(i);
                 }
-                final int[] selectedItems = UserIO.getInstance().requestMultiSelectionDialog(0, episodeTitle, "Staffelauswahl für " + seriesTitle, userOptions, null, "Ausgewählte Staffeln crawlen", "Nichts crawlen", null);
+                final int[] selectedItems = UserIO.getInstance().requestMultiSelectionDialog(0, episodeTitle, "Staffelauswahl für " + seriesTitle, userOptions, new int[] { 0 }, null, "Ausgewählte Staffeln crawlen", "Nichts crawlen", null);
                 if (selectedItems == null) {
                     logger.info("User aborted season crawl dialog -> Crawling nothing");
                     return ret;

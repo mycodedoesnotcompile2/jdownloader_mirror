@@ -68,6 +68,16 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+        if (!account.isEnabled()) {
+            return ChallengeVetoReason.ACCOUNT_DISABLED;
+        }
+        if (!account.isValid()) {
+            return ChallengeVetoReason.ACCOUNT_IN_ERROR_STATE;
+        }
+        if (!plugin.enoughBalanceFor(c, account)) {
+            return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
+        }
+        /* Check if plugin provides a veto reason */
         final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
         if (veto != null) {
             return veto;

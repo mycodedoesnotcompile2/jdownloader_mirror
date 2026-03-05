@@ -32,5 +32,4 @@ public interface SolverService {
     public abstract void setWaitFor(String id, Integer waitFor);
 
     public abstract Map<String, Integer> getWaitForMapCopy();
-
 }

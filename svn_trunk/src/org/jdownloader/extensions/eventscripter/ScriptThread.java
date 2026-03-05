@@ -205,9 +205,11 @@ public class ScriptThread extends Thread implements JSShutterDelegate, StateMach
             evalTrusted("global=this;");
             initEnvironment();
             cleanupClasses();
+            getStateMachine().setStatus(RUNNING_STATE);
             try {
                 evalUNtrusted(script.getScript());
             } finally {
+                getStateMachine().setStatus(STOPPED_STATE);
                 finalizeEnvironment();
             }
             // ProcessBuilderFactory.runCommand(commandline);
@@ -358,12 +360,7 @@ public class ScriptThread extends Thread implements JSShutterDelegate, StateMach
     }
 
     private void evalUNtrusted(String script) {
-        getStateMachine().setStatus(RUNNING_STATE);
-        try {
-            cx.evaluateString(getScope(), script, "", 1, null);
-        } finally {
-            getStateMachine().setStatus(STOPPED_STATE);
-        }
+        cx.evaluateString(getScope(), script, "", 1, null);
     }
 
     public Object evalTrusted(String preloadClasses) {

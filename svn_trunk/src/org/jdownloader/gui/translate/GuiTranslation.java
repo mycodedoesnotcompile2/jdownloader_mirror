@@ -4262,57 +4262,18 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "<html>To %s1, the \"Third party\" application FFmpeg™ is required.FFmpeg™ is a leading multimedia application that can be started by JDownloader to merge video and audio streams and vice versa. Unfortunately, JDownloader could not find FFmpeg™ installed on your system.</html>" })
     String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_parameterd_2(String str);
 
-    @Default(lngs = { "en" }, values = { "<html>To %s1, the \"Third party\" application PhantomJS is required. PhantomJS is a commandline browser that is required to automate some steps. Unfortunately, JDownloader could not find PhantomJS installed on your system.</html>" })
-    String PhantomJSInstallTypeChooserDialog_message(String str);
-
     @Default(lngs = { "en" }, values = { "Ok, but what now?" })
     String FFMpegInstallTypeChooserDialog_layoutDialogContent_path_chooser();
 
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Step %s1:" })
-    // String lit_step_x(int i);
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Download FFmpeg™. Recommended Version: Offical \"FFmpeg static build for linux\"" })
-    // String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_download_linux();
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Download FFmpeg™. Recommended Version: Offical \"FFmpeg binary for mac\"" })
-    // String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_download_mac();
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Download FFmpeg™. Recommended Version: Offical \"FFmpeg.exe build for windows\"" })
-    // String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_download_windows2();
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Download FFmpeg™. Recommended Version: Offical \"FFmpeg build for %s1\"" })
-    // String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_download_others(String osString);
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Install it" })
-    // String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_install();
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Tell JDownloader the Installation Location" })
-    // String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_message_path();
     @Default(lngs = { "en" }, values = { "What's the matter?" })
     String FFMpegInstallTypeChooserDialog_layoutDialogContent_problem();
 
     @Default(lngs = { "en" }, values = { "<html>If you want JDownloader to download and install the required official FFmpeg™ Package, please click [Install FFmpeg™ now].</html>" })
     String FFMpegInstallTypeChooserDialog_FFMpegInstallTypeChooserDialog_solve2();
 
-    @Default(lngs = { "en" }, values = { "<html>If you want JDownloader to download and install the required official (http://phantomjs.org) PhantomJS Package, please click [Install PhantomJS now].</html>" })
-    String Phantom_JS_Explain_download();
-
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Searching for the FFmpeg™ Binary" })
-    // String FFMpegInstallTypeChooserDialog_run_searching_();
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Please wait..." })
-    // String lit_please_wait_dotdotdot();
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "Please choose the correct path to the FFmpeg™ binary..." })
-    // String FFMpegInstallTypeChooserDialog_layoutDialogContent_help_();
     @Default(lngs = { "en" }, values = { "FFmpeg™ Setup" })
     String FFMpegInstallProgress_getMessage();
 
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "FFmpeg™ is missing" })
-    // String YoutubeDash_handleFree_ffmpegmissing();
     @Default(lngs = { "en" }, values = { "Converting/Demuxing..." })
     String FFMpegProgress_getMessage_merging();
 
@@ -6160,30 +6121,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Open Browser" })
     String BrowserCaptchaDialog_getOKButtonText_open_browser();
 
-    @Default(lngs = { "en" }, values = { "New Feature: Browser Loop" })
-    String RecaptchaV1Handler_load_help__title();
-
-    @Default(lngs = { "en" }, values = { "JDownloader just opened your browser, did some captcha magic and closed it a few seconds later. Thanks to this 'Browser Loop', JD is able to show you captchas that are much easier to read and solve. If you do not want to use this new feature, click [Disable Browser Loop]. You can enable or disable the browser loop at any time in the advanced options." })
-    String RecaptchaV1Handler_load_help_msg();
-
-    @Default(lngs = { "en" }, values = { "Keep Browser Loop enabled" })
-    String RecaptchaV1Handler_ok();
-
-    @Default(lngs = { "en" }, values = { "Disable Browser Loop" })
-    String RecaptchaV1Handler_disable();
-
-    @Default(lngs = { "en" }, values = { "More Information..." })
-    String RecaptchaV1Handler_load_help_();
-
-    @Default(lngs = { "en" }, values = { "Recaptcha Cookie Tester" })
-    String Recaptcha_cookie_help_title();
-
-    @Default(lngs = { "en" }, values = { "Please compare the captchas on the left. The Easy captcha should be easier to read and solve. If not, you did not use a validated Google Session, or the entered cookies are invalid." })
-    String Recaptcha_cookie_help_msg();
-
-    @Default(lngs = { "en" }, values = { "For this feature, 2 advanced options are required:\r\nBrowserCaptchaSolver: Google Com Cookie Value HSID\r\n*BrowserCaptchaSolver: Google Com Cookie Value SID\r\n\r\nPlease enter both." })
-    String Recaptcha_cookie_help_msg_both_cookies();
-
     @Default(lngs = { "en" }, values = { "Start CRC task!" })
     String gui_table_contextmenu_runchecksum();
 
@@ -6766,59 +6703,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Choose all Variant that should be in the linkgrabber variants column dropdown list for the selected collections" })
     String youtube_choose_dropdown_list();
 
-    @Default(lngs = { "en" }, values = { "Select all pieces, that contain ANY trace of '%s1'" })
-    String RECAPTCHA_2_Dialog_help_tile_selection(String string);
-
-    @Default(lngs = { "en" }, values = { "Ignore greyed out pieces. Empty selections are valid as well." })
-    String RECAPTCHA_2_Dialog_help_dynamic();
-
-    @Default(lngs = { "en" }, values = { "Continue empty" })
-    String RECAPTCHA_2_Dialog_empty_tile_selection();
-
-    @Default(lngs = { "en" }, values = { "You did not select ALL pieces!" })
-    String RECAPTCHA_2_VERIFICATION_ERROR_MORE_REQUIRED();
-
-    @Default(lngs = { "en" }, values = { "You did not select ALL pieces!" })
-    String RECAPTCHA_2_VERIFICATION_ERROR_TILE_MORE();
-
-    @Default(lngs = { "en" }, values = { "Another challenge is required." })
-    String RECAPTCHA_2_VERIFICATION_ERROR_ANOTHER_CHALLENGE();
-
-    @Default(lngs = { "en" }, values = { "PhantomJS Setup" })
-    String phantomjs_setup_progress();
-
-    @Default(lngs = { "en" }, values = { "PhantomJS is missing!" })
-    String phantom_js_installation_dialog_title();
-
-    @Default(lngs = { "en" }, values = { "Install PhantomJS now" })
-    String phantom_js_install_now();
-
-    @Default(lngs = { "en" }, values = { "automate Download- and Linkcrawling tasks" })
-    String phantomjs_usage();
-
     @Default(lngs = { "en" }, values = { "Installation" })
     String lit_installation();
-
-    @Default(lngs = { "en" }, values = { "Please wait until JDownloader has downloaded and installed PhantomJS" })
-    String phantomjs_installation_message();
-
-    @Default(lngs = { "en" }, values = { "Download: %s2% %s1/s" })
-    String phantom_downloading_status(String formatBytes, long progress);
-
-    @Default(lngs = { "en" }, values = { "Installation ..." })
-    String phantom_installation_status();
-
-    @Default(lngs = { "en" }, values = { "PhantomJS Installation has been successful" })
-    String phantomjs_installation_message_success();
-
-    @Default(lngs = { "en" }, values = { "PhantomJS Installation failed.\r\nPlease contact the support." })
-    String phantomjs_installation_message_failed();
-
-    @Default(lngs = { "en" }, values = { "Improve Captcha Solving..." })
-    String phantomjs_recaptcha_google_account_title();
-
-    @Default(lngs = { "en" }, values = { "If you get many hard to solve image captchas, \r\nyou should think about adding 'recaptcha.google.com' account at Settings->Accountmanager.\r\nAfterwards, you will probably get less and easier captcha images." })
-    String phantomjs_recaptcha_google_account_msg();
 
     @Default(lngs = { "en" }, values = { "Authorization required for %s1" })
     String OAUTH_DIALOG_TITLE(String tld);

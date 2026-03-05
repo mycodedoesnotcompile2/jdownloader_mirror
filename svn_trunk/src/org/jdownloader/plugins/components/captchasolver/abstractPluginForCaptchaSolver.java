@@ -3,15 +3,6 @@ package org.jdownloader.plugins.components.captchasolver;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.CaptchaType;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.PluginForHost;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -24,6 +15,15 @@ import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaType;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.PluginForHost;
 
 /**
  * Abstract base class for captcha solver plugins.
@@ -235,15 +235,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return null if this solver can handle the challenge, ChallengeVetoReason otherwise
      */
     public ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
-        if (!account.isEnabled()) {
-            return ChallengeVetoReason.ACCOUNT_DISABLED;
-        }
-        if (!account.isValid()) {
-            return ChallengeVetoReason.ACCOUNT_IN_ERROR_STATE;
-        }
-        if (!this.enoughBalanceFor(c, account)) {
-            return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
-        }
         return null;
     }
 

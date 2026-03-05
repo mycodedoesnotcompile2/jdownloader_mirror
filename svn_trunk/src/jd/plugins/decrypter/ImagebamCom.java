@@ -20,8 +20,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,7 +36,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51436 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagebamCom extends PluginForDecrypt {
     public ImagebamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,14 +75,14 @@ public class ImagebamCom extends PluginForDecrypt {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:image|gallery)/[a-z0-9]+";
             regex += "|" + "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/view/[A-Z0-9]+";
             regex += "|" + "https?://thumbs\\d+\\." + buildHostsPatternPart(domains) + "/\\d+/[a-z0-9]+/[a-z0-9]+/[a-z0-9]+\\.[a-z]{3,5}";
-            regex += "|" + "https?://thumbs\\d+\\." + buildHostsPatternPart(domains) + "/\\d+/[a-z0-9]+/[a-z0-9]+/[A-Z0-9]+_t\\.[a-z]{3,5}";
+            regex += "|" + "https?://thumbs\\d+\\." + buildHostsPatternPart(domains) + "/\\d+/[a-z0-9]+/[a-z0-9]+/[a-z0-9]+_t\\.[a-z]{3,5}";
             ret.add(regex);
         }
         return ret.toArray(new String[0]);
     }
 
     private static final String TYPE_THUMBNAIL     = "https?://thumbs\\d+\\.[^/]+/\\d+/[a-z0-9]+/[a-z0-9]+/([a-z0-9]+)\\.[a-z]{3,5}";
-    private static final String TYPE_THUMBNAIL_NEW = "https?://thumbs\\d+\\.[^/]+/\\d+/[a-z0-9]+/[a-z0-9]+/([A-Z0-9]+)_t\\.[a-z]{3,5}";
+    private static final String TYPE_THUMBNAIL_NEW = "https?://thumbs\\d+\\.[^/]+/\\d+/[a-z0-9]+/[a-z0-9]+/([a-z0-9]+)_t\\.[a-z]{3,5}";
     private static final String TYPE_IMAGE         = "https?://(?:www\\.)?[^/]+/image/([a-z0-9]+)";
     private static final String TYPE_VIEW          = "https?://(?:www\\.)?[^/]+/view/([A-Za-z0-9]+)";
     private static final String TYPE_GALLERY       = "https?://(?:www\\.)?[^/]+/gallery/([a-z0-9]+)";
@@ -90,21 +90,21 @@ public class ImagebamCom extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        if (param.getCryptedUrl().matches(TYPE_THUMBNAIL)) {
+        if (param.getCryptedUrl().matches("(?i)" + TYPE_THUMBNAIL)) {
             /* Rewrite thumbnail to fullImage link */
             final String id = new Regex(param.getCryptedUrl(), TYPE_THUMBNAIL).getMatch(0);
             final String newURL = "https://www." + this.getHost() + "/image/" + id;
             decryptedLinks.add(this.createDownloadlink(newURL));
             return decryptedLinks;
-        } else if (param.getCryptedUrl().matches(TYPE_THUMBNAIL_NEW)) {
+        } else if (param.getCryptedUrl().matches("(?i)" + TYPE_THUMBNAIL_NEW)) {
             /* Rewrite thumbnail to fullImage link */
             final String id = new Regex(param.getCryptedUrl(), TYPE_THUMBNAIL_NEW).getMatch(0);
             final String newURL = "https://www." + this.getHost() + "/view/" + id;
             decryptedLinks.add(this.createDownloadlink(newURL));
             return decryptedLinks;
-        } else if (param.getCryptedUrl().matches(TYPE_GALLERY)) {
+        } else if (param.getCryptedUrl().matches("(?i)" + TYPE_GALLERY)) {
             return crawlGallery(param);
-        } else if (param.getCryptedUrl().matches(TYPE_VIEW)) {
+        } else if (param.getCryptedUrl().matches("(?i)" + TYPE_VIEW)) {
             return crawlGalleryNew(param);
         } else {
             /* TYPE_IMAGE */
@@ -188,7 +188,7 @@ public class ImagebamCom extends PluginForDecrypt {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         final boolean isNewGallery;
         String galleryID;
-        if (param.getCryptedUrl().matches(TYPE_GALLERY)) {
+        if (param.getCryptedUrl().matches("(?i)" + TYPE_GALLERY)) {
             isNewGallery = false;
             galleryID = new Regex(param.getCryptedUrl(), TYPE_GALLERY).getMatch(0);
         } else {

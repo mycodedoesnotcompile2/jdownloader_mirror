@@ -23,14 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -54,7 +46,15 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.DailyMotionComDecrypter;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49500 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52435 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -90,6 +90,7 @@ public class DailyMotionCom extends PluginForHost {
     public static final String  ALLOW_1440               = "ALLOW_6";
     public static final String  ALLOW_2160               = "ALLOW_7";
     public static final String  ALLOW_AUDIO              = "ALLOW_AUDIO";
+    public static final String  USER_PACKAGE             = "USER_PACKAGE";
     private static final String CUSTOM_DATE              = "CUSTOM_DATE";
     private static final String CUSTOM_FILENAME          = "CUSTOM_FILENAME";
     private final static String defaultCustomFilename    = "*videoname*_*quality**ext*";
@@ -171,8 +172,7 @@ public class DailyMotionCom extends PluginForHost {
     }
 
     /**
-     * Returns height of this item. </br>
-     * -1 = Fallback / audio.
+     * Returns height of this item. </br> -1 = Fallback / audio.
      */
     public static int getQualityHeight(final DownloadLink link) {
         final int height = link.getIntegerProperty(PROPERTY_QUALITY_HEIGHT, -1);
@@ -466,7 +466,7 @@ public class DailyMotionCom extends PluginForHost {
         br.setCookie("http://www.dailymotion.com", "family_filter", "off");
         br.setCookie("http://www.dailymotion.com", "ff", "off");
         br.setCookie("http://www.dailymotion.com", "lang", "en_US");
-        br.setAllowedResponseCodes(new int[] { 410 });
+        br.setAllowedResponseCodes(new int[] { 410, 503 });
         return br;
     }
 
@@ -553,6 +553,8 @@ public class DailyMotionCom extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Customize the filenames"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_DATE, JDL.L("plugins.hoster.dailymotioncom.customdate", "Define how the date should look.")).setDefaultValue(defaultCustomDate));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), USER_PACKAGE, JDL.L("plugins.hoster.dailymotioncom.user_package", "Group all videos into one package for user links?")).setDefaultValue(false));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Customize the filename! Example: '*channelname*_*date*_*videoname**ext*'"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_FILENAME, JDL.L("plugins.hoster.dailymotioncom.customfilename", "Define how the filenames should look:")).setDefaultValue(defaultCustomFilename));

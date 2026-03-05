@@ -108,50 +108,61 @@ import org.appwork.utils.net.httpserver.responses.HttpResponse;
  *
  * <h3>Enable CORS for All Origins (Development Only)</h3>
  *
- * <pre>{@code
- * CorsHandler corsHandler = new CorsHandler();
- * java.util.List<OriginRule> origins = new java.util.ArrayList<OriginRule>();
- * origins.add(new OriginRule("*"));
- * corsHandler.setAllowedOrigins(origins);
- * corsHandler.setAllowMethods(EnumSet.of(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS));
- * corsHandler.setExposeHeaders("X-Session, X-ServerTime");
- * server.setCorsHandler(corsHandler);
- * }</pre>
+ * <pre>
+ * {
+ *     &#064;code
+ *     CorsHandler corsHandler = new CorsHandler();
+ *     java.util.List&lt;OriginRule&gt; origins = new java.util.ArrayList&lt;OriginRule&gt;();
+ *     origins.add(new OriginRule(&quot;*&quot;));
+ *     corsHandler.setAllowedOrigins(origins);
+ *     corsHandler.setAllowMethods(EnumSet.of(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS));
+ *     corsHandler.setExposeHeaders(&quot;X-Session, X-ServerTime&quot;);
+ *     server.setCorsHandler(corsHandler);
+ * }
+ * </pre>
  *
  * <h3>Enable CORS for Specific Origins</h3>
  *
- * <pre>{@code
- * CorsHandler corsHandler = new CorsHandler();
- * java.util.List<OriginRule> origins = new java.util.ArrayList<OriginRule>();
- * origins.add(new OriginRule("https://example.com"));
- * origins.add(new OriginRule("https://another.example"));
- * corsHandler.setAllowedOrigins(origins);
- * corsHandler.setAllowMethods(EnumSet.of(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS));
- * server.setCorsHandler(corsHandler);
- * }</pre>
+ * <pre>
+ * {
+ *     &#064;code
+ *     CorsHandler corsHandler = new CorsHandler();
+ *     java.util.List&lt;OriginRule&gt; origins = new java.util.ArrayList&lt;OriginRule&gt;();
+ *     origins.add(new OriginRule(&quot;https://example.com&quot;));
+ *     origins.add(new OriginRule(&quot;https://another.example&quot;));
+ *     corsHandler.setAllowedOrigins(origins);
+ *     corsHandler.setAllowMethods(EnumSet.of(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS));
+ *     server.setCorsHandler(corsHandler);
+ * }
+ * </pre>
  *
  * <h3>Disable CORS</h3>
  *
- * <pre>{@code
+ * <pre>
+ * {@code
  * server.setCorsHandler(null); // Disables CORS headers
- * }</pre>
+ * }
+ * </pre>
  *
  * <h3>Pattern-based Rules for Credentials and Private Network Access</h3>
  *
- * <pre>{@code
- * CorsHandler corsHandler = new CorsHandler();
- * java.util.List<OriginRule> origins = new java.util.ArrayList<OriginRule>();
- * origins.add(new OriginRule("*"));
- * corsHandler.setAllowedOrigins(origins);
- * // Deny credentials for all origins by default
- * corsHandler.addCredentialsRule(java.util.regex.Pattern.compile(".*"), false);
- * // But allow credentials for specific trusted origin (higher priority - checked last)
- * corsHandler.addCredentialsRule(java.util.regex.Pattern.compile("https://example\\.com"), true);
- * // Same for Private Network Access
- * corsHandler.addPrivateNetworkRequestRule(java.util.regex.Pattern.compile(".*"), false);
- * corsHandler.addPrivateNetworkRequestRule(java.util.regex.Pattern.compile("https://trusted\\.example\\.com"), true);
- * server.setCorsHandler(corsHandler);
- * }</pre>
+ * <pre>
+ * {
+ *     &#064;code
+ *     CorsHandler corsHandler = new CorsHandler();
+ *     java.util.List&lt;OriginRule&gt; origins = new java.util.ArrayList&lt;OriginRule&gt;();
+ *     origins.add(new OriginRule(&quot;*&quot;));
+ *     corsHandler.setAllowedOrigins(origins);
+ *     // Deny credentials for all origins by default
+ *     corsHandler.addCredentialsRule(java.util.regex.Pattern.compile(&quot;.*&quot;), false);
+ *     // But allow credentials for specific trusted origin (higher priority - checked last)
+ *     corsHandler.addCredentialsRule(java.util.regex.Pattern.compile(&quot;https://example\\.com&quot;), true);
+ *     // Same for Private Network Access
+ *     corsHandler.addPrivateNetworkRequestRule(java.util.regex.Pattern.compile(&quot;.*&quot;), false);
+ *     corsHandler.addPrivateNetworkRequestRule(java.util.regex.Pattern.compile(&quot;https://trusted\\.example\\.com&quot;), true);
+ *     server.setCorsHandler(corsHandler);
+ * }
+ * </pre>
  *
  * <p>
  * <b>Rule Priority:</b> Rules are checked in reverse order (last entry has highest priority). If the first rule is ".*":false and the
@@ -332,7 +343,7 @@ public class CorsHandler {
      *            Set of RequestMethod enum values or null
      */
     public void setAllowMethods(Set<RequestMethod> allowMethods) {
-        if (allowMethods != null) {
+        if (allowMethods != null && allowMethods.size() > 0) {
             this.allowMethods = Collections.unmodifiableSet(EnumSet.copyOf(allowMethods));
         } else {
             this.allowMethods = null;
@@ -634,8 +645,8 @@ public class CorsHandler {
             // No Origin header present - allow (direct browser navigation)
             return true;
         }
-        List<OriginRule> rules = getAllowedOrigins();
-        if (rules == null) {
+        final List<OriginRule> rules = getAllowedOrigins();
+        if (rules == null || rules.size() == 0) {
             return false;
         }
         // For preflight requests, also validate the requested method
@@ -852,8 +863,8 @@ public class CorsHandler {
      *         /pfad") or "*" wildcard, the requesting origin is returned (not "*") to allow credentials.
      */
     protected String getOriginForResponse(String origin, HttpRequest request) {
-        List<OriginRule> rules = this.getAllowedOrigins();
-        if (rules == null) {
+        final List<OriginRule> rules = this.getAllowedOrigins();
+        if (rules == null || rules.size() == 0) {
             return null;
         }
         // Get request path directly from HttpRequest

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -43,7 +44,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50409 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52432 $", interfaceVersion = 2, names = {}, urls = {})
 public class FeimaoyunCom extends PluginForHost {
     public FeimaoyunCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,15 +57,12 @@ public class FeimaoyunCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME                  = false;
-    private static final int     FREE_MAXCHUNKS               = 1;
-    private static final int     FREE_MAXDOWNLOADS            = 1;
-    private static final boolean ACCOUNT_FREE_RESUME          = false;
-    private static final int     ACCOUNT_FREE_MAXCHUNKS       = 1;
-    private static final int     ACCOUNT_FREE_MAXDOWNLOADS    = 1;
-    private static final boolean ACCOUNT_PREMIUM_RESUME       = false;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS    = 1;
-    private static final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = 1;
+    private static final boolean FREE_RESUME               = false;
+    private static final int     FREE_MAXCHUNKS            = 1;
+    private static final boolean ACCOUNT_FREE_RESUME       = false;
+    private static final int     ACCOUNT_FREE_MAXCHUNKS    = 1;
+    private static final boolean ACCOUNT_PREMIUM_RESUME    = false;
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = 1;
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -82,37 +80,46 @@ public class FeimaoyunCom extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_OLD = Pattern.compile("/file\\-(\\d+)\\.html");
+    private static final Pattern PATTERN_NEW = Pattern.compile("/(?:[^/]+/)?s/([a-z0-9]+)");
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(file\\-\\d+\\.html|(#/)?s/\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_OLD.pattern() + "|" + PATTERN_NEW.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String linkid = getFID(link);
-        if (linkid != null) {
-            return this.getHost() + "://" + linkid;
+        final String file_id = getFID(link);
+        if (file_id != null) {
+            return this.getHost() + "://" + file_id;
         } else {
             return super.getLinkID(link);
         }
     }
 
-    private String getFID(final DownloadLink dl) {
-        return new Regex(dl.getPluginPatternMatcher(), "(\\d+)(?:\\.html)?$").getMatch(0);
+    private String getFID(final DownloadLink link) {
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_NEW).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_OLD).getMatch(0);
+        return fid;
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback name */
-            link.setName(this.getFID(link));
+            link.setName(fid);
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.postPage("https://www." + this.getHost() + "/index.php/down/new_detailv2", "code=" + this.getFID(link));
+        br.postPage("https://www." + this.getHost() + "/index.php/down/new_detailv2", "code=" + fid);
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -245,7 +252,7 @@ public class FeimaoyunCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 1;
     }
 
     /**
@@ -322,18 +329,15 @@ public class FeimaoyunCom extends PluginForHost {
             }
         }
         ai.setUnlimitedTraffic();
-        if (br.containsHTML("href=\"upvip\\.php\" title=\"升级为VIP会员\"") || expire < System.currentTimeMillis()) {
+        if (expire < System.currentTimeMillis() || br.containsHTML("href=\"upvip\\.php\" title=\"升级为VIP会员\"")) {
             account.setType(AccountType.FREE);
             /* free accounts can still have captcha */
-            account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(false);
-            ai.setStatus("Registered (free) user");
         } else {
             ai.setValidUntil(expire);
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
             account.setConcurrentUsePossible(true);
-            ai.setStatus("Premium Account");
         }
         return ai;
     }
@@ -392,19 +396,11 @@ public class FeimaoyunCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public SiteTemplate siteTemplateType() {
         return SiteTemplate.PhpDisk;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
