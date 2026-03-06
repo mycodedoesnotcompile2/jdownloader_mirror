@@ -48,4 +48,6 @@ import java.lang.annotation.Target;
 @Target({ ElementType.METHOD })
 public @interface AboutConfig {
     boolean inGUIVisible() default true;
+
+    boolean inADVVisible() default true;
 }

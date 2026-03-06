@@ -211,8 +211,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         }
 
         public boolean abort() {
-            CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(this));
             final boolean aborted = abortedFlag.compareAndSet(false, true);
+            if (aborted) {
+                CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(this));
+            }
             final boolean wasCollecting = isCollecting();
             getLinkChecker().stopChecking();
             stopCrawling();
@@ -1475,9 +1477,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
     /*
      * converts a CrawledPackage into a FilePackage
-     *
+     * 
      * if plinks is not set, then the original children of the CrawledPackage will get added to the FilePackage
-     *
+     * 
      * if plinks is set, then only plinks will get added to the FilePackage
      */
     private FilePackage createFilePackage(final CrawledPackage pkg, List<CrawledLink> plinks) {

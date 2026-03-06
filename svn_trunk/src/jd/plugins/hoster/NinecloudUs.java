@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -35,7 +32,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52084 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 52442 $", interfaceVersion = 3, names = {}, urls = {})
 public class NinecloudUs extends PluginForHost {
     public NinecloudUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,6 +116,9 @@ public class NinecloudUs extends PluginForHost {
         final boolean expectFilenameInHtmlCodeOfFirstStep = false;
         String filename = br.getRegex(">\\s*Filename\\s*:\\s*([^<>\"]+)<").getMatch(0);
         String filesize = br.getRegex(">\\s*Size\\s*:\\s*([^<>\"]+)<").getMatch(0);
+        if (filesize == null) {
+            filesize = br.getRegex("and would make a zip of (.*?)\\.").getMatch(0);
+        }
         /* 2021-02-17: Filename is not visible e.g. when limit is currently reached. */
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
@@ -142,7 +145,7 @@ public class NinecloudUs extends PluginForHost {
         if (waitMinutesStr != null) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(waitMinutesStr) * 60 * 1001l);
         }
-        String premiumOnlyMessage = br.getRegex("<div class=\"box_notice\"[^>]*>(.*?)</div>").getMatch(0);
+        String premiumOnlyMessage = br.getRegex("<div class=\"(?:important|box)(?:_|-)notice\"[^>]*>(.*?)</div>").getMatch(0);
         if (premiumOnlyMessage != null) {
             /* E.g. This file contains XX pictures, and would make a zip of XXX.XMB. You cannot download it without a subscription. */
             premiumOnlyMessage = premiumOnlyMessage.replaceAll("<[^>]*>", "").trim();

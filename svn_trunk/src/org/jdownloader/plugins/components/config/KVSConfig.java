@@ -6,7 +6,10 @@ import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.Type;
 
+@PluginHost(host = "", type = Type.HOSTER, multi = true)
 public interface KVSConfig extends PluginConfigInterface {
     public static enum PreferredStreamQuality implements LabelInterface {
         BEST {

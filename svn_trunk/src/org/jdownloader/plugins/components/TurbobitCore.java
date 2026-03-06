@@ -47,18 +47,22 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
+import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52427 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52442 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -826,11 +830,45 @@ public abstract class TurbobitCore extends PluginForHost {
                 final String captchaIndex = captchainfo.get("index").toString();
                 final String captchaResponse;
                 if (StringUtils.startsWithCaseInsensitive(driver, "recaptcha")) {
+                    final String siteUrl = buildExternalDownloadURL(link, this);
                     final String captchaKey = captchainfo.get("publicKey").toString();
-                    captchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, brc, captchaKey).getToken();
+                    captchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, brc, captchaKey) {
+                        protected String getSiteUrl() {
+                            return siteUrl;
+                        };
+                    }.getToken();
                 } else if (StringUtils.startsWithCaseInsensitive(driver, "turnstile")) {
+                    final String siteUrl = buildExternalDownloadURL(link, this);
                     final String captchaKey = captchainfo.get("publicKey").toString();
-                    captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, brc, captchaKey).getToken();
+                    captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, brc, captchaKey) {
+                        protected org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge createChallenge() throws PluginException {
+                            final PluginForHost plugin = getPlugin();
+                            final String siteKey = getSiteKey();
+                            if (plugin == null) {
+                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                            } else if (siteKey == null) {
+                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                            } else {
+                                return new CloudflareTurnstileChallenge(plugin, siteKey) {
+
+                                    @Override
+                                    public String getSiteUrl() {
+                                        return siteUrl;
+                                    }
+
+                                    @Override
+                                    public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
+                                        return null;
+                                    }
+
+                                    @Override
+                                    public String getHTML(HttpRequest request, String id) {
+                                        return null;
+                                    }
+                                };
+                            }
+                        };
+                    }.getToken();
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha:" + driver);
                 }

@@ -12,6 +12,7 @@ import java.util.WeakHashMap;
 import jd.config.SubConfiguration;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.HostPlugin;
+import jd.plugins.Plugin.PluginEnvironment;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
@@ -45,12 +46,12 @@ public class PluginJsonConfig {
     private static final WeakHashMap<ClassLoader, HashMap<String, WeakReference<ConfigInterface>>> CONFIG_CACHE  = new WeakHashMap<ClassLoader, HashMap<String, WeakReference<ConfigInterface>>>();
     private static final HashMap<String, JsonKeyValueStorage>                                      STORAGE_CACHE = new HashMap<String, JsonKeyValueStorage>();
     protected static final DelayedRunnable                                                         SAVEDELAYER   = new DelayedRunnable(5000, 30000) {
-        @Override
-        public void delayedrun() {
-            saveAll();
-            cleanup();
-        }
-    };
+                                                                                                                     @Override
+                                                                                                                     public void delayedrun() {
+                                                                                                                         saveAll();
+                                                                                                                         cleanup();
+                                                                                                                     }
+                                                                                                                 };
     private final static boolean                                                                   DEBUG         = false;
     static {
         final File pluginsFolder = Application.getResource("cfg/plugins/");
@@ -100,10 +101,21 @@ public class PluginJsonConfig {
         String host = null;
         final Type type;
         final PluginHost hostAnnotation = configInterface.getAnnotation(PluginHost.class);
+        final boolean isMulti;
         if (hostAnnotation != null) {
-            host = hostAnnotation.host();
+            isMulti = hostAnnotation.multi();
+            if (isMulti) {
+                if (lazyPlugin == null) {
+                    host = PluginEnvironment.getPluginEnvironment().getCurrentPlugin().getLazy().getDisplayName();
+                } else {
+                    host = lazyPlugin.getDisplayName();
+                }
+            } else {
+                host = hostAnnotation.host();
+            }
             type = hostAnnotation.type();
         } else {
+            isMulti = false;
             final Class<?> enc = configInterface.getEnclosingClass();
             if (enc == null) {
                 throw new WTFException("Bad Config Interface Definition. " + configInterface.getName() + ". @PluginHost(\"domain.de\") or    public Class<? extends UsenetConfigInterface> getConfigInterface() {... is missing");
@@ -167,7 +179,7 @@ public class PluginJsonConfig {
             }
         }
         String ID = JsonConfig.getStorageName(configInterface);
-        if (ID.equals(configInterface.getName())) {
+        if (ID.equals(configInterface.getName()) || isMulti) {
             ID = type + "/" + host;
         }
         final ClassLoader cl = configInterface.getClassLoader();

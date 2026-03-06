@@ -11,6 +11,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.nutils.encoding.HTMLEntities;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -40,13 +47,6 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.gui.translate._GUI;
-
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.nutils.encoding.HTMLEntities;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
 
 public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
     public static final String             RAWTOKEN    = "rawtoken";
@@ -169,7 +169,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         if (RAWTOKEN.equals(format)) {
             final RecaptchaV2APIStorable ret = new RecaptchaV2APIStorable();
             ret.setSiteKey(getSiteKey());
-            final String siteUrl = getSiteUrl();
+            final String siteUrl = getSiteUrl(this);
             final String protocol;
             if (StringUtils.startsWithCaseInsensitive("https://", siteUrl)) {
                 protocol = "https://";
@@ -260,9 +260,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
 
     public abstract String getType();
 
-    public String getSiteUrl() {
-        return null;
-    }
+    public abstract String getSiteUrl();
 
     public String getSecureToken() {
         return secureToken;
@@ -671,7 +669,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
             html = html.replace("%%%extensionSupportHeader%%%", _GUI.T.extension_support_header());
             html = html.replace("%%%extensionSupportDescription%%%", _GUI.T.extension_support_description());
             html = html.replace("%%%extensionSupportLinkTitle%%%", _GUI.T.extension_support_link_title());
-            html = html.replace("%%%siteUrl%%%", StringUtils.valueOrEmpty(getSiteUrl()));
+            html = html.replace("%%%siteUrl%%%", StringUtils.valueOrEmpty(getSiteUrl(this)));
             html = html.replace("%%%siteDomain%%%", getSiteDomain());
             html = html.replace("%%%sitekey%%%", getSiteKey());
             html = html.replace("%%%sitekeyType%%%", getType());

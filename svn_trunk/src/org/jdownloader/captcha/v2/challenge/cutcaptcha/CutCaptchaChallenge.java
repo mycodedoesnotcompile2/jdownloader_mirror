@@ -3,6 +3,10 @@ package org.jdownloader.captcha.v2.challenge.cutcaptcha;
 import java.io.IOException;
 import java.net.URL;
 
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -15,13 +19,8 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.AbstractResponse;
-import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
-
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
 
 public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
     private final String siteKey;
@@ -33,10 +32,6 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
 
     public String getApiKey() {
         return apiKey;
-    }
-
-    public String getSiteUrl() {
-        return ChallengeResponseController.getInstance().getSiteURL(this.getPluginBrowser().getURL());
     }
 
     public CutCaptchaChallenge(final Plugin plugin, final String siteKey, final String apiKey) throws PluginException {

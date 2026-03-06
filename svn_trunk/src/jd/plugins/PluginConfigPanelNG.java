@@ -98,6 +98,7 @@ import org.jdownloader.gui.settings.Pair;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.AccountJsonConfig;
 import org.jdownloader.plugins.config.CustomUI;
@@ -581,7 +582,11 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         }
         final PluginConfigInterface config;
         if (plugin instanceof PluginForHost) {
-            config = PluginJsonConfig.get(((PluginForHost) plugin).getLazyP(), inf);
+            if (plugin instanceof abstractPluginForCaptchaSolver) {
+                config = PluginJsonConfig.get(((abstractPluginForCaptchaSolver) plugin).getLazyP(), inf);
+            } else {
+                config = PluginJsonConfig.get(((PluginForHost) plugin).getLazyP(), inf);
+            }
         } else if (plugin instanceof PluginForDecrypt) {
             config = PluginJsonConfig.get(((PluginForDecrypt) plugin).getLazyC(), inf);
         } else {
@@ -668,15 +673,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                             final Map<String, Boolean> finalValue = value;
                             final MultiComboBox<String> comp = new MultiComboBox<String>(new ArrayList<String>(value.keySet())) {
                                 private final GenericConfigEventListener<Map<String, Boolean>> listener = new GenericConfigEventListener<Map<String, Boolean>>() {
-                                                                                                            @Override
-                                                                                                            public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
-                                                                                                            }
+                                    @Override
+                                    public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
+                                    }
 
-                                                                                                            @Override
-                                                                                                            public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
-                                                                                                                updateModel(newValue);
-                                                                                                            }
-                                                                                                        };
+                                    @Override
+                                    public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
+                                        updateModel(newValue);
+                                    }
+                                };
                                 {
                                     m.getEventSender().addListener(listener, true);
                                     updateModel(finalValue);
@@ -738,15 +743,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                         try {
                             final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                                 private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
-                                                                                                 @Override
-                                                                                                 public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
-                                                                                                 }
+                                    @Override
+                                    public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
+                                    }
 
-                                                                                                 @Override
-                                                                                                 public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
-                                                                                                     updateModel(newValue);
-                                                                                                 }
-                                                                                             };
+                                    @Override
+                                    public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                                        updateModel(newValue);
+                                    }
+                                };
                                 {
                                     Set<Enum> value = (Set<Enum>) m.getValue();
                                     if (value == null) {

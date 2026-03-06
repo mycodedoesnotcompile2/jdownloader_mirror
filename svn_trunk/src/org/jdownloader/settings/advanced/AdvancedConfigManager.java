@@ -131,17 +131,26 @@ public class AdvancedConfigManager {
     }
 
     private AdvancedConfigEntry toConfigEntry(final KeyHandler<?> m, ConfigInterface cf) {
-        if (m.getAnnotation(AboutConfig.class) != null && (m.getAnnotation(DevConfig.class) == null || !Application.isJared(null))) {
-            if (m.getGetMethod() == null) {
-                throw new RuntimeException("Getter for " + m.getKey() + " missing");
-            } else if (m.getSetMethod() == null && m.getAnnotation(StorableValidatorIgnoresMissingSetter.class) == null) {
-                // StorableValidatorIgnoresMissingSetter annotation -> allow get only entry
-                throw new RuntimeException("Setter for " + m.getKey() + " missing");
-            } else {
-                return new AdvancedConfigEntry(cf, m);
-            }
+        if (m.getAnnotation(DevConfig.class) != null && Application.isJared(null)) {
+            // not visible in non IDE
+            return null;
         }
-        return null;
+        final AboutConfig aboutConfig = m.getAnnotation(AboutConfig.class);
+        if (cf instanceof PluginConfigInterface && aboutConfig != null && !aboutConfig.inADVVisible()) {
+            // explicit AboutConfig.inADVVisible==false
+            return null;
+        } else if (!(cf instanceof PluginConfigInterface) && (aboutConfig == null || !aboutConfig.inADVVisible())) {
+            // no AboutConfig or AboutConfig.inADVVisible==false
+            return null;
+        }
+        if (m.getGetMethod() == null) {
+            throw new RuntimeException("Getter for " + m.getKey() + " missing");
+        } else if (m.getSetMethod() == null && m.getAnnotation(StorableValidatorIgnoresMissingSetter.class) == null) {
+            // StorableValidatorIgnoresMissingSetter annotation -> allow get only entry
+            throw new RuntimeException("Setter for " + m.getKey() + " missing");
+        } else {
+            return new AdvancedConfigEntry(cf, m);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -151,34 +160,40 @@ public class AdvancedConfigManager {
         final PluginClassLoaderChild pluginClassLoader = PluginClassLoader.getInstance().getChild();
         for (final LazyHostPlugin hplg : HostPluginController.getInstance().list()) {
             final String ifName = hplg.getConfigInterface();
-            if (StringUtils.isNotEmpty(ifName) && configInterfaces.add(ifName)) {
-                try {
-                    final PluginConfigInterface cf = PluginJsonConfig.get(hplg, (Class<PluginConfigInterface>) pluginClassLoader.loadClass(ifName));
-                    for (KeyHandler<?> m : cf._getStorageHandler().getKeyHandler()) {
-                        final AdvancedConfigEntry configEntry = toConfigEntry(m, cf);
-                        if (configEntry != null) {
-                            ret.add(configEntry);
-                        }
+            if (StringUtils.isEmpty(ifName)) {
+                continue;
+            }
+            try {
+                final PluginConfigInterface cf = PluginJsonConfig.get(hplg, (Class<PluginConfigInterface>) pluginClassLoader.loadClass(ifName));
+                for (KeyHandler<?> m : cf._getStorageHandler().getKeyHandler()) {
+                    final AdvancedConfigEntry configEntry = toConfigEntry(m, cf);
+                    if (configEntry == null) {
+                        continue;
+                    } else if (configInterfaces.add(configEntry.getUniqueID())) {
+                        ret.add(configEntry);
                     }
-                } catch (Throwable e) {
-                    logger.log(e);
                 }
+            } catch (Throwable e) {
+                logger.log(e);
             }
         }
         for (final LazyCrawlerPlugin cplg : CrawlerPluginController.getInstance().list()) {
             final String ifName = cplg.getConfigInterface();
-            if (StringUtils.isNotEmpty(ifName) && configInterfaces.add(ifName)) {
-                try {
-                    final PluginConfigInterface cf = PluginJsonConfig.get(cplg, (Class<PluginConfigInterface>) pluginClassLoader.loadClass(ifName));
-                    for (final KeyHandler<?> m : cf._getStorageHandler().getKeyHandler()) {
-                        final AdvancedConfigEntry configEntry = toConfigEntry(m, cf);
-                        if (configEntry != null) {
-                            ret.add(configEntry);
-                        }
+            if (StringUtils.isEmpty(ifName)) {
+                continue;
+            }
+            try {
+                final PluginConfigInterface cf = PluginJsonConfig.get(cplg, (Class<PluginConfigInterface>) pluginClassLoader.loadClass(ifName));
+                for (final KeyHandler<?> m : cf._getStorageHandler().getKeyHandler()) {
+                    final AdvancedConfigEntry configEntry = toConfigEntry(m, cf);
+                    if (configEntry == null) {
+                        continue;
+                    } else if (configInterfaces.add(configEntry.getUniqueID())) {
+                        ret.add(configEntry);
                     }
-                } catch (Throwable e) {
-                    logger.log(e);
                 }
+            } catch (Throwable e) {
+                logger.log(e);
             }
         }
         // ContainerPluginController.getInstance().list().get(0).getConfigInterface()

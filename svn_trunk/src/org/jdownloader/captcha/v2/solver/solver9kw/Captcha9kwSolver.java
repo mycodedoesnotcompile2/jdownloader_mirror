@@ -3,6 +3,8 @@ package org.jdownloader.captcha.v2.solver.solver9kw;
 import java.io.IOException;
 import java.util.Map;
 
+import jd.http.Browser;
+
 import org.appwork.utils.IO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -13,8 +15,6 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
-
-import jd.http.Browser;
 
 public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
     private static final Captcha9kwSolver INSTANCE = new Captcha9kwSolver();
@@ -113,7 +113,7 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
             qi.appendEncoded("captchaSource", "jdPlugin");
             qi.appendEncoded("version", "1.2");
             qi.appendEncoded("data-sitekey", hCaptcha.getSiteKey());
-            qi.appendEncoded("pageurl", hCaptcha.getSiteUrl());
+            qi.appendEncoded("pageurl", hCaptcha.getSiteUrl(this));
             qi.appendEncoded("oldsource", "hcaptcha");
             qi.appendEncoded("captchachoice", "hcaptcha");
             qi.appendEncoded("interactive", "1");
@@ -163,7 +163,7 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
             qi.appendEncoded("isInvisible", rcChallenge.getType() + "");// required since ~12-2019 (NORMAL vs INVISIBLE)
             final Map<String, Object> v3action = rcChallenge.getV3Action();
             if (v3action != null) {
-                qi.appendEncoded("pageurl", rcChallenge.getSiteUrl());
+                qi.appendEncoded("pageurl", rcChallenge.getSiteUrl(this));
                 qi.appendEncoded("captchachoice", "recaptchav3");
                 qi.appendEncoded("actionname", (String) v3action.get("action"));
                 qi.appendEncoded("min_score", "0.3");// minimal score
@@ -171,7 +171,7 @@ public class Captcha9kwSolver extends AbstractCaptcha9kwSolver<String> {
                 if (options.isSiteDomain()) {
                     qi.appendEncoded("pageurl", rcChallenge.getSiteDomain());
                 } else {
-                    qi.appendEncoded("pageurl", rcChallenge.getSiteUrl());
+                    qi.appendEncoded("pageurl", rcChallenge.getSiteUrl(this));
                 }
                 qi.appendEncoded("captchachoice", "recaptchav2");
             }

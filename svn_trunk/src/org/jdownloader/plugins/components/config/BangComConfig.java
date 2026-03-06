@@ -10,7 +10,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "bang.com", type = Type.HOSTER)
+@PluginHost(host = "bang.com", type = Type.HOSTER, multi = true)
 public interface BangComConfig extends PluginConfigInterface {
     final String                    text_GrabPreviewVideo     = "Grab preview video?";
     final String                    text_GrabThumbnail        = "Grab thumbnail?";

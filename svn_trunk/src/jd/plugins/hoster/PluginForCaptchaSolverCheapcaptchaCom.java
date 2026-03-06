@@ -8,6 +8,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -29,20 +42,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCheapcaptchaCom;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
-@HostPlugin(revision = "$Revision: 52194 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52443 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -135,7 +135,7 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
                 final RecaptchaV2Challenge rc_challenge = (RecaptchaV2Challenge) challenge;
                 final Map<String, Object> token_param = new HashMap<String, Object>();
                 token_param.put("googlekey", rc_challenge.getSiteKey());
-                token_param.put("pageurl", rc_challenge.getSiteUrl());
+                token_param.put("pageurl", rc_challenge.getSiteUrl(this));
                 final Map<String, Object> v3action = rc_challenge.getV3Action();
                 if (v3action != null) {
                     type = "RecaptchaV3";
@@ -165,7 +165,7 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
                 final Map<String, Object> cutcaptcha_params = new HashMap<String, Object>();
                 cutcaptcha_params.put("apikey", cc.getApiKey());
                 cutcaptcha_params.put("miserykey", cc.getSiteKey());
-                cutcaptcha_params.put("pageurl", cc.getSiteUrl());
+                cutcaptcha_params.put("pageurl", cc.getSiteUrl(this));
                 r.addFormData(new FormData("cutcaptcha_params", JSonStorage.serializeToJson(cutcaptcha_params)));
             } else if (challenge instanceof CloudflareTurnstileChallenge) {
                 type = "CloudflareTurnstileCaptcha";
@@ -173,7 +173,7 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
                 r.addFormData(new FormData("type", "12"));
                 final Map<String, Object> turnstile_params = new HashMap<String, Object>();
                 turnstile_params.put("sitekey", cc.getSiteKey());
-                turnstile_params.put("pageurl", cc.getSiteUrl());
+                turnstile_params.put("pageurl", cc.getSiteUrl(this));
                 r.addFormData(new FormData("turnstile_params", JSonStorage.serializeToJson(turnstile_params)));
             } else if (challenge instanceof ImageCaptchaChallenge) {
                 type = "Image";

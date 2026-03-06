@@ -48,4 +48,6 @@ public @interface PluginHost {
     String host();
 
     Type type();
+
+    boolean multi() default false;
 }

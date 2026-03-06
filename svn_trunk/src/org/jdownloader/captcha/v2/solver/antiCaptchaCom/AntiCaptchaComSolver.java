@@ -4,6 +4,8 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import jd.http.Browser;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -24,8 +26,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
-
-import jd.http.Browser;
 
 public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     private static final AntiCaptchaComSolver INSTANCE = new AntiCaptchaComSolver();
@@ -173,7 +173,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
             job.setStatus(SolverStatus.SOLVING);
             final HashMap<String, Object> task = new HashMap<String, Object>();
             task.put("type", "TurnstileTaskProxyless");
-            task.put("websiteURL", challenge.getSiteUrl());
+            task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
             HashMap<String, Object> dataMap = new HashMap<String, Object>();
             dataMap.put("clientKey", config.getApiKey());
@@ -219,7 +219,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
             // or vector of bytes here:
             job.setStatus(SolverStatus.SOLVING);
             HashMap<String, Object> task = new HashMap<String, Object>();
-            task.put("websiteURL", challenge.getSiteUrl());
+            task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
             final Map<String, Object> v3Action = challenge.getV3Action();
             if (v3Action != null || challenge.isV3()) {

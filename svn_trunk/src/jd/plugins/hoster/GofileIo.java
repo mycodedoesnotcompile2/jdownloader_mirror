@@ -59,9 +59,9 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.HTTPHeader;
 import org.jdownloader.plugins.components.config.GofileIoConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -69,7 +69,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52440 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52454 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +79,7 @@ public class GofileIo extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader " + this.getVersion());
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Base64.decodeToString("SkRvd25sb2FkZXI8LT5Hb2ZpbGU="));
         br.setFollowRedirects(true);
         return br;
     }
@@ -191,9 +191,6 @@ public class GofileIo extends PluginForHost {
     }
 
     public String getAndSetToken(final Plugin plugin, final Browser br, final Account account) throws Exception {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         String token = null;
         if (account != null) {
             token = getAccountTokenOrFail(account);

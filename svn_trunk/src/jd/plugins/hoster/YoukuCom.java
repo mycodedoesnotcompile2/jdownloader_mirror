@@ -20,6 +20,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.utils.StringUtils;
@@ -31,17 +41,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "youku.com" }, urls = { "https?://k\\.youku\\.com/player/getFlvPath/.*?fileid/[A-F0-9\\-]+.+|https?://[A-Za-z0-9\\-]+\\.youku\\.com/playlist/m3u8.*?psid=[a-f0-9]{32}.+" })
+@HostPlugin(revision = "$Revision: 52447 $", interfaceVersion = 3, names = { "youku.com" }, urls = { "https?://k\\.youku\\.com/player/getFlvPath/.*?fileid/[A-F0-9\\-]+.+|https?://[A-Za-z0-9\\-]+\\.youku\\.com/playlist/m3u8.*?psid=[a-f0-9]{32}.+" })
 public class YoukuCom extends antiDDoSForHost {
     public YoukuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -358,12 +358,14 @@ public class YoukuCom extends antiDDoSForHost {
 
         public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(9)
         boolean isFastLinkcheckEnabled();
 
         void setFastLinkcheckEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(20)
         boolean isGrabBESTEnabled();
@@ -377,54 +379,63 @@ public class YoukuCom extends antiDDoSForHost {
 
         void setOnlyBestVideoQualityOfSelectedQualitiesEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(22)
         boolean isAddUnknownQualitiesEnabled();
 
         void setAddUnknownQualitiesEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(90)
         boolean isGrabHTTPMp4_1080pEnabled();
 
         void setGrabHTTPMp4_1080pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(100)
         boolean isGrabHTTPMp4_720pEnabled();
 
         void setGrabHTTPMp4_720pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(110)
         boolean isGrabHTTPMp4_540pEnabled();
 
         void setGrabHTTPMp4_540pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(120)
         boolean isGrabHTTPMp4_360pEnabled();
 
         void setGrabHTTPMp4_360pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(130)
         boolean isGrabHLSMp4_1080pEnabled();
 
         void setGrabHLSMp4_1080pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(140)
         boolean isGrabHLSMp4_720pEnabled();
 
         void setGrabHLSMp4_720pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(150)
         boolean isGrabHLSMp4_540pEnabled();
 
         void setGrabHLSMp4_540pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(160)
         boolean isGrabHLSMp4_360pEnabled();

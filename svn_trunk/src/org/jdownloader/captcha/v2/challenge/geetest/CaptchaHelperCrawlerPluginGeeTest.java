@@ -29,6 +29,12 @@ public class CaptchaHelperCrawlerPluginGeeTest extends AbstractCaptchaHelperGeeT
         }
         final PluginForDecrypt plugin = getPlugin();
         final GeeTestChallenge c = new GeeTestChallenge(apiKey, plugin) {
+
+            @Override
+            public String getSiteUrl() {
+                return null;
+            }
+
             @Override
             public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
                 return null;

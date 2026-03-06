@@ -21,13 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,7 +36,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52426 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52442 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,60 +101,51 @@ public class RlGalleriesNt extends PluginForDecrypt {
         if (new Regex(contenturl, PATTERN_SINGLE_REDIRECT).patternFind()) {
             /* Crawl single redirect link */
             synchronized (LOCK) {
-                final Browser brc = br.cloneBrowser();
-                brc.setFollowRedirects(false);
+                br.setFollowRedirects(false);
                 final String property_PHPSESSID = "PHPSESSID";
                 final String phpsessid = this.getPluginConfig().getStringProperty(property_PHPSESSID);
                 if (phpsessid != null) {
                     /* Re-use session cookie otherwise we might need to solve a captcha for each link. */
-                    brc.setCookie(this.getHost(), "PHPSESSID", phpsessid);
+                    br.setCookie(this.getHost(), "PHPSESSID", phpsessid);
                 }
-                brc.getPage(contenturl);
-                if (brc.getHttpConnection().getResponseCode() == 404) {
+                br.getPage(contenturl);
+                if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                final Form form = brc.getForm(0);
+                final Form form = br.getForm(0);
                 String finallink = null;
                 findFinallink: if (form != null) {
-                    finallink = findFinallink(brc);
+                    finallink = findFinallink(br);
                     if (finallink != null) {
                         logger.info("Found finallink without captcha");
                         break findFinallink;
                     }
-                    final String previous_path = brc._getURL().getPath();
-                    final Browser old_br = this.br;
-                    this.setBrowser(brc);
-                    try {
-                        /* Small hack: Set current browser as plugin browser so that captcha handling can extract siteURL */
-                        this.setBrowser(brc);
-                        final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, brc).getToken();
-                        form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
-                    } finally {
-                        this.setBrowser(old_br);
-                    }
-                    brc.submitForm(form);
-                    final String redirect = brc.getRedirectLocation();
+                    final String previous_path = br._getURL().getPath();
+                    final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+                    form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                    br.submitForm(form);
+                    final String redirect = br.getRedirectLocation();
                     if (redirect == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     /* Check for redirect on previous URL which will then reidrect to final URL. */
                     if (redirect.contains(previous_path)) {
                         logger.info("Handling double-redirect");
-                        brc.getPage(redirect);
+                        br.getPage(redirect);
                     }
-                    finallink = findFinallink(brc);
+                    finallink = findFinallink(br);
                     if (finallink == null) {
                         logger.info("Failed to fina finallink in html code -> Website might have changed and plugin is broken?");
                     }
                 }
                 if (finallink == null) {
-                    finallink = brc.getRedirectLocation();
+                    finallink = br.getRedirectLocation();
                 }
                 if (finallink == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 ret.add(this.createDownloadlink(finallink));
-                final String phpsessid_new = brc.getCookie(brc.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN);
+                final String phpsessid_new = br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN);
                 if (!StringUtils.isEmpty(phpsessid_new)) {
                     if (phpsessid == null || !phpsessid_new.equals(phpsessid)) {
                         logger.info("Remembering new phpsessid cookie: " + phpsessid_new);

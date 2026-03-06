@@ -9,14 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.captcha.v2.ChallengeResponseController;
-import org.jdownloader.logging.LogController;
-
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
 import jd.http.Request;
@@ -26,6 +18,13 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.logging.LogController;
 
 public abstract class AbstractRecaptchaV2<T extends Plugin> {
     /**
@@ -102,8 +101,7 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
      * errormessage and the user will have to solve it again! This value is especially important for rare EDGE cases such as long
      * waiting-times + captcha. Example: User has to wait 180 seconds before he can confirm such a captcha. If he solves it directly, the
      * captcha will be invalid once the 180 seconds are over. Also see documentation in XFileSharingProBasic.java class in method
-     * 'handleCaptcha'. </br>
-     * TRY TO KEEP THIS VALUE UP-TO-DATE!!
+     * 'handleCaptcha'. </br> TRY TO KEEP THIS VALUE UP-TO-DATE!!
      */
     public int getSolutionTimeout() {
         return 1 * 60 * 1000;
@@ -270,7 +268,7 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
             if (rewriteHost && !StringUtils.equalsIgnoreCase(urlDomain, siteDomain)) {
                 url = url.replaceFirst(Pattern.quote(urlDomain), siteDomain);
             }
-            return ChallengeResponseController.getInstance().getSiteURL(url);
+            return url;
         } else {
             if (request != null) {
                 return request.getURL().getProtocol() + "://" + siteDomain;

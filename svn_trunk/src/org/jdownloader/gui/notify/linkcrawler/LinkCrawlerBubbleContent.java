@@ -1,6 +1,7 @@
 package org.jdownloader.gui.notify.linkcrawler;
 
 import java.awt.Color;
+import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -15,8 +16,10 @@ import jd.gui.swing.jdgui.components.IconedProcessIndicator;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.notify.AbstractBubbleContentPanel;
 import org.jdownloader.gui.notify.Element;
@@ -27,19 +30,22 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
-    private Pair             duration;
-    private Pair             links;
-    private Pair             offline;
-    private Pair             status;
-    private Pair             statusQueue;
-    private Pair             listQueue;
-    private Pair             packages;
-    private Pair             online;
-    private final int        CLOSETIMEOUT = JsonConfig.create(BubbleNotifyConfig.class).getBubbleNotifyOnNewLinkgrabberLinksEndNotifyDelay();
-    private final LinkOrigin origin;
+    private Pair                 duration;
+    private Pair                 links;
+    private Pair                 offline;
+    private Pair                 status;
+    private Pair                 statusQueue;
+    private Pair                 listQueue;
+    private Pair                 packages;
+    private Pair                 online;
+    private ExtButton            cancel;
+    private final int            CLOSETIMEOUT = JsonConfig.create(BubbleNotifyConfig.class).getBubbleNotifyOnNewLinkgrabberLinksEndNotifyDelay();
+    private final LinkOrigin     origin;
+    private final JobLinkCrawler crawler;
 
     public LinkCrawlerBubbleContent(JobLinkCrawler crawler) {
         super(IconKey.ICON_LINKGRABBER);
+        this.crawler = crawler;
         origin = crawler.getJob().getOrigin().getOrigin();
         layoutComponents();
         if (offline != null) {
@@ -116,6 +122,19 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
         if (CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_STATUS_VISIBLE.isEnabled()) {
             status = addPair(status, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_status(), IconKey.ICON_RUN);
         }
+        add(cancel = new ExtButton(new AppAction() {
+            {
+                setName(_GUI.T.literally_abort());
+                setIconKey(IconKey.ICON_CANCEL);
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (LinkCrawlerBubbleContent.this.crawler.abort()) {
+                    LinkCrawlerBubbleContent.this.update(crawler);
+                }
+            }
+        }), "hidemode 3,spanx,pushx,growx");
     }
 
     private int              joblessCount        = -1;
@@ -126,6 +145,15 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
     private int              lastMaxStringLength = -1;
 
     public void update(final JobLinkCrawler jlc) {
+        if (jlc.isAborted() || !jlc.isRunning()) {
+            new EDTRunner() {
+
+                @Override
+                protected void runInEDT() {
+                    cancel.setEnabled(false);
+                }
+            };
+        }
         final List<CrawledLink> linklist = jlc.getCrawledLinks();
         final HashSet<CrawledPackage> dupe = new HashSet<CrawledPackage>();
         int offlineCnt = 0;

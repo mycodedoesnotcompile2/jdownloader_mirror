@@ -109,6 +109,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
@@ -155,6 +156,20 @@ public abstract class Plugin implements ActionListener {
         }
         pattern.append(")");
         return pattern.toString();
+    }
+
+    public LazyPlugin<?> getLazy() {
+        if (this instanceof PluginForHost) {
+            return ((PluginForHost) this).getLazyP();
+        } else if (this instanceof PluginForDecrypt) {
+            return ((PluginForDecrypt) this).getLazy();
+        } else {
+            return null;
+        }
+    }
+
+    public <T extends PluginConfigInterface> T get(Class<T> configInterface) {
+        return PluginJsonConfig.get(getLazy(), configInterface);
     }
 
     public Browser createNewBrowserInstance() {
@@ -910,6 +925,21 @@ public abstract class Plugin implements ActionListener {
                 return PluginEnvironment.ACCOUNT_CHECK;
             } else {
                 return PluginEnvironment.UNKNOWN;
+            }
+        }
+
+        public Plugin getCurrentPlugin() {
+            final Thread thread = Thread.currentThread();
+            if (thread instanceof SingleDownloadController) {
+                return ((SingleDownloadController) thread).getProcessingPlugin();
+            } else if (thread instanceof LinkCrawlerThread) {
+                return ((LinkCrawlerThread) thread).getCurrentPlugin();
+            } else if (thread instanceof LinkCheckerThread) {
+                return ((LinkCheckerThread) thread).getPlugin();
+            } else if (thread instanceof AccountCheckerThread) {
+                return ((AccountCheckerThread) thread).getPlugin();
+            } else {
+                return null;
             }
         }
     }

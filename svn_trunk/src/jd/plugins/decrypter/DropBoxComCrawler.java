@@ -23,6 +23,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.protobuf.Decoder;
+import org.appwork.storage.protobuf.Decoder.Record;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.Base64InputStream;
+import org.appwork.utils.net.CharSequenceInputStream;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.DialogCanceledException;
+import org.appwork.utils.swing.dialog.DialogClosedException;
+import org.jdownloader.plugins.components.config.DropBoxConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -47,25 +65,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.protobuf.Decoder;
-import org.appwork.storage.protobuf.Decoder.Record;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.Base64InputStream;
-import org.appwork.utils.net.CharSequenceInputStream;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.DialogCanceledException;
-import org.appwork.utils.swing.dialog.DialogClosedException;
-import org.jdownloader.plugins.components.config.DropBoxConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 52441 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -222,8 +222,9 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         if (storedPasswordCookieValue != null) {
             /**
              * If this is given, the folder is most likely password protected and the user has entered the correct password when a parent
-             * folder was crawled. </br> Re-using that cookie speeds up the crawl process as we do not have to send the password again for
-             * each subfolder we want to crawl.
+             * folder was crawled. </br>
+             * Re-using that cookie speeds up the crawl process as we do not have to send the password again for each subfolder we want to
+             * crawl.
              */
             DropBoxComCrawler.setPasswordCookie(br, storedPasswordCookieValue);
             passwordCookieValue = storedPasswordCookieValue;
@@ -239,7 +240,8 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Restricted Content: This file is no longer available. For additional information contact Dropbox Support.");
         } else if (br.getHttpConnection().getResponseCode() == 509) {
             /**
-             * Temporarily unavailable link --> Rare case </br> 2023: Unsure whether this case can still happen.
+             * Temporarily unavailable link --> Rare case </br>
+             * 2023: Unsure whether this case can still happen.
              */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -318,6 +320,9 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             if (cfg.isEnableFastLinkcheckForSingleFiles()) {
                 file.setAvailable(true);
                 /* Set file_id as temporary filename if it looks like the link itself doesn't contain a filename. */
+                final Regex urlinfo = new Regex(URLHelper.getUrlWithoutParams(br.getURL()), "scl/fi/(\\w+)(/(.+))?");
+                final String file_id = urlinfo.getMatch(0);
+                final String filenameFromURL = urlinfo.getMatch(2);
                 Object[] fileDetails = null;
                 final String[] edison_prefetch_items = br.getRegex("Edison\\.registerStreamedPrefetch\\(([^\\)]+)\\)").getColumn(0);
                 find_filename: if (edison_prefetch_items != null && edison_prefetch_items.length > 0) {
@@ -336,14 +341,13 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 if (fileDetails != null) {
                     file.setFinalFileName(fileDetails[0].toString());
                     file.setVerifiedFileSize(((Number) fileDetails[1]).longValue());
+                } else if (filenameFromURL != null) {
+                    file.setName(Encoding.htmlDecode(filenameFromURL));
+                } else if (file_id != null) {
+                    logger.info("Setting file_id as weak/temporary filename: " + file_id);
+                    file.setName(file_id);
                 } else {
-                    final String file_id = new Regex(br.getURL(), "(?i)/fi/([a-z0-9]+)/($|\\?.+)").getMatch(0);
-                    if (file_id != null) {
-                        logger.info("Setting file_id as weak/temporary filename: " + file_id);
-                        file.setName(file_id);
-                    } else {
-                        logger.warning("Failed to find anything to set as weak/temporary filename");
-                    }
+                    logger.warning("Failed to find anything to set as weak/temporary filename");
                 }
             }
             ret.add(file);
@@ -351,7 +355,8 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         }
         /**
          * Very important as sometimes the initially added URL does not contain a path/filename but it gets added later e.g. </br>
-         * https://www.dropbox.com/s/5h5bnwzklsev6ch </br> --> Redirects to: https://www.dropbox.com/s/5h5bnwzklsev6ch/1mb.test
+         * https://www.dropbox.com/s/5h5bnwzklsev6ch </br>
+         * --> Redirects to: https://www.dropbox.com/s/5h5bnwzklsev6ch/1mb.test
          */
         contenturl = br.getURL();
         if (!br.getURL().matches(TYPES_NORMAL)) {
@@ -494,8 +499,10 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                     final DownloadLink singleFile = createSingleFileDownloadLink(br.getURL());
                     setDownloadPasswordProperties(singleFile, passCode, passwordCookieValue);
                     /**
-                     * TODO: Remove that setting once we can parse GRPC strings </br> References: </br> Ticket:
-                     * https://svn.jdownloader.org/issues/90376 </br> Forum: https://board.jdownloader.org/showthread.php?t=93518
+                     * TODO: Remove that setting once we can parse GRPC strings </br>
+                     * References: </br>
+                     * Ticket: https://svn.jdownloader.org/issues/90376 </br>
+                     * Forum: https://board.jdownloader.org/showthread.php?t=93518
                      */
                     if (cfg.isEnableFastLinkcheckForSingleFiles()) {
                         singleFile.setAvailable(true);

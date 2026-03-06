@@ -6,6 +6,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import jd.PluginWrapper;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -22,20 +32,10 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52176 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52443 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -152,7 +152,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             q.appendEncoded("isInvisible", challenge.isInvisible() == true ? "1" : "0");
             final Map<String, Object> v3action = challenge.getV3Action();
             if (v3action != null) {
-                q.appendEncoded("pageurl", challenge.getSiteUrl());
+                q.appendEncoded("pageurl", challenge.getSiteUrl(this));
                 q.appendEncoded("captchachoice", "recaptchav3");
                 q.appendEncoded("actionname", (String) v3action.get("action"));
                 q.appendEncoded("min_score", "0.3");// minimal score
@@ -162,7 +162,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
                 // } else {
                 // query.appendEncoded("pageurl", rcChallenge.getSiteUrl());
                 // }
-                q.appendEncoded("pageurl", challenge.getSiteUrl());
+                q.appendEncoded("pageurl", challenge.getSiteUrl(this));
                 q.appendEncoded("captchachoice", "recaptchav2");
             }
             q.appendEncoded("securetoken", challenge.getSecureToken());
@@ -170,7 +170,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         } else if (captchachallenge instanceof HCaptchaChallenge) {
             final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;
             q.appendEncoded("data-sitekey", challenge.getSiteKey());
-            q.appendEncoded("pageurl", challenge.getSiteUrl());
+            q.appendEncoded("pageurl", challenge.getSiteUrl(this));
             q.appendEncoded("oldsource", "hcaptcha");
             q.appendEncoded("captchachoice", "hcaptcha");
             q.appendEncoded("interactive", "1");
@@ -180,7 +180,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             task.put("type", "CutCaptchaTaskProxyless");
             task.put("miseryKey", challenge.getSiteKey());
             task.put("apiKey", challenge.getApiKey());
-            task.put("websiteURL", challenge.getSiteUrl());
+            task.put("websiteURL", challenge.getSiteUrl(this));
         } else if (captchachallenge instanceof ClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;

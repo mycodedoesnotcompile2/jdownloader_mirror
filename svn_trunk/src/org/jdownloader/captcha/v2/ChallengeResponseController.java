@@ -10,6 +10,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
@@ -18,7 +27,6 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
@@ -67,16 +75,6 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.CaptchaSettings.INTERACTIVE_CAPTCHA_PRIVACY_LEVEL;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -362,21 +360,6 @@ public class ChallengeResponseController {
             }
             c.onHandled();
         }
-    }
-
-    /**
-     * Wrapper function to be used when an interactive captcha challenge requests its siteURL. <br>
-     * This function is to be used before such URLs are used anywhere in case they need to be modified for example due to the users' privacy
-     * settings.
-     */
-    public String getSiteURL(String url) {
-        if (INTERACTIVE_CAPTCHA_PRIVACY_LEVEL.STRICT.equals(CAPTCHA_SETTINGS.getInteractiveCaptchaPrivacyLevel())) {
-            final String baseurl = new Regex(url, "(?i)(https?://[^/]+/?)").getMatch(0);
-            if (baseurl != null) {
-                url = baseurl;
-            }
-        }
-        return url;
     }
 
     protected final static Map<String, Long> TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new HashMap<String, Long>();

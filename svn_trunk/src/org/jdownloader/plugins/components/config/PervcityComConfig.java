@@ -9,7 +9,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "pervcity.com", type = Type.HOSTER)
+@PluginHost(host = "pervcity.com", type = Type.HOSTER, multi = true)
 public interface PervcityComConfig extends PluginConfigInterface {
     public static enum Quality implements LabelInterface {
         BEST {

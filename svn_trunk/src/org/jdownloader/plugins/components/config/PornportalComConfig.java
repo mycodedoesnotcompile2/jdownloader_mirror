@@ -10,7 +10,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "pornportal.com", type = Type.HOSTER)
+@PluginHost(host = "pornportal.com", type = Type.HOSTER, multi = true)
 public interface PornportalComConfig extends PluginConfigInterface {
     public static enum FilenameScheme implements LabelInterface {
         ORIGINAL {
@@ -77,6 +77,7 @@ public interface PornportalComConfig extends PluginConfigInterface {
         }
     }
 
+    @AboutConfig
     @DefaultEnumValue("ALL_SELECTED")
     @DescriptionForConfigEntry("If preferred qualities are not found, all will be crawled instead")
     @Order(100)

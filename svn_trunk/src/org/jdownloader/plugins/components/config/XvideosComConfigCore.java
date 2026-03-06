@@ -165,6 +165,7 @@ public interface XvideosComConfigCore extends PluginConfigInterface {
 
     void setPreferredOfficialDownloadQuality(PreferredOfficialDownloadQuality quality);
 
+    @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry("xvideos.com/xvideos.red/xnxx.cc can 'shadow ban' users who download a lot. This will limit the max. available quality to 240p. This experimental setting will make JD try to detect this limit.")
     @Order(140)
@@ -172,6 +173,7 @@ public interface XvideosComConfigCore extends PluginConfigInterface {
 
     void setTryToRecognizeLimit(boolean b);
 
+    @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry(text_PluginContentURLExposeDirecturls)
     @Order(150)

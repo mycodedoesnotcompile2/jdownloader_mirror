@@ -32,6 +32,12 @@ public class CaptchaHelperHostPluginGeeTest extends AbstractCaptchaHelperGeeTest
         final PluginForHost plugin = getPlugin();
         final DownloadLink link = plugin.getDownloadLink();
         final GeeTestChallenge challenge = new GeeTestChallenge(apiKey, plugin) {
+
+            @Override
+            public String getSiteUrl() {
+                return null;
+            }
+
             @Override
             public BrowserViewport getBrowserViewport(BrowserWindow screenResource, Rectangle elementBounds) {
                 return null;

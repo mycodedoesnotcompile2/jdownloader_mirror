@@ -21,11 +21,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -44,7 +39,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52085 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52442 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
 public class LusciousNetAlbum extends PluginForDecrypt {
     public LusciousNetAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -178,8 +179,8 @@ public class LusciousNetAlbum extends PluginForDecrypt {
                     link.setDefaultPlugin(plg);
                     /**
                      * For 9cloud.us we cannot find any filenames as long as any free download limit is reached which is often the case.
-                     * </br>
-                     * To counter that, we'll just set a filename here including the available status as we know that that file is online.
+                     * </br> To counter that, we'll just set a filename here including the available status as we know that that file is
+                     * online.
                      */
                     link.setName(title + ".zip");
                     link.setAvailable(true);
@@ -244,15 +245,40 @@ public class LusciousNetAlbum extends PluginForDecrypt {
                         }
                         numberofNewItems++;
                         final String description = (String) item.get("description");
-                        final String url_to_original = item.get("url_to_original").toString();
-                        final DownloadLink image = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url_to_original));
-                        if (!StringUtils.isEmpty(description)) {
-                            image.setComment(description);
+                        final String url_to_original = (String) item.get("url_to_original");
+                        final String url_to_video = (String) item.get("url_to_video");
+                        DownloadLink downloadLink = null;
+                        if (url_to_video != null) {
+                            downloadLink = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url_to_video).toExternalForm()));
+                        } else if (url_to_original != null) {
+                            downloadLink = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url_to_original).toExternalForm()));
+                        } else {
+                            final List<Map<String, Object>> thumbnails = (List<Map<String, Object>>) item.get("thumbnails");
+                            Number height = null;
+                            for (Map<String, Object> thumbnail : thumbnails) {
+                                final String url_to_thumbnail = (String) thumbnail.get("url");
+                                if ("xMax".equals(thumbnail.get("size"))) {
+                                    height = (Number) thumbnail.get(("height"));
+                                    downloadLink = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url_to_thumbnail).toExternalForm()));
+                                    break;
+                                } else if (height == null || ((Number) thumbnail.get("height")).intValue() > height.intValue()) {
+                                    height = (Number) thumbnail.get(("height"));
+                                    downloadLink = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url_to_thumbnail).toExternalForm()));
+                                }
+                            }
+                            if (downloadLink == null) {
+                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                            }
                         }
-                        image.setAvailable(true);
-                        image._setFilePackage(fp);
-                        ret.add(image);
-                        distribute(image);
+                        downloadLink.setAvailable(true);
+                        if (!StringUtils.isEmpty(description)) {
+                            downloadLink.setComment(description);
+                        }
+                        downloadLink._setFilePackage(fp);
+                        ret.add(downloadLink);
+                        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                            distribute(downloadLink);
+                        }
                     }
                     logger.info("Cralwed page " + page + "/" + pageMax + " | Found items so far: " + dupes.size() + "/" + total_numberof_items);
                     if (Boolean.FALSE.equals(info.get("has_next_page"))) {

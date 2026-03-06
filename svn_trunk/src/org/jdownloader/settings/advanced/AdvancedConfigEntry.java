@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import jd.config.Property;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.WarnLevel;
 
@@ -23,9 +24,11 @@ import org.appwork.storage.config.annotations.MultiLineString;
 import org.appwork.storage.config.annotations.RequiresRestart;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.storage.config.handler.StorageHandler;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.Regex;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.reflection.CompiledType;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
@@ -33,6 +36,8 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
 
 public class AdvancedConfigEntry {
     private final ConfigInterface configInterface;
@@ -120,27 +125,44 @@ public class AdvancedConfigEntry {
 
     private String configInterfaceName = null;
 
-    public String getConfigInterfaceName() {
+    protected String getConfigInterfaceName() {
         if (configInterfaceName == null) {
-            String ret = configInterface._getStorageHandler().getConfigInterface().getSimpleName();
+            final StorageHandler<?> sh = configInterface._getStorageHandler();
+            String ret = null;
+            multiPluginConfig: if (configInterface instanceof PluginConfigInterface) {
+                final PluginHost hostPlugin = sh.getConfigInterface().getAnnotation(PluginHost.class);
+                if (hostPlugin == null || !hostPlugin.multi()) {
+                    break multiPluginConfig;
+                }
+                ret = new Regex(sh.getStorageID(), "/((?:HOSTER|CRAWLER|CAPTCHA|CONTAINER)/[a-z0-9\\-\\.]+)").getMatch(0);
+                if (ret != null) {
+                    ret = ret.toLowerCase(Locale.ROOT).replaceFirst("([^/]+)(/)", "$1Plugin: ");
+                }
+            }
+            if (ret == null) {
+                ret = sh.getConfigInterface().getSimpleName();
+            }
             if (ret.contains("Config")) {
                 ret = ret.replace("Config", "");
             }
-            configInterfaceName = ret;
+            configInterfaceName = Property.dedupeString(ret);
             return ret;
         }
         return configInterfaceName;
     }
 
+    protected String getUniqueID() {
+        return getConfigInterfaceName() + "/" + getKeyHandler().getKey();
+    }
+
     private String keyText = null;
 
     public String getKeyText() {
-        if (keyText == null) {
-            keyText = getConfigInterfaceName() + ": " + getKeyHandler().getReadableName();
-            return keyText;
-        } else {
-            return keyText;
+        String ret = keyText;
+        if (ret == null) {
+            keyText = ret = getKeyHandler().getReadableName();
         }
+        return getConfigInterfaceName() + ": " + getKeyHandler().getReadableName();
     }
 
     public Object getValue() {

@@ -10,7 +10,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "srf.ch", type = Type.HOSTER)
+@PluginHost(host = "srf.ch", type = Type.HOSTER, multi = true)
 public interface SrfChConfig extends PluginConfigInterface {
     final String                    text_CrawlThumbnail               = "Crawl thumbnail?";
     final String                    text_QualitySelectionMode         = "Define how this plugin should pick your desired qualities";

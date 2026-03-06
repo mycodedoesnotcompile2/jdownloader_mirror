@@ -13,7 +13,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "metart.com", type = Type.HOSTER)
+@PluginHost(host = "metart.com", type = Type.HOSTER, multi = true)
 public interface MetartConfig extends PluginConfigInterface {
     // class EnumSetValidator extends AbstractValidator<Set<MediaQuality>> {
     // @Override

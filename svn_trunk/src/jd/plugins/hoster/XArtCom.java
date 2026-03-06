@@ -20,12 +20,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
 
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.AccountController;
@@ -48,63 +42,80 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "x-art.com" }, urls = { "https?://(?:www\\.)?(x\\-art(decrypted)?\\.com/(members/)?(videos|galleries)/.+|([a-z0-9]+\\.)?x-art(decrypted)?\\.com/.+\\.(mov|mp4|wmv|zip).*)" })
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52447 $", interfaceVersion = 2, names = { "x-art.com" }, urls = { "https?://(?:www\\.)?(x\\-art(decrypted)?\\.com/(members/)?(videos|galleries)/.+|([a-z0-9]+\\.)?x-art(decrypted)?\\.com/.+\\.(mov|mp4|wmv|zip).*)" })
 public class XArtCom extends PluginForHost {
     public static interface XArtConfigInterface extends PluginConfigInterface {
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(10)
         boolean isGrabBestVideoVersionEnabled();
 
         void setGrabBestVideoVersionEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(20)
         boolean isGrab4KVideoEnabled();
 
         void setGrab4KVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(30)
         boolean isGrab1080pVideoEnabled();
 
         void setGrab1080pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(40)
         boolean isGrab720pVideoEnabled();
 
         void setGrab720pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(50)
         boolean isGrab540pVideoEnabled();
 
         void setGrab540pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(60)
         boolean isGrab360pVideoEnabled();
 
         void setGrab360pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(70)
         boolean isGrabBestImagesVersionEnabled();
 
         void setGrabBestImagesVersionEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(80)
         boolean isGrab1200pImagesVersionEnabled();
 
         void setGrab1200pImagesVersionEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(90)
         boolean isGrab2000pImagesVersionEnabled();
 
         void setGrab2000pImagesVersionEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(100)
         boolean isGrab4000pImagesVersionEnabled();

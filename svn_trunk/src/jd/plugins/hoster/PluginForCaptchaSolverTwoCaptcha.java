@@ -16,7 +16,7 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52437 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52441 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     private final Map<Account, Long> hcaptcha_disabled_accounts = new HashMap<Account, Long>();
 
@@ -59,7 +59,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         /* Get list of all captcha types supported by this service. */
         final List<CAPTCHA_TYPE> supported_captcha_types = this.getSupportedCaptchaTypes();
         if (hcaptcha_disabled_accounts.get(account) != null) {
-            /* hCaptcha is not supported by this account -> REmove from list of supported captcha types. */
+            /* hCaptcha is not supported by this account -> Remove from list of supported captcha types. */
             supported_captcha_types.remove(CAPTCHA_TYPE.HCAPTCHA);
         }
         return supported_captcha_types;

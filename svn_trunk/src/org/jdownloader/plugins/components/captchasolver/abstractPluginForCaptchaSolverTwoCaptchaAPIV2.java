@@ -7,6 +7,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import jd.PluginWrapper;
+import jd.controlling.captcha.SkipException;
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
@@ -33,18 +45,6 @@ import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaResponse;
 import org.jdownloader.plugins.controller.LazyPlugin;
-
-import jd.PluginWrapper;
-import jd.controlling.captcha.SkipException;
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 /**
  * Base plugin class for captcha solving via 2captcha.com APIv2: https://2captcha.com/api-docs
@@ -88,7 +88,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
                 task.put("type", "RecaptchaV2TaskProxyless");
                 task.put("websiteKey", challenge.getSiteKey());
-                task.put("websiteURL", challenge.getSiteUrl());
+                task.put("websiteURL", challenge.getSiteUrl(this));
                 final Map<String, Object> action = challenge.getV3Action();
                 if (challenge.isV3() || action != null) {
                     task.put("type", "RecaptchaV3TaskProxyless");
@@ -104,10 +104,9 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 if (minScore != null) {
                     task.put("minScore", minScore);
                 }
-                if (account.getHoster().equals("2captcha.com") && challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(), "filer.net")) {
+                if (account.getHoster().equals("2captcha.com") && challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(this), "filer.net")) {
                     /**
-                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results.
-                     * <br>
+                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results. <br>
                      * Is: https://2captcha.com/api-docs/recaptcha-v2-enterprise#recaptcha-v2-enterprise <br>
                      * Should be: https://2captcha.com/api-docs/recaptcha-v3
                      */
@@ -119,7 +118,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             } else if (captchachallenge instanceof HCaptchaChallenge) {
                 final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;
                 task.put("type", "HCaptchaTaskProxyless");
-                task.put("websiteURL", challenge.getSiteUrl());
+                task.put("websiteURL", challenge.getSiteUrl(this));
                 task.put("websiteKey", challenge.getSiteKey());
                 final AbstractHCaptcha<?> hCaptcha = challenge.getAbstractCaptchaHelperHCaptcha();
                 if (hCaptcha != null && AbstractHCaptcha.TYPE.INVISIBLE.equals(hCaptcha.getType())) {
@@ -131,12 +130,12 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 task.put("type", "CutCaptchaTaskProxyless");
                 task.put("miseryKey", challenge.getSiteKey());
                 task.put("apiKey", challenge.getApiKey());
-                task.put("websiteURL", challenge.getSiteUrl());
+                task.put("websiteURL", challenge.getSiteUrl(this));
             } else if (captchachallenge instanceof CloudflareTurnstileChallenge) {
                 /* Cloudflare turnstile: https://2captcha.com/api-docs/cloudflare-turnstile */
                 final CloudflareTurnstileChallenge challenge = (CloudflareTurnstileChallenge) captchachallenge;
                 task.put("type", "TurnstileTaskProxyless");
-                task.put("websiteURL", challenge.getSiteUrl());
+                task.put("websiteURL", challenge.getSiteUrl(this));
                 task.put("websiteKey", challenge.getSiteKey());
             } else if (captchachallenge instanceof ClickCaptchaChallenge) {
                 /* Coordinates task: https://2captcha.com/api-docs/coordinates */

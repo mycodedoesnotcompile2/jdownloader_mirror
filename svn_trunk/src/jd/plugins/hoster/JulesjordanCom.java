@@ -20,18 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.Type;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.translate._JDT;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
@@ -56,7 +44,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 51662 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.Type;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.translate._JDT;
+
+@HostPlugin(revision = "$Revision: 52447 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -453,7 +453,7 @@ public class JulesjordanCom extends PluginForHost {
         return JulesjordanComConfigInterface.class;
     }
 
-    @PluginHost(host = "julesjordan.com", type = Type.HOSTER)
+    @PluginHost(host = "julesjordan.com", type = Type.HOSTER, multi = true)
     public static interface JulesjordanComConfigInterface extends PluginConfigInterface {
         public static class TRANSLATION {
             public String getFastLinkcheckEnabled_label() {
@@ -491,12 +491,14 @@ public class JulesjordanCom extends PluginForHost {
 
         public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(9)
         boolean isFastLinkcheckEnabled();
 
         void setFastLinkcheckEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(20)
         boolean isGrabBESTEnabled();
@@ -510,30 +512,35 @@ public class JulesjordanCom extends PluginForHost {
 
         void setOnlyBestVideoQualityOfSelectedQualitiesEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(22)
         boolean isAddUnknownQualitiesEnabled();
 
         void setAddUnknownQualitiesEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(90)
         boolean isGrabHTTPMp4_4kEnabled();
 
         void setGrabHTTPMp4_4kEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(90)
         boolean isGrabHTTPMp4_1080pEnabled();
 
         void setGrabHTTPMp4_1080pEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(100)
         boolean isGrabHTTPMp4_720pHDEnabled();
 
         void setGrabHTTPMp4_720pHDEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(110)
         boolean isGrabHTTPMp4_MobileSDEnabled();
