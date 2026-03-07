@@ -16,9 +16,9 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52441 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52456 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
-    private final Map<Account, Long> hcaptcha_disabled_accounts = new HashMap<Account, Long>();
+    private final Map<Account, Object> hcaptcha_account_status_map = new HashMap<Account, Object>();
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -45,7 +45,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        /* 2025-12-22: hCaptcha is not supported anymore */
+        /* 2025-12-22: hCaptcha is officially not supported anymore */
         // types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.MT_CAPTCHA);
@@ -53,16 +53,47 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.GEETEST_V4);
         return types;
     }
+    // @Override
+    // public List<CAPTCHA_TYPE> getSupportedCaptchaTypesForGUI() {
+    // final List<CAPTCHA_TYPE> supported_captcha_types = super.getSupportedCaptchaTypesForGUI();
+    // if (!this.supportsHcaptcha()) {
+    // supported_captcha_types.remove(CAPTCHA_TYPE.HCAPTCHA);
+    // }
+    // return supported_captcha_types;
+    // }
 
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
         /* Get list of all captcha types supported by this service. */
         final List<CAPTCHA_TYPE> supported_captcha_types = this.getSupportedCaptchaTypes();
-        if (hcaptcha_disabled_accounts.get(account) != null) {
+        if (!supportsHcaptcha(account)) {
             /* hCaptcha is not supported by this account -> Remove from list of supported captcha types. */
             supported_captcha_types.remove(CAPTCHA_TYPE.HCAPTCHA);
         }
         return supported_captcha_types;
+    }
+
+    /* Returns true if account supports hCaptcha. */
+    private boolean supportsHcaptcha(final Account account) {
+        if (hcaptcha_account_status_map.get(account) instanceof Long) {
+            /* Last failure timestamp is given -> We know that this account doesn't support hCaptcha */
+            return false;
+        } else {
+            /* Account supports hCaptcha or hCaptcha status hasn't been evaluated yet. */
+            return true;
+        }
+    }
+
+    /* Returns true if any account supported hCaptcha in current session */
+    private boolean supportsHcaptcha() {
+        synchronized (hcaptcha_account_status_map) {
+            for (final Object valueO : hcaptcha_account_status_map.values()) {
+                if (valueO instanceof Boolean) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     protected String getApiBase() {
@@ -98,6 +129,9 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         final int errorId = ((Number) entries.get("errorId")).intValue();
         if (errorId == 0) {
             /* No error */
+            if (this.getCurrentCaptchaChallenge() instanceof HCaptchaChallenge) {
+                hcaptcha_account_status_map.put(account, true);
+            }
             return;
         }
         final String errorCode = entries.get("errorCode").toString();
@@ -105,7 +139,8 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
             /* Special hCaptcha handling. This should only happen once per session. */
             /* Example response: {"errorId":5,"errorCode":"ERROR_METHOD_CALL","errorDescription":"Error"} */
             logger.info("hCaptcha is not supported by this 2captcha API key");
-            hcaptcha_disabled_accounts.put(account, Time.systemIndependentCurrentJVMTimeMillis());
+            hcaptcha_account_status_map.put(account, Time.systemIndependentCurrentJVMTimeMillis());
+            // lastTimestampHcaptchaWorking.set(0);
         }
         super.handleAPIErrors(entries, account);
     }

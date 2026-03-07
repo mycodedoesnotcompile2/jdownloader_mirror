@@ -21,10 +21,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -36,14 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52442 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52457 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -216,7 +217,6 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 } while (true);
                 return ret;
             }
-            /* Website */
             final String url = URLHelper.getUrlWithoutParams(contenturl);
             /* Display as many items as possible to avoid having to deal with pagination. */
             final UrlQuery query = UrlQuery.parse(contenturl);
@@ -224,7 +224,23 @@ public class RlGalleriesNt extends PluginForDecrypt {
             query.addAndReplace("a", "10000");
             /* Start from page 1 else we may get an empty page (website is buggy). */
             query.addAndReplace("p", "1");
-            br.getPage(url + "?" + query.toString());
+            /**
+             * Allow for any direct-URLs added by user <br>
+             * Example: https://urlgalleries.com/img/88x31_RTA-5042-1996-1400-1577-RTA_b.gif
+             */
+            final URLConnectionAdapter con = br.openGetConnection(url + "?" + query.toString());
+            if (this.looksLikeDownloadableContent(con)) {
+                try {
+                    con.disconnect();
+                } catch (final Throwable ignore) {
+                }
+                final DownloadLink direct = getCrawler().createDirectHTTPDownloadLink(con.getRequest(), con);
+                ret.add(direct.getDownloadLink());
+                /* Early return */
+                return ret;
+            } else {
+                br.followConnection();
+            }
             if (isOffline(br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

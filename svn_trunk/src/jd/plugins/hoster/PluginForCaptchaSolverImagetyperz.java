@@ -60,15 +60,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52185 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
-        } else {
-            return null;
-        }
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     public PluginForCaptchaSolverImagetyperz(PluginWrapper wrapper) {
@@ -129,7 +125,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
          * Their API docs are documented in a chaotic way, here is a different version of them:
          * https://www.imagetyperz.com/Forms/api/api.html
          */
-        return "https://captchatypers.com";
+        return "https://" + getHost();
     }
 
     @Override

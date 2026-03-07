@@ -6,16 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -32,10 +22,20 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
+import jd.PluginWrapper;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52443 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -119,6 +119,13 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         query.appendEncoded("captchaSource", "jdPlugin");
         query.appendEncoded("version", "1.2");
         br.getPage(getBaseURL() + "/index.cgi?" + query.toString());
+        /* Check for non-json response. This is the best workaround I found in order to "keep things pretty". */
+        final Regex captcha_upload_success = br.getRegex("OK-(\\d+)");
+        if (captcha_upload_success.patternFind()) {
+            final Map<String, Object> resp = new HashMap<String, Object>();
+            resp.put("captcha_id", captcha_upload_success.getMatch(0));
+            return resp;
+        }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> status = (Map<String, Object>) entries.get("status");
         if (Boolean.TRUE.equals(status.get("success"))) {

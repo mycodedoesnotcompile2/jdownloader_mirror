@@ -44,6 +44,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public abstractPluginForCaptchaSolver(PluginWrapper wrapper) {
         super(wrapper);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* All captcha solver plugins have account support. */
             this.enablePremium(getBuyPremiumUrl());
         }
     }
@@ -68,6 +69,15 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return List of supported captcha types
      */
     public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+
+    /**
+     * Returns list of supported captcha types to be displayed in GUI. <br>
+     * Override this in edge cases for example when a specific captcha type is only supported for some accounts of a specific service to
+     * prevent it from being displayed in the services' list of supported captcha types in beforehand -> Prevent confuding the user.
+     */
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypesForGUI() {
+        return getSupportedCaptchaTypes();
+    }
 
     /** Returns list of captcha types supported by this account. */
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {

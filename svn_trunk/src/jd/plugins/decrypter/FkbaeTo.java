@@ -35,7 +35,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 52444 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = {}, urls = {})
 public class FkbaeTo extends PluginForDecrypt {
     public FkbaeTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,7 +69,7 @@ public class FkbaeTo extends PluginForDecrypt {
     }
 
     private static final Pattern PATTERN_NORMAL = Pattern.compile("/(\\d+)/");
-    /* snstrhls = HLS, XX = Progressive */
+    /* snstrhls = HLS, snstr = Progressive */
     private static final Pattern PATTERN_EMBED  = Pattern.compile("/(?:snstr|snstrhls)\\.php\\?fileid=([a-zA-Z0-9]+)");
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
