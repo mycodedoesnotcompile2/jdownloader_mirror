@@ -99,10 +99,19 @@ public interface EpornerComConfig extends PluginConfigInterface {
         },
         DEFAULT {
             @Override
+            public PreferredVideoCodec getActualPreferredVideoCodec() {
+                return defaultPreferredVideoCodec;
+            }
+
+            @Override
             public String getLabel() {
                 return "Default: " + defaultPreferredVideoCodec.getLabel();
             }
         };
+
+        public PreferredVideoCodec getActualPreferredVideoCodec() {
+            return this;
+        }
     }
 
     @AboutConfig

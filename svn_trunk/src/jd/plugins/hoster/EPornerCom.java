@@ -21,6 +21,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.EpornerComConfig;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -43,16 +52,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.EpornerComConfig;
-import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52413 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52459 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -242,32 +242,39 @@ public class EPornerCom extends PluginForHost {
                             filesizeSelectedH264 = tempsize;
                         }
                     }
-                    /* Determine best candidate for fallback / "global best" */
-                    // if (dllink == null || tempsize > filesize) {
-                    // filesize = tempsize;
-                    // dllink = directurl;
-                    // }
                 }
             }
-            if (dllinkSelectedAV1 != null && codec == PreferredVideoCodec.AV1) {
-                dllink = dllinkSelectedAV1;
-                filesize = filesizeSelectedAV1;
-            } else if (dllinkSelectedH264 != null && codec == PreferredVideoCodec.H264) {
-                dllink = dllinkSelectedH264;
-                filesize = filesizeSelectedH264;
-            } else if (dllinkBestH264 != null && codec == PreferredVideoCodec.H264) {
-                /* Best H264 */
-                dllink = dllinkBestH264;
-                filesize = filesizeBestH264;
-            } else if (dllinkBestAV1 != null && codec == PreferredVideoCodec.AV1) {
-                /* Fallback / best AV1 */
-                dllink = dllinkBestAV1;
-                filesize = filesizeBestAV1;
-            }
-            if (dllink == null) {
-                /* Fallback */
-                if (dllinkBestH264 != null) {
+            switch (codec.getActualPreferredVideoCodec()) {
+            case AV1:
+                if (dllinkSelectedAV1 != null) {
+                    // wished codec + wished resolution
+                    dllink = dllinkSelectedAV1;
+                    filesize = filesizeSelectedAV1;
+                } else if (dllinkSelectedH264 != null) {
+                    // still wished resolution
+                    dllink = dllinkSelectedH264;
+                    filesize = filesizeSelectedH264;
+                } else if (dllinkBestAV1 != null) {
+                    /* Fallback / best wished AV1 */
+                    dllink = dllinkBestAV1;
+                    filesize = filesizeBestAV1;
+                } else if (dllinkBestH264 != null) {
                     /* Fallback / best H264 */
+                    dllink = dllinkBestH264;
+                    filesize = filesizeBestH264;
+                }
+                break;
+            case H264:
+                if (dllinkSelectedH264 != null) {
+                    // wished codec + wished resolution
+                    dllink = dllinkSelectedH264;
+                    filesize = filesizeSelectedH264;
+                } else if (dllinkSelectedAV1 != null) {
+                    // still wished resolution
+                    dllink = dllinkSelectedAV1;
+                    filesize = filesizeSelectedAV1;
+                } else if (dllinkBestH264 != null) {
+                    /* Fallback / best wished H264 */
                     dllink = dllinkBestH264;
                     filesize = filesizeBestH264;
                 } else if (dllinkBestAV1 != null) {
@@ -275,6 +282,7 @@ public class EPornerCom extends PluginForHost {
                     dllink = dllinkBestAV1;
                     filesize = filesizeBestAV1;
                 }
+                break;
             }
             if (dllink == null && isDownload) {
                 /* Fallback to stream download */
