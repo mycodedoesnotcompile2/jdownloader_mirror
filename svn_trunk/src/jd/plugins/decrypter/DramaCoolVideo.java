@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52081 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52461 $", interfaceVersion = 3, names = {}, urls = {})
 public class DramaCoolVideo extends PluginForDecrypt {
     public DramaCoolVideo(PluginWrapper wrapper) {
         super(wrapper);
@@ -72,7 +72,7 @@ public class DramaCoolVideo extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\d*\\.)?" + buildHostsPatternPart(domains) + "/[\\w\\-]+(\\.html)?");
+            ret.add("https?://(?:www\\d*\\.)?" + buildHostsPatternPart(domains) + "/(?!drama-detail/)([\\w\\-]+)(\\.html)?");
         }
         return ret.toArray(new String[0]);
     }

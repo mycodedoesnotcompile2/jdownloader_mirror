@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52457 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52469 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -244,11 +244,14 @@ public class RlGalleriesNt extends PluginForDecrypt {
             if (isOffline(br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            if (br.containsHTML("Continue to the image")) {
+            if (br.containsHTML("Continue to the image") || br.containsHTML("Continue to image")) {
                 /* 2025-03-26: Single image */
-                final String finallink = br.getRegex("window\\.location\\.href = '(http?://[^']+)").getMatch(0);
+                String finallink = br.getRegex("window\\.location\\.href = '(https?://[^']+)").getMatch(0);
                 if (finallink == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    finallink = br.getRegex("var\\s*IMAGE_URL\\s*=\\s*\"(https?://[^\"]+)").getMatch(0);
+                    if (finallink == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
                 ret.add(this.createDownloadlink(finallink));
                 return ret;
@@ -268,7 +271,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 /* Fallback */
                 fp.setName(br._getURL().getPath());
             }
-            String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"((http|/)[^\"]+)").getMatch(0);
+            String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"((https?|/)[^\"]+)").getMatch(0);
             if (zip_url != null) {
                 zip_url = br.getURL(zip_url).toExternalForm();
                 final DownloadLink zip = this.createDownloadlink(zip_url);
@@ -283,7 +286,10 @@ public class RlGalleriesNt extends PluginForDecrypt {
             do {
                 logger.info("Crawling page " + page + " of ??");
                 final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
-                final String[] redirecturls = br.getRegex("rel='nofollow noopener' href='(/[^/\\']+)' target='_blank'").getColumn(0);
+                String[] redirecturls = br.getRegex("rel='nofollow noopener' href='(/[^/\\']+)' target='_blank'").getColumn(0);
+                if (redirecturls == null || redirecturls.length == 0) {
+                    redirecturls = br.getRegex("href\\s*=\\s*\"(/[^\"]+)\"\\s*target\\s*=\\s*\"_blank\"\\s*rel\\s*=\\s*\"nofollow noopener").getColumn(0);
+                }
                 /*
                  * Check for special thumbnails that our host plugins will change to the original URLs without needing to crawl the
                  * individual urlgalleries.net URLs -> Speeds up things a lot!
@@ -291,6 +297,13 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 String[] thumbnailurls = br.getRegex("class='gallery' src='" + allowed_thumbnail_urls.pattern() + "'").getColumn(0);
                 if (thumbnailurls == null || thumbnailurls.length == 0) {
                     thumbnailurls = br.getRegex("class=\"thumb\"\\s*src=\"" + allowed_thumbnail_urls.pattern() + "\"").getColumn(0);
+                }
+                if (thumbnailurls == null || thumbnailurls.length == 0) {
+                    if (ret.size() > 0) {
+                        return ret;
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
                 for (final String thumbnailurl : thumbnailurls) {
                     if (dupes.add(thumbnailurl)) {
@@ -362,10 +375,10 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 ret.add(this.createDownloadlink(redirect));
                 return ret;
             }
-            String finallink = br.getRegex("linkDestUrl\\s*=\\s*\\'(http[^<>\"\\']+)\\'").getMatch(0);
+            String finallink = br.getRegex("linkDestUrl\\s*=\\s*\\'(https?[^<>\"\\']+)\\'").getMatch(0);
             if (finallink == null) {
                 /* 2023-02-17 */
-                finallink = br.getRegex("externalUrl\\s*=\\s*(?:\\'|\")(http[^<>\"\\']+)").getMatch(0);
+                finallink = br.getRegex("externalUrl\\s*=\\s*(?:\\'|\")(https?[^<>\"\\']+)").getMatch(0);
             }
             if (finallink == null) {
                 /* Invalid link or plugin broken */

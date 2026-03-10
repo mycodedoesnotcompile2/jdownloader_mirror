@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52081 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52461 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidbasicTop extends PluginForDecrypt {
     public VidbasicTop(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,6 +81,9 @@ public class VidbasicTop extends PluginForDecrypt {
         final String content_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         br.getPage("https://" + getHost() + "/embed/" + content_id + "?json");
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getRequest().getHtmlCode().equals("[]")) {
+            /* Broken or offline stream */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Map with key value where key is the name of a filehost and value to URL to the mirror. */

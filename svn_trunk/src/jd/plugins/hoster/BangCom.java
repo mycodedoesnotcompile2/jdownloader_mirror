@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangComCrawler;
 
-@HostPlugin(revision = "$Revision: 52331 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52462 $", interfaceVersion = 3, names = {}, urls = {})
 public class BangCom extends PluginForHost {
     public BangCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -305,7 +305,7 @@ public class BangCom extends PluginForHost {
                 }
                 loginform.put("_username", Encoding.urlEncode(account.getUser()));
                 loginform.put("_password", Encoding.urlEncode(account.getPass()));
-                final String turnstileSiteKey = br.getRegex("class=\"cf-turnstile[^\"]*\" data-sitekey=\"([^\"]+)\"").getMatch(0);
+                final String turnstileSiteKey = br.getRegex("class=\"cf-turnstile[^\"]*\"[^>]*data-sitekey=\"([^\"]+)\"").getMatch(0);
                 if (turnstileSiteKey != null) {
                     final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileSiteKey);
                     logger.info("Detected captcha method \"CloudflareTurnstileCaptcha\" for this host");

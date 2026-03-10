@@ -158,11 +158,11 @@ public abstract class Plugin implements ActionListener {
         return pattern.toString();
     }
 
-    public LazyPlugin<?> getLazy() {
+    public final LazyPlugin<?> getLazy() {
         if (this instanceof PluginForHost) {
             return ((PluginForHost) this).getLazyP();
         } else if (this instanceof PluginForDecrypt) {
-            return ((PluginForDecrypt) this).getLazy();
+            return ((PluginForDecrypt) this).getLazyC();
         } else {
             return null;
         }

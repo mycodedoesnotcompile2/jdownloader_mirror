@@ -16,24 +16,16 @@
 package jd.plugins.hoster;
 
 import jd.PluginWrapper;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 47853 $", interfaceVersion = 3, names = { "pobierz.biz" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52460 $", interfaceVersion = 3, names = { "pobierz.biz" }, urls = { "" })
 public class PobierzBiz extends RapidtrafficCore {
+    /* 2026-03-09: Alternative domain: download.biz, download.to */
     protected static MultiHosterManagement mhm = new MultiHosterManagement("pobierz.biz");
 
     public PobierzBiz(PluginWrapper wrapper) {
         super(wrapper);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

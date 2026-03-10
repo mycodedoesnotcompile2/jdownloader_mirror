@@ -19,13 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.PervcityComConfig;
-import org.jdownloader.plugins.components.config.PervcityComConfig.Quality;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -46,7 +39,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.PervcityComConfig;
+import org.jdownloader.plugins.components.config.PervcityComConfig.Quality;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 3, names = {}, urls = {})
 public class PervcityCom extends PluginForHost {
     public PervcityCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -350,7 +349,7 @@ public class PervcityCom extends PluginForHost {
     }
 
     private String getUserPreferredqualityStr() {
-        final Quality quality = PluginJsonConfig.get(PervcityComConfig.class).getPreferredQuality();
+        final Quality quality = get(PervcityComConfig.class).getPreferredQuality();
         switch (quality) {
         case Q480:
             return "480p";

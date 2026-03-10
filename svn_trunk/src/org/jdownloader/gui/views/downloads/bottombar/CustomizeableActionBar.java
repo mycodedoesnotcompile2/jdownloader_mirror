@@ -13,7 +13,6 @@ import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.InvocationTargetException;
 
-import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JSeparator;
@@ -51,7 +50,7 @@ public class CustomizeableActionBar extends MigPanel {
     private final AbstractBottomBarMenuManager manager;
 
     public CustomizeableActionBar(AbstractBottomBarMenuManager bottomBarMenuManager) {
-        super("ins 0 0 0 0,gap " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap(), "[]", "[]");
+        super();
         setOpaque(false);
         manager = bottomBarMenuManager;
         manager.addLink(this);
@@ -68,15 +67,17 @@ public class CustomizeableActionBar extends MigPanel {
         });
     }
 
+    protected void setLayout() {
+        this.setLayout(new MigLayout("ins 0 0 0 0, gap " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap(), "[]", "[]"));
+    }
+
     public void updateGui() {
         if (!SecondLevelLaunch.EXTENSIONS_LOADED.isReached()) {
             return;
         }
         removeAll();
-        MenuContainerRoot items = prepare(manager.getMenuData());
-        this.setLayout(new MigLayout("ins 0 0 0 0, gap " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap(), "[]", "[]"));
-        AbstractButton ab;
-        // System.out.println(this.getColConstraints(list.length));
+        final MenuContainerRoot items = prepare(manager.getMenuData());
+        setLayout();
         MenuItemData last = null;
         for (MenuItemData menudata : items.getItems()) {
             // "height 24!,aligny top"
@@ -108,6 +109,7 @@ public class CustomizeableActionBar extends MigPanel {
                 e.printStackTrace();
             }
         }
+        setVisible(getComponentCount() > 0);
         revalidate();
         repaint();
     }

@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52207 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52461 $", interfaceVersion = 3, names = {}, urls = {})
 public class SupervideoTv extends XFileSharingProBasic {
     public SupervideoTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -152,6 +152,10 @@ public class SupervideoTv extends XFileSharingProBasic {
         String betterFileTitle = new Regex(html, "<h1 class=\"download__title\">([^<]+)</h1>").getMatch(0);
         if (betterFileTitle == null) {
             betterFileTitle = new Regex(html, "<h5 class=\"text-white\"[^>]*>([^<]+)</h5>").getMatch(0);
+        }
+        if (betterFileTitle == null) {
+            /* 2026-03-09 */
+            betterFileTitle = new Regex(html, "<h3[^>]*>\\s*Download ([^<]+)</h3>").getMatch(0);
         }
         if (betterFileTitle != null) {
             /* Overwrite possible previous result since we know that this one is better. */

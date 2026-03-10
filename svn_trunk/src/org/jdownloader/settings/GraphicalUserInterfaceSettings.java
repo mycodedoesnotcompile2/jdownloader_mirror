@@ -1443,6 +1443,12 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     void setOverviewPositions(HashMap<String, Position> map);
 
     public static enum DockingPosition implements LabelInterface {
+        INVISIBE() {
+            @Override
+            public String getLabel() {
+                return _GUI.T.setOverviewPositions_invisible();
+            }
+        },
         NORTH() {
             @Override
             public String getLabel() {
@@ -1461,6 +1467,12 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     DockingPosition getLinkgrabberBottombarPosition();
 
     void setLinkgrabberBottombarPosition(DockingPosition pos);
+
+    @DefaultEnumValue("SOUTH")
+    @AboutConfig
+    DockingPosition getDownloadListBottombarPosition();
+
+    void setDownloadListBottombarPosition(DockingPosition pos);
 
     public static enum DownloadFolderChooserDialogDefaultPath implements LabelInterface {
         CURRENT_PATH {

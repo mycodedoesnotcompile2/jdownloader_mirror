@@ -174,6 +174,7 @@ public class CFG_GUI {
      **/
     public static final StringKeyHandler                               TITLE_PATTERN                                           = SH.getKeyHandler("TitlePattern", StringKeyHandler.class);
     public static final EnumKeyHandler                                 LINKGRABBER_BOTTOMBAR_POSITION                          = SH.getKeyHandler("LinkgrabberBottombarPosition", EnumKeyHandler.class);
+    public static final EnumKeyHandler                                 DOWNLOADLIST_BOTTOMBAR_POSITION                         = SH.getKeyHandler("DownloadListBottombarPosition", EnumKeyHandler.class);
     /**
      * The last used the Regex option for 'Rename Filename/Packagename' Dialog
      **/

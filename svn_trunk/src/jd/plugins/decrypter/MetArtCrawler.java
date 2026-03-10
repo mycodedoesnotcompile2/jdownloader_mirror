@@ -9,17 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.MetartConfig;
-import org.jdownloader.plugins.components.config.MetartConfig.PhotoQuality;
-import org.jdownloader.plugins.components.config.MetartConfig.VideoCrawlMode;
-import org.jdownloader.plugins.components.config.MetartConfig.VideoQuality;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -37,7 +26,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50810 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.MetartConfig;
+import org.jdownloader.plugins.components.config.MetartConfig.PhotoQuality;
+import org.jdownloader.plugins.components.config.MetartConfig.VideoCrawlMode;
+import org.jdownloader.plugins.components.config.MetartConfig.VideoQuality;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -83,7 +82,7 @@ public class MetArtCrawler extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final MetartConfig cfg = PluginJsonConfig.get(getLazyC(), MetartConfig.class);
+        final MetartConfig cfg = get(MetartConfig.class);
         final Regex urlinfo_gallery = new Regex(param.getCryptedUrl(), PATTERN_GALLERY);
         final Regex urlinfo_movie;
         final Set<PhotoQuality> qualitiesPhotosLoose = cfg.getMediaQualitiesPhotosLoose();

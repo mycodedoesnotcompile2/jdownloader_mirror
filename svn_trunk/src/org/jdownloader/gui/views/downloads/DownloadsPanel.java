@@ -38,6 +38,7 @@ import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 import org.jdownloader.gui.views.downloads.table.HorizontalScrollbarAction;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.DockingPosition;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
@@ -85,6 +86,16 @@ public class DownloadsPanel extends SwitchPanel implements DownloadControllerLis
         LAFOptions.getInstance().getExtension().customizeLinksTable(table, tableScrollPane);
 
         HorizontalScrollbarAction.setup(CFG_GUI.HORIZONTAL_SCROLLBARS_IN_DOWNLOAD_TABLE_ENABLED, table);
+        org.jdownloader.settings.staticreferences.CFG_GUI.DOWNLOADLIST_BOTTOMBAR_POSITION.getEventSender().addListener(new GenericConfigEventListener<Enum>() {
+            @Override
+            public void onConfigValueModified(KeyHandler<Enum> keyHandler, Enum newValue) {
+                fireRelayout();
+            }
+
+            @Override
+            public void onConfigValidatorError(KeyHandler<Enum> keyHandler, Enum invalidValue, ValidationException validateException) {
+            }
+        });
         bottomBar = new CustomizeableActionBar(MenuManagerDownloadTabBottomBar.getInstance()) {
 
             @Override
@@ -94,7 +105,10 @@ public class DownloadsPanel extends SwitchPanel implements DownloadControllerLis
             }
 
         };
+        fireRelayout();
+    }
 
+    public void fireRelayout() {
         DownloadController.DOWNLOADLIST_LOADED.executeWhen(new Runnable() {
 
             @Override
@@ -184,11 +198,16 @@ public class DownloadsPanel extends SwitchPanel implements DownloadControllerLis
             add(new JScrollPane(loader), "alignx center,aligny 20%");
         } else {
             setLayout(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[grow,fill]0[]0[]"));
+            if (CFG_GUI.CFG.getDownloadListBottombarPosition() == DockingPosition.NORTH) {
+                add(bottomBar, "hidemode 3,height 24!,gaptop " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap());
+            }
             this.add(tableScrollPane);
             this.panelContainer = new DownloadsPanelWidgetContainer(table, bottomBar);
             panelContainer.relayout();
-            this.add(panelContainer, "hidemode 3,gaptop " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap());
-            add(bottomBar, "height 24!,gaptop " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap());
+            add(panelContainer, "hidemode 3,gaptop " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap());
+            if (CFG_GUI.CFG.getDownloadListBottombarPosition() == DockingPosition.SOUTH) {
+                add(bottomBar, "hidemode 3,height 24!,gaptop " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap());
+            }
         }
     }
 

@@ -46,12 +46,12 @@ public class PluginJsonConfig {
     private static final WeakHashMap<ClassLoader, HashMap<String, WeakReference<ConfigInterface>>> CONFIG_CACHE  = new WeakHashMap<ClassLoader, HashMap<String, WeakReference<ConfigInterface>>>();
     private static final HashMap<String, JsonKeyValueStorage>                                      STORAGE_CACHE = new HashMap<String, JsonKeyValueStorage>();
     protected static final DelayedRunnable                                                         SAVEDELAYER   = new DelayedRunnable(5000, 30000) {
-                                                                                                                     @Override
-                                                                                                                     public void delayedrun() {
-                                                                                                                         saveAll();
-                                                                                                                         cleanup();
-                                                                                                                     }
-                                                                                                                 };
+        @Override
+        public void delayedrun() {
+            saveAll();
+            cleanup();
+        }
+    };
     private final static boolean                                                                   DEBUG         = false;
     static {
         final File pluginsFolder = Application.getResource("cfg/plugins/");
@@ -93,6 +93,7 @@ public class PluginJsonConfig {
         CONFIG_CACHE.size();
     }
 
+    @Deprecated
     public synchronized static <T extends PluginConfigInterface> T get(Class<T> configInterface) {
         return get(null, configInterface);
     }

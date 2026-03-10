@@ -86,13 +86,12 @@ import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
 import org.jdownloader.plugins.components.config.XFSConfigVideo.PreferredDownloadQuality;
 import org.jdownloader.plugins.components.config.XFSConfigVideo.PreferredStreamQuality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52422 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52463 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -339,7 +338,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected boolean userPrefersHTTPS() {
         final Class<? extends XFSConfig> cfgO = this.getConfigInterface();
         if (cfgO != null) {
-            return !PluginJsonConfig.get(cfgO).isPreferHTTP();
+            return !get(cfgO).isPreferHTTP();
         } else {
             return true;
         }
@@ -384,8 +383,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else if (br.containsHTML("/e/" + fuid)) {
             /* A lot of newer XFS templates got such embed URLs. */
             return true;
-        } else if (br.containsHTML(fuid + "_o")) {
-            /* e.g. casthq.to */
+        } else if (br.containsHTML(fuid + "_(l|n|h|o|x)")) {
+            /* e.g. casthq.to, dropload.io */
             return true;
         } else if (br.containsHTML("This video can be watched as embed only\\s*<")) {
             return true;
@@ -1063,27 +1062,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-    try {
-        /* Check if response is plaintext and contains any known error messages. */
-        final byte[] probe = urlConnection.peek(32);
-        if (probe.length > 0) {
-            final String probeContext = new String(probe, "UTF-8");
-            final Request clone = urlConnection.getRequest().cloneRequest();
-            clone.setHtmlCode(probeContext);
-            final Browser br = createNewBrowserInstance();
-            br.setRequest(clone);
-            try {
-                // TODO: extract the html checks into own method to avoid Browser instance
-                checkServerErrors(br, getDownloadLink(), null);
-            } catch (PluginException e) {
-                logger.log(e);
-                return false;
+        try {
+            /* Check if response is plaintext and contains any known error messages. */
+            final byte[] probe = urlConnection.peek(32);
+            if (probe.length > 0) {
+                final String probeContext = new String(probe, "UTF-8");
+                final Request clone = urlConnection.getRequest().cloneRequest();
+                clone.setHtmlCode(probeContext);
+                final Browser br = createNewBrowserInstance();
+                br.setRequest(clone);
+                try {
+                    // TODO: extract the html checks into own method to avoid Browser instance
+                    checkServerErrors(br, getDownloadLink(), null);
+                } catch (PluginException e) {
+                    logger.log(e);
+                    return false;
+                }
             }
+        } catch (IOException e) {
+            logger.log(e);
         }
-    } catch (IOException e) {
-        logger.log(e);
-    }
-    return true;
+        return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -2810,7 +2809,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (cfgO == null) {
             return null;
         }
-        final XFSConfigVideo cfg = PluginJsonConfig.get(cfgO);
+        final XFSConfigVideo cfg = get(cfgO);
         final PreferredDownloadQuality quality = cfg.getPreferredDownloadQuality();
         switch (quality) {
         case HIGH:
@@ -3262,7 +3261,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         final Class<? extends XFSConfig> cfg = this.getConfigInterface();
         if (cfg != null) {
-            final String custom_referer_from_settings = PluginJsonConfig.get(cfg).getCustomReferer();
+            final String custom_referer_from_settings = get(cfg).getCustomReferer();
             if (!StringUtils.isEmpty(custom_referer_from_settings) && verifyURLFormat(custom_referer_from_settings)) {
                 logger.info("Using custom config as referer: " + custom_referer_from_settings);
                 return custom_referer_from_settings;
@@ -3712,7 +3711,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (cfgO == null) {
             return -1;
         }
-        final XFSConfigVideo cfg = PluginJsonConfig.get(cfgO);
+        final XFSConfigVideo cfg = get(cfgO);
         final PreferredStreamQuality quality = cfg.getPreferredStreamQuality();
         switch (quality) {
         case Q2160P:
@@ -6134,7 +6133,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     public static class APIUnavailableException extends AccountUnavailableException {
-
         /**
          *
          */
@@ -6239,7 +6237,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (cfgO == null) {
             return null;
         }
-        final String apikey = PluginJsonConfig.get(cfgO).getApikey();
+        final String apikey = get(cfgO).getApikey();
         if (looksLikeValidAPIKey(apikey)) {
             return apikey;
         } else {
@@ -6253,7 +6251,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* 2023-12-19: TODO: Return default from default config and not hardcoded */
             return DownloadMode.AUTO;
         } else {
-            return PluginJsonConfig.get(cfgO).getPreferredDownloadMode();
+            return get(cfgO).getPreferredDownloadMode();
         }
     }
 
@@ -6300,6 +6298,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (this.isImagehoster()) {
             return false;
         }
+        /* Auto handling */
         return isVideohosterEmbed() || isVideohosterEmbedHTML(br);
     }
 

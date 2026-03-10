@@ -107,7 +107,6 @@ import org.jdownloader.plugins.PluginTaskID;
 import org.jdownloader.plugins.components.config.MegaNzConfig;
 import org.jdownloader.plugins.components.config.MegaNzConfig.InvalidOrMissingDecryptionKeyAction;
 import org.jdownloader.plugins.components.config.MegaNzConfig.LimitMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.GeneralSettings;
@@ -115,7 +114,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 52293 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -1885,7 +1884,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     }
 
     private MegaNzConfig getMegaNzConfig() {
-        return PluginJsonConfig.get(getConfigInterface());
+        return get(getConfigInterface());
     }
 
     @Override

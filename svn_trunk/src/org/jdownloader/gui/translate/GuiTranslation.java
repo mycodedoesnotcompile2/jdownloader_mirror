@@ -5842,6 +5842,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "↑ At the top" })
     String setOverviewPositions_north();
 
+    @Default(lngs = { "en" }, values = { "Not visible" })
+    String setOverviewPositions_invisible();
+
     @Default(lngs = { "en" }, values = { "↓ At the bottom" })
     String setOverviewPositions_south();
 
@@ -6963,4 +6966,16 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Cannot be used with your current account type", "Nicht verwendbar mit deinem aktuellen Account Typ" })
     String multihost_single_host_object_status_deactivated_multihost_not_for_this_account_type();
+
+    @Deprecated
+    @Default(lngs = { "en" }, values = { "Recaptcha Cookie Tester" })
+    String Recaptcha_cookie_help_title();
+
+    @Deprecated
+    @Default(lngs = { "en" }, values = { "Please compare the captchas on the left. The Easy captcha should be easier to read and solve. If not, you did not use a validated Google Session, or the entered cookies are invalid." })
+    String Recaptcha_cookie_help_msg();
+
+    @Deprecated
+    @Default(lngs = { "en" }, values = { "For this feature, 2 advanced options are required:\r\nBrowserCaptchaSolver: Google Com Cookie Value HSID\r\n*BrowserCaptchaSolver: Google Com Cookie Value SID\r\n\r\nPlease enter both." })
+    String Recaptcha_cookie_help_msg_both_cookies();
 }

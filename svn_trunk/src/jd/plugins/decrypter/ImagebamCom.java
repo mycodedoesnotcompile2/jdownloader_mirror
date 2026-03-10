@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,9 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52461 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagebamCom extends PluginForDecrypt {
     public ImagebamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,52 +71,66 @@ public class ImagebamCom extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    /** Path-based patterns; all start with "/" for substring(1) compatibility. */
+    public static final Pattern PATTERN_THUMBNAIL     = Pattern.compile("/\\d+/[a-z0-9]+/[a-z0-9]+/([a-z0-9]+)\\.[a-z]{3,5}$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_THUMBNAIL_NEW = Pattern.compile("/\\d+/[a-z0-9]+/[a-z0-9]+/([a-z0-9]+)_t\\.[a-z]{3,5}$", Pattern.CASE_INSENSITIVE);
+    /* 2026-03-09: TODO: Check if links matching PATTERN_IMAGE still exist. */
+    public static final Pattern PATTERN_IMAGE         = Pattern.compile("/image/([a-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_VIEW          = Pattern.compile("/view/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_GALLERY       = Pattern.compile("/gallery/([a-z0-9]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:image|gallery)/[a-z0-9]+";
-            regex += "|" + "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/view/[A-Z0-9]+";
-            regex += "|" + "https?://thumbs\\d+\\." + buildHostsPatternPart(domains) + "/\\d+/[a-z0-9]+/[a-z0-9]+/[a-z0-9]+\\.[a-z]{3,5}";
-            regex += "|" + "https?://thumbs\\d+\\." + buildHostsPatternPart(domains) + "/\\d+/[a-z0-9]+/[a-z0-9]+/[a-z0-9]+_t\\.[a-z]{3,5}";
-            ret.add(regex);
+            final String hostsPattern = buildHostsPatternPart(domains);
+            /* Main host: /image/, /gallery/, /view/ paths */
+            String pattern = "https?://(?:www\\.)?" + hostsPattern + "/(";
+            pattern += PATTERN_IMAGE.pattern().substring(1);
+            pattern += "|" + PATTERN_GALLERY.pattern().substring(1);
+            pattern += "|" + PATTERN_VIEW.pattern().substring(1);
+            pattern += ")";
+            /* Thumbnail CDN host: thumbsN.imagebam.com — domain included to avoid matching foreign hosts */
+            final String thumbPrefix = "|https?://thumbs\\d+\\." + hostsPattern;
+            pattern += thumbPrefix + PATTERN_THUMBNAIL.pattern();
+            pattern += thumbPrefix + PATTERN_THUMBNAIL_NEW.pattern();
+            ret.add(pattern);
         }
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_THUMBNAIL     = "https?://thumbs\\d+\\.[^/]+/\\d+/[a-z0-9]+/[a-z0-9]+/([a-z0-9]+)\\.[a-z]{3,5}";
-    private static final String TYPE_THUMBNAIL_NEW = "https?://thumbs\\d+\\.[^/]+/\\d+/[a-z0-9]+/[a-z0-9]+/([a-z0-9]+)_t\\.[a-z]{3,5}";
-    private static final String TYPE_IMAGE         = "https?://(?:www\\.)?[^/]+/image/([a-z0-9]+)";
-    private static final String TYPE_VIEW          = "https?://(?:www\\.)?[^/]+/view/([A-Za-z0-9]+)";
-    private static final String TYPE_GALLERY       = "https?://(?:www\\.)?[^/]+/gallery/([a-z0-9]+)";
-
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        if (param.getCryptedUrl().matches("(?i)" + TYPE_THUMBNAIL)) {
+        final String url = param.getCryptedUrl();
+        final String host = this.getHost();
+        final String thumbPrefix = "https?://thumbs\\d+\\." + Pattern.quote(host);
+        final String thumbnailFullPattern = thumbPrefix + PATTERN_THUMBNAIL.pattern();
+        final String thumbnailNewFullPattern = thumbPrefix + PATTERN_THUMBNAIL_NEW.pattern();
+        String id = new Regex(url, thumbnailFullPattern).getMatch(0);
+        if (id != null) {
             /* Rewrite thumbnail to fullImage link */
-            final String id = new Regex(param.getCryptedUrl(), TYPE_THUMBNAIL).getMatch(0);
-            final String newURL = "https://www." + this.getHost() + "/image/" + id;
-            decryptedLinks.add(this.createDownloadlink(newURL));
-            return decryptedLinks;
-        } else if (param.getCryptedUrl().matches("(?i)" + TYPE_THUMBNAIL_NEW)) {
+            ret.add(this.createDownloadlink("https://www." + host + "/image/" + id));
+            return ret;
+        }
+        id = new Regex(url, thumbnailNewFullPattern).getMatch(0);
+        if (id != null) {
             /* Rewrite thumbnail to fullImage link */
-            final String id = new Regex(param.getCryptedUrl(), TYPE_THUMBNAIL_NEW).getMatch(0);
-            final String newURL = "https://www." + this.getHost() + "/view/" + id;
-            decryptedLinks.add(this.createDownloadlink(newURL));
-            return decryptedLinks;
-        } else if (param.getCryptedUrl().matches("(?i)" + TYPE_GALLERY)) {
+            ret.add(this.createDownloadlink("https://www." + host + "/view/" + id));
+            return ret;
+        }
+        if (new Regex(url, PATTERN_GALLERY).patternFind()) {
             return crawlGallery(param);
-        } else if (param.getCryptedUrl().matches("(?i)" + TYPE_VIEW)) {
+        } else if (new Regex(url, PATTERN_VIEW).patternFind()) {
             return crawlGalleryNew(param);
         } else {
-            /* TYPE_IMAGE */
-            decryptedLinks.add(crawlSingleImage(param));
-            return decryptedLinks;
+            /* PATTERN_IMAGE */
+            ret.add(crawlSingleImage(param));
+            return ret;
         }
     }
 
     private ArrayList<DownloadLink> crawlGallery(final CryptedLink param) throws PluginException, IOException, InterruptedException {
-        final String galleryID = new Regex(param.getCryptedUrl(), TYPE_GALLERY).getMatch(0);
+        final String galleryID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY).getMatch(0);
         if (galleryID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -150,7 +166,7 @@ public class ImagebamCom extends PluginForDecrypt {
      * @throws NumberFormatException
      */
     private ArrayList<DownloadLink> crawlGalleryNew(final CryptedLink param) throws PluginException, IOException, NumberFormatException, InterruptedException {
-        final String galleryID = new Regex(param.getCryptedUrl(), TYPE_VIEW).getMatch(0);
+        final String galleryID = new Regex(param.getCryptedUrl(), PATTERN_VIEW).getMatch(0);
         if (galleryID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -160,40 +176,43 @@ public class ImagebamCom extends PluginForDecrypt {
         continueToYourImage(br, param);
         if (br.containsHTML("class=\"links gallery\"")) {
             return this.crawlProcessGallery(param, this.br);
-        } else {
-            /* Single image - very similar to "crawlSingleImage". */
-            final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-            final String finallink = br.getRegex("class=\"image-loader\"[^>]*>\\s*<img src=\"(https?://[^\"]+)\"").getMatch(0);
-            if (finallink == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String originalFilename = br.getRegex(galleryID + "\\?full=1\"[^<>]*title=\"([^\"]+)\"").getMatch(0);
-            final DownloadLink direct = this.createDownloadlink(finallink);
-            direct.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
-            direct.setContentUrl(param.getCryptedUrl());
-            final String filenameURL = Plugin.getFileNameFromURL(new URL(finallink));
-            if (originalFilename != null) {
-                direct.setFinalFileName(originalFilename);
-                direct.setProperty(DirectHTTP.FIXNAME, originalFilename);
-            } else if (filenameURL != null) {
-                direct.setFinalFileName(filenameURL);
-            }
-            direct.setAvailable(true);
-            decryptedLinks.add(direct);
-            return decryptedLinks;
         }
+        /* Single image - very similar to "crawlSingleImage". */
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String finallink = br.getRegex("class=\"image-loader\"[^>]*>\\s*<img src=\"(https?://[^\"]+)\"").getMatch(0);
+        if (finallink == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String originalFilename = br.getRegex(galleryID + "\\?full=1\"[^<>]*title=\"([^\"]+)\"").getMatch(0);
+        final DownloadLink img = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(finallink));
+        img.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
+        img.setContentUrl(param.getCryptedUrl());
+        final String filenameURL = Plugin.getFileNameFromURL(new URL(finallink));
+        if (originalFilename != null) {
+            img.setFinalFileName(originalFilename);
+            img.setProperty(DirectHTTP.FIXNAME, originalFilename);
+        } else if (filenameURL != null) {
+            img.setFinalFileName(filenameURL);
+        }
+        final String filesizeStr = br.getRegex("class=\"count text-uppercase\"[^>]*>[^<]*&bull;\\s*(\\d+[^<]+)</span>").getMatch(0);
+        if (filesizeStr != null) {
+            img.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        }
+        img.setAvailable(true);
+        ret.add(img);
+        return ret;
     }
 
-    private ArrayList<DownloadLink> crawlProcessGallery(final CryptedLink param, final Browser br) throws IOException {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+    private ArrayList<DownloadLink> crawlProcessGallery(final CryptedLink param, final Browser br) throws IOException, InterruptedException {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final boolean isNewGallery;
-        String galleryID;
-        if (param.getCryptedUrl().matches("(?i)" + TYPE_GALLERY)) {
+        final String galleryID;
+        if (new Regex(param.getCryptedUrl(), PATTERN_GALLERY).patternFind()) {
             isNewGallery = false;
-            galleryID = new Regex(param.getCryptedUrl(), TYPE_GALLERY).getMatch(0);
+            galleryID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY).getMatch(0);
         } else {
             isNewGallery = true;
-            galleryID = new Regex(param.getCryptedUrl(), TYPE_VIEW).getMatch(0);
+            galleryID = new Regex(param.getCryptedUrl(), PATTERN_VIEW).getMatch(0);
         }
         final String galleryTitle = br.getRegex("id=\"gallery-name\"[^>]*>([^<>\"]+)<").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
@@ -207,53 +226,50 @@ public class ImagebamCom extends PluginForDecrypt {
             logger.info("Crawling page: " + page);
             boolean foundNewItems = false;
             if (isNewGallery) {
-                final String links[] = br.getRegex(TYPE_VIEW).getColumn(-1);
+                final String[] links = br.getRegex(PATTERN_VIEW).getColumn(-1);
                 for (final String link : links) {
-                    final String imageID = new Regex(link, TYPE_VIEW).getMatch(0);
+                    final String imageID = new Regex(link, PATTERN_VIEW).getMatch(0);
                     /* Don't re-add previously added URL! */
                     if (imageID.equals(galleryID)) {
                         continue;
-                    } else {
-                        final DownloadLink dl = this.createDownloadlink(link);
-                        dl._setFilePackage(fp);
-                        decryptedLinks.add(dl);
-                        distribute(dl);
-                        foundNewItems = true;
                     }
+                    final DownloadLink dl = this.createDownloadlink(link);
+                    dl._setFilePackage(fp);
+                    ret.add(dl);
+                    distribute(dl);
+                    foundNewItems = true;
                 }
             } else {
-                final String links[] = br.getRegex(TYPE_IMAGE).getColumn(-1);
-                for (final String link : links) {
-                    final String imageID = new Regex(link, TYPE_IMAGE).getMatch(0);
+                final String[] urls = br.getRegex(PATTERN_IMAGE).getColumn(-1);
+                for (final String link : urls) {
+                    final String imageID = new Regex(link, PATTERN_IMAGE).getMatch(0);
                     /* Don't re-add previously added URL! */
                     if (imageID.equals(galleryID)) {
                         continue;
-                    } else {
-                        final DownloadLink dl = this.createDownloadlink(link);
-                        dl._setFilePackage(fp);
-                        decryptedLinks.add(dl);
-                        distribute(dl);
-                        foundNewItems = true;
                     }
+                    final DownloadLink dl = this.createDownloadlink(link);
+                    dl._setFilePackage(fp);
+                    ret.add(dl);
+                    distribute(dl);
+                    foundNewItems = true;
                 }
             }
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             final String nextPage = br.getRegex("(/[^\"]+\\?page=" + (page + 1) + ")\"").getMatch(0);
             if (this.isAbort()) {
-                break;
+                throw new InterruptedException();
             } else if (!foundNewItems) {
                 logger.info("Stopping because: Failed to find new items on current page");
                 break;
             } else if (nextPage == null) {
                 logger.info("Stopping because: No nextPage given");
                 break;
-            } else {
-                /* Next page available --> Continue crawl process */
-                page += 1;
-                br.getPage(nextPage);
-                continue;
             }
+            /* Next page available --> Continue crawl process */
+            page += 1;
+            br.getPage(nextPage);
         } while (true);
-        return decryptedLinks;
+        return ret;
     }
 
     private void errorHandling(Browser br, CryptedLink param) throws PluginException {
@@ -268,7 +284,7 @@ public class ImagebamCom extends PluginForDecrypt {
     }
 
     private DownloadLink crawlSingleImage(final CryptedLink param) throws Exception {
-        final String imageID = new Regex(param.getCryptedUrl(), TYPE_IMAGE).getMatch(0);
+        final String imageID = new Regex(param.getCryptedUrl(), PATTERN_IMAGE).getMatch(0);
         if (imageID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -284,9 +300,9 @@ public class ImagebamCom extends PluginForDecrypt {
             throw new DecrypterException("Decrypter broken for link: " + br.getURL());
         }
         finallink = Encoding.htmlDecode(finallink);
-        final DownloadLink dl = createDownloadlink(finallink);
-        dl.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
-        dl.setContentUrl(param.getCryptedUrl());
+        final DownloadLink img = createDownloadlink(finallink);
+        img.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
+        img.setContentUrl(param.getCryptedUrl());
         String originalFilename = br.getRegex(imageID + "\\?full=1\"[^<>]*title=\"([^\"]+)\"").getMatch(0);
         String urlFilename = extractFileNameFromURL(finallink);
         if (urlFilename != null) {
@@ -296,9 +312,9 @@ public class ImagebamCom extends PluginForDecrypt {
             urlFilename = Encoding.htmlDecode(urlFilename);
             /* If has extension don't set, if hasn't extension set default one. */
             urlFilename += getFileNameExtensionFromString(urlFilename) != null ? "" : ".jpg";
-            dl.setFinalFileName(urlFilename);
+            img.setFinalFileName(urlFilename);
         }
-        dl.setAvailable(true);
-        return dl;
+        img.setAvailable(true);
+        return img;
     }
 }

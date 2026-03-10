@@ -32,9 +32,8 @@ import org.jdownloader.plugins.components.TurbobitCore;
 import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet;
 import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet.PreferredDomain;
 import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 51250 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurboBitNet extends TurbobitCore {
     public TurboBitNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +52,7 @@ public class TurboBitNet extends TurbobitCore {
          * 2021-02-03: They're adding new domains quite often so in order to provide a more permanent solution for the user, I've added a
          * setting to let the user define a custom preferred domain.
          */
-        final TurbobitCoreConfigTurbobitNet cfg = PluginJsonConfig.get(TurbobitCoreConfigTurbobitNet.class);
+        final TurbobitCoreConfigTurbobitNet cfg = get(TurbobitCoreConfigTurbobitNet.class);
         final String customDefinedPreferredDomain = cfg.getCustomDomain();
         final List<String> deadDomains = Arrays.asList(domains_dead);
         if (customDefinedPreferredDomain != null && deadDomains.contains(customDefinedPreferredDomain)) {
@@ -135,7 +134,7 @@ public class TurboBitNet extends TurbobitCore {
 
     @Override
     protected boolean isFastLinkcheckEnabled() {
-        return PluginJsonConfig.get(TurbobitCoreConfigTurbobitNet.class).isEnableFastLinkcheck();
+        return get(TurbobitCoreConfigTurbobitNet.class).isEnableFastLinkcheck();
     }
 
     @Override

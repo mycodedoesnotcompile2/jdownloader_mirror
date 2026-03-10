@@ -1171,7 +1171,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
             // Place combined bar on mainframe
             this.mainFrame.getContentPane().add(toolBarPanel, BorderLayout.NORTH);
         } else {
-            this.mainFrame.add(this.toolBar, "dock NORTH");
+            this.mainFrame.add(this.toolBar, "hidemode 1,dock NORTH");
         }
     }
 

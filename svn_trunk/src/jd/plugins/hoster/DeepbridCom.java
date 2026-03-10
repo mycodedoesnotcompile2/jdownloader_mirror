@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51621 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52460 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -202,7 +202,7 @@ public class DeepbridCom extends PluginForHost {
         } else {
             /* PATTERN_TORRENT */
             if (account == null) {
-                logger.info("Torrent cloud files can only be checked when account is available!");
+                /* Torrent cloud files can only be checked when account is available */
                 return AvailableStatus.UNCHECKABLE;
             }
             this.login(account, false);

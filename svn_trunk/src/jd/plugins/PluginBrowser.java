@@ -7,6 +7,14 @@ import java.net.URL;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.SocketStreamInterface;
+
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
@@ -17,16 +25,7 @@ import jd.http.URLConnectionAdapterSocks4Impl;
 import jd.http.URLConnectionAdapterSocks5Impl;
 import jd.parser.Regex;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.SocketStreamInterface;
-
 public class PluginBrowser<T extends Plugin> extends Browser {
-
     private final T plugin;
 
     public T getPlugin() {
@@ -48,8 +47,11 @@ public class PluginBrowser<T extends Plugin> extends Browser {
         for (final String ldJSON : ldJSONs) {
             try {
                 final Map<String, Object> map = getPlugin().restoreFromString(ldJSON, TypeRef.MAP);
+                if (map == null) {
+                    continue;
+                }
                 // https://schema.org/VideoObject
-                if (map != null && "VideoObject".equals(map.get("@type"))) {
+                if ("VideoObject".equals(map.get("@type"))) {
                     return map;
                 }
             } catch (Exception e) {

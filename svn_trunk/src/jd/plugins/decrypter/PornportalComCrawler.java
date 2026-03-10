@@ -24,16 +24,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.PornportalComConfig;
-import org.jdownloader.plugins.components.config.PornportalComConfig.FilenameScheme;
-import org.jdownloader.plugins.components.config.PornportalComConfig.QualitySelectionMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -55,7 +45,16 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 52425 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.PornportalComConfig;
+import org.jdownloader.plugins.components.config.PornportalComConfig.FilenameScheme;
+import org.jdownloader.plugins.components.config.PornportalComConfig.QualitySelectionMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -122,7 +121,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final PornportalCom hostPlugin = (PornportalCom) getNewPluginForHostInstance(this.getHost());
-        return crawlContentAPI(hostPlugin, contentID, acc, PluginJsonConfig.get(PornportalComConfig.class));
+        return crawlContentAPI(hostPlugin, contentID, acc, get(PornportalComConfig.class));
     }
 
     @Override

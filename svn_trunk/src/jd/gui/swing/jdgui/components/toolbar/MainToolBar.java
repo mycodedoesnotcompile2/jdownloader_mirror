@@ -34,6 +34,7 @@ import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.ActionMap;
 import javax.swing.Box;
+import javax.swing.Box.Filler;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
@@ -211,7 +212,8 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                 removeAll();
                 initToolbar();
                 updateSpecial();
-                setVisible(true);
+                final boolean isEmpty = getComponentCount() == 0 || (getComponentCount() == 1 && getComponentAtIndex(0) instanceof Filler);
+                setVisible(!isEmpty);
                 revalidate();
             }
         };

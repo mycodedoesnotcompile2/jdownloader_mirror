@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+import jd.controlling.ClipboardMonitoring;
+
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.logging2.LogSink.FLUSH;
 import org.appwork.utils.logging2.LogSourceProvider;
@@ -33,8 +35,6 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.jdserv.JDServUtils;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.startup.commands.ThreadDump;
-
-import jd.controlling.ClipboardMonitoring;
 
 public class LogAction extends AbstractLogAction {
     /**
@@ -85,7 +85,7 @@ public class LogAction extends AbstractLogAction {
             LogController.CL().log(e);
         } catch (Exception e) {
             LogController.CL().log(e);
-            Dialog.getInstance().showExceptionDialog("Exception ocurred", e.getMessage(), e);
+            Dialog.getInstance().showExceptionDialog("Exception occurred", e.getMessage(), e);
         }
     }
 

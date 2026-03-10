@@ -51,10 +51,9 @@ import org.jdownloader.plugins.components.config.SrfChConfig;
 import org.jdownloader.plugins.components.config.SrfChConfig.QualitySelectionFallbackMode;
 import org.jdownloader.plugins.components.config.SrfChConfig.QualitySelectionMode;
 import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52465 $", interfaceVersion = 3, names = {}, urls = {})
 public class SrfChCrawler extends PluginForDecrypt {
     public SrfChCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,7 +97,7 @@ public class SrfChCrawler extends PluginForDecrypt {
     public static final String IS_AUDIO        = "is_audio";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final SrfChConfig cfg = PluginJsonConfig.get(SrfChConfig.class);
+        final SrfChConfig cfg = get(SrfChConfig.class);
         return this.crawl(param, cfg.getQualitySelectionMode(), cfg.getQualitySelectionFallbackMode());
     }
 
@@ -243,7 +242,7 @@ public class SrfChCrawler extends PluginForDecrypt {
     }
 
     private List<Integer> getSelectedQualities() {
-        final SrfChConfig cfg = PluginJsonConfig.get(SrfChConfig.class);
+        final SrfChConfig cfg = get(SrfChConfig.class);
         final List<Integer> selectedQualities = new ArrayList<Integer>();
         if (cfg.isCrawl180p()) {
             selectedQualities.add(180);
@@ -485,7 +484,7 @@ public class SrfChCrawler extends PluginForDecrypt {
                     fp.setComment(description);
                 }
                 final int numberofReturnedMediaItems = retChapter.size();
-                final SrfChConfig cfg = PluginJsonConfig.get(SrfChConfig.class);
+                final SrfChConfig cfg = get(SrfChConfig.class);
                 if (cfg.isCrawlThumbnail()) {
                     final String thumbnailURL = (String) chapter.get("imageUrl");
                     if (!StringUtils.isEmpty(thumbnailURL)) {

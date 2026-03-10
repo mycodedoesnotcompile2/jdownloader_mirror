@@ -35,7 +35,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 52316 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52465 $", interfaceVersion = 3, names = {}, urls = {})
 public class SlideShareNetDecrypter extends PluginForDecrypt {
     public SlideShareNetDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,7 +110,7 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
             } while (next != null);
         }
         /* Single url */
-        title = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
+        title = br.getRegex("<title[^>]*>([^<>\"]*?)</title>").getMatch(0);
         if (title != null) {
             title = Encoding.htmlDecode(title.trim());
         }
@@ -136,6 +136,7 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
                     }
                 }
                 final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                dl.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
                 dl.setAvailable(true);
                 dl._setFilePackage(fp);
                 ret.add(dl);

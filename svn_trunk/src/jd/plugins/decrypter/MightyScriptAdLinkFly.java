@@ -25,15 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -51,6 +42,20 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
+import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 /**
  *
  * @author raztoki
@@ -59,12 +64,13 @@ import jd.plugins.components.SiteType.SiteTemplate;
  *            With reCaptchaV2 (like most): sh2rt.com <br />
  *
  */
-@DecrypterPlugin(revision = "$Revision: 51790 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52466 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     public enum CaptchaType {
         hCaptcha,
         reCaptchaV2,
         reCaptchaV2_invisible,
+        turnstile,
         WTF
     };
 
@@ -152,9 +158,9 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                 key = getAppVarsResult("invisible_reCAPTCHA_site_key");
             }
             /**
-             * Some websites do not allow users to access the target URL directly but will require a certain Referer to be set. </br>
-             * We pre-set this in our browser but if that same URL is opened in browser, it may redirect to another website as the Referer
-             * is missing. In this case we'll use the main page to solve the captcha to prevent this from happening.
+             * Some websites do not allow users to access the target URL directly but will require a certain Referer to be set. </br> We
+             * pre-set this in our browser but if that same URL is opened in browser, it may redirect to another website as the Referer is
+             * missing. In this case we'll use the main page to solve the captcha to prevent this from happening.
              */
             final String reCaptchaSiteURL;
             if (this.getSpecialReferer() != null) {
@@ -240,7 +246,50 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                 if (action == null || !"continue".equals(action.getValue()) || "captcha".equals(action.getValue())) {
                     /* Captcha type will usually stay the same even on bad solve attempts! */
                     // captchaType = getCaptchaType();
-                    if (captchaType == CaptchaType.hCaptcha) {
+                    if (captchaType == CaptchaType.turnstile) {
+                        requiresCaptchaWhichCanFail = false;
+                        final String key = getAppVarsResult("turnstile_site_key");
+                        if (StringUtils.isEmpty(key)) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find Turnstile key");
+                        }
+                        final String siteURL;
+                        if (this.getSpecialReferer() != null) {
+                            /* Required e.g. for ClicksflyCom. */
+                            siteURL = br.getBaseURL();
+                        } else {
+                            /* Fine for most of all websites. */
+                            siteURL = br.getURL();
+                        }
+                        final String turnstileCaptchaResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, key) {
+                            protected org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge createChallenge() throws PluginException {
+                                final String siteKey = getSiteKey();
+                                if (plugin == null) {
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                                } else if (siteKey == null) {
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                                } else {
+                                    return new CloudflareTurnstileChallenge(plugin, siteKey) {
+
+                                        @Override
+                                        public String getSiteUrl() {
+                                            return siteURL;
+                                        }
+
+                                        @Override
+                                        public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
+                                            return null;
+                                        }
+
+                                        @Override
+                                        public String getHTML(HttpRequest request, String id) {
+                                            return null;
+                                        }
+                                    };
+                                }
+                            }
+                        }.getToken();
+                        form.put("cf-turnstile-response", Encoding.urlEncode(turnstileCaptchaResponse));
+                    } else if (captchaType == CaptchaType.hCaptcha) {
                         requiresCaptchaWhichCanFail = false;
                         final String key = getAppVarsResult("hcaptcha_checkbox_site_key");
                         if (StringUtils.isEmpty(key)) {
@@ -534,10 +583,10 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
         }
         if (firstRedirect != null) {
             /**
-             * Check if this is redirect redirect or if it really is the one we expect. </br>
-             * Some websites redirect e.g. to a fake blog and only redirect back to the usual handling if you re-access the main URL with
-             * that fake blog as referer header e.g.: adshort.co, ez4short.com </br>
-             * In some cases this special referer is pre-given via getSpecialReferer in which we do not have to re-check.
+             * Check if this is redirect redirect or if it really is the one we expect. </br> Some websites redirect e.g. to a fake blog and
+             * only redirect back to the usual handling if you re-access the main URL with that fake blog as referer header e.g.:
+             * adshort.co, ez4short.com </br> In some cases this special referer is pre-given via getSpecialReferer in which we do not have
+             * to re-check.
              */
             if (getSpecialReferer() != null) {
                 /* Assume that redirect redirects to external website and use it as our final result. */
@@ -679,7 +728,13 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
             return null;
         }
         /* No Form there or no reCaptchaKey in existent Form or different captcha than reCaptcha -> Decide based on captchaTypeStr. */
-        if (captchaTypeStr.equalsIgnoreCase("hcaptcha_checkbox")) {
+        if (captchaTypeStr.equalsIgnoreCase("turnstile")) {
+            if (getAppVarsResult("turnstile_site_key") != null) {
+                return CaptchaType.turnstile;
+            } else {
+                return null;
+            }
+        } else if (captchaTypeStr.equalsIgnoreCase("hcaptcha_checkbox")) {
             if (getAppVarsResult("hcaptcha_checkbox_site_key") != null) {
                 return CaptchaType.hCaptcha;
             } else {

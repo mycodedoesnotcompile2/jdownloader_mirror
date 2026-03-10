@@ -22,6 +22,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.BangComConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -31,6 +36,7 @@ import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -43,13 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BangCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.BangComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52469 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BangCom.class })
 public class BangComCrawler extends PluginForDecrypt {
     public BangComCrawler(PluginWrapper wrapper) {
@@ -81,7 +81,7 @@ public class BangComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:dvd|video)/[\\w\\-]+/[a-z0-9\\-]+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:dvd|video)/([\\w\\-]+)/([a-z0-9\\-]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -95,7 +95,7 @@ public class BangComCrawler extends PluginForDecrypt {
         if (param.getCryptedUrl().matches(PATTERN_SET)) {
             return crawlSet(param.getCryptedUrl(), account);
         } else {
-            return crawlVideo(param.getCryptedUrl(), account, PluginJsonConfig.get(BangComConfig.class));
+            return crawlVideo(param.getCryptedUrl(), account, get(BangComConfig.class));
         }
     }
 
@@ -103,7 +103,7 @@ public class BangComCrawler extends PluginForDecrypt {
     public <QualitySelectionMode> ArrayList<DownloadLink> crawlSet(final String contenturl, final Account account) throws Exception {
         final Regex seturl = new Regex(contenturl, PATTERN_SET);
         final String setSlug = seturl.getMatch(1);
-        final BangComConfig cfg = PluginJsonConfig.get(BangComConfig.class);
+        final BangComConfig cfg = get(BangComConfig.class);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (userHasDisabledCrawler(account, cfg)) {
             logger.info("Returning nothing because user has deselected all qualities -> Disabled crawler");
@@ -148,6 +148,9 @@ public class BangComCrawler extends PluginForDecrypt {
         if (videoidIfURLMatchesSpecialPattern != null) {
             url = "https://www." + this.getHost() + "/video/" + videoidIfURLMatchesSpecialPattern;
         }
+        final Regex urlinfo = new Regex(url, this.getSupportedLinks());
+        final String video_id_from_url = urlinfo.getMatch(0);
+        final String title_slug_from_url = urlinfo.getMatch(1);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final List<String> knownVideoQualities = Arrays.asList(new String[] { "2160p", "1080p", "720p", "540p", "480p", "360p" });
         final List<String> selectedVideoQualities = new ArrayList<String>();
@@ -187,54 +190,61 @@ public class BangComCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (new Regex(br._getURL().getPath(), "(?i)/tour/sfw.*").patternFind()) {
+            /* Account required to watch this video */
+            throw new AccountRequiredException();
+        }
         if (account != null && br.containsHTML(">\\s*No unlocks")) {
             account.setError(AccountError.EXPIRED, 3 * 60 * 1000, "Expired trial account (no unlocks left)");
+            throw new AccountRequiredException();
         }
+        /* 2026-03-09: Looks like videoObject doesn't exist anymore. */
+        int numberofSkippedItems = 0;
         final Map<String, Object> videoObject = ((PluginBrowser) br).getVideoObject();
-        if (videoObject == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String contentID = videoObject.get("@id").toString();
-        String title = videoObject.get("name").toString();
-        title = Encoding.htmlDecode(title).trim();
-        final String thumbnailUrl = videoObject.get("thumbnailUrl").toString(); // always available
-        final String previewURL = videoObject.get("contentUrl").toString(); // always available
-        final String description = (String) videoObject.get("description");
-        final String photosAsZipURL = br.getRegex("\"(https?://photos\\.[^/]+/[^\"]*\\.zip[^\"]+)\"").getMatch(0); // not always available
-        if (StringUtils.isEmpty(previewURL) || StringUtils.isEmpty(thumbnailUrl)) {
-            /* Both thumbnail and preview-video should always be available. */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        if (cfg == null || cfg.isGrabThumbnail()) {
-            final String finalThumbnailURL;
+        String title = null;
+        /* Not always available */
+        final String photosAsZipURL = br.getRegex("\"(https?://photos\\.[^/]+/[^\"]*\\.zip[^\"]+)\"").getMatch(0);
+        String previewURL = null;
+        String description = null;
+        String contentID = null;
+        String thumbnailUrl = null;
+        if (videoObject != null) {
+            contentID = videoObject.get("@id").toString();
+            title = videoObject.get("name").toString();
+            title = Encoding.htmlDecode(title).trim();
+            thumbnailUrl = videoObject.get("thumbnailUrl").toString(); // always available
+            previewURL = videoObject.get("contentUrl").toString(); // always available
+            description = (String) videoObject.get("description");
+            if (StringUtils.isEmpty(previewURL) || StringUtils.isEmpty(thumbnailUrl)) {
+                /* Both thumbnail and preview-video should always be available. */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             final String thumbnailURLWithQualityParam = new Regex(thumbnailUrl, "(http.+)\\?p=\\d+p$").getMatch(0);
             if (thumbnailURLWithQualityParam != null) {
                 logger.info("Trick to get higher thumbnail quality was successful");
-                finalThumbnailURL = thumbnailURLWithQualityParam;
+                thumbnailUrl = thumbnailURLWithQualityParam;
             } else {
                 logger.warning("Trick to get higher thumbnail quality was unsuccessful");
-                finalThumbnailURL = thumbnailUrl;
             }
-            final String filename = Plugin.getFileNameFromURL(new URL(finalThumbnailURL));
-            final DownloadLink thumb = new DownloadLink(plg, null, this.getHost(), finalThumbnailURL, true);
-            if (filename != null) {
-                thumb.setName(filename);
-            }
-            thumb.setProperty(BangCom.PROPERTY_QUALITY_IDENTIFIER, "THUMBNAIL");
-            ret.add(thumb);
         }
         /*
          * Enforce preview video download if no account is given as without account we will not be able to download any full length streams.
          */
-        if (cfg == null || cfg.isGrabPreviewVideo() || account == null) {
+        if (cfg == null || account == null || cfg.isGrabPreviewVideo()) {
             final DownloadLink preview = new DownloadLink(plg, null, this.getHost(), previewURL, true);
             preview.setProperty(BangCom.PROPERTY_QUALITY_IDENTIFIER, "PREVIEW");
             ret.add(preview);
+        } else {
+            numberofSkippedItems += 1;
         }
-        if (photosAsZipURL != null && (cfg == null || cfg.isGrabPhotosZipArchive())) {
-            final DownloadLink zip = new DownloadLink(plg, null, this.getHost(), Encoding.htmlDecode(photosAsZipURL), true);
-            zip.setProperty(BangCom.PROPERTY_QUALITY_IDENTIFIER, "ZIP");
-            ret.add(zip);
+        if (photosAsZipURL != null) {
+            if (cfg == null || cfg.isGrabPhotosZipArchive()) {
+                final DownloadLink zip = new DownloadLink(plg, null, this.getHost(), Encoding.htmlDecode(photosAsZipURL), true);
+                zip.setProperty(BangCom.PROPERTY_QUALITY_IDENTIFIER, "ZIP");
+                ret.add(zip);
+            } else {
+                numberofSkippedItems += 1;
+            }
         }
         String videodownloadsJson = null;
         final String videodownloadsSource = br.getRegex("data-videoplayer-video-value=\"([^\"]+)").getMatch(0);
@@ -255,6 +265,22 @@ public class BangComCrawler extends PluginForDecrypt {
             DownloadLink bestVideoOfSelection = null;
             int pixelHeightBestOfSelection = -1;
             final Map<String, Object> entries = restoreFromString(videodownloadsJson, TypeRef.MAP);
+            final Map<String, Object> entries_dvd = (Map<String, Object>) entries.get("dvd");
+            if (entries_dvd != null) {
+                /* 2026-03-09: Don't use this as title since it's incomplete. */
+                // if (title == null) {
+                // title = entries_dvd.get("name").toString();
+                // }
+                if (contentID == null) {
+                    contentID = entries_dvd.get("id").toString();
+                }
+                if (StringUtils.isEmpty(thumbnailUrl)) {
+                    thumbnailUrl = br.getURL(entries_dvd.get("img").toString()).toExternalForm();
+                }
+            }
+            if (contentID == null) {
+                contentID = entries.get("identifier").toString();
+            }
             final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
             // final String[] videoQualityLabels = br.getRegex("</svg>([^<]+)</span>").getColumn(0);
             for (final Map<String, Object> file : files) {
@@ -322,6 +348,30 @@ public class BangComCrawler extends PluginForDecrypt {
             if (account != null) {
                 logger.warning("Failed to find any video streams although account is available -> Possible plugin failure!");
             }
+        }
+        if (!StringUtils.isEmpty(thumbnailUrl)) {
+            if (cfg == null || cfg.isGrabThumbnail()) {
+                final String filename = Plugin.getFileNameFromURL(new URL(thumbnailUrl));
+                final DownloadLink thumb = new DownloadLink(plg, null, this.getHost(), thumbnailUrl, true);
+                if (filename != null) {
+                    thumb.setName(filename);
+                }
+                thumb.setProperty(BangCom.PROPERTY_QUALITY_IDENTIFIER, "THUMBNAIL");
+                ret.add(thumb);
+            } else {
+                numberofSkippedItems += 1;
+            }
+        }
+        if (title == null && title_slug_from_url != null) {
+            logger.warning("Failed to find title -> Fallback to title from url");
+            title = Encoding.htmlDecode(title_slug_from_url).replace("-", " ").trim();
+        }
+        if (ret.isEmpty() && numberofSkippedItems == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (contentID == null) {
+            /* Final fallback */
+            contentID = video_id_from_url;
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);

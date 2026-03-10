@@ -218,13 +218,14 @@ public class LinkGrabberPanel extends SwitchPanel implements LinkCollectorListen
         case NORTH:
             setLayout(new MigLayout("ins 0, wrap 2", "[grow,fill]" + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap() + "[fill]0", "[]" + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap() + "[grow, fill]0[]"));
             break;
+        case INVISIBE:
         case SOUTH:
             setLayout(new MigLayout("ins 0, wrap 2", "[grow,fill]" + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap() + "[fill]0", "[grow, fill]0[]" + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap() + "[]"));
             break;
         }
         if (CFG_GUI.LINKGRABBER_BOTTOMBAR_POSITION.getValue() == DockingPosition.NORTH) {
-            add(leftBar, "height 24!");
-            add(rightBar, "height 24!");
+            add(leftBar, "hidemode 1,height 24!");
+            add(rightBar, "hidemode 1,height 24!");
         }
         String constrains = "spanx";
         if (widgetContainer == null) {
@@ -244,39 +245,9 @@ public class LinkGrabberPanel extends SwitchPanel implements LinkCollectorListen
             add(widgetContainer, "spanx");
             widgetContainer.relayout();
         }
-        // if (propertiesPanelVisible) {
-        //
-        // add(this.propertiesPanel, constrains);
-        // propertiesPanel.update(table.getModel().getObjectbyRow(table.getSelectionModel().getLeadSelectionIndex()));
-        // }
-        // if (CFG_GUI.LINKGRABBER_TAB_OVERVIEW_VISIBLE.isEnabled()) {
-        // add(getOverView(), constrains);
-        // }
-        //
-        // if (CFG_GUI.LINKGRABBER_TAB_OVERVIEW_VISIBLE.isEnabled()) {
-        // this.add(tableScrollPane, "");
-        // add(sidebarScrollPane, "spany 2,growx");
-        // add(getOverView());
-        //
-        // } else {
-        // this.add(tableScrollPane, "spany 2");
-        // add(sidebarScrollPane, "spany 2,growx");
-        // }
-        //
-        // } else {
-        //
-        // if (CFG_GUI.LINKGRABBER_TAB_OVERVIEW_VISIBLE.isEnabled()) {
-        //
-        // this.add(tableScrollPane, "spanx");
-        // add(getOverView(), "spanx");
-        // } else {
-        // this.add(tableScrollPane, "spany 2,spanx,growx");
-        // }
-        //
-        // }
-        if (CFG_GUI.LINKGRABBER_BOTTOMBAR_POSITION.getValue() != DockingPosition.NORTH) {
-            add(leftBar, "height 24!");
-            add(rightBar, "height 24!");
+        if (CFG_GUI.LINKGRABBER_BOTTOMBAR_POSITION.getValue() == DockingPosition.SOUTH) {
+            add(leftBar, "hidemode 1,height 24!");
+            add(rightBar, "hidemode 1,height 24!");
         }
     }
 
