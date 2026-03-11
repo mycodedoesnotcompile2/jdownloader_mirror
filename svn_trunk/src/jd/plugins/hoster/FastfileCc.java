@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52470 $", interfaceVersion = 3, names = {}, urls = {})
 public class FastfileCc extends XFileSharingProBasic {
     public FastfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +55,12 @@ public class FastfileCc extends XFileSharingProBasic {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 200);
     }
 
     @Override
@@ -94,19 +100,21 @@ public class FastfileCc extends XFileSharingProBasic {
         }
     }
 
+    // For free and registered users the limit is 1 concurrent connection in total, and for Premium users the limit is up to 5 concurrent
+    // connections in total.
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return 20;
+        return 1;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return 20;
+        return 1;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return 20;
+        return 5;
     }
 
     @Override

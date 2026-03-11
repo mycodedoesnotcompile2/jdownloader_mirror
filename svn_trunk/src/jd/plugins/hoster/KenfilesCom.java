@@ -37,7 +37,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52472 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -124,7 +124,7 @@ public class KenfilesCom extends XFileSharingProBasic {
     /** Function to find the final downloadlink. */
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, final String src) {
-        String dllink = new Regex(src, "(\"|\\')(https?://(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|([\\w\\-]+\\.)?kfs\\.space)(:\\d{1,4})?/(files|d|p|f|cgi\\-bin/dl\\.cgi)/(\\d+/)?[a-z0-9]+/[^<>\"/]*?)(\"|\\')").getMatch(1);
+        String dllink = new Regex(src, "(\"|\\')(https?://(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|([\\w\\-]+\\.)?(kfs\\.space|sfile\\.cc))(:\\d{1,4})?/(files|d|p|f|cgi\\-bin/dl\\.cgi)/(\\d+/)?[a-z0-9]+/[^<>\"/]*?)(\"|\\')").getMatch(1);
         if (dllink == null) {
             final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
             if (cryptedScripts != null && cryptedScripts.length != 0) {
