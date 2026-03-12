@@ -101,6 +101,7 @@ public class HttpClient {
         private OutputStream            target          = new ByteArrayOutputStream();
         private int                     postDataLength;
         private InputStream             postDataStream;
+        private int                     connectTimeout   = -1;
         private int                     readTimeout     = -1;
         public URL                      redirectTo;
         private long                    resumePosition  = -1;
@@ -190,6 +191,10 @@ public class HttpClient {
 
         public int getReadTimeout() {
             return this.readTimeout;
+        }
+
+        public int getConnectTimeout() {
+            return this.connectTimeout;
         }
 
         /**
@@ -411,6 +416,11 @@ public class HttpClient {
 
         public RequestContext setReadTimeout(final int readTimeout) {
             this.readTimeout = readTimeout;
+            return this;
+        }
+
+        public RequestContext setConnectTimeout(final int connectTimeout) {
+            this.connectTimeout = connectTimeout;
             return this;
         }
 
@@ -916,7 +926,7 @@ public class HttpClient {
 
     protected void prepareConnection(final RequestContext context) {
         this.setAllowedResponseCodes(context);
-        context.connection.setConnectTimeout(this.getConnectTimeout());
+        context.connection.setConnectTimeout(context.getConnectTimeout() < 0 ? this.getConnectTimeout() : context.getConnectTimeout());
         context.connection.setReadTimeout(context.getReadTimeout() < 0 ? this.getReadTimeout() : context.getReadTimeout());
         context.connection.setRequestMethod(context.method);
         context.connection.setRequestProperty(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE, TranslationFactory.getDesiredLanguage());

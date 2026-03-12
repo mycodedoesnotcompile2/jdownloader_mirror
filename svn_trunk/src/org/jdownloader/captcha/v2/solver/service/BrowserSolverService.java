@@ -6,7 +6,6 @@ import java.util.Map;
 import javax.swing.Icon;
 
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.logging2.extmanager.LoggerFactory;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfig;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaSolverService;
@@ -18,15 +17,9 @@ import org.jdownloader.captcha.v2.solver.solver9kw.NineKwSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
-import org.jdownloader.plugins.components.google.GoogleAccountConfig;
-import org.jdownloader.plugins.components.google.GoogleHelper;
-import org.jdownloader.plugins.config.AccountJsonConfig;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
-import jd.controlling.AccountController;
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
-import jd.http.Browser;
-import jd.plugins.Account;
 
 public class BrowserSolverService extends AbstractSolverService {
     public static final String                ID       = "browser";
@@ -127,24 +120,5 @@ public class BrowserSolverService extends AbstractSolverService {
     @Override
     public String getID() {
         return ID;
-    }
-
-    public static void fillCookies(final Browser rcBr) {
-        try {
-            for (Account acc : AccountController.getInstance().list("recaptcha.google.com")) {
-                if (acc.isEnabled()) {
-                    GoogleAccountConfig cfg = (GoogleAccountConfig) AccountJsonConfig.get(acc.getPlugin(), acc);
-                    if (cfg.isUsageRecaptchaV1Enabled()) {
-                        final GoogleHelper helper = new GoogleHelper(rcBr);
-                        helper.setLogger(rcBr.getLogger());
-                        helper.setCacheEnabled(true);
-                        helper.login(acc, false);
-                        return;
-                    }
-                }
-            }
-        } catch (Throwable e) {
-            LoggerFactory.getDefaultLogger().log(e);
-        }
     }
 }

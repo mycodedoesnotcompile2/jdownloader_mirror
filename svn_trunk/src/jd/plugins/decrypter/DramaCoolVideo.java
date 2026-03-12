@@ -32,8 +32,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52461 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52481 $", interfaceVersion = 3, names = {}, urls = {})
 public class DramaCoolVideo extends PluginForDecrypt {
     public DramaCoolVideo(PluginWrapper wrapper) {
         super(wrapper);
@@ -141,17 +142,53 @@ public class DramaCoolVideo extends PluginForDecrypt {
         if (links == null || links.length == 0) {
             links = br.getRegex("<li>\\s*<a href=\"([^\"]+)\" class=\"img\">\\s*<span class=\"type[^\"]*\">").getColumn(0);
         }
-        if (links == null || links.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         if (links != null && links.length > 0) {
             for (String link : links) {
                 if (link.startsWith("/")) {
-                    link = br.getURL(link).toString();
+                    link = br.getURL(link).toExternalForm();
                 }
                 // link = Encoding.htmlDecode(link);
                 ret.add(createDownloadlink(link));
             }
+        }
+        final String[] iframelinks = br.getRegex("<iframe[^<]*src=\"(https?://[^\"]+)\"").getColumn(0);
+        if (iframelinks != null && iframelinks.length > 0) {
+            for (String link : iframelinks) {
+                if (link.startsWith("/")) {
+                    link = br.getURL(link).toExternalForm();
+                }
+                ret.add(createDownloadlink(link));
+            }
+        }
+        if (ret.isEmpty()) {
+            final String cover_url = br.getRegex("property=\"og:image\" content=\"(https?://[^\"]+)\"").getMatch(0);
+            if (cover_url != null) {
+                logger.info("Found no stream-results -> Adding cover_url");
+                final DownloadLink cover = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(cover_url));
+                cover.setAvailable(true);
+                ret.add(cover);
+            } else {
+                logger.warning("Failed to find cover -> Link offline?");
+            }
+        }
+        if (ret.isEmpty()) {
+            /* Check for special offline cases */
+            final String html = br.getRequest().getHtmlCode();
+            if (StringUtils.isEmpty(html)) {
+                /* Blank page */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (html.startsWith("{")) {
+                /* json response */
+                /* e.g. https://dramacool9.com.ro/wp-json */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (html.contains("<title>Index of")) {
+                /* e.g. https://dramacool9.com.ro/wp-includes/ */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br._getURL().getPath().startsWith("/wp-")) {
+                /* e.g. https://dramacool9.com.ro/wp-admin */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (title != null) {
             final FilePackage fp = FilePackage.getInstance();

@@ -85,6 +85,17 @@ public class ExtIOException extends IOException {
         this.streamInfo = streaminfo;
     }
 
+    /**
+     * @param string
+     * @param local
+     */
+    public ExtIOException(String msg, IOExceptionType local) {
+        super(msg);
+        this.type = local;
+        this.desc = msg;
+        this.streamInfo = null;
+    }
+
     public String getDescription() {
         return this.desc;
     }

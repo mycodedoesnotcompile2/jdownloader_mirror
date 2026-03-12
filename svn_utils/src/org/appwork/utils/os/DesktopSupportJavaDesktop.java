@@ -36,10 +36,10 @@ package org.appwork.utils.os;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.SocketAddress;
 
 /**
  * @author daniel
@@ -165,7 +165,6 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     @Override
     public int getPIDForRemoteAddress(final SocketAddress adr) throws InterruptedException, NotSupportedException {
-       throw new NotSupportedException("OS not supported");
+        throw new NotSupportedException("OS not supported");
     }
-
 }

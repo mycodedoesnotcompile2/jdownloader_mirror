@@ -76,9 +76,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 52282 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52475 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1245,12 +1246,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         try {
             if (account == null) {
                 throw new AccountRequiredException();
-            } else {
-                if (!loggedIN.get()) {
-                    final PluginForHost plg = getNewPluginForHostInstance(getHost());
-                    ((jd.plugins.hoster.InstaGramCom) plg).login(account, false);
-                    loggedIN.set(true);
-                }
+            }
+            if (!loggedIN.get()) {
+                final PluginForHost plg = getNewPluginForHostInstance(getHost());
+                ((jd.plugins.hoster.InstaGramCom) plg).login(account, false);
+                loggedIN.set(true);
             }
         } catch (Exception e) {
             logger.log(e);
@@ -1425,7 +1425,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 /* Skip invalid items */
                 continue;
             }
-            final DownloadLink dl = this.createDownloadlink("directhttp://" + finallink);
+            final DownloadLink dl = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(finallink));
             dl.setFinalFileName(filename);
             dl.setAvailable(true);
             dl.setRelativeDownloadFolderPath(subfolderpath);
@@ -1485,10 +1485,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         metadata.setDate(new Date(date_timestamp * 1000));
         /* Find username if it is not pre-given. */
         String username = null;
+        String userID = null;
         try {
             final Map<String, Object> ownerInfo = (Map<String, Object>) post.get("owner");
             final Map<String, Object> user = (Map<String, Object>) post.get("user");
-            String userID = StringUtils.valueOfOrNull(ownerInfo.get("id"));
+            userID = StringUtils.valueOfOrNull(ownerInfo.get("id"));
             if (userID == null && user != null) {
                 userID = user.get("pk").toString();
             }
@@ -1626,6 +1627,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             final boolean isPartOfStory = Boolean.TRUE.equals(media.get("is_reel_media"));
             final DownloadLink dl = this.createDownloadlink(postURL);
             dl.setAvailable(true);
+            dl.setProperty(InstaGramCom.PROPERTY_uploader_id, userID);
             dl.setProperty(InstaGramCom.PROPERTY_main_content_id, mainContentID);
             dl.setProperty(InstaGramCom.PROPERTY_date, metadata.getDateFormatted());
             if (!StringUtils.isEmpty(shortcode)) {
@@ -1809,6 +1811,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 final DownloadLink dl = this.createDownloadlink(this.generateURLPost(postIDInternal));
                 dl.setContentUrl(contentURL);
                 dl.setAvailable(true);
+                dl.setProperty(InstaGramCom.PROPERTY_uploader_id, userID);
                 dl.setProperty(InstaGramCom.PROPERTY_main_content_id, postIDInternal);
                 final String dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(new Date(date * 1000));
                 dl.setProperty(InstaGramCom.PROPERTY_date, dateFormatted);
@@ -1860,6 +1863,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 final DownloadLink dl = this.createDownloadlink(contentURL);
                 dl.setContentUrl(contentURL);
                 dl.setAvailable(true);
+                dl.setProperty(InstaGramCom.PROPERTY_uploader_id, userID);
                 dl.setProperty(InstaGramCom.PROPERTY_main_content_id, postID);
                 final String dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(new Date(date * 1000));
                 dl.setProperty(InstaGramCom.PROPERTY_date, dateFormatted);
@@ -1945,6 +1949,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         final String storyHighlightTitle = link.getStringProperty(InstaGramCom.PROPERTY_story_title);
         final String dateFormatted = link.getStringProperty(InstaGramCom.PROPERTY_date);
         final String username = link.getStringProperty(InstaGramCom.PROPERTY_uploader);
+        final String user_id = link.getStringProperty(InstaGramCom.PROPERTY_uploader_id);
         final int orderid = link.getIntegerProperty(InstaGramCom.PROPERTY_orderid_raw);
         final int orderid_max = link.getIntegerProperty(InstaGramCom.PROPERTY_orderid_max_raw);
         final String orderidFormatted = link.getStringProperty(InstaGramCom.PROPERTY_orderid);
@@ -1977,6 +1982,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             // *date*_*uploader* - *main_content_id* *orderid*_of_*orderid_max* - *shortcode*.*ext*
             String filename = filenameScheme.replace("*date*", dateFormatted);
             filename = filename.replace("*uploader*", username != null ? username : "-");
+            filename = filename.replace("*uploader_id*", user_id != null ? user_id : "-");
             filename = filename.replace("*title*", storyHighlightTitle != null ? storyHighlightTitle : "-");
             filename = filename.replace("*orderid*", orderidFormatted != null ? orderidFormatted : "-");
             filename = filename.replace("*main_content_id*", mainContentID);
@@ -2332,9 +2338,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             } else if (numberofCrawledPostsTotal >= maxItemsLimit) {
                 logger.info("Stopping because: Reached user defined max items limit of " + maxItemsLimit);
                 break;
-            } else {
-                page++;
             }
+            /* Continue to next page */
+            page++;
         } while (!this.isAbort());
         return ret;
     }

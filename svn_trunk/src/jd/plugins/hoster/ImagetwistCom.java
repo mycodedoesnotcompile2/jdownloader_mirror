@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52484 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagetwistCom extends XFileSharingProBasic {
     public ImagetwistCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -69,7 +69,7 @@ public class ImagetwistCom extends XFileSharingProBasic {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[a-z0-9]{12}(/[^/#]+)?";
-            regex += "|https?://img\\d+\\." + buildHostsPatternPart(domains) + PATTERN_THUMBNAIL.pattern();
+            regex += "|https?://i(?:mg)?\\d+\\." + buildHostsPatternPart(domains) + PATTERN_THUMBNAIL.pattern();
             ret.add(regex);
         }
         return ret.toArray(new String[0]);
@@ -82,7 +82,7 @@ public class ImagetwistCom extends XFileSharingProBasic {
 
     @Override
     protected boolean supports_availablecheck_alt() {
-        /* 2021-04-12 */
+        /* 2021-04-12: Their mass-linkchecker is broken -> returns no results, see: https://imagetwist.com/?op=checkfiles */
         return false;
     }
 

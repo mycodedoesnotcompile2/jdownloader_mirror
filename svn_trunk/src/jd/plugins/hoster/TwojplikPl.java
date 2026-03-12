@@ -52,11 +52,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51258 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52475 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwojplikPl extends PluginForHost {
     public TwojplikPl(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://" + getHost() + "/odkryj-pelnie-mozliwosci");
+        this.enablePremium(getBuyPremiumURL());
     }
 
     @Override
@@ -64,9 +64,21 @@ public class TwojplikPl extends PluginForHost {
         return new FEATURE[] { LazyPlugin.FEATURE.FAVICON };
     }
 
+    private String getBuyPremiumURL() {
+        if (isTwojplik()) {
+            return "https://" + getHost() + "/odkryj-pelnie-mozliwosci";
+        } else {
+            return "https://" + getHost() + "/premium";
+        }
+    }
+
     @Override
     public Object getFavIcon(String host) throws IOException {
-        return "https://jd2." + getHost() + "/assets/images/favicon-2/favicon.ico";
+        if (isTwojplik()) {
+            return "https://jd2." + getHost() + "/assets/images/favicon-2/favicon.ico";
+        } else {
+            return "https://" + getHost() + "/assets/images/favicon/favicon.ico";
+        }
     }
 
     @Override
@@ -84,14 +96,38 @@ public class TwojplikPl extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost() + "/terms-and-conditions";
+        if (isTwojplik()) {
+            return "https://" + getHost() + "/terms-and-conditions";
+        } else {
+            return "https://" + getHost() + "/terms";
+        }
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "twojplik.to", "twojplik.pl", "plik.to" });
+        /* 2026-03-11: Moved from old plugin PobierajNet to this one and changed main domain from pobieraj.net to pobieraj.to */
+        ret.add(new String[] { "pobieraj.to", "pobieraj.net", "pobieraj.io", "rapidu.vip" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final List<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("rapidu.vip");
+        return deadDomains;
+    }
+
+    private String getApiBase() {
+        if (isTwojplik()) {
+            return "https://jd2.twojplik.pl/api/v1";
+        } else {
+            return "https://jd2." + getHost() + "/api/v1";
+        }
+    }
+
+    private boolean isTwojplik() {
+        return getHost().equalsIgnoreCase("twojplik.to");
     }
 
     public static String[] getAnnotationNames() {
@@ -106,7 +142,7 @@ public class TwojplikPl extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:(?:download|view)/)?([A-Z0-9\\-]{24,})(/([^/#\\?]+))?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:(?:download|view)/)?([A-Z0-9-]{24,})(/([^/#\\?/]+))?");
         }
         return ret.toArray(new String[0]);
     }
@@ -148,10 +184,6 @@ public class TwojplikPl extends PluginForHost {
     private final boolean USE_API                      = true;
     private final String  PROPERTY_ACCOUNT_SESSION_KEY = "session_key";
     private final String  PROPERTY_ACCOUNT_MAX_CHUNKS  = "max_chunks";
-
-    private String getApiBase() {
-        return "https://jd2.twojplik.pl/api/v1";
-    }
 
     @Override
     public boolean checkLinks(final DownloadLink[] urls) {
@@ -196,7 +228,6 @@ public class TwojplikPl extends PluginForHost {
                             break;
                         }
                     }
-                    this.setWeakFilename(link);
                     if (filemap == null) {
                         /* Invalid fileID. */
                         link.setAvailable(false);
@@ -228,6 +259,18 @@ public class TwojplikPl extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final String fileid = urlinfo.getMatch(0);
+        final String filenameFromURL = urlinfo.getMatch(2);
+        if (filenameFromURL != null) {
+            return Encoding.htmlDecode(filenameFromURL).trim();
+        } else {
+            return fileid;
+        }
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, null);
     }
@@ -248,20 +291,6 @@ public class TwojplikPl extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
             return AvailableStatus.TRUE;
-        }
-    }
-
-    private void setWeakFilename(final DownloadLink link) {
-        if (link.isNameSet()) {
-            return;
-        }
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-        final String fileid = urlinfo.getMatch(0);
-        final String filenameFromURL = urlinfo.getMatch(2);
-        if (filenameFromURL != null) {
-            link.setName(Encoding.htmlDecode(filenameFromURL).trim());
-        } else {
-            link.setName(fileid);
         }
     }
 
@@ -469,15 +498,17 @@ public class TwojplikPl extends PluginForHost {
             return dataO;
         }
         final String errormsg = entries.get("alertText").toString();
+        if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
+            throw new AccountInvalidException(errormsg);
+        }
         if (errormsg.matches("(?i).*File not found.*")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /* Unknown error */
+        if (link == null) {
+            throw new AccountUnavailableException(errormsg, 1 * 60 * 1000l);
         } else {
-            /* Unknown error */
-            if (link == null) {
-                throw new AccountUnavailableException(errormsg, 1 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, 1 * 60 * 1000l);
-            }
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, 1 * 60 * 1000l);
         }
     }
 
@@ -555,7 +586,6 @@ public class TwojplikPl extends PluginForHost {
 
     private AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        setWeakFilename(link);
         if (account != null) {
             this.loginWebsite(account, false);
         }
@@ -620,13 +650,5 @@ public class TwojplikPl extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

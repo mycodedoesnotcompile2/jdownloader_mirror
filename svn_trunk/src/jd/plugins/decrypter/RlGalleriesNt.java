@@ -32,7 +32,6 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -44,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52469 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52484 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,14 +78,15 @@ public class RlGalleriesNt extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    public static final Pattern PATTERN_GALLERY         = Pattern.compile("/[\\w\\-]+.+");
-    public static final Pattern PATTERN_SINGLE_REDIRECT = Pattern.compile("/dl?/([0-9]+)/?");
-    public static Object        LOCK                    = new Object();
+    public static final Pattern PATTERN_GALLERY_AND_SINGLE_IMAGE = Pattern.compile("/([\\w\\-]+)/(\\d+)/([\\w\\-]+)(/([^/]+))?");
+    public static final Pattern PATTERN_SINGLE_REDIRECT          = Pattern.compile("/dl?/([0-9]+)/?");
+    public static final Pattern PATTERN_SPECIAL_FAPPIC           = Pattern.compile("/ft/img\\d+/\\d+/([a-z0-9]{12}).*");
+    public static Object        LOCK                             = new Object();
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SINGLE_REDIRECT.pattern() + "|" + PATTERN_GALLERY.pattern() + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SINGLE_REDIRECT.pattern() + "|" + PATTERN_SPECIAL_FAPPIC.pattern() + "|" + PATTERN_GALLERY_AND_SINGLE_IMAGE.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -158,10 +158,34 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 return ret;
             }
         }
-        String galleryID = new Regex(contenturl, "(?i)https?://[^/]+/[^/]+/(\\d+)").getMatch(0);
+        final String image_host_url_from_contenturl = getRealURLFromThumbnail(contenturl);
+        if (image_host_url_from_contenturl != null) {
+            /* No http request required */
+            final DownloadLink link = this.createDownloadlink(image_host_url_from_contenturl);
+            ret.add(link);
+            return ret;
+        }
+        final Regex gallery_regex = new Regex(contenturl, PATTERN_GALLERY_AND_SINGLE_IMAGE);
+        String galleryID = gallery_regex.getMatch(1);
         if (galleryID == null) {
             /* For old links */
             galleryID = new Regex(contenturl, "(?i)(?:porn-gallery-|blog_gallery\\.php\\?id=)(\\d+)").getMatch(0);
+        }
+        if (gallery_regex.getMatch(3) != null) {
+            /* We expect a single image */
+            br.getPage(contenturl);
+            if (isOffline(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            String finallink = br.getRegex("window\\.location\\.href = '(https?://[^']+)").getMatch(0);
+            if (finallink == null) {
+                finallink = br.getRegex("var\\s*IMAGE_URL\\s*=\\s*\"(https?://[^\"]+)").getMatch(0);
+                if (finallink == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+            ret.add(this.createDownloadlink(finallink));
+            return ret;
         }
         if (galleryID != null) {
             /* Gallery */
@@ -228,33 +252,9 @@ public class RlGalleriesNt extends PluginForDecrypt {
              * Allow for any direct-URLs added by user <br>
              * Example: https://urlgalleries.com/img/88x31_RTA-5042-1996-1400-1577-RTA_b.gif
              */
-            final URLConnectionAdapter con = br.openGetConnection(url + "?" + query.toString());
-            if (this.looksLikeDownloadableContent(con)) {
-                try {
-                    con.disconnect();
-                } catch (final Throwable ignore) {
-                }
-                final DownloadLink direct = getCrawler().createDirectHTTPDownloadLink(con.getRequest(), con);
-                ret.add(direct.getDownloadLink());
-                /* Early return */
-                return ret;
-            } else {
-                br.followConnection();
-            }
+            br.getPage(url + "?" + query.toString());
             if (isOffline(br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (br.containsHTML("Continue to the image") || br.containsHTML("Continue to image")) {
-                /* 2025-03-26: Single image */
-                String finallink = br.getRegex("window\\.location\\.href = '(https?://[^']+)").getMatch(0);
-                if (finallink == null) {
-                    finallink = br.getRegex("var\\s*IMAGE_URL\\s*=\\s*\"(https?://[^\"]+)").getMatch(0);
-                    if (finallink == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
-                ret.add(this.createDownloadlink(finallink));
-                return ret;
             }
             String title = br.getRegex("border='0' /></a></div>(?:\\s*<h\\d+[^>]*>\\s*)?(.*?)(?:\\s*</h\\d+>\\s*)?</td></tr><tr>").getMatch(0);
             if (title == null) {
@@ -282,7 +282,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
             int page = 1;
             String nextpage = null;
             final HashSet<String> dupes = new HashSet<String>();
-            final Pattern allowed_thumbnail_urls = Pattern.compile("(https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com)/[^<>\"\\']+)");
+            final Pattern allowed_thumbnail_urls = Pattern.compile("((https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com))?/[^<>\"\\']+)");
             do {
                 logger.info("Crawling page " + page + " of ??");
                 final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
@@ -298,20 +298,37 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 if (thumbnailurls == null || thumbnailurls.length == 0) {
                     thumbnailurls = br.getRegex("class=\"thumb\"\\s*src=\"" + allowed_thumbnail_urls.pattern() + "\"").getColumn(0);
                 }
-                if (thumbnailurls == null || thumbnailurls.length == 0) {
+                if ((thumbnailurls == null || thumbnailurls.length == 0) && (redirecturls == null || redirecturls.length == 0)) {
                     if (ret.size() > 0) {
+                        logger.info("Stopping because: Failed to find any items on current page -> Reached end?");
                         return ret;
                     } else {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                 }
-                for (final String thumbnailurl : thumbnailurls) {
-                    if (dupes.add(thumbnailurl)) {
+                for (String thumbnailurl : thumbnailurls) {
+                    final String image_host_url = getRealURLFromThumbnail(thumbnailurl);
+                    if (image_host_url != null) {
+                        if (!dupes.add(image_host_url)) {
+                            /* Skip duplicates */
+                            continue;
+                        }
+                        final DownloadLink link = this.createDownloadlink(image_host_url);
+                        newitems.add(link);
+                    } else {
+                        if (thumbnailurl.startsWith("/")) {
+                            // ignore self hosted thumbnails
+                            continue;
+                        } else if (!dupes.add(thumbnailurl)) {
+                            /* Skip duplicates */
+                            continue;
+                        }
+                        thumbnailurl = br.getURL(thumbnailurl).toExternalForm();
                         final DownloadLink link = this.createDownloadlink(thumbnailurl);
                         newitems.add(link);
                     }
                 }
-                if (redirecturls != null && thumbnailurls != null && redirecturls.length > thumbnailurls.length) {
+                if (redirecturls != null && thumbnailurls != null && redirecturls.length > newitems.size()) {
                     for (String redirecturl : redirecturls) {
                         if (!dupes.add(redirecturl)) {
                             continue;
@@ -321,7 +338,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
                         newitems.add(link);
                     }
                 } else {
-                    logger.info("Thumbnail crawling was successful");
+                    logger.info("Thumbnail crawling was successful -> No need to crawl the individual redirect-urls");
                 }
                 for (final DownloadLink newitem : newitems) {
                     newitem._setFilePackage(fp);
@@ -332,7 +349,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 nextpage = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "\\?p=" + (page + 1) + ")").getMatch(0);
                 if (isAbort()) {
                     logger.info("Stopping because: Aborted by user");
-                    break;
+                    throw new InterruptedException();
                 } else if (newitems.size() == 0) {
                     /* Fail-safe */
                     logger.info("Stopping because: Failed to find any new item on this page");
@@ -352,7 +369,8 @@ public class RlGalleriesNt extends PluginForDecrypt {
             }
             return ret;
         } else {
-            /* Single image */
+            /* Single image, old handling */
+            // TODO: 2026-03-11: Remove this?
             logger.info("Crawling single image");
             br.setFollowRedirects(false);
             br.getPage(contenturl.replaceFirst("(?i)http://", "https://"));
@@ -389,16 +407,40 @@ public class RlGalleriesNt extends PluginForDecrypt {
         }
     }
 
-    private String findFinallink(final Browser brc) {
-        String finallink = brc.getRegex("var u = \"(https?://[^\"]+)").getMatch(0);
+    /**
+     * Returns a string if it is possible to change the given thumbnail URL to a fullsize/image-host URL. <br>
+     * Returns null otherwise.
+     */
+    private String getRealURLFromThumbnail(final String url_thumbnail) {
+        final String fappic_image_id = new Regex(url_thumbnail, PATTERN_SPECIAL_FAPPIC).getMatch(0);
+        if (fappic_image_id != null) {
+            return "https://fappic.com/" + fappic_image_id;
+        }
+        return null;
+    }
+
+    private String findFinallink(final Browser br) {
+        String finallink = br.getRegex("var u = \"(https?://[^\"]+)").getMatch(0);
         if (finallink == null) {
-            finallink = brc.getRegex("<a href=\"(https?://[^\"]+)\">\\s*If you are not redirected, click here").getMatch(0);
+            finallink = br.getRegex("<a href=\"(https?://[^\"]+)\">\\s*If you are not redirected, click here").getMatch(0);
         }
         return finallink;
     }
 
     private boolean isOffline(final Browser br) {
-        return br.getHttpConnection().getResponseCode() == 404 | br.containsHTML("(?i)<center>\\s*This blog has been closed down") | br.containsHTML("<title> - urlgalleries\\.net</title>|>ERROR - NO IMAGES AVAILABLE") || br.getURL().contains("/not_found_adult.php");
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        }
+        if (br.containsHTML("<center>\\s*This blog has been closed down")) {
+            return true;
+        }
+        if (br.containsHTML("<title> - urlgalleries\\.net</title>|>ERROR - NO IMAGES AVAILABLE")) {
+            return true;
+        }
+        if (br.getURL().contains("/not_found_adult.php")) {
+            return true;
+        }
+        return false;
     }
 
     @Override

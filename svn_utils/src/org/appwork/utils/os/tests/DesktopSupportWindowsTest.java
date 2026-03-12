@@ -62,6 +62,7 @@ import org.appwork.utils.processes.command.Command;
  * @date 20.11.2024
  */
 public class DesktopSupportWindowsTest extends AWTest {
+
     /**
      * @see org.appwork.testframework.TestInterface#runTest()
      */

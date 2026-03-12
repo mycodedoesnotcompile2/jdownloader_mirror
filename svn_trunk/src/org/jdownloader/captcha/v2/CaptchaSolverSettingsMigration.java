@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComConfigInterface;
+import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfig;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSettings;
 import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaConfigInterface;
@@ -93,6 +94,7 @@ public class CaptchaSolverSettingsMigration {
         migrate_imagetyperz();
         migrate_2captcha();
         migrate_9kw();
+        /* Migrate local browser solver settings */
         // TODO: Save a property somewhere aka "migration_conmpleted_timestamp" so we can early abort this next time
     }
 
@@ -458,6 +460,23 @@ public class CaptchaSolverSettingsMigration {
             }
         }
         System.out.print(host + " migration successful");
+    }
+
+    public void migrate_BrowserCaptchaSolverConfig() {
+        final String name = "BrowserCaptchaSolver";
+        final BrowserCaptchaSolverConfig cfgOld = JsonConfig.create(BrowserCaptchaSolverConfig.class);
+        // TODO: Create- and migrate to new settings
+        // final CaptchaSolverPluginConfigNinekw cfgNew = null;
+        /* Migrate settings, migrate all that are different from the defaults */
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = cfgOld.getBlacklistEntries();
+        final List<String> whitelist = cfgOld.getWhitelistEntries();
+        final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        if (filters != null) {
+            // cfgNew.setFilterList(filters);
+        }
+        System.out.print(name + " migration successful");
     }
 
     /**

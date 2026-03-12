@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 52252 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52475 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -157,6 +157,7 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_story_title                        = "story_title";
     public static final String   PROPERTY_description                        = "description";
     public static final String   PROPERTY_uploader                           = "uploader";
+    public static final String   PROPERTY_uploader_id                        = "uploader_id";
     public static final String   PROPERTY_type                               = "type";
     public static final String   PROPERTY_date                               = "date";
     public static final String   PROPERTY_hashtag                            = "hashtag";

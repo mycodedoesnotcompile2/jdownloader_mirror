@@ -245,7 +245,7 @@ public interface InstagramConfig extends PluginConfigInterface {
     void setFilenameType(final FilenameType filenameNamingSchemeType);
 
     @AboutConfig
-    @DefaultStringValue("*date*_*uploader* - *main_content_id* *orderid*_of_*orderid_max* - *shortcode**ext*")
+    @DefaultStringValue("*date*_*uploader_id*_*uploader* - *main_content_id* *orderid*_of_*orderid_max* - *shortcode**ext*")
     @Order(15)
     String getFilenameScheme();
 

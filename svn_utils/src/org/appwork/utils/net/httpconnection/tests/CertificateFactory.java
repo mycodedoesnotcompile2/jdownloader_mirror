@@ -220,7 +220,7 @@ public class CertificateFactory {
     public static CACertificateResult createCACertificate(final String cn, final int keySize, final int validityDays) throws Exception {
         final KeyPair caKeyPair = generateRsaKeyPair(keySize);
         final long now = System.currentTimeMillis();
-        final Date notBefore = new Date(now - 60_000L); // allow clock skew
+        final Date notBefore = new Date(now - 60000L); // allow clock skew
         final Date notAfter = new Date(now + (validityDays * 24L * 60L * 60L * 1000L));
         final X500Name subject = new X500Name("CN=" + cn);
         final X509CertInfo info = new X509CertInfo();
@@ -277,7 +277,7 @@ public class CertificateFactory {
     public static ServerCertificateResult createServerCertificate(final X509Certificate caCertificate, final PrivateKey caPrivateKey, final String cn, final int keySize, final int validityDays, final SANConfig sanConfig) throws Exception {
         final KeyPair serverKeyPair = generateRsaKeyPair(keySize);
         final long now = System.currentTimeMillis();
-        final Date notBefore = new Date(now - 60_000L);
+        final Date notBefore = new Date(now - 60000L);
         final Date notAfter = new Date(now + (validityDays * 24L * 60L * 60L * 1000L));
         final X500Name subject = new X500Name("CN=" + cn);
         final X500Name issuer = X500Name.asX500Name(caCertificate.getSubjectX500Principal());
@@ -393,7 +393,7 @@ public class CertificateFactory {
     public static ClientCertificateResult createClientCertificate(final X509Certificate caCertificate, final PrivateKey caPrivateKey, final String cn, final int keySize, final int validityDays) throws Exception {
         final KeyPair clientKeyPair = generateRsaKeyPair(keySize);
         final long now = System.currentTimeMillis();
-        final Date notBefore = new Date(now - 60_000L);
+        final Date notBefore = new Date(now - 60000L);
         final Date notAfter = new Date(now + (validityDays * 24L * 60L * 60L * 1000L));
         final X500Name subject = new X500Name("CN=" + cn);
         final X500Name issuer = X500Name.asX500Name(caCertificate.getSubjectX500Principal());
@@ -448,7 +448,7 @@ public class CertificateFactory {
     public static ClientCertificateResult createClientCertificateEC(final X509Certificate caCertificate, final PrivateKey caPrivateKey, final String cn) throws Exception {
         final KeyPair clientKeyPair = generateECKeyPair();
         final long now = System.currentTimeMillis();
-        final Date notBefore = new Date(now - 60_000L);
+        final Date notBefore = new Date(now - 60000L);
         final Date notAfter = new Date(now + (825L * 24L * 60L * 60L * 1000L));
         final X500Name subject = new X500Name("CN=" + cn);
         final X500Name issuer = X500Name.asX500Name(caCertificate.getSubjectX500Principal());
@@ -500,8 +500,11 @@ public class CertificateFactory {
      */
     public static void createPKCS12Keystore(final X509Certificate serverCertificate, final PrivateKey serverPrivateKey, final File keystoreFile, final char[] password, final String alias, final X509Certificate caCertificate) throws Exception {
         final KeyStore keyStore = createPKCS12KeyStore(serverCertificate, serverPrivateKey, password, alias, caCertificate);
-        try (FileOutputStream fos = new FileOutputStream(keystoreFile)) {
+        FileOutputStream fos = new FileOutputStream(keystoreFile);
+        try {
             keyStore.store(fos, password);
+        } finally {
+            fos.close();
         }
     }
 
@@ -516,7 +519,9 @@ public class CertificateFactory {
      * Saves a certificate to PEM.
      */
     public static void saveCertificateToPEM(final X509Certificate certificate, final File certFile) throws IOException, CertificateEncodingException {
-        try (FileOutputStream fos = new FileOutputStream(certFile)) {
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(certFile);
             fos.write("-----BEGIN CERTIFICATE-----\n".getBytes(StandardCharsets.US_ASCII));
             final byte[] encoded = certificate.getEncoded();
             final String base64 = Base64.encodeToString(encoded);
@@ -527,6 +532,13 @@ public class CertificateFactory {
                 fos.write('\n');
             }
             fos.write("-----END CERTIFICATE-----\n".getBytes(StandardCharsets.US_ASCII));
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                }
+            }
         }
     }
 

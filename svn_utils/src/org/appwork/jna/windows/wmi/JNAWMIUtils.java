@@ -24,6 +24,9 @@ import com.sun.jna.platform.win32.COM.COMException;
  *
  */
 public class JNAWMIUtils {
+    /** Enable verbose timing logs when system property logs.verbose.JNAWMIUtils=true */
+    private static final boolean VERBOSE_LOGS = Boolean.getBoolean("logs.verbose.JNAWMIUtils");
+
     /**
      *
      */
@@ -151,16 +154,35 @@ public class JNAWMIUtils {
     }
 
     public static List<Map<String, Object>> query(String namespace, final String query, String... properties) throws WMIException, InterruptedException {
+        final long tStart = System.currentTimeMillis();
         if (namespace == null) {
             namespace = "ROOT\\CIMV2";
         }
+        final String queryShort = query.length() > 120 ? query.substring(0, 120) + "..." : query;
+        if (VERBOSE_LOGS) {
+            LogV3.info("[JNAWMIUtils.query] START namespace=" + namespace + " query=" + queryShort);
+        }
         try {
+            final long tNewConn = System.currentTimeMillis();
             final WMIConnector con = new WMIConnector(namespace);
+            final long tOpen = System.currentTimeMillis();
             con.open();
+            if (VERBOSE_LOGS) {
+                LogV3.info("[JNAWMIUtils.query] con.open() took " + (System.currentTimeMillis() - tOpen) + " ms");
+            }
             try {
-                return con.query(query, properties);
+                final long tQuery = System.currentTimeMillis();
+                List<Map<String, Object>> result = con.query(query, properties);
+                if (VERBOSE_LOGS) {
+                    LogV3.info("[JNAWMIUtils.query] con.query() took " + (System.currentTimeMillis() - tQuery) + " ms, rows=" + (result == null ? 0 : result.size()));
+                }
+                return result;
             } finally {
+                final long tClose = System.currentTimeMillis();
                 con.close();
+                if (VERBOSE_LOGS) {
+                    LogV3.info("[JNAWMIUtils.query] con.close() took " + (System.currentTimeMillis() - tClose) + " ms");
+                }
             }
         } catch (final Exception org) {
             final COMException com = Exceptions.getInstanceof(org, COMException.class);
@@ -175,13 +197,20 @@ public class JNAWMIUtils {
             LogV3.log(org);
             LogV3.info("Try Fallback via PowerShell");
             try {
+                final long tPs = System.currentTimeMillis();
                 ArrayList<Map<String, Object>> ret = wmiQueryViaPowerShell(namespace, query, properties);
-                LogV3.info("Try Fallback via PowerShell Result: " + ret.size() + " Entries");
+                if (VERBOSE_LOGS) {
+                    LogV3.info("[JNAWMIUtils.query] wmiQueryViaPowerShell took " + (System.currentTimeMillis() - tPs) + " ms, rows=" + ret.size());
+                }
                 return ret;
             } catch (WMIException e1) {
                 LogV3.log(e1);
             }
             throw WMIException.wrap(org, "query:" + query + ";namespace:" + namespace);
+        } finally {
+            if (VERBOSE_LOGS) {
+                LogV3.info("[JNAWMIUtils.query] END total " + (System.currentTimeMillis() - tStart) + " ms");
+            }
         }
     }
 

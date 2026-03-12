@@ -31,6 +31,9 @@ import com.sun.jna.platform.win32.COM.Wbemcli.IWbemServices;
 import com.sun.jna.ptr.IntByReference;
 
 public class WMIConnector implements Closeable {
+    /** Enable verbose timing logs when system property logs.verbose.WMIConnector=true */
+    private static final boolean VERBOSE_LOGS = Boolean.getBoolean("logs.verbose.WMIConnector");
+
     /**
      *
      */
@@ -100,15 +103,34 @@ public class WMIConnector implements Closeable {
         if (svc == null) {
             open();
         }
+        final long tQueryStart = System.currentTimeMillis();
         try {
             final ArrayList<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
             final IntByReference pType = new IntByReference();
             // Send query
+            // Note: With Win32_Process, the first Next() often takes ~1s even for 0 rows. The provider does
+            // expensive work (full or partial process enumeration) on first pull; WHERE ExecutablePath is
+            // not always pushed down. Callers should batch (e.g. one listByPath(null)) instead of one
+            // query per path. See https://learn.microsoft.com/en-us/windows/win32/wmisdk/improving-enumeration-performance
+            final long tExec = System.currentTimeMillis();
             final IEnumWbemClassObject enumRes = svc.ExecQuery("WQL", query, Wbemcli.WBEM_FLAG_FORWARD_ONLY | Wbemcli.WBEM_FLAG_RETURN_IMMEDIATELY, null);
+            if (VERBOSE_LOGS) {
+                LogV3.info("[WMIConnector.query] ExecQuery took " + (System.currentTimeMillis() - tExec) + " ms");
+            }
             try {
+                long tEnumStart = System.currentTimeMillis();
+                int rowIndex = 0;
                 while (enumRes.getPointer() != Pointer.NULL) {
+                    // lTimeout: provider often does real work on first Next() (Win32_Process ~1s even for empty result)
+                    final long tNext = System.currentTimeMillis();
                     final Pointer[] pclsObj = new Pointer[1];
                     hres = enumRes.Next(timeout, pclsObj.length, pclsObj, new IntByReference(0));
+                    long nextMs = System.currentTimeMillis() - tNext;
+                    if (rowIndex < 3 || (rowIndex % 20 == 0 && rowIndex > 0)) {
+                        if (VERBOSE_LOGS) {
+                            LogV3.info("[WMIConnector.query] Next #" + rowIndex + " took " + nextMs + " ms");
+                        }
+                    }
                     if (hres.intValue() == Wbemcli.WBEM_S_FALSE || hres.intValue() == Wbemcli.WBEM_S_NO_MORE_DATA) {
                         break;
                     }
@@ -122,6 +144,7 @@ public class WMIConnector implements Closeable {
                         String message = WMI_ERRORS.get(hres.intValue());
                         throw new COMException(message == null ? "Unknown Error" : message, hres);
                     }
+                    final long tGetProps = System.currentTimeMillis();
                     final Wbemcli.IWbemClassObject classObject = new ExtIWbemClassObject(pclsObj[0]);
                     try {
                         String propertiesList[];
@@ -236,9 +259,21 @@ public class WMIConnector implements Closeable {
                     } finally {
                         classObject.Release();
                     }
+                    rowIndex++;
+                    if (rowIndex <= 3 || rowIndex % 20 == 0) {
+                        if (VERBOSE_LOGS) {
+                            LogV3.info("[WMIConnector.query] Get properties for row " + (rowIndex - 1) + " took " + (System.currentTimeMillis() - tGetProps) + " ms");
+                        }
+                    }
+                }
+                if (VERBOSE_LOGS) {
+                    LogV3.info("[WMIConnector.query] enumeration total " + (System.currentTimeMillis() - tEnumStart) + " ms, rows=" + list.size());
                 }
             } finally {
                 enumRes.Release();
+            }
+            if (VERBOSE_LOGS) {
+                LogV3.info("[WMIConnector.query] query() total " + (System.currentTimeMillis() - tQueryStart) + " ms");
             }
             return list;
         } catch (final Exception org) {
@@ -255,10 +290,15 @@ public class WMIConnector implements Closeable {
     }
 
     public void open() throws WMIException {
+        final long tOpenStart = System.currentTimeMillis();
+        if (VERBOSE_LOGS) {
+            LogV3.info("[WMIConnector.open] START");
+        }
         try {
             oleAuto = OleAuto.INSTANCE;
             ole32 = Ole32.INSTANCE;
             comUnInitRequired = false;
+            final long tCoInit = System.currentTimeMillis();
             hres = ole32.CoInitializeEx(null, Ole32.COINIT_MULTITHREADED);
             // LogV3.info("COM CoInitializeEx - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
             switch (hres.intValue()) {
@@ -295,6 +335,9 @@ public class WMIConnector implements Closeable {
             default:
                 throw new COMException("Failed to initialize COM library #1. Error: " + hres.intValue(), hres);
             }
+            if (VERBOSE_LOGS) {
+                LogV3.info("[WMIConnector.open] CoInitializeEx took " + (System.currentTimeMillis() - tCoInit) + " ms");
+            }
             if (true) {
                 synchronized (SECURITY_LOCK) {
                     if (!securityInitialized) {
@@ -326,6 +369,7 @@ public class WMIConnector implements Closeable {
                     }
                 }
             }
+            final long tConnect = System.currentTimeMillis();
             // Obtain the initial locator to WMI -
             final IWbemLocator loc = IWbemLocator.create();
             if (loc == null) {
@@ -350,6 +394,10 @@ public class WMIConnector implements Closeable {
                 // Release the locator. If successful, pSvc contains connection
                 // information
                 loc.Release();
+            }
+            if (VERBOSE_LOGS) {
+                LogV3.info("[WMIConnector.open] ConnectServer+CoSetProxyBlanket took " + (System.currentTimeMillis() - tConnect) + " ms");
+                LogV3.info("[WMIConnector.open] END total " + (System.currentTimeMillis() - tOpenStart) + " ms");
             }
         } catch (final Exception org) {
             throw WMIException.wrap(org, "Failed to open COM Connection");

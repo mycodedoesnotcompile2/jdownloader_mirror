@@ -51,7 +51,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
+@HostPlugin(revision = "$Revision: 52482 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
 public class NicoVideoJp extends PluginForHost {
     private static final String  CUSTOM_DATE               = "CUSTOM_DATE";
     private static final String  CUSTOM_FILENAME           = "CUSTOM_FILENAME";
@@ -154,13 +154,19 @@ public class NicoVideoJp extends PluginForHost {
             link.setName(fallbackTitle + extDefault);
         }
         String jsonapi = br.getRegex("data-api-data=\"([^\"]+)").getMatch(0);
+        if (jsonapi == null) {
+            jsonapi = br.getRegex("type\\s*=\\s*\"application/ld\\+json\"[^>]*>\\s*(.*?)\\s*</script").getMatch(0);
+        }
         if (jsonapi != null) {
             jsonapi = jsonapi.replace("&quot;", "\"");
             entries = restoreFromString(jsonapi, TypeRef.MAP);
-            final Map<String, Object> video = (Map<String, Object>) entries.get("video");
+            Map<String, Object> video = (Map<String, Object>) entries.get("video");
+            if (video == null) {
+                video = entries;
+            }
             final String description = (String) video.get("description");
-            link.setProperty(PROPERTY_TITLE, Encoding.htmlDecode(video.get("title").toString()));
-            final String registeredAt = (String) video.get("registeredAt");
+            link.setProperty(PROPERTY_TITLE, Encoding.htmlDecode(StringUtils.firstNotEmpty((String) video.get("title"), (String) video.get("name"))));
+            final String registeredAt = StringUtils.firstNotEmpty((String) video.get("registeredAt"), (String) video.get("uploadDate"));
             if (!StringUtils.isEmpty(registeredAt)) {
                 link.setProperty(PROPERTY_DATE_ORIGINAL, registeredAt);
             }
@@ -169,13 +175,31 @@ public class NicoVideoJp extends PluginForHost {
             if (!StringUtils.isEmpty(description) && link.getComment() == null) {
                 link.setComment(Encoding.htmlDecode(description));
             }
-            link.setProperty(PROPERTY_ACCOUNT_REQUIRED, video.get("isAuthenticationRequired"));
-            if ((Boolean) video.get("isDeleted")) {
+            link.setProperty(PROPERTY_ACCOUNT_REQUIRED, (Boolean.TRUE.equals(video.get("isAuthenticationRequired")) || Boolean.TRUE.equals(video.get("requiresSubscription"))));
+            if (Boolean.TRUE.equals(video.get("isDeleted"))) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }
         if (br.containsHTML("class=\"login-box-title\"")) {
             link.setProperty(PROPERTY_ACCOUNT_REQUIRED, true);
+        }
+        final String html = br.getRequest().getHtmlCode().replace("&quot;", "\"");
+        final String errorCode = new Regex(html, "\"errorCode\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+        if (errorCode != null) {
+            final String reasonCode = new Regex(html, "\"reasonCode\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+            if ("NOT_FOUND".equals(errorCode)) {
+                // NOT_FOUND: RIGHT_HOLDER_DELETE_VIDEO
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if ("FORBIDDEN".equals(errorCode)) {
+                // FORBIDDEN: HIDDEN_VIDEO, DOMESTIC_VIDEO, HIGH_RISK_COUNTRY_VIDEO, DELETED_CHANNEL_VIDEO, DELETED_COMMUNITY_VIDEO,
+                // ADMINISTRATOR_DELETE_VIDEO, HARMFUL_VIDEO
+                if ("DOMESTIC_VIDEO".equals(reasonCode)) {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "GEO_BLOCKED", java.util.concurrent.TimeUnit.DAYS.toMillis(24));
+                }
+            }
+            // INVALID_PARAMETER
+
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, reasonCode);
         }
         return AvailableStatus.TRUE;
     }

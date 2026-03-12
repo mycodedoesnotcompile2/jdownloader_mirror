@@ -44,7 +44,7 @@ import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "4shared.com" }, urls = { "https?://(?:www\\.)?4shared(?:\\-china)?\\.com/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/(?:\\d+/)?[A-Za-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 52482 $", interfaceVersion = 3, names = { "4shared.com" }, urls = { "https?://(?:www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/(?:\\d+/)?[A-Za-z0-9\\-_]+" })
 public class FourSharedComFolder extends PluginForDecrypt {
     public FourSharedComFolder(final PluginWrapper wrapper) {
         super(wrapper);
@@ -59,7 +59,7 @@ public class FourSharedComFolder extends PluginForDecrypt {
     private String                  pass                        = null;
     private Browser                 br2                         = createNewBrowserInstance();
     private ArrayList<DownloadLink> decryptedLinks              = new ArrayList<DownloadLink>();
-    private String                  type_folder_with_pagenumber = "https?://(?:www\\.)?4shared(?:\\-china)?\\.com/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/\\d+/[A-Za-z0-9\\-_]+";
+    private String                  type_folder_with_pagenumber = "https?://(?:www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/\\d+/[A-Za-z0-9\\-_]+";
 
     /**
      * TODO: Implement API: http://www.4shared.com/developer/ 19.12.12: Their support never responded so we don't know how to use the API...

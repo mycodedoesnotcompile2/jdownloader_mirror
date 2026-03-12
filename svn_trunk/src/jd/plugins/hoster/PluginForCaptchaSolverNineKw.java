@@ -10,12 +10,17 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw;
@@ -35,7 +40,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52478 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -59,6 +64,15 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
+        return types;
+    }
+
+    @Override
+    public List<FeedbackType> getSupportedFeedbackTypes() {
+        final List<FeedbackType> types = new ArrayList<FeedbackType>();
+        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
+        types.add(FeedbackType.REPORT_VALID_CAPTCHAS);
+        types.add(FeedbackType.ABORT_CAPTCHAS);
         return types;
     }
 
@@ -90,8 +104,32 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        // TODO: Implement this
-        return false;
+        return sendCaptchaFeedback(response, account, 2);
+    }
+
+    @Override
+    public boolean setValid(AbstractResponse<?> response, Account account) {
+        return sendCaptchaFeedback(response, account, 1);
+    }
+
+    @Override
+    public boolean setUnused(AbstractResponse<?> response, Account account) {
+        return sendCaptchaFeedback(response, account, 3);
+    }
+
+    private boolean sendCaptchaFeedback(AbstractResponse<?> response, Account account, final int correct_value) {
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("action", "usercaptchacorrectback");
+        query.appendEncoded("correct", "");
+        query.appendEncoded("id", response.getCaptchaSolverTaskID());
+        try {
+            final Map<String, Object> resp = this.callAPI(query, account);
+            final Map<String, Object> status = (Map<String, Object>) resp.get("status");
+            return ((Boolean) status.get("success")).booleanValue();
+        } catch (final Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     @Override
@@ -120,12 +158,30 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         query.appendEncoded("version", "1.2");
         br.getPage(getBaseURL() + "/index.cgi?" + query.toString());
         /* Check for non-json response. This is the best workaround I found in order to "keep things pretty". */
+        /* See list of possible errors here: https://www.9kw.eu/api.html#apigeneral-tab */
+        final Regex non_json_error_regex = br.getRegex("(\\d{4}) (.+)");
+        if (non_json_error_regex.patternFind()) {
+            // TODO: Check for account related problems too
+            final String error_code = non_json_error_regex.getMatch(0);
+            final String error_msg = non_json_error_regex.getMatch(1);
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA, error_msg);
+        }
         final Regex captcha_upload_success = br.getRegex("OK-(\\d+)");
         if (captcha_upload_success.patternFind()) {
             final Map<String, Object> resp = new HashMap<String, Object>();
             resp.put("captcha_id", captcha_upload_success.getMatch(0));
             return resp;
         }
+        final Regex captcha_response_success = br.getRegex("OK-answered-(.+)");
+        if (captcha_response_success.patternFind()) {
+            final Map<String, Object> resp = new HashMap<String, Object>();
+            resp.put("answer", captcha_response_success.getMatch(0));
+            return resp;
+        }
+        if (br.getRequest().getHtmlCode().equalsIgnoreCase("OK")) {
+            return null;
+        }
+        /* Expect json response */
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> status = (Map<String, Object>) entries.get("status");
         if (Boolean.TRUE.equals(status.get("success"))) {
@@ -148,39 +204,39 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
 
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
-        final UrlQuery q = new UrlQuery();
-        q.appendEncoded("action", "usercaptchaupload");
+        final UrlQuery upload_query = new UrlQuery();
+        upload_query.appendEncoded("action", "usercaptchaupload");
         final Challenge<?> captchachallenge = job.getChallenge();
         final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
         if (captchachallenge instanceof RecaptchaV2Challenge) {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
-            q.appendEncoded("data-sitekey", challenge.getSiteKey());
-            q.appendEncoded("oldsource", challenge.getTypeID() + "");
-            q.appendEncoded("isInvisible", challenge.isInvisible() == true ? "1" : "0");
+            upload_query.appendEncoded("data-sitekey", challenge.getSiteKey());
+            upload_query.appendEncoded("oldsource", challenge.getTypeID() + "");
+            upload_query.appendEncoded("isInvisible", challenge.isInvisible() == true ? "1" : "0");
             final Map<String, Object> v3action = challenge.getV3Action();
             if (v3action != null) {
-                q.appendEncoded("pageurl", challenge.getSiteUrl(this));
-                q.appendEncoded("captchachoice", "recaptchav3");
-                q.appendEncoded("actionname", (String) v3action.get("action"));
-                q.appendEncoded("min_score", "0.3");// minimal score
+                upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
+                upload_query.appendEncoded("captchachoice", "recaptchav3");
+                upload_query.appendEncoded("actionname", (String) v3action.get("action"));
+                upload_query.appendEncoded("min_score", "0.3");// minimal score
             } else {
                 // if (options.isSiteDomain()) {
                 // query.appendEncoded("pageurl", rcChallenge.getSiteDomain());
                 // } else {
                 // query.appendEncoded("pageurl", rcChallenge.getSiteUrl());
                 // }
-                q.appendEncoded("pageurl", challenge.getSiteUrl(this));
-                q.appendEncoded("captchachoice", "recaptchav2");
+                upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
+                upload_query.appendEncoded("captchachoice", "recaptchav2");
             }
-            q.appendEncoded("securetoken", challenge.getSecureToken());
-            q.appendEncoded("interactive", "1");
+            upload_query.appendEncoded("securetoken", challenge.getSecureToken());
+            upload_query.appendEncoded("interactive", "1");
         } else if (captchachallenge instanceof HCaptchaChallenge) {
             final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;
-            q.appendEncoded("data-sitekey", challenge.getSiteKey());
-            q.appendEncoded("pageurl", challenge.getSiteUrl(this));
-            q.appendEncoded("oldsource", "hcaptcha");
-            q.appendEncoded("captchachoice", "hcaptcha");
-            q.appendEncoded("interactive", "1");
+            upload_query.appendEncoded("data-sitekey", challenge.getSiteKey());
+            upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
+            upload_query.appendEncoded("oldsource", "hcaptcha");
+            upload_query.appendEncoded("captchachoice", "hcaptcha");
+            upload_query.appendEncoded("interactive", "1");
         } else if (captchachallenge instanceof CutCaptchaChallenge) {
             /* CutCaptcha: https://2captcha.com/api-docs/cutcaptcha */
             final CutCaptchaChallenge challenge = (CutCaptchaChallenge) captchachallenge;
@@ -191,40 +247,60 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         } else if (captchachallenge instanceof ClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
-            q.appendEncoded("mouse", "1");
-            q.appendEncoded("base64", "1");
-            q.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            upload_query.appendEncoded("mouse", "1");
+            upload_query.appendEncoded("base64", "1");
+            upload_query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-            q.appendEncoded("multimouse", "1");
-            q.appendEncoded("base64", "1");
-            q.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            upload_query.appendEncoded("multimouse", "1");
+            upload_query.appendEncoded("base64", "1");
+            upload_query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
             /* Image captcha: https://2captcha.com/api-docs/normal-captcha */
             final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge<String>) job.getChallenge();
-            q.appendEncoded("base64", "1");
-            q.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            upload_query.appendEncoded("base64", "1");
+            upload_query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
-        q.appendEncoded("maxtimeout", Math.min(60, captchachallenge.getTimeout()) + "");
+        upload_query.appendEncoded("maxtimeout", Math.min(60, captchachallenge.getTimeout()) + "");
         if (captchachallenge.getExplain() != null) {
-            q.appendEncoded("textinstructions", captchachallenge.getExplain());
-        }
-        try {
-            final Map<String, Object> uploadresp = this.callAPI(q, account);
-            // TODO: Add captcha check loop
-        } catch (IOException e) {
-            e.printStackTrace();
+            upload_query.appendEncoded("textinstructions", captchachallenge.getExplain());
         }
         final CaptchaSolverPluginConfigNinekw cfg = PluginJsonConfig.get(this.getConfigInterface());
-        q.appendEncoded("captchaperhour", cfg.getHour() + "");
-        q.appendEncoded("captchapermin", cfg.getMinute() + "");
-        q.appendEncoded("prio", cfg.getPrio() + "");
-        q.appendEncoded("selfsolve", cfg.isSelfsolve() + "");
-        q.appendEncoded("confirm", cfg.isConfirm() + "");
+        upload_query.appendEncoded("captchaperhour", cfg.getHour() + "");
+        upload_query.appendEncoded("captchapermin", cfg.getMinute() + "");
+        upload_query.appendEncoded("prio", cfg.getPrio() + "");
+        upload_query.appendEncoded("selfsolve", cfg.isSelfsolve() + "");
+        upload_query.appendEncoded("confirm", cfg.isConfirm() + "");
+        final Map<String, Object> uploadresp = this.callAPI(upload_query, account);
+        final String captcha_id = uploadresp.get("captcha_id").toString();
+        final UrlQuery polling_query = new UrlQuery();
+        polling_query.appendEncoded("action", "usercaptchacorrectdata");
+        polling_query.appendEncoded("id", captcha_id);
         // q.appendEncoded("maxtimeout", cfg.tt + "");
+        /* Wait for captcha answer */
+        job.setStatus(SolverStatus.SOLVING);
+        while (job.getJob().isAlive() && !job.getJob().isSolved()) {
+            checkInterruption();
+            Thread.sleep(getPollingIntervalMillis(account));
+            final Map<String, Object> pollingresp = this.callAPI(polling_query, account);
+            final String answer = pollingresp.get("answer").toString();
+            AbstractResponse resp = null;
+            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
+                resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, answer);
+            } else {
+                resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, answer);
+            }
+            /**
+             * TODO: Correct answer leads to exception in PluginForHost -> Line 676 check why this happens <br>
+             * if (!c.isSolved()) { throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+             */
+            resp.setCaptchaSolverTaskID(captcha_id);
+            job.setAnswer(resp);
+            return;
+        }
     }
 
     @Override
