@@ -69,13 +69,12 @@ import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenam
 import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
 import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
 import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52393 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -192,11 +191,11 @@ public class RedditComCrawler extends PluginForDecrypt {
         }
         String sorting = urlinfo.getMatch(2);
         if (sorting == null) {
-            /* No specific sort order = use server side default sort order which should be "best" */
-            sorting = "";
+            /* No specific sort order = use "new" */
+            sorting = "new";
         }
         final String timeRange = UrlQuery.parse(contenturl).get("t");
-        final int maxPagesToCrawl = PluginJsonConfig.get(RedditConfig.class).getSubredditCrawlerMaxPages();
+        final int maxPagesToCrawl = get(RedditConfig.class).getSubredditCrawlerMaxPages();
         if (maxPagesToCrawl == 0) {
             logger.info("User has disabled subreddit crawler");
             return new ArrayList<DownloadLink>();
@@ -221,14 +220,14 @@ public class RedditComCrawler extends PluginForDecrypt {
         final UrlQuery query = UrlQuery.parse(contenturl);
         final String sorting = query.get("sort");
         final String timeRange = query.get("t");
-        final int maxPagesToCrawl = PluginJsonConfig.get(RedditConfig.class).getProfileCrawlerMaxPages();
+        final int maxPagesToCrawl = get(RedditConfig.class).getProfileCrawlerMaxPages();
         if (maxPagesToCrawl == 0) {
             logger.info("User has disabled user profile crawler");
             return new ArrayList<DownloadLink>();
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName("/u/" + username);
-        String url = "https://www." + this.getHost() + "/user/" + username + "/.json";
+        String url = "https://www." + this.getHost() + "/user/" + username + "/submitted.json";
         if (sorting != null) {
             url = URLHelper.parseLocation(new URL(url), "&sort=" + sorting);
         }
@@ -262,6 +261,8 @@ public class RedditComCrawler extends PluginForDecrypt {
         final UrlQuery query = new UrlQuery();
         // query.add("type", "links");
         query.add("limit", Integer.toString(maxItemsPerCall));
+        query.add("raw_json", "1");
+        query.add("sr_detail", "1");
         int page = 1;
         int numberofItemsWalkedThrough = 0;
         fp.setAllowMerge(true);
@@ -288,6 +289,9 @@ public class RedditComCrawler extends PluginForDecrypt {
                         ids.add(postID);
                     }
                     ret.add(pageResult);
+                    if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        distribute(pageResult);
+                    }
                 } else {
                     dupeCounter++;
                 }
@@ -407,7 +411,7 @@ public class RedditComCrawler extends PluginForDecrypt {
         /* https://www.reddit.com/dev/api/#fullnames */
         final ArrayList<DownloadLink> crawledItems = new ArrayList<DownloadLink>();
         final List<Map<String, Object>> items = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "data/children");
-        final RedditConfig cfg = PluginJsonConfig.get(RedditConfig.class);
+        final RedditConfig cfg = get(RedditConfig.class);
         final PreviewCrawlerMode previewMode = cfg.getPreviewDownloadMode();
         int numberofSkippedItems = 0;
         for (final Map<String, Object> post : items) {

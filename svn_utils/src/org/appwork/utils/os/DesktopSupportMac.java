@@ -34,15 +34,10 @@
 package org.appwork.utils.os;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
 
 import org.appwork.utils.processes.ProcessBuilderFactory;
-import org.appwork.utils.processes.ProcessOutput;
-import org.appwork.utils.Application;
-import org.appwork.utils.Regex;
 
 /**
  * @author Thomas
@@ -86,7 +81,6 @@ public class DesktopSupportMac extends DesktopSupportJavaDesktop {
             } catch (Exception e) {
                 org.appwork.loggingv3.LogV3.log(e);
             }
-
             return true;
         } else {
             /* normal shutdown */
@@ -152,49 +146,5 @@ public class DesktopSupportMac extends DesktopSupportJavaDesktop {
     public boolean hibernate() {
         org.appwork.loggingv3.LogV3.info("no hibernate support, use shutdown");
         return false;
-    }
-
-    /**
-     * Experimental: resolves peer PID from TCP connection table via {@code lsof -i -P -n}. Only active when running in IDE (not
-     * from jar); in production returns -1.
-     * @throws NotSupportedException 
-     */
-    @Override
-    public int getPIDForRemoteAddress(final SocketAddress adr) throws InterruptedException, NotSupportedException {
-        if (adr == null || !(adr instanceof InetSocketAddress)) {
-            return -1;
-        }
-        if (Application.isJared(null)) {
-           throw new NotSupportedException("OS not supported");
-        }
-        try {
-            final InetSocketAddress inetAdr = (InetSocketAddress) adr;
-            final String peerHost = inetAdr.getAddress().getHostAddress();
-            final int port = inetAdr.getPort();
-            final String peerKey = peerHost + ":" + port;
-            final ProcessOutput out = ProcessBuilderFactory.runCommand(new String[] { "lsof", "-i", "-P", "-n" });
-            final String str = out.getStdOutString();
-            if (str == null) {
-                return -1;
-            }
-            for (final String line : Regex.getLines(str)) {
-                if (line.indexOf(peerKey + "->") < 0) {
-                    continue;
-                }
-                final String[] cols = line.trim().split("\\s+", 3);
-                if (cols.length >= 2) {
-                    try {
-                        return Integer.parseInt(cols[1], 10);
-                    } catch (NumberFormatException e) {
-                        // ignore
-                    }
-                }
-            }
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            org.appwork.loggingv3.LogV3.log(e);
-        }
-        return -1;
     }
 }

@@ -72,7 +72,7 @@ public class CCADBPEMTrustProviderTest extends AWTest {
                     revokedTestsDone = true;
                 }
                 final CCADBCertificateVerificationTest.CrtshInfo crtShInfo = CCADBCertificateVerificationTest.fetchAndParseCrtsh(fingerprint);
-                crtShOk = crtShInfo != null && (crtShInfo.revocationStatus == null || !crtShInfo.revocationStatus.toLowerCase().contains("revoked"));
+                crtShOk = crtShInfo != null && !CCADBCertificateVerificationTest.isRevokedOrRejected(crtShInfo);
             }
             if (jreOk && osOk) {
                 trustedByBoth++;

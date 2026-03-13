@@ -109,8 +109,11 @@ public abstract class SSLTrustProviderTestBase extends AWTest {
         assertNotNull(this.sslContext, "SSL context should not be null");
         this.tempKeystoreFile = File.createTempFile("test-ssl-trust-", ".p12");
         this.tempKeystoreFile.deleteOnExit();
-        try (FileOutputStream fos = new FileOutputStream(this.tempKeystoreFile)) {
+        FileOutputStream fos = new FileOutputStream(this.tempKeystoreFile);
+        try {
             serverKs.store(fos, password);
+        } finally {
+            fos.close();
         }
         LogV3.info("Test certificates created successfully (in-memory keystore; temp file for provider tests)");
     }

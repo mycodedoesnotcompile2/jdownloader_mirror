@@ -22,15 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -52,7 +43,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52475 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@HostPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwojplikPl extends PluginForHost {
     public TwojplikPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +142,7 @@ public class TwojplikPl extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:(?:download|view)/)?([A-Z0-9-]{24,})(/([^/#\\?/]+))?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:(?:download|view)/)?([A-Z0-9-]{20,})(/([^/#\\?/]+))?");
         }
         return ret.toArray(new String[0]);
     }

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -58,18 +58,30 @@ public class ProcessOutput {
     private final ByteArrayOutputStream errOutData;
     private final String                codePage;
 
-    /**
-     * @param codePage
-     * @param waitFor
-     * @param byteArray
-     * @param byteArray2
-     * @throws InterruptedException
-     */
     public ProcessOutput(int exitCode, ByteArrayOutputStream stdOut, ByteArrayOutputStream errOut, String codePage) {
+        this(exitCode, stdOut, errOut, codePage, null, null);
+    }
+
+    /**
+     * Optional remote process PID when process was started with waitFor=false (e.g. runAsAdmin). Null when not applicable.
+     */
+    private Integer  remotePid;
+    /**
+     * Optional callback to destroy/stop the remote process (e.g. write stop file or run taskkill). Set by caller when using waitFor=false
+     * so the process can be closed later.
+     */
+    private Runnable destroyCallback;
+
+    /**
+     * Constructor with optional remote PID and destroy callback for processes started with waitFor=false.
+     */
+    public ProcessOutput(int exitCode, ByteArrayOutputStream stdOut, ByteArrayOutputStream errOut, String codePage, Integer remotePid, Runnable destroyCallback) {
         this.exitCode = exitCode;
         this.stdOutData = stdOut;
         this.errOutData = errOut;
         this.codePage = codePage;
+        this.remotePid = remotePid;
+        this.destroyCallback = destroyCallback;
     }
 
     @Override
@@ -114,6 +126,30 @@ public class ProcessOutput {
             } catch (UnsupportedEncodingException e2) {
                 throw Exceptions.addSuppressed(new WTFException(e2), e);
             }
+        }
+    }
+
+    /**
+     * @return remote process PID when process was started with waitFor=false and PID is known; null otherwise.
+     */
+    public Integer getRemotePid() {
+        return remotePid;
+    }
+
+    /**
+     * Set a callback to destroy/stop the remote process (e.g. write stop file, or taskkill). Use when process was started with
+     * waitFor=false. Call {@link #destroy()} to run it.
+     */
+    public void setDestroyCallback(Runnable destroyCallback) {
+        this.destroyCallback = destroyCallback;
+    }
+
+    /**
+     * If a destroy callback was set (e.g. when using waitFor=false), runs it to stop the remote process. No-op if no callback set.
+     */
+    public void destroy() {
+        if (destroyCallback != null) {
+            destroyCallback.run();
         }
     }
 }

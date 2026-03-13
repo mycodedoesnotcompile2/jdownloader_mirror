@@ -36,17 +36,14 @@ package org.appwork.utils.net.httpserver;
 import java.io.IOException;
 import java.net.Socket;
 
-import org.appwork.utils.net.httpserver.AbstractServerBasics;
-
 /**
  * @author daniel
  *
  */
 public class HttpConnectionThread extends Thread {
-
     private volatile HttpServerConnection currentConnection = null;
-    private volatile Socket         socket            = null;
-    private int                     serverThreadID    = 0;
+    private volatile Socket               socket            = null;
+    private int                           serverThreadID    = 0;
 
     public HttpConnectionThread(final AbstractServerBasics server, final Runnable r) {
         super(r);
@@ -55,9 +52,9 @@ public class HttpConnectionThread extends Thread {
 
     protected void setName(final HttpServer server, Socket socket) {
         if (socket != null) {
-            this.setName("HttpConnectionThread:" + serverThreadID + ":" + socket.getLocalSocketAddress() + "<-" + socket.getRemoteSocketAddress());
+            this.setName("HCT(acti):" + serverThreadID + ":" + socket.getLocalSocketAddress() + "<-" + socket.getRemoteSocketAddress());
         } else {
-            this.setName("HttpConnectionThread:" + serverThreadID + ":" + server.getPort() + ":" + server.isLocalhostOnly());
+            this.setName("HCT(idle):" + serverThreadID + ":PT>" + server.getPort() + ":LH>" + server.isLocalhostOnly());
         }
     }
 

@@ -610,4 +610,323 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Retry", "Erneut versuchen" })
     String lit_retry();
+
+    @Default(lngs = { "en", "de" }, values = { "Read data", "Daten lesen" })
+    String AccessPermission_FILE_READ_DATA();
+
+    @Default(lngs = { "en", "de" }, values = { "List directory", "Ordner auflisten" })
+    String AccessPermission_FILE_LIST_DIRECTORY();
+
+    @Default(lngs = { "en", "de" }, values = { "Write data", "Daten schreiben" })
+    String AccessPermission_FILE_WRITE_DATA();
+
+    @Default(lngs = { "en", "de" }, values = { "Add file", "Datei hinzufügen" })
+    String AccessPermission_FILE_ADD_FILE();
+
+    @Default(lngs = { "en", "de" }, values = { "Append data", "Daten anfügen" })
+    String AccessPermission_FILE_APPEND_DATA();
+
+    @Default(lngs = { "en", "de" }, values = { "Add subdirectory", "Unterordner hinzufügen" })
+    String AccessPermission_FILE_ADD_SUBDIRECTORY();
+
+    @Default(lngs = { "en", "de" }, values = { "Create pipe", "Pipe erstellen" })
+    String AccessPermission_FILE_CREATE_PIPE_INSTANCE();
+
+    @Default(lngs = { "en", "de" }, values = { "Read extended attributes", "Erweiterte Attribute lesen" })
+    String AccessPermission_FILE_READ_EA();
+
+    @Default(lngs = { "en", "de" }, values = { "Write extended attributes", "Erweiterte Attribute schreiben" })
+    String AccessPermission_FILE_WRITE_EA();
+
+    @Default(lngs = { "en", "de" }, values = { "Execute", "Ausführen" })
+    String AccessPermission_FILE_EXECUTE();
+
+    @Default(lngs = { "en", "de" }, values = { "Traverse directory", "Ordner durchlaufen" })
+    String AccessPermission_FILE_TRAVERSE();
+
+    @Default(lngs = { "en", "de" }, values = { "Delete entries", "Einträge löschen" })
+    String AccessPermission_FILE_DELETE_CHILD();
+
+    @Default(lngs = { "en", "de" }, values = { "Delete", "Löschen" })
+    String AccessPermission_DELETE();
+
+    @Default(lngs = { "en", "de" }, values = { "Read attributes", "Attribute lesen" })
+    String AccessPermission_FILE_READ_ATTRIBUTES();
+
+    @Default(lngs = { "en", "de" }, values = { "Write attributes", "Attribute schreiben" })
+    String AccessPermission_FILE_WRITE_ATTRIBUTES();
+
+    @Default(lngs = { "en", "de" }, values = { "Full access", "Voller Zugriff" })
+    String AccessPermission_FILE_ALL_ACCESS();
+
+    @Default(lngs = { "en", "de" }, values = { "Read (generic)", "Lesen (generisch)" })
+    String AccessPermission_FILE_GENERIC_READ();
+
+    @Default(lngs = { "en", "de" }, values = { "Write (generic)", "Schreiben (generisch)" })
+    String AccessPermission_FILE_GENERIC_WRITE();
+
+    @Default(lngs = { "en", "de" }, values = { "Execute (generic)", "Ausführen (generisch)" })
+    String AccessPermission_FILE_GENERIC_EXECUTE();
+
+    @Default(lngs = { "en", "de" }, values = { "Read security", "Sicherheit lesen" })
+    String AccessPermission_READ_CONTROL();
+
+    @Default(lngs = { "en", "de" }, values = { "Change permissions", "Berechtigungen ändern" })
+    String AccessPermission_WRITE_DAC();
+
+    @Default(lngs = { "en", "de" }, values = { "Change owner", "Besitzer ändern" })
+    String AccessPermission_WRITE_OWNER();
+
+    @Default(lngs = { "en", "de" }, values = { "Synchronize", "Synchronisieren" })
+    String AccessPermission_SYNCHRONIZE();
+
+    @Default(lngs = { "en", "de" }, values = { "System security", "System-Sicherheit" })
+    String AccessPermission_ACCESS_SYSTEM_SECURITY();
+
+    // SID enum labels (Windows well-known security identifiers)
+    @Default(lngs = { "en", "de" }, values = { "Null SID", "Null-SID" })
+    String SID_SID_NULL();
+
+    @Default(lngs = { "en", "de" }, values = { "Everyone", "Jeder" })
+    String SID_SID_EVERYONE();
+
+    @Default(lngs = { "en", "de" }, values = { "Local", "Lokal" })
+    String SID_SID_LOCAL();
+
+    @Default(lngs = { "en", "de" }, values = { "Console logon", "Konsolenanmeldung" })
+    String SID_SID_CONSOLE_LOGON();
+
+    @Default(lngs = { "en", "de" }, values = { "Creator Owner", "Ersteller-Besitzer" })
+    String SID_SID_CREATOR_OWNER();
+
+    @Default(lngs = { "en", "de" }, values = { "Creator Group", "Ersteller-Gruppe" })
+    String SID_SID_CREATOR_GROUP();
+
+    @Default(lngs = { "en", "de" }, values = { "Owner Server", "Besitzer-Server" })
+    String SID_SID_OWNER_SERVER();
+
+    @Default(lngs = { "en", "de" }, values = { "Group Server", "Gruppen-Server" })
+    String SID_SID_GROUP_SERVER();
+
+    @Default(lngs = { "en", "de" }, values = { "Owner Rights", "Besitzerrechte" })
+    String SID_SID_OWNER_RIGHTS();
+
+    @Default(lngs = { "en", "de" }, values = { "NT Authority", "NT-Autorität" })
+    String SID_SID_NT_AUTHORITY();
+
+    @Default(lngs = { "en", "de" }, values = { "Dialup", "Einwahl" })
+    String SID_SID_DIALUP();
+
+    @Default(lngs = { "en", "de" }, values = { "Network", "Netzwerk" })
+    String SID_SID_NETWORK();
+
+    @Default(lngs = { "en", "de" }, values = { "Batch", "Stapelverarbeitung" })
+    String SID_SID_BATCH();
+
+    @Default(lngs = { "en", "de" }, values = { "Interactive", "Interaktiv" })
+    String SID_SID_INTERACTIVE();
+
+    @Default(lngs = { "en", "de" }, values = { "Service", "Dienst" })
+    String SID_SID_SERVICE();
+
+    @Default(lngs = { "en", "de" }, values = { "Anonymous", "Anonym" })
+    String SID_SID_ANONYMOUS();
+
+    @Default(lngs = { "en", "de" }, values = { "Proxy", "Proxy" })
+    String SID_SID_PROXY();
+
+    @Default(lngs = { "en", "de" }, values = { "Enterprise Domain Controllers", "Unternehmens-Domänencontroller" })
+    String SID_SID_ENTERPRISE_DOMAIN_CONTROLLERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Principal Self", "Prinzipal Selbst" })
+    String SID_SID_PRINCIPAL_SELF();
+
+    @Default(lngs = { "en", "de" }, values = { "Authenticated Users", "Authentifizierte Benutzer" })
+    String SID_SID_AUTHENTICATED_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Restricted Code", "Eingeschränkter Code" })
+    String SID_SID_RESTRICTED_CODE();
+
+    @Default(lngs = { "en", "de" }, values = { "Terminal Server User", "Terminalserverbenutzer" })
+    String SID_SID_TERMINAL_SERVER_USER();
+
+    @Default(lngs = { "en", "de" }, values = { "Remote Interactive Logon", "Remote-Interaktive Anmeldung" })
+    String SID_SID_REMOTE_INTERACTIVE_LOGON();
+
+    @Default(lngs = { "en", "de" }, values = { "This Organization", "Diese Organisation" })
+    String SID_SID_THIS_ORGANIZATION();
+
+    @Default(lngs = { "en", "de" }, values = { "IUSR", "IUSR" })
+    String SID_SID_IUSR();
+
+    @Default(lngs = { "en", "de" }, values = { "Local System", "Lokales System" })
+    String SID_SID_LOCAL_SYSTEM();
+
+    @Default(lngs = { "en", "de" }, values = { "Local Service", "Lokaler Dienst" })
+    String SID_SID_LOCAL_SERVICE();
+
+    @Default(lngs = { "en", "de" }, values = { "Network Service", "Netzwerkdienst" })
+    String SID_SID_NETWORK_SERVICE();
+
+    @Default(lngs = { "en", "de" }, values = { "Compounded Authentication", "Zusammengesetzte Authentifizierung" })
+    String SID_SID_COMPOUNDED_AUTHENTICATION();
+
+    @Default(lngs = { "en", "de" }, values = { "Claims Valid", "Ansprüche gültig" })
+    String SID_SID_CLAIMS_VALID();
+
+    @Default(lngs = { "en", "de" }, values = { "Built-in Administrators", "Integrierte Administratoren" })
+    String SID_SID_BUILTIN_ADMINISTRATORS();
+
+    @Default(lngs = { "en", "de" }, values = { "Built-in Users", "Integrierte Benutzer" })
+    String SID_SID_BUILTIN_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Built-in Guests", "Integrierte Gäste" })
+    String SID_SID_BUILTIN_GUESTS();
+
+    @Default(lngs = { "en", "de" }, values = { "Power Users", "Power-Benutzer" })
+    String SID_SID_POWER_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Account Operators", "Kontenoperatoren" })
+    String SID_SID_ACCOUNT_OPERATORS();
+
+    @Default(lngs = { "en", "de" }, values = { "Server Operators", "Serveroperatoren" })
+    String SID_SID_SERVER_OPERATORS();
+
+    @Default(lngs = { "en", "de" }, values = { "Printer Operators", "Druckeroperatoren" })
+    String SID_SID_PRINTER_OPERATORS();
+
+    @Default(lngs = { "en", "de" }, values = { "Backup Operators", "Sicherungsoperatoren" })
+    String SID_SID_BACKUP_OPERATORS();
+
+    @Default(lngs = { "en", "de" }, values = { "Replicator", "Replikator" })
+    String SID_SID_REPLICATOR();
+
+    @Default(lngs = { "en", "de" }, values = { "Pre-W2K Compatibility Access", "Kompatibilität Vork-W2K" })
+    String SID_SID_ALIAS_PREW2KCOMPACC();
+
+    @Default(lngs = { "en", "de" }, values = { "Remote Desktop", "Remote Desktop" })
+    String SID_SID_REMOTE_DESKTOP();
+
+    @Default(lngs = { "en", "de" }, values = { "Network Configuration Operators", "Netzwerkkonfigurations-Operatoren" })
+    String SID_SID_NETWORK_CONFIGURATION_OPS();
+
+    @Default(lngs = { "en", "de" }, values = { "Incoming Forest Trust Builders", "Eingehende Gesamtstruktur-Vertrauenssteller" })
+    String SID_SID_INCOMING_FOREST_TRUST_BUILDERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Performance Monitor Users", "Systemmonitor-Benutzer" })
+    String SID_SID_PERFMON_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Performance Log Users", "Leistungsprotokoll-Benutzer" })
+    String SID_SID_PERFLOG_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Windows Authorization Access Group", "Windows-Autorisierungszugriffsgruppe" })
+    String SID_SID_WINDOWS_AUTHORIZATION_ACCESS_GROUP();
+
+    @Default(lngs = { "en", "de" }, values = { "Terminal Server License Servers", "Terminalserver-Lizenzserver" })
+    String SID_SID_TERMINAL_SERVER_LICENSE_SERVERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Distributed COM Users", "Verteilte COM-Benutzer" })
+    String SID_SID_DISTRIBUTED_COM_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "IIS IUSRs", "IIS IUSRs" })
+    String SID_SID_IIS_IUSRS();
+
+    @Default(lngs = { "en", "de" }, values = { "Cryptographic Operators", "Kryptografieoperatoren" })
+    String SID_SID_CRYPTOGRAPHIC_OPERATORS();
+
+    @Default(lngs = { "en", "de" }, values = { "Event Log Readers", "Ereignisprotokoll-Leser" })
+    String SID_SID_EVENT_LOG_READERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Certificate Service DCOM Access", "Zertifikatsdienst-DCOM-Zugriff" })
+    String SID_SID_CERTIFICATE_SERVICE_DCOM_ACCESS();
+
+    @Default(lngs = { "en", "de" }, values = { "RDS Remote Access Servers", "RDS-Remotezugriffsserver" })
+    String SID_SID_RDS_REMOTE_ACCESS_SERVERS();
+
+    @Default(lngs = { "en", "de" }, values = { "RDS Endpoint Servers", "RDS-Endpunktserver" })
+    String SID_SID_RDS_ENDPOINT_SERVERS();
+
+    @Default(lngs = { "en", "de" }, values = { "RDS Management Servers", "RDS-Verwaltungsserver" })
+    String SID_SID_RDS_MANAGEMENT_SERVERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Hyper-V Administrators", "Hyper-V-Administratoren" })
+    String SID_SID_HYPER_V_ADMINS();
+
+    @Default(lngs = { "en", "de" }, values = { "Access Control Assistance Operators", "Zugriffssteuerungs-Assistenten" })
+    String SID_SID_ACCESS_CONTROL_ASSISTANCE_OPS();
+
+    @Default(lngs = { "en", "de" }, values = { "Remote Management Users", "Remote-Verwaltungsbenutzer" })
+    String SID_SID_REMOTE_MANAGEMENT_USERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Write Restricted Code", "Schreibbeschränkter Code" })
+    String SID_SID_WRITE_RESTRICTED_CODE();
+
+    @Default(lngs = { "en", "de" }, values = { "NTLM Authentication", "NTLM-Authentifizierung" })
+    String SID_SID_NTLM_AUTHENTICATION();
+
+    @Default(lngs = { "en", "de" }, values = { "SChannel Authentication", "SChannel-Authentifizierung" })
+    String SID_SID_SCHANNEL_AUTHENTICATION();
+
+    @Default(lngs = { "en", "de" }, values = { "Digest Authentication", "Digest-Authentifizierung" })
+    String SID_SID_DIGEST_AUTHENTICATION();
+
+    @Default(lngs = { "en", "de" }, values = { "This Organization Certificate", "Zertifikat dieser Organisation" })
+    String SID_SID_THIS_ORGANIZATION_CERTIFICATE();
+
+    @Default(lngs = { "en", "de" }, values = { "NT Service", "NT-Dienst" })
+    String SID_SID_NT_SERVICE();
+
+    @Default(lngs = { "en", "de" }, values = { "User-mode Drivers", "Benutzermodus-Treiber" })
+    String SID_SID_USER_MODE_DRIVERS();
+
+    @Default(lngs = { "en", "de" }, values = { "Local Account", "Lokales Konto" })
+    String SID_SID_LOCAL_ACCOUNT();
+
+    @Default(lngs = { "en", "de" }, values = { "Local Account and Member of Administrators", "Lokales Konto und Mitglied der Administratoren" })
+    String SID_SID_LOCAL_ACCOUNT_AND_MEMBER_OF_ADMINISTRATORS_GROUP();
+
+    @Default(lngs = { "en", "de" }, values = { "Other Organization", "Andere Organisation" })
+    String SID_SID_OTHER_ORGANIZATION();
+
+    @Default(lngs = { "en", "de" }, values = { "All App Packages", "Alle App-Pakete" })
+    String SID_SID_ALL_APP_PACKAGES();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level Untrusted", "Vertrauensstufe Nicht vertrauenswürdig" })
+    String SID_SID_ML_UNTRUSTED();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level Low", "Vertrauensstufe Niedrig" })
+    String SID_SID_ML_LOW();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level Medium", "Vertrauensstufe Mittel" })
+    String SID_SID_ML_MEDIUM();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level Medium Plus", "Vertrauensstufe Mittel Plus" })
+    String SID_SID_ML_MEDIUM_PLUS();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level High", "Vertrauensstufe Hoch" })
+    String SID_SID_ML_HIGH();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level System", "Vertrauensstufe System" })
+    String SID_SID_ML_SYSTEM();
+
+    @Default(lngs = { "en", "de" }, values = { "Mandatory Level Protected Process", "Vertrauensstufe Geschützter Prozess" })
+    String SID_SID_ML_PROTECTED_PROCESS();
+
+    @Default(lngs = { "en", "de" }, values = { "Authentication Authority Asserted Identity", "Von Authentifizierungsstelle bestätigte Identität" })
+    String SID_SID_AUTHENTICATION_AUTHORITY_ASSERTED_IDENTITY();
+
+    @Default(lngs = { "en", "de" }, values = { "Service Asserted Identity", "Vom Dienst bestätigte Identität" })
+    String SID_SID_SERVICE_ASSERTED_IDENTITY();
+
+    @Default(lngs = { "en", "de" }, values = { "Fresh Public Key Identity", "Frische öffentliche Schlüssel-Identität" })
+    String SID_SID_FRESH_PUBLIC_KEY_IDENTITY();
+
+    @Default(lngs = { "en", "de" }, values = { "Key Trust Identity", "Schlüssel-Vertrauensidentität" })
+    String SID_SID_KEY_TRUST_IDENTITY();
+
+    @Default(lngs = { "en", "de" }, values = { "Key Property MFA", "Schlüsseleigenschaft MFA" })
+    String SID_SID_KEY_PROPERTY_MFA();
+
+    @Default(lngs = { "en", "de" }, values = { "Key Property Attestation", "Schlüsseleigenschaft Attestation" })
+    String SID_SID_KEY_PROPERTY_ATTESTATION();
 }

@@ -70,11 +70,13 @@ import org.appwork.utils.net.httpconnection.trust.ccadb.CCADBTrustProvider;
  * AWTest that reads the CCADB common-ca-database.pem, loads all certificates, and verifies each certificate against trusted external
  * platforms (crt.sh, optionally others). Uses SHA-256 fingerprint to query crt.sh; certificates found in Certificate Transparency logs are
  * considered cross-checked. Loads https://crt.sh/?q=&lt;sha256&gt; and parses key info (crt.sh ID, Summary, fingerprints, revocation). Same
- * Successful (found) fingerprints are persisted under user.home/.tests and not re-checked for 12 hours.
+ * Successful (found) fingerprints are persisted under user.home/.tests and not re-checked for 7 days plus a
+ * deterministic 0–7 day spread per fingerprint (so 7–14 days total), to distribute re-verification over multiple days.
  */
 public class CCADBCertificateVerificationTest extends AWTest {
-    private static final long                                       MILLIS_PER_DAY  = 86400_000L;
-    private static final long                                       CACHE_VALID_MS  = 7 * 24 * 3600 * 1000L;                           // 12h
+    private static final long                                       MILLIS_PER_DAY  = 86400000L;
+    /** Base cache validity: 7 days. Actual validity per fingerprint is 7 + (0..7) days via {@link #getCacheValidMs(String)}. */
+    private static final long                                       CACHE_VALID_BASE_MS = 7 * MILLIS_PER_DAY;
     private static final ConcurrentHashMap<String, CrtshCacheEntry> CRTSH_CACHE     = new ConcurrentHashMap<String, CrtshCacheEntry>();
     private static final ConcurrentHashMap<String, Long>            PERSISTED_FOUND = new ConcurrentHashMap<String, Long>();
     private static final Object                                     FILE_LOCK       = new Object();
@@ -134,6 +136,14 @@ public class CCADBCertificateVerificationTest extends AWTest {
 
     public static void main(final String[] args) {
         run();
+    }
+
+    /**
+     * @see org.appwork.testframework.AWTest#isSkipOnUnchangedDependencies()
+     */
+    @Override
+    public boolean isSkipOnUnchangedDependencies() {
+        return false;
     }
 
     @Override
@@ -214,14 +224,26 @@ public class CCADBCertificateVerificationTest extends AWTest {
     }
 
     /**
+     * Cache validity for a fingerprint: 7 days + 0..7 days deterministic spread (based on fingerprint hash) so that
+     * expiries are distributed over multiple days and not all re-verifications happen on the same day.
+     */
+    private static long getCacheValidMs(final String sha256Hex) {
+        if (sha256Hex == null) {
+            return CACHE_VALID_BASE_MS;
+        }
+        final int extraDays = Math.abs(sha256Hex.hashCode()) % 8; // 0..7
+        return CACHE_VALID_BASE_MS + extraDays * MILLIS_PER_DAY;
+    }
+
+    /**
      * Load https://crt.sh/?q=&lt;sha256&gt; and parse the main certificate information. Returns null if not found or on error. Uses
-     * persisted cache (user.home/.tests): if fingerprint was successfully verified within 12h, returns cached result without HTTP.
+     * persisted cache (user.home/.tests): if fingerprint was successfully verified within 7–14 days (spread per fingerprint), returns cached result without HTTP.
      */
     static CrtshInfo fetchAndParseCrtsh(final String sha256Hex) {
         final long now = System.currentTimeMillis();
         final Long cachedAt = PERSISTED_FOUND.get(sha256Hex);
-        if (cachedAt != null && (now - cachedAt.longValue()) < CACHE_VALID_MS + TimeUnit.DAYS.toMillis(1) * Math.random()) {
-            return new CrtshInfo("cached", "(cached, verified within 12h)", sha256Hex, "", "", false);
+        if (cachedAt != null && (now - cachedAt.longValue()) < getCacheValidMs(sha256Hex)) {
+            return new CrtshInfo("cached", "(cached, verified within 7–14 days)", sha256Hex, "", "", false);
         }
         final long dayIndex = now / MILLIS_PER_DAY;
         final CrtshCacheEntry memEntry = CRTSH_CACHE.get(sha256Hex);
@@ -312,7 +334,7 @@ public class CCADBCertificateVerificationTest extends AWTest {
         }
         final long now = System.currentTimeMillis();
         final Long cachedAt = PERSISTED_FOUND.get(key);
-        if (cachedAt != null && (now - cachedAt.longValue()) < CACHE_VALID_MS) {
+        if (cachedAt != null && (now - cachedAt.longValue()) < getCacheValidMs(key)) {
             return true;
         }
         final long dayIndex = now / MILLIS_PER_DAY;

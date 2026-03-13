@@ -43,7 +43,7 @@ import java.io.StringWriter;
 
 /**
  * Runner class that executes serialized {@link JRETestTask} instances in a child JRE process. This class is used internally by
- * {@link TestJREProvider#runInJRE(org.appwork.utils.JavaVersion, JRETestTask)}.
+ * {@link JREExecuter#runInJRE(JREExecuter.JreOptions, JRETestTask)}.
  * <p>
  * The task is read from a file path passed as command line argument (to avoid stdin issues).
  * <p>

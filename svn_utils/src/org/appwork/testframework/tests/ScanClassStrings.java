@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -65,6 +65,11 @@ public class ScanClassStrings extends AWTest {
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
+    public boolean isSkipOnUnchangedDependencies() {
+        return false;
+    }
+
+    @Override
     public void runTest() throws Exception {
         if (isPostBuildTest()) {
             return;
@@ -72,7 +77,7 @@ public class ScanClassStrings extends AWTest {
         new ClassPathScanner<Exception>() {
             protected void handle(java.lang.Class<?> cls, File root) throws Exception {
                 if (!Application.isJared(null) && root.isFile()) {
-                    // jar in ide. this is probabl now our own class
+                    // jar in ide. this is probabl not our own class
                     return;
                 }
                 super.handle(cls, root);

@@ -437,9 +437,12 @@ public class HttpClientComparisonTest extends HttpServerTestBase {
             connection.setDoInput(true);
 
             // Write POST data
-            try (OutputStream outputStream = connection.getOutputStream()) {
+            OutputStream outputStream = connection.getOutputStream();
+            try {
                 outputStream.write(postData);
                 outputStream.flush();
+            } finally {
+                outputStream.close();
             }
 
             // Read response

@@ -62,7 +62,6 @@ import org.appwork.utils.net.httpserver.ConnectionTimeouts;
  * @author AppWork
  */
 public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -71,6 +70,7 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
     public void runTest() throws Exception {
         try {
             this.setupServer();
+            this.warmupTrustCheck();
             this.testDefaultSocketTimeout();
             this.testCustomSocketTimeout();
             this.testSocketTimeoutEnforcement();
@@ -79,6 +79,21 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
         } finally {
             this.teardownServer();
         }
+    }
+
+    /**
+     * Warmup: Trigger socket address validator a few times so that first-call overhead (native/Windows API) does not
+     * affect timing tests.
+     */
+    private void warmupTrustCheck() throws Exception {
+        LogV3.info("Warmup: socket address validator (a few requests so timing tests are stable)");
+        final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("warmup", "UTF-8");
+        for (int i = 0; i < 8; i++) {
+            this.httpClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");
+            final RequestContext ctx = this.httpClient.get(url);
+            assertTrue(ctx.getCode() == 200, "Warmup request " + (i + 1) + " should succeed, was: " + ctx.getCode());
+        }
+        LogV3.info("Warmup done");
     }
 
     /**
@@ -101,12 +116,10 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
         final int customTimeout = (int) TimeUnit.SECONDS.toMillis(10); // 10 seconds
         final ConnectionTimeouts customTimeouts = new ConnectionTimeouts(customTimeout);
         httpServer.setConnectionTimeouts(customTimeouts);
-
         final ConnectionTimeouts retrievedTimeouts = httpServer.getConnectionTimeouts();
         assertTrue(retrievedTimeouts != null, "ConnectionTimeouts should be configured");
         assertTrue(retrievedTimeouts.getSocketTimeoutMs() == customTimeout, "Custom socket timeout should be " + customTimeout + "ms, was: " + retrievedTimeouts.getSocketTimeoutMs());
         assertTrue(retrievedTimeouts.getSocketTimeoutMs() > 0, "Socket timeout should be enabled");
-
         // Restore default
         httpServer.setConnectionTimeouts(new ConnectionTimeouts());
         LogV3.info("Custom Socket Timeout test successful: " + customTimeout + "ms");
@@ -126,12 +139,11 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
         final int shortTimeout = (int) TimeUnit.SECONDS.toMillis(2); // 2 seconds
         final ConnectionTimeouts shortTimeouts = new ConnectionTimeouts(shortTimeout);
         httpServer.setConnectionTimeouts(shortTimeouts);
-
+        httpServer.setVerboseLog(true);
         try {
             // Open a socket connection but don't send any data
             final Socket testSocket = new Socket("localhost", this.serverPort);
             // Don't set client timeout - we want to test the server timeout
-
             // Try to read from the socket - server should close connection after ~2 seconds
             // Note: Draining is skipped for SocketTimeoutException, so no additional drain timeout
             final InputStream is = testSocket.getInputStream();
@@ -142,7 +154,6 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
                 // Expected: Server timeout after 2s, no draining (because socket is dead), immediate connection close
                 final int byteRead = is.read();
                 final long elapsed = System.currentTimeMillis() - startTime;
-
                 assertTrue(lastServerException instanceof SocketTimeoutException, "We expect a read timeout while reading the header");
                 // -1 means connection closed by server (this is what should happen)
                 assertTrue(byteRead == -1, "Expected EOF (read() == -1) after server timeout, got: " + byteRead);
@@ -165,7 +176,6 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
                 } catch (final IOException e) {
                 }
             }
-
             LogV3.info("Socket Timeout Enforcement test successful");
         } finally {
             // Restore default
@@ -183,12 +193,10 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
         LogV3.info("Test: Socket Timeout Disabled");
         final ConnectionTimeouts disabledTimeouts = new ConnectionTimeouts(-1);
         httpServer.setConnectionTimeouts(disabledTimeouts);
-
         final ConnectionTimeouts retrievedTimeouts = httpServer.getConnectionTimeouts();
         assertTrue(retrievedTimeouts != null, "ConnectionTimeouts should be configured");
         assertTrue(retrievedTimeouts.getSocketTimeoutMs() == -1, "Disabled socket timeout should be -1, was: " + retrievedTimeouts.getSocketTimeoutMs());
         assertTrue(retrievedTimeouts.getSocketTimeoutMs() <= 0, "Socket timeout should be disabled");
-
         // Verify that normal requests still work (server should use fallback default)
         lastServerException = null;
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("test", "UTF-8");
@@ -198,7 +206,6 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
         assertTrue(responseCode == 200, "Request should succeed even with disabled timeout (using fallback), was: " + responseCode);
         // Server-side: No exception should occur
         assertTrue(lastServerException == null, "Server-side: No exception expected for successful request, but got: " + lastServerException);
-
         // Restore default
         httpServer.setConnectionTimeouts(new ConnectionTimeouts());
         LogV3.info("Socket Timeout Disabled test successful");
@@ -211,7 +218,6 @@ public class HttpServerConnectionTimeoutsTest extends HttpServerTestBase {
         LogV3.info("Test: Normal Request with Default Timeout");
         // Ensure default timeout is set
         httpServer.setConnectionTimeouts(new ConnectionTimeouts());
-
         lastServerException = null;
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + URLEncoder.encode("Hello", "UTF-8");
         this.httpClient.putRequestHeader(HTTPConstants.X_APPWORK, "1");

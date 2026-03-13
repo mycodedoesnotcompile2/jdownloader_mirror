@@ -97,7 +97,12 @@ public class TestHttpProxyServer {
             port = serverSocket.getLocalPort();
         }
         running.set(true);
-        serverThread = new Thread(this::runServer, "TestHttpProxyServer-" + port);
+        serverThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runServer();
+            }
+        }, "TestHttpProxyServer-" + port);
         serverThread.setDaemon(true);
         serverThread.start();
         LogV3.info("TestHttpProxyServer started on port " + port);
@@ -144,7 +149,12 @@ public class TestHttpProxyServer {
         while (running.get()) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                new Thread(() -> handleClient(clientSocket), "ProxyHandler-" + clientSocket.getRemoteSocketAddress()).start();
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        handleClient(clientSocket);
+                    }
+                }, "ProxyHandler-" + clientSocket.getRemoteSocketAddress()).start();
             } catch (IOException e) {
                 if (running.get()) {
                     LogV3.log(e);
@@ -238,15 +248,18 @@ public class TestHttpProxyServer {
 
             // Forward data bidirectionally
             final Socket finalTargetSocket = targetSocket;
-            Thread forwardToTarget = new Thread(() -> {
-                try {
-                    forwardData(input, finalTargetSocket.getOutputStream());
-                } catch (IOException e) {
-                    // Connection closed
-                } finally {
+            Thread forwardToTarget = new Thread(new Runnable() {
+                @Override
+                public void run() {
                     try {
-                        finalTargetSocket.close();
+                        forwardData(input, finalTargetSocket.getOutputStream());
                     } catch (IOException e) {
+                        // Connection closed
+                    } finally {
+                        try {
+                            finalTargetSocket.close();
+                        } catch (IOException e) {
+                        }
                     }
                 }
             }, "ForwardToTarget");

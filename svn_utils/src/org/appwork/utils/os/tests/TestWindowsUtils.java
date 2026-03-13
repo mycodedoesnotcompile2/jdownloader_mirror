@@ -38,16 +38,23 @@ import java.io.File;
 import java.util.List;
 import java.util.Set;
 
+import org.appwork.processes.ProcessHandler;
 import org.appwork.processes.ProcessHandlerFactory;
 import org.appwork.processes.ProcessInfo;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
+import org.appwork.testframework.TestInterface;
+import org.appwork.testframework.executer.AdminExecuter;
+import org.appwork.testframework.executer.ElevatedTestTask;
 import org.appwork.utils.Time;
 import org.appwork.utils.Timeout;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.JNAProcessInfo;
 import org.appwork.utils.os.WindowsUtils;
+import org.appwork.storage.TypeRef;
 
+import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.Advapi32Util.Account;
 
 /**
@@ -60,6 +67,19 @@ import com.sun.jna.platform.win32.Advapi32Util.Account;
 public class TestWindowsUtils extends AWTest {
     private static final String TEST_DIR = System.getProperty("java.io.tmpdir") + "/WindowsUtilsTest";
     private File                testDir;
+
+    /** Serializable task for runAsAdmin; must not capture outer test instance. */
+    private static class ElevatedCheckTask implements ElevatedTestTask {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public java.io.Serializable run() throws Exception {
+            if (!WindowsUtils.isElevated()) {
+                throw new Exception("Expected Admin");
+            }
+            return null;
+        }
+    }
 
     /**
      * Test user account and SID related functionality
@@ -139,22 +159,22 @@ public class TestWindowsUtils extends AWTest {
         // Test startElevatedProcess (returns JNAProcessInfo with handle, commandLine, workingDirectory)
         long started = Time.now();
         Timeout timeout = new Timeout(60 * 60000l);
-        org.appwork.utils.os.JNAProcessInfo processInfo = null;
+        JNAProcessInfo processInfo = null;
+        AdminExecuter.runAsAdmin(new ElevatedCheckTask(), TypeRef.OBJECT);
         while (true) {
             try {
                 processInfo = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "appwork.org" }, null, false);
                 break;
-            } catch (com.sun.jna.platform.win32.Win32Exception e) {
+            } catch (Win32Exception e) {
                 if (timeout.isAlive() && 1223 == e.getErrorCode()) {
                     continue;
                 } else {
                     logInfoAnyway("ErrorCode: " + e.getErrorCode());
-
                     throw e;
                 }
             }
         }
-        org.appwork.processes.ProcessHandler handler = ProcessHandlerFactory.getProcessHandler();
+        ProcessHandler handler = ProcessHandlerFactory.getProcessHandler();
         try {
             assertTrue(processInfo.getPid() > 0);
             assertTrue(processInfo.getCommandLine() != null && processInfo.getCommandLine().length() > 0);
@@ -188,7 +208,7 @@ public class TestWindowsUtils extends AWTest {
     }
 
     /**
-     * @see org.appwork.testframework.TestInterface#runTest()
+     * @see TestInterface#runTest()
      */
     @Override
     public void runTest() throws Exception {

@@ -78,6 +78,7 @@ public class HttpServerAttackScenariosTest extends HttpServerTestBase {
     public void runTest() throws Exception {
         try {
             this.setupServer();
+            this.warmupForTimingTests();
             this.testNormalRequest();
             this.testLongGetParameters();
             this.testLargePostBody();
@@ -94,6 +95,20 @@ public class HttpServerAttackScenariosTest extends HttpServerTestBase {
     }
 
     /**
+     * Warmup: A few requests so that first-call overhead (JVM, server, trust check) does not affect
+     * timing assertions in the following tests.
+     */
+    private void warmupForTimingTests() throws Exception {
+        LogV3.info("Warmup: a few requests so timing tests are stable");
+        final String url = "http://localhost:" + this.serverPort + "/test/echo?message=" + URLEncode.encodeURIComponent("warmup");
+        for (int i = 0; i < 8; i++) {
+            final RequestContext ctx = this.httpClient.get(url);
+            assertTrue(ctx.getCode() == 200, "Warmup request " + (i + 1) + " should succeed, was: " + ctx.getCode());
+        }
+        LogV3.info("Warmup done");
+    }
+
+    /**
      * Test: Normal request should work
      */
     private void testNormalRequest() throws Exception {
@@ -107,10 +122,8 @@ public class HttpServerAttackScenariosTest extends HttpServerTestBase {
         final long elapsed = System.currentTimeMillis() - startTime;
         assertTrue(responseCode == 200, "Response Code should be 200, was: " + responseCode);
         assertTrue(lastServerException == null, "Server-side: No exception expected for normal request, but got: " + lastServerException);
-        // Timing validation: First request after server start (includes JVM warmup)
-        // - Measured: 1003-1043ms across 5 runs (JVM warmup overhead!)
-        // - Expected for subsequent requests: 5-50ms
-        // - Max allowed: 1500ms (1.5x measured max, accounts for JVM warmup on slow machines)
+        // Timing validation: warmup runs before tests, so this request is not cold
+        // - Expected: 5-50ms typically; max allowed: 1500ms (safety margin on slow machines)
         assertTrue(elapsed < 1500, "Normal request should complete within 1500ms, took: " + elapsed + "ms");
         assertTrue(elapsed > 0, "Request duration should be positive, was: " + elapsed + "ms");
         LogV3.info("Normal request successful: " + responseCode + " in " + elapsed + "ms");

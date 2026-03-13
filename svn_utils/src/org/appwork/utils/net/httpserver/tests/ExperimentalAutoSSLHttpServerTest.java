@@ -189,8 +189,11 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
         LogV3.info("SSL context created from in-memory keystore");
         this.tempKeystoreFile = File.createTempFile("test-server-", ".p12");
         this.tempKeystoreFile.deleteOnExit();
-        try (FileOutputStream fos = new FileOutputStream(this.tempKeystoreFile)) {
+        FileOutputStream fos = new FileOutputStream(this.tempKeystoreFile);
+        try {
             serverKeyStore.store(fos, password);
+        } finally {
+            fos.close();
         }
         LogV3.info("PKCS12 temp file for PFX tests: " + this.tempKeystoreFile.getAbsolutePath());
     }
@@ -465,7 +468,9 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
         try {
             trustAllContext = SSLContext.getInstance("TLS");
             trustAllContext.init(null, trustAllCerts, new java.security.SecureRandom());
-        } catch (final NoSuchAlgorithmException | KeyManagementException e) {
+        } catch (final NoSuchAlgorithmException e) {
+            throw new IOException("Failed to create trust-all SSL context", e);
+        } catch (final KeyManagementException e) {
             throw new IOException("Failed to create trust-all SSL context", e);
         }
         try {
@@ -490,17 +495,28 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
                 LogV3.warning("Java URL HTTPS request returned: " + responseCode);
                 final InputStream errorStream = connection.getErrorStream();
                 if (errorStream != null) {
-                    try (final BufferedReader reader = new BufferedReader(new InputStreamReader(errorStream))) {
+                    BufferedReader reader = null;
+                    try {
+                        reader = new BufferedReader(new InputStreamReader(errorStream));
                         String line;
                         while ((line = reader.readLine()) != null) {
                             LogV3.warning("Error response: " + line);
+                        }
+                    } finally {
+                        if (reader != null) {
+                            try {
+                                reader.close();
+                            } catch (IOException e) {
+                            }
                         }
                     }
                 }
             }
             assertTrue(responseCode == 200, "Java URL HTTPS request should return 200, was: " + responseCode);
             // Read response body
-            try (final BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+            BufferedReader reader = null;
+            try {
+                reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                 final StringBuilder responseBody = new StringBuilder();
                 String line;
                 while ((line = reader.readLine()) != null) {
@@ -510,6 +526,13 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
                 assertTrue(response != null, "Java URL HTTPS response body should not be null");
                 assertTrue(response.contains("Hello Java URL"), "Java URL HTTPS response should contain request message");
                 LogV3.info("Java URL HTTPS response: " + response.trim());
+            } finally {
+                if (reader != null) {
+                    try {
+                        reader.close();
+                    } catch (IOException e) {
+                    }
+                }
             }
             LogV3.info("HTTPS-Only Server test with Java URL.openConnection() passed");
         } catch (final Exception e) {
@@ -679,11 +702,20 @@ public class ExperimentalAutoSSLHttpServerTest extends AWTest {
             final String httpsUrl = "https://localhost:" + testPort + "/test/echo?message=" + URLEncoder.encode("HTTPS", "UTF-8");
             try {
                 final SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-                try (final SSLSocket socket = (SSLSocket) factory.createSocket()) {
+                SSLSocket socket = null;
+                try {
+                    socket = (SSLSocket) factory.createSocket();
                     socket.connect(new InetSocketAddress("localhost", testPort), 2000);
                     socket.setSoTimeout(2000);
                     socket.startHandshake();
                     LogV3.info("HTTPS handshake unexpectedly succeeded without SSL context: " + httpsUrl);
+                } finally {
+                    if (socket != null) {
+                        try {
+                            socket.close();
+                        } catch (IOException e) {
+                        }
+                    }
                 }
             } catch (final SSLException e) {
                 // Expected - HTTPS should fail without SSL context

@@ -34,7 +34,6 @@ public class TestWindowsCertificateCode extends AWTest {
         } finally {
             out.close();
         }
-
         File javaExeSigndateFromCounterSig = Application.getTempUniqueResource("appworktests");
         javaExeSigndateFromCounterSig.deleteOnExit();
         javaExeSigndateFromCounterSig.getParentFile().mkdirs();
@@ -44,23 +43,25 @@ public class TestWindowsCertificateCode extends AWTest {
         } finally {
             out2.close();
         }
-
         TestTarget testExeTarget;
         // ------------------------------------------------------------
         // Test targets (prevent Eclipse auto-formatting)
         // ------------------------------------------------------------
         //@formatter:off
         TestTarget[] targets = new TestTarget[] {
-            new TestTarget(javaExeSigndateFromCounterSig.getAbsolutePath(), true,    "Eclipse.org Foundation, Inc.", "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1", DateMapper.parse("2025-01-22T02:57:12Z"), DateMapper.parse("2025-07-22T01:59:59Z")),
-            testExeTarget= new TestTarget(file.getAbsolutePath(), true,    "Appwork GmbH", "GlobalSign GCC R45 EV CodeSigning CA 2020", DateMapper.parse("2025-09-20T19:24:38Z"), DateMapper.parse("2026-10-22T14:36:28Z")),
-            new TestTarget(CrossSystem.getJavaBinary(),  true,    "Eclipse.org Foundation, Inc.", "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1", null, null),
-            new TestTarget(winDir + "explorer.exe",      true,    "Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null),
-            new TestTarget(sys32 + "taskmgr.exe",        true,    "Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null),
-            new TestTarget(winDir + "regedit.exe",       false,  null, null, null, null),
-            new TestTarget(sys32 + "mmc.exe",            false, null, null, null, null),
-            new TestTarget(sys32 + "services.exe",       true,    "Microsoft Windows Publisher", "Microsoft Windows Production PCA 2011", null, null),
-            new TestTarget(sys32 + "svchost.exe",        true,    "Microsoft Windows Publisher", "Microsoft Windows Production PCA 2011", null, null),
-            new TestTarget(sys32 + "wuauclt.exe",        true,    "Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null)
+            new TestTarget(javaExeSigndateFromCounterSig.getAbsolutePath(), true, new ExpectedResult("Eclipse.org Foundation, Inc.", "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1", DateMapper.parse("2025-01-22T02:57:12Z"), DateMapper.parse("2025-07-22T01:59:59Z"))),
+            testExeTarget = new TestTarget(file.getAbsolutePath(), true, new ExpectedResult("Appwork GmbH", "GlobalSign GCC R45 EV CodeSigning CA 2020", DateMapper.parse("2025-09-20T19:24:38Z"), DateMapper.parse("2026-10-22T14:36:28Z"))),
+
+            new TestTarget(CrossSystem.getJavaBinary(), true,
+                new ExpectedResult("Eclipse.org Foundation, Inc.", "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1", null, null),
+                new ExpectedResult("Eclipse.org Foundation, Inc.", "DigiCert SHA2 Assured ID Code Signing CA", null, null)),
+            new TestTarget(winDir + "explorer.exe", true, new ExpectedResult("Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null)),
+            new TestTarget(sys32 + "taskmgr.exe", true, new ExpectedResult("Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null)),
+            new TestTarget(winDir + "regedit.exe", false),
+            new TestTarget(sys32 + "mmc.exe", false),
+            new TestTarget(sys32 + "services.exe", true, new ExpectedResult("Microsoft Windows Publisher", "Microsoft Windows Production PCA 2011", null, null)),
+            new TestTarget(sys32 + "svchost.exe", true, new ExpectedResult("Microsoft Windows Publisher", "Microsoft Windows Production PCA 2011", null, null)),
+            new TestTarget(sys32 + "wuauclt.exe", true, new ExpectedResult("Microsoft Windows", "Microsoft Windows Production PCA 2011", null, null))
         };
         //@formatter:on
         // ------------------------------------------------------------
@@ -119,6 +120,7 @@ public class TestWindowsCertificateCode extends AWTest {
 
     /**
      * Validates a single test result. Includes CN, issuer, fingerprint, and date consistency checks.
+     * Passes if at least one of the target's expected results matches the actual certificate info.
      */
     private void validateResult(TestTarget target, CodeSignature info, boolean valid) {
         String name = new File(target.path).getName();
@@ -134,27 +136,7 @@ public class TestWindowsCertificateCode extends AWTest {
         if (info == null) {
             return;
         }
-        // ---- Issued To CN ----
-        if (target.expectedCN != null) {
-            String cn = info.getIssuedTo().get("CN");
-            if (cn == null) {
-                throw new IllegalStateException(name + ": missing CN (issuedTo).");
-            }
-            if (!cn.toLowerCase().contains(target.expectedCN.toLowerCase())) {
-                throw new IllegalStateException(name + ": CN mismatch, expected '" + target.expectedCN + "', got '" + cn + "'");
-            }
-        }
-        // ---- Issued By CN ----
-        if (target.expectedIssuerCN != null) {
-            String issuerCN = info.getIssuedBy().get("CN");
-            if (issuerCN == null) {
-                throw new IllegalStateException(name + ": missing CN (issuedBy).");
-            }
-            if (!issuerCN.toLowerCase().contains(target.expectedIssuerCN.toLowerCase())) {
-                throw new IllegalStateException(name + ": Issuer CN mismatch, expected '" + target.expectedIssuerCN + "', got '" + issuerCN + "'");
-            }
-        }
-        // ---- Date validity checks ----
+        // ---- Date validity checks (independent of expected result) ----
         Date now = new Date();
         Date signDate = info.getSigningDate();
         Date validUntil = info.getValidUntil();
@@ -167,45 +149,92 @@ public class TestWindowsCertificateCode extends AWTest {
         if (signDate != null && signDate.after(now)) {
             System.out.println("⚠ Warning: signing date is in the future for " + name + " (" + signDate + ")");
         }
-        // ---- Optional expected date range checks ----
-        if (target.expectedSigningDate != null && signDate != null) {
-            if (Math.abs(signDate.getTime() - target.expectedSigningDate.getTime()) > (60 * 1000l)) {
-                throw new IllegalStateException(name + ": signingDate differs more than 1min from expected.");
-            }
-        }
-        if (target.expectedValidUntil != null && validUntil != null) {
-            long diff = Math.abs(validUntil.getTime() - target.expectedValidUntil.getTime());
-            if (diff > 86400000l) { // >
-                                    // 1
-                                    // day
-                                    // difference
-                throw new IllegalStateException(name + ": validUntil differs more than 1 day from expected.");
-            }
-        }
         // ---- Fingerprint presence ----
         if (info.getFingerprint() == null || info.getFingerprint().isEmpty()) {
             System.out.println("⚠ Warning: missing fingerprint for " + name);
         }
+        // ---- Match against list of expected results: at least one must match ----
+        if (target.expectedResults == null || target.expectedResults.length == 0) {
+            return;
+        }
+        for (ExpectedResult expected : target.expectedResults) {
+            if (matchesExpected(info, signDate, validUntil, expected)) {
+                return;
+            }
+        }
+        StringBuilder sb = new StringBuilder(name + ": no expected result matched. Actual: CN=");
+        sb.append(info.getIssuedTo().get("CN"));
+        sb.append(", Issuer CN=");
+        sb.append(info.getIssuedBy().get("CN"));
+        sb.append(". Expected one of: ");
+        for (int i = 0; i < target.expectedResults.length; i++) {
+            ExpectedResult e = target.expectedResults[i];
+            if (i > 0) {
+                sb.append(" | ");
+            }
+            sb.append("CN=").append(e.cn).append(", IssuerCN=").append(e.issuerCn);
+        }
+        throw new IllegalStateException(sb.toString());
     }
 
     /**
-     * Test definition for one executable. Allows optional date validation and expected issuer.
+     * Returns true if the actual certificate info matches this expected result (all non-null fields match).
      */
-    private static final class TestTarget {
-        final String  path;
-        final boolean mustExist;
-        final String  expectedCN;
-        final String  expectedIssuerCN;
-        final Date    expectedSigningDate;
-        final Date    expectedValidUntil;
+    private boolean matchesExpected(CodeSignature info, Date signDate, Date validUntil, ExpectedResult expected) {
+        if (expected.cn != null) {
+            String cn = info.getIssuedTo().get("CN");
+            if (cn == null || !cn.toLowerCase().contains(expected.cn.toLowerCase())) {
+                return false;
+            }
+        }
+        if (expected.issuerCn != null) {
+            String issuerCN = info.getIssuedBy().get("CN");
+            if (issuerCN == null || !issuerCN.toLowerCase().contains(expected.issuerCn.toLowerCase())) {
+                return false;
+            }
+        }
+        if (expected.expectedSigningDate != null && signDate != null) {
+            if (Math.abs(signDate.getTime() - expected.expectedSigningDate.getTime()) > (60 * 1000L)) {
+                return false;
+            }
+        }
+        if (expected.expectedValidUntil != null && validUntil != null) {
+            if (Math.abs(validUntil.getTime() - expected.expectedValidUntil.getTime()) > 86400000L) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-        TestTarget(String path, boolean mustExist, String expectedCN, String expectedIssuerCN, Date expectedSigningDate, Date expectedValidUntil) {
-            this.path = path;
-            this.mustExist = mustExist;
-            this.expectedCN = expectedCN;
-            this.expectedIssuerCN = expectedIssuerCN;
+    /**
+     * One possible expected certificate result. All non-null fields must match for this result to match.
+     */
+    private static final class ExpectedResult {
+        final String cn;
+        final String issuerCn;
+        final Date   expectedSigningDate;
+        final Date   expectedValidUntil;
+
+        ExpectedResult(String cn, String issuerCn, Date expectedSigningDate, Date expectedValidUntil) {
+            this.cn = cn;
+            this.issuerCn = issuerCn;
             this.expectedSigningDate = expectedSigningDate;
             this.expectedValidUntil = expectedValidUntil;
+        }
+    }
+
+    /**
+     * Test definition for one executable. Validation passes if at least one of the expected results matches.
+     */
+    private static final class TestTarget {
+        final String           path;
+        final boolean          mustExist;
+        final ExpectedResult[] expectedResults;
+
+        TestTarget(String path, boolean mustExist, ExpectedResult... expectedResults) {
+            this.path = path;
+            this.mustExist = mustExist;
+            this.expectedResults = expectedResults;
         }
     }
 

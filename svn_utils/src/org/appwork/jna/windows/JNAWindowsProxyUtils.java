@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -47,7 +47,9 @@ import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.NotSupportedException;
 
+import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinReg;
 
@@ -84,6 +86,43 @@ public class JNAWindowsProxyUtils {
         } catch (final Win32Exception e) {
             if (e.getErrorCode() != com.sun.jna.platform.win32.WinError.ERROR_FILE_NOT_FOUND) {
                 LogV3.log(e);
+            }
+        } catch (final Throwable e) {
+            LogV3.log(e);
+        }
+        return null;
+    }
+
+    /**
+     * Gets the PAC script URL via WPAD (Web Proxy Auto-Discovery) using WinHTTP WinHttpDetectAutoProxyConfigUrl.
+     * Uses DHCP and DNS to discover the PAC file URL; does not use the registry AutoConfigURL. Can be slow (blocking).
+     * Requires JNA and WinHTTP (winhttp.dll).
+     *
+     * @return The PAC script URL if discovered by WPAD, null otherwise
+     * @throws NotSupportedException if not running on Windows
+     */
+    public static String getWindowsPACScriptURLViaWPAD() throws NotSupportedException {
+        if (!CrossSystem.isWindows()) {
+            throw new NotSupportedException("JNAWindowsProxyUtils is only supported on Windows");
+        }
+        if (!JNAHelper.isJNAAvailable()) {
+            return null;
+        }
+        try {
+            final PointerByReference pref = new PointerByReference();
+            final boolean ok = WinHttp.INSTANCE.WinHttpDetectAutoProxyConfigUrl(WinHttp.WINHTTP_AUTO_DETECT_TYPE_DHCP | WinHttp.WINHTTP_AUTO_DETECT_TYPE_DNS_A, pref);
+            if (!ok || pref.getValue() == null) {
+                LogV3.fine("JNAWindowsProxyUtils: WinHttpDetectAutoProxyConfigUrl failed or no URL (GetLastError=" + Kernel32.INSTANCE.GetLastError() + ")");
+                return null;
+            }
+            try {
+                final String url = pref.getValue().getWideString(0);
+                if (!StringUtils.isEmpty(url)) {
+                    LogV3.info("JNAWindowsProxyUtils: WPAD PAC URL: " + url);
+                    return url;
+                }
+            } finally {
+                Kernel32.INSTANCE.GlobalFree(pref.getValue());
             }
         } catch (final Throwable e) {
             LogV3.log(e);

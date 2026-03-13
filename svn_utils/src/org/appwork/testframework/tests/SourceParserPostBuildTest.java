@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -58,6 +58,11 @@ public class SourceParserPostBuildTest implements PostBuildTestInterface {
      *
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
+    @Override
+    public boolean isSkipOnUnchangedDependencies() {
+        return false;
+    }
+
     @Override
     public void runPostBuildTest(String[] args, File applicationRoot) throws Exception {
         final ParameterParser pp = new ParameterParser(args).parse();

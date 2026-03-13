@@ -302,6 +302,20 @@ public class IDETestRunner {
                 }
             }
             if (skip) {
+                try {
+                    final Class<?> clsForCheck = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
+                    if (TestInterface.class.isAssignableFrom(clsForCheck)) {
+                        TestInterface inst = (TestInterface) ClassCache.getClassCache(clsForCheck).getInstance();
+                        if (inst != null && !inst.isSkipOnUnchangedDependencies()) {
+                            skip = false;
+                            AWTest.logInfoAnyway(testClass + " always run (isSkipOnUnchangedDependencies=false)");
+                        }
+                    }
+                } catch (Throwable t) {
+                    // keep skip as true
+                }
+            }
+            if (skip) {
                 skippedTestClasses++;
                 AWTest.logInfoAnyway(testClass + " SKIPPED! Total: " + skippedTestClasses + " of " + testClassesFound);
                 continue;
@@ -342,7 +356,12 @@ public class IDETestRunner {
             System.setProperty("AWTEST.CLASS", cls.getName());
             LogV3Factory factory = LogV3.getFactory();
             try {
-                ((TestInterface) ClassCache.getClassCache(cls).getInstance()).runTest();
+                TestInterface instance = ((TestInterface) ClassCache.getClassCache(cls).getInstance());
+                if (AWTest.isSkipDueToMaintenance(instance)) {
+                    AWTest.logInfoAnyway("[** MAINTENANCE **]" + cls.getName());
+                    return;
+                }
+                instance.runTest();
             } finally {
                 // restore factory-
                 if (LogV3.getFactory() != factory) {

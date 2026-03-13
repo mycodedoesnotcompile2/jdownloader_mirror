@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52484 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52488 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,7 +110,9 @@ public class RlGalleriesNt extends PluginForDecrypt {
                     br.setCookie(this.getHost(), "PHPSESSID", phpsessid);
                 }
                 br.getPage(contenturl);
-                if (br.getHttpConnection().getResponseCode() == 404) {
+                if (br.getHttpConnection().getResponseCode() == 403) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 final Form form = br.getForm(0);
@@ -167,12 +169,13 @@ public class RlGalleriesNt extends PluginForDecrypt {
         }
         final Regex gallery_regex = new Regex(contenturl, PATTERN_GALLERY_AND_SINGLE_IMAGE);
         String galleryID = gallery_regex.getMatch(1);
+        final String gallery_title_from_url = gallery_regex.getMatch(2);
         if (galleryID == null) {
             /* For old links */
             galleryID = new Regex(contenturl, "(?i)(?:porn-gallery-|blog_gallery\\.php\\?id=)(\\d+)").getMatch(0);
         }
         if (gallery_regex.getMatch(3) != null) {
-            /* We expect a single image */
+            /* Single image */
             br.getPage(contenturl);
             if (isOffline(br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -187,224 +190,194 @@ public class RlGalleriesNt extends PluginForDecrypt {
             ret.add(this.createDownloadlink(finallink));
             return ret;
         }
-        if (galleryID != null) {
-            /* Gallery */
-            logger.info("Crawling gallery");
-            /* 2023-11-09: API does not work anymore */
-            final boolean useAPI = false;
-            if (useAPI) {
-                br.getPage("https://urlgalleries.net/api/v1.php?endpoint=get_gallery&gallery_id=" + galleryID + "&exclude_cat=undefined&_=" + System.currentTimeMillis());
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-                final String title = data.get("name").toString();
-                final FilePackage fp = FilePackage.getInstance();
-                fp.setName(title);
-                int page = 1;
-                String nextpage = null;
-                final HashSet<String> dupes = new HashSet<String>();
-                do {
-                    logger.info("Crawling page " + page + " of ??");
-                    final List<Map<String, Object>> thumbs = (List<Map<String, Object>>) data.get("thumbs");
-                    final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
-                    for (final Map<String, Object> thumb : thumbs) {
-                        final String redirecturl = thumb.get("url").toString();
-                        final String thumbnailurl = thumb.get("imgcode").toString();
-                        if (dupes.add(redirecturl)) {
-                            newitems.add(this.createDownloadlink(redirecturl));
-                        }
-                        if (dupes.add(thumbnailurl)) {
-                            newitems.add(this.createDownloadlink(thumbnailurl));
-                        }
-                    }
-                    for (final DownloadLink newitem : newitems) {
-                        newitem._setFilePackage(fp);
-                        ret.add(newitem);
-                        distribute(newitem);
-                    }
-                    if (isAbort()) {
-                        logger.info("Stopping because: Aborted by user");
-                        break;
-                    } else if (newitems.isEmpty()) {
-                        /* Fail-safe */
-                        logger.info("Stopping because: Failed to find any new item on this page");
-                        break;
-                    } else if (nextpage == null) {
-                        logger.info("Stopping because: Reached last page?");
-                        break;
-                    } else {
-                        br.getPage(nextpage);
-                        page++;
-                    }
-                } while (true);
-                return ret;
-            }
-            final String url = URLHelper.getUrlWithoutParams(contenturl);
-            /* Display as many items as possible to avoid having to deal with pagination. */
-            final UrlQuery query = UrlQuery.parse(contenturl);
-            /* Display all images on one page */
-            query.addAndReplace("a", "10000");
-            /* Start from page 1 else we may get an empty page (website is buggy). */
-            query.addAndReplace("p", "1");
-            /**
-             * Allow for any direct-URLs added by user <br>
-             * Example: https://urlgalleries.com/img/88x31_RTA-5042-1996-1400-1577-RTA_b.gif
-             */
-            br.getPage(url + "?" + query.toString());
-            if (isOffline(br)) {
+        if (galleryID == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        /* Gallery */
+        logger.info("Crawling gallery");
+        /* 2023-11-09: API does not work anymore */
+        final boolean useAPI = false;
+        if (useAPI) {
+            br.getPage("https://urlgalleries.net/api/v1.php?endpoint=get_gallery&gallery_id=" + galleryID + "&exclude_cat=undefined&_=" + System.currentTimeMillis());
+            if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            String title = br.getRegex("border='0' /></a></div>(?:\\s*<h\\d+[^>]*>\\s*)?(.*?)(?:\\s*</h\\d+>\\s*)?</td></tr><tr>").getMatch(0);
-            if (title == null) {
-                title = br.getRegex("<title>([^<]*?)</title>").getMatch(0);
-            }
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+            final String title = data.get("name").toString();
             final FilePackage fp = FilePackage.getInstance();
-            if (title != null) {
-                title = Encoding.htmlDecode(title).trim();
-                title = title.replaceAll("(?i) - URLGalleries$", "");
-            }
-            if (!StringUtils.isEmpty(title)) {
-                fp.setName(title);
-            } else {
-                /* Fallback */
-                fp.setName(br._getURL().getPath());
-            }
-            String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"((https?|/)[^\"]+)").getMatch(0);
-            if (zip_url != null) {
-                zip_url = br.getURL(zip_url).toExternalForm();
-                final DownloadLink zip = this.createDownloadlink(zip_url);
-                zip._setFilePackage(fp);
-                ret.add(zip);
-                distribute(zip);
-            }
+            fp.setName(title);
             int page = 1;
             String nextpage = null;
             final HashSet<String> dupes = new HashSet<String>();
-            final Pattern allowed_thumbnail_urls = Pattern.compile("((https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com))?/[^<>\"\\']+)");
             do {
                 logger.info("Crawling page " + page + " of ??");
+                final List<Map<String, Object>> thumbs = (List<Map<String, Object>>) data.get("thumbs");
                 final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
-                String[] redirecturls = br.getRegex("rel='nofollow noopener' href='(/[^/\\']+)' target='_blank'").getColumn(0);
-                if (redirecturls == null || redirecturls.length == 0) {
-                    redirecturls = br.getRegex("href\\s*=\\s*\"(/[^\"]+)\"\\s*target\\s*=\\s*\"_blank\"\\s*rel\\s*=\\s*\"nofollow noopener").getColumn(0);
-                }
-                /*
-                 * Check for special thumbnails that our host plugins will change to the original URLs without needing to crawl the
-                 * individual urlgalleries.net URLs -> Speeds up things a lot!
-                 */
-                String[] thumbnailurls = br.getRegex("class='gallery' src='" + allowed_thumbnail_urls.pattern() + "'").getColumn(0);
-                if (thumbnailurls == null || thumbnailurls.length == 0) {
-                    thumbnailurls = br.getRegex("class=\"thumb\"\\s*src=\"" + allowed_thumbnail_urls.pattern() + "\"").getColumn(0);
-                }
-                if ((thumbnailurls == null || thumbnailurls.length == 0) && (redirecturls == null || redirecturls.length == 0)) {
-                    if (ret.size() > 0) {
-                        logger.info("Stopping because: Failed to find any items on current page -> Reached end?");
-                        return ret;
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                for (final Map<String, Object> thumb : thumbs) {
+                    final String redirecturl = thumb.get("url").toString();
+                    final String thumbnailurl = thumb.get("imgcode").toString();
+                    if (dupes.add(redirecturl)) {
+                        newitems.add(this.createDownloadlink(redirecturl));
                     }
-                }
-                for (String thumbnailurl : thumbnailurls) {
-                    final String image_host_url = getRealURLFromThumbnail(thumbnailurl);
-                    if (image_host_url != null) {
-                        if (!dupes.add(image_host_url)) {
-                            /* Skip duplicates */
-                            continue;
-                        }
-                        final DownloadLink link = this.createDownloadlink(image_host_url);
-                        newitems.add(link);
-                    } else {
-                        if (thumbnailurl.startsWith("/")) {
-                            // ignore self hosted thumbnails
-                            continue;
-                        } else if (!dupes.add(thumbnailurl)) {
-                            /* Skip duplicates */
-                            continue;
-                        }
-                        thumbnailurl = br.getURL(thumbnailurl).toExternalForm();
-                        final DownloadLink link = this.createDownloadlink(thumbnailurl);
-                        newitems.add(link);
+                    if (dupes.add(thumbnailurl)) {
+                        newitems.add(this.createDownloadlink(thumbnailurl));
                     }
-                }
-                if (redirecturls != null && thumbnailurls != null && redirecturls.length > newitems.size()) {
-                    for (String redirecturl : redirecturls) {
-                        if (!dupes.add(redirecturl)) {
-                            continue;
-                        }
-                        redirecturl = br.getURL(redirecturl).toExternalForm();
-                        final DownloadLink link = this.createDownloadlink(redirecturl);
-                        newitems.add(link);
-                    }
-                } else {
-                    logger.info("Thumbnail crawling was successful -> No need to crawl the individual redirect-urls");
                 }
                 for (final DownloadLink newitem : newitems) {
                     newitem._setFilePackage(fp);
                     ret.add(newitem);
                     distribute(newitem);
                 }
-                logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
-                nextpage = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "\\?p=" + (page + 1) + ")").getMatch(0);
                 if (isAbort()) {
                     logger.info("Stopping because: Aborted by user");
-                    throw new InterruptedException();
-                } else if (newitems.size() == 0) {
+                    break;
+                } else if (newitems.isEmpty()) {
                     /* Fail-safe */
                     logger.info("Stopping because: Failed to find any new item on this page");
                     break;
-                } else if (nextpage == null || !dupes.add(nextpage)) {
+                } else if (nextpage == null) {
                     logger.info("Stopping because: Reached last page?");
                     break;
-                } else if (this.isAbort()) {
-                    throw new InterruptedException();
+                } else {
+                    br.getPage(nextpage);
+                    page++;
                 }
-                /* Continue to next page */
-                br.getPage(nextpage);
-                page++;
-            } while (!this.isAbort());
-            if (ret.isEmpty()) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            return ret;
-        } else {
-            /* Single image, old handling */
-            // TODO: 2026-03-11: Remove this?
-            logger.info("Crawling single image");
-            br.setFollowRedirects(false);
-            br.getPage(contenturl.replaceFirst("(?i)http://", "https://"));
-            int counter = 0;
-            String redirect = null;
-            do {
-                counter++;
-                redirect = br.getRedirectLocation();
-                if (redirect == null || !redirect.contains(this.getHost())) {
-                    break;
-                }
-                br.getPage(redirect);
-            } while (counter <= 5);
-            if (isOffline(br)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML("/not_found_adult\\.php")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (redirect != null) {
-                ret.add(this.createDownloadlink(redirect));
-                return ret;
-            }
-            String finallink = br.getRegex("linkDestUrl\\s*=\\s*\\'(https?[^<>\"\\']+)\\'").getMatch(0);
-            if (finallink == null) {
-                /* 2023-02-17 */
-                finallink = br.getRegex("externalUrl\\s*=\\s*(?:\\'|\")(https?[^<>\"\\']+)").getMatch(0);
-            }
-            if (finallink == null) {
-                /* Invalid link or plugin broken */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            ret.add(this.createDownloadlink(finallink));
+            } while (true);
             return ret;
         }
+        String url = URLHelper.getUrlWithoutParams(contenturl);
+        /* Display as many items as possible to avoid having to deal with pagination. */
+        final UrlQuery query = UrlQuery.parse(contenturl);
+        /* Display all images on one page */
+        query.addAndReplace("a", "10000");
+        /* Start from page 1 else we may get an empty page (website is buggy). */
+        query.addAndReplace("p", "1");
+        /**
+         * Allow for any direct-URLs added by user <br>
+         * Example: https://urlgalleries.com/img/88x31_RTA-5042-1996-1400-1577-RTA_b.gif
+         */
+        if (!url.endsWith("/")) {
+            // avoid unnecessary redirect
+            url = url + "/";
+        }
+        br.getPage(url + "?" + query.toString());
+        if (isOffline(br)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String title = br.getRegex("border='0' /></a></div>(?:\\s*<h\\d+[^>]*>\\s*)?(.*?)(?:\\s*</h\\d+>\\s*)?</td></tr><tr>").getMatch(0);
+        if (title == null) {
+            title = br.getRegex("<title>\\s*([^<]*?)\\s*</title>").getMatch(0);
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            title = title.replaceAll("(?i)\\s*(-|\\|)\\s*URLGalleries$", "");
+        }
+        if (!StringUtils.isEmpty(title)) {
+            fp.setName(title);
+        } else {
+            /* Fallback */
+            fp.setName(gallery_title_from_url.replace("-", " ").trim());
+        }
+        String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"((https?|/)[^\"]+)").getMatch(0);
+        if (zip_url != null) {
+            zip_url = br.getURL(zip_url).toExternalForm();
+            final DownloadLink zip = this.createDownloadlink(zip_url);
+            zip._setFilePackage(fp);
+            ret.add(zip);
+            distribute(zip);
+        }
+        int page = 1;
+        String nextpage = null;
+        final HashSet<String> dupes = new HashSet<String>();
+        final Pattern allowed_thumbnail_urls = Pattern.compile("((https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com))?/[^<>\"\\']+)");
+        do {
+            logger.info("Crawling page " + page + " of ??");
+            final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
+            String[] redirecturls = br.getRegex("rel='nofollow noopener' href='(/[^/\\']+)' target='_blank'").getColumn(0);
+            if (redirecturls == null || redirecturls.length == 0) {
+                redirecturls = br.getRegex("href\\s*=\\s*\"(/[^\"]+)\"\\s*target\\s*=\\s*\"_blank\"\\s*rel\\s*=\\s*\"nofollow noopener").getColumn(0);
+            }
+            /*
+             * Check for special thumbnails that our host plugins will change to the original URLs without needing to crawl the individual
+             * urlgalleries.net URLs -> Speeds up things a lot!
+             */
+            String[] thumbnailurls = br.getRegex("class='gallery' src='" + allowed_thumbnail_urls.pattern() + "'").getColumn(0);
+            if (thumbnailurls == null || thumbnailurls.length == 0) {
+                thumbnailurls = br.getRegex("class=\"thumb\"\\s*src=\"" + allowed_thumbnail_urls.pattern() + "\"").getColumn(0);
+            }
+            if ((thumbnailurls == null || thumbnailurls.length == 0) && (redirecturls == null || redirecturls.length == 0)) {
+                if (ret.size() > 0) {
+                    logger.info("Stopping because: Failed to find any items on current page -> Reached end?");
+                    return ret;
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+            for (String thumbnailurl : thumbnailurls) {
+                final String image_host_url = getRealURLFromThumbnail(thumbnailurl);
+                if (image_host_url != null) {
+                    if (!dupes.add(image_host_url)) {
+                        /* Skip duplicates */
+                        continue;
+                    }
+                    final DownloadLink link = this.createDownloadlink(image_host_url);
+                    newitems.add(link);
+                } else {
+                    if (thumbnailurl.startsWith("/")) {
+                        // ignore self hosted thumbnails
+                        continue;
+                    } else if (!dupes.add(thumbnailurl)) {
+                        /* Skip duplicates */
+                        continue;
+                    }
+                    thumbnailurl = br.getURL(thumbnailurl).toExternalForm();
+                    final DownloadLink link = this.createDownloadlink(thumbnailurl);
+                    newitems.add(link);
+                }
+            }
+            if (redirecturls != null && thumbnailurls != null && redirecturls.length > newitems.size()) {
+                for (String redirecturl : redirecturls) {
+                    if (!dupes.add(redirecturl)) {
+                        continue;
+                    }
+                    redirecturl = br.getURL(redirecturl).toExternalForm();
+                    final DownloadLink link = this.createDownloadlink(redirecturl);
+                    newitems.add(link);
+                }
+            } else {
+                logger.info("Thumbnail crawling was successful -> No need to crawl the individual redirect-urls");
+            }
+            for (final DownloadLink newitem : newitems) {
+                newitem._setFilePackage(fp);
+                ret.add(newitem);
+                distribute(newitem);
+            }
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
+            nextpage = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "\\?p=" + (page + 1) + ")").getMatch(0);
+            if (isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            } else if (newitems.size() == 0) {
+                /* Fail-safe */
+                logger.info("Stopping because: Failed to find any new item on this page");
+                break;
+            } else if (nextpage == null || !dupes.add(nextpage)) {
+                logger.info("Stopping because: Reached last page?");
+                break;
+            } else if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+            /* Continue to next page */
+            br.getPage(nextpage);
+            page++;
+        } while (!this.isAbort());
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        return ret;
     }
 
     /**

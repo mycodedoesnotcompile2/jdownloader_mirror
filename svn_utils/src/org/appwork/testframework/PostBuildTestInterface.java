@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -45,4 +45,12 @@ public interface PostBuildTestInterface {
     static final Class<PostBuildRunner> RUNNER = PostBuildRunner.class;
 
     public void runPostBuildTest(String[] args, File workingDirectory) throws Exception;
+
+    /**
+     * When true (default), the test may be skipped when resource/dependency hash has not changed.
+     * When false, the test must always run (e.g. tests that scan source for wrong headers or line endings).
+     *
+     * @return true to allow skip on unchanged deps, false to always run
+     */
+    boolean isSkipOnUnchangedDependencies();
 }

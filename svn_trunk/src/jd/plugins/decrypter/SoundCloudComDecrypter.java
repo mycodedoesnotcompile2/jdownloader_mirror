@@ -25,11 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -50,7 +45,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SoundcloudCom;
 
-@DecrypterPlugin(revision = "$Revision: 51950 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52486 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -641,11 +641,10 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
                 url_base = SoundcloudCom.API_BASEv2 + "/stream/users/" + userID;
                 playlistname = "";
             }
-            packagename = getFormattedPackagename(user.get("permalink").toString(), user.get("username").toString(), playlistname, user.get("created_at").toString());
+            packagename = getFormattedPackagename(user.get("permalink").toString(), user.get("username").toString(), playlistname, StringUtils.valueOfOrNull(user.get("created_at")));
         }
         /**
-         * seems to be a limit of the API (12.02.14), </br>
-         * still valid far as I can see raztoki20160208
+         * seems to be a limit of the API (12.02.14), </br> still valid far as I can see raztoki20160208
          */
         final int maxItemsPerCall = 200;
         FilePackage fp = null;
@@ -783,32 +782,34 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         if (StringUtils.isEmpty(formattedpackagename)) {
             formattedpackagename = defaultCustomPackagename;
         }
-        String formattedDate = null;
-        if (date != null && formattedpackagename.contains("*date*")) {
-            try {
-                final String userDefinedDateFormat = cfg.getStringProperty(CUSTOM_DATE);
-                final SimpleDateFormat formatter;
-                if (date.matches("\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+")) {
-                    formatter = new SimpleDateFormat("yyyy/MM/ddHH:mm:ss");
-                } else if (date.contains("/")) {
-                    formatter = new SimpleDateFormat("yyyy/MM/dd'T'HH:mm:ss Z");
-                } else {
-                    formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-                }
-                final Date dateStr = formatter.parse(date);
-                formattedDate = formatter.format(dateStr);
-                final String defaultformattedDate = formattedDate;
-                if (userDefinedDateFormat != null) {
-                    try {
-                        final SimpleDateFormat customFormatter = new SimpleDateFormat(userDefinedDateFormat);
-                        formattedDate = customFormatter.format(dateStr);
-                    } catch (final Exception e) {
-                        // prevent user error killing plugin.
-                        formattedDate = defaultformattedDate;
+        if (formattedpackagename.contains("*date*")) {
+            String formattedDate = null;
+            if (date != null) {
+                try {
+                    final String userDefinedDateFormat = cfg.getStringProperty(CUSTOM_DATE);
+                    final SimpleDateFormat formatter;
+                    if (date.matches("\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+")) {
+                        formatter = new SimpleDateFormat("yyyy/MM/ddHH:mm:ss");
+                    } else if (date.contains("/")) {
+                        formatter = new SimpleDateFormat("yyyy/MM/dd'T'HH:mm:ss Z");
+                    } else {
+                        formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
                     }
+                    final Date dateStr = formatter.parse(date);
+                    formattedDate = formatter.format(dateStr);
+                    final String defaultformattedDate = formattedDate;
+                    if (userDefinedDateFormat != null) {
+                        try {
+                            final SimpleDateFormat customFormatter = new SimpleDateFormat(userDefinedDateFormat);
+                            formattedDate = customFormatter.format(dateStr);
+                        } catch (final Exception e) {
+                            // prevent user error killing plugin.
+                            formattedDate = defaultformattedDate;
+                        }
+                    }
+                } catch (final Exception e) {
+                    // prevent user error killing plugin.
                 }
-            } catch (final Exception e) {
-                // prevent user error killing plugin.
             }
             if (formattedDate != null) {
                 formattedpackagename = formattedpackagename.replace("*date*", formattedDate);

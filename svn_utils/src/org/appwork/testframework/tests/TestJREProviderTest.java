@@ -41,8 +41,8 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.TestJREProvider;
-import org.appwork.testframework.TestJREProvider.JreOptions;
+import org.appwork.testframework.JREExecuter;
+import org.appwork.testframework.JREExecuter.JreOptions;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.JavaVersionInterface;
 
@@ -75,7 +75,7 @@ public class TestJREProviderTest extends AWTest implements Serializable {
             }
         }
         for (JavaVersion runJRE : runJREs) {
-            TestJREProvider.executeInJRE(JreOptions.version(runJRE).jvmArgs("-DTEST_JRE_VERSION=" + runJRE.name()), TestJREProviderTestMethod.class, "test");
+            JREExecuter.runInJRE(JreOptions.version(runJRE).jvmArgs("-DTEST_JRE_VERSION=" + runJRE.name()), TestJREProviderTestMethod.class, "test");
         }
     }
 }

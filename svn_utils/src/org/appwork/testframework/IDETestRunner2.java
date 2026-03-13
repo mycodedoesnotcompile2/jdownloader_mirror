@@ -46,7 +46,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -56,6 +55,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.app.launcher.parameterparser.CommandSwitch;
+import org.appwork.app.launcher.parameterparser.ParameterParser;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
 import org.appwork.loggingv3.simple.LogRecord2;
@@ -73,8 +74,6 @@ import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.LineParsingOutputStream;
 import org.appwork.utils.reflection.CompiledType;
-import org.appwork.app.launcher.parameterparser.CommandSwitch;
-import org.appwork.app.launcher.parameterparser.ParameterParser;
 
 /**
  * @author thomas
@@ -115,7 +114,7 @@ public class IDETestRunner2 {
                 if ((IDETestRunner2.class.getSimpleName() + ".java").equals(record.getThrownAt().getFileName())) {
                     return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - ";
                 }
-                return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - " + fillPost("(" + record.getThrownAt().getFileName() + ":" + record.getThrownAt().getLineNumber() + ")." + abbr(record.getThrownAt().getMethodName(), 30), " ", offsetForThrownAt) + " > ";
+                return fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " - ." + fillPost("(" + record.getThrownAt().getFileName() + ":" + record.getThrownAt().getLineNumber() + ")." + abbr(record.getThrownAt().getMethodName(), 30), " ", offsetForThrownAt) + " > ";
             }
         });
         if (knownClassesCacheFile != null && knownClassesCacheFile.isFile()) {
@@ -215,7 +214,6 @@ public class IDETestRunner2 {
                 String regexPattern = pattern;
                 // Check if pattern looks like a regex (starts with ^ or contains regex special chars)
                 boolean isRegex = pattern.startsWith("^") || pattern.endsWith("$") || pattern.contains("\\.") || pattern.contains("\\+") || pattern.contains("\\(") || pattern.contains("\\[");
-
                 if (!isRegex && pattern.contains("*")) {
                     // Simple wildcard pattern: convert * to .*
                     regexPattern = "^" + pattern.replace(".", "\\.").replace("*", ".*") + "$";
@@ -223,7 +221,6 @@ public class IDETestRunner2 {
                     // Simple string match - convert to regex with anchors
                     regexPattern = "^" + Pattern.quote(pattern) + "$";
                 }
-
                 if (Pattern.matches(regexPattern, testClass)) {
                     return true;
                 }
@@ -259,7 +256,6 @@ public class IDETestRunner2 {
             }
         }
         // testClasses.add("org.appwork.utils.net.httpserver.tests.HttpServerConnectionTimeoutsTest");
-
         if (testClasses.size() == 0) {
             for (final URL url : ClassPathScanner.getClassPath()) {
                 // System.out.println(url);
@@ -295,7 +291,6 @@ public class IDETestRunner2 {
         }
         final int testClassesFound = testClasses.size();
         int skippedTestClasses = 0;
-
         {
             // shuffle test classes, tests must not rely on specific order of execution
             Collections.shuffle(testClasses);
@@ -314,24 +309,20 @@ public class IDETestRunner2 {
         AWTest.logInfoAnyway("Found  " + testClassesFound + " - Skipped Tests: " + skippedTestClasses);
         int count = 0;
         nextTest: for (final String testClass : testClasses) {
-
             count++;
             AWTest.logInfoAnyway("Next  " + " - " + count + "/" + testClassesFound + " : " + testClass);
             Map<String, String> references = new ClassCollector2().getClasses(testClass, true);
             File file = Application.getResource("cfg/testcache_" + testClass + ".cache");
             HashMap<String, String> known = new HashMap<String, String>();
             AWTest.logInfoAnyway("References: " + references.size());
-
             if (file.isFile()) {
                 known = Deser.fromByteArray(IO.readFile(file), TypeRef.HASHMAP_STRING);
             } else {
-
                 AWTest.logInfoAnyway(testClass + " new TEST!");
             }
             AWTest.logInfoAnyway("Latest Known references: " + known.size());
             if (references.size() != known.size()) {
                 System.out.println("Ref Changed");
-
             }
             boolean skip = true;
             List<String> changedClasses = new ArrayList<String>();
@@ -342,7 +333,6 @@ public class IDETestRunner2 {
                     if (es.getKey().startsWith(IDETestRunner.class.getName().replaceAll("[^\\.]+$", ""))) {
                         continue;
                     }
-
                     String cls = es.getKey();
                     String knownHash = known.get(cls);
                     if (knownHash == null) {
@@ -354,7 +344,6 @@ public class IDETestRunner2 {
                     }
                 }
             }
-
             if (!changedClasses.isEmpty()) {
                 AWTest.logInfoAnyway(testClass + " - Changed files (References: last known:" + known.size() + "/new:" + references.size() + "):");
                 int displayCount = Math.min(10, changedClasses.size());
@@ -365,13 +354,25 @@ public class IDETestRunner2 {
                     AWTest.logInfoAnyway("  [+ " + (changedClasses.size() - 10) + " more]");
                 }
             }
-
+            if (skip) {
+                try {
+                    final Class<?> clsForCheck = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
+                    if (TestInterface.class.isAssignableFrom(clsForCheck)) {
+                        TestInterface inst = (TestInterface) ClassCache.getClassCache(clsForCheck).getInstance();
+                        if (inst != null && !inst.isSkipOnUnchangedDependencies()) {
+                            skip = false;
+                            AWTest.logInfoAnyway(testClass + " always run (isSkipOnUnchangedDependencies=false)");
+                        }
+                    }
+                } catch (Throwable t) {
+                    // keep skip as true
+                }
+            }
             if (skip) {
                 skippedTestClasses++;
                 AWTest.logInfoAnyway(testClass + " SKIPPED! Total: " + skippedTestClasses + " of " + testClassesFound);
                 continue;
             }
-
             final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
             runTestInternal(cls);
             byte[] bytes = Deser.toByteArray(references, SC.READABLE);
@@ -409,7 +410,12 @@ public class IDETestRunner2 {
             System.setProperty("AWTEST.CLASS", cls.getName());
             LogV3Factory factory = LogV3.getFactory();
             try {
-                ((TestInterface) ClassCache.getClassCache(cls).getInstance()).runTest();
+                TestInterface instance = ((TestInterface) ClassCache.getClassCache(cls).getInstance());
+                if (AWTest.isSkipDueToMaintenance(instance)) {
+                    AWTest.logInfoAnyway("[** MAINTENANCE **]" + cls.getName());
+                    return;
+                }
+                instance.runTest();
             } finally {
                 // restore factory-
                 if (LogV3.getFactory() != factory) {

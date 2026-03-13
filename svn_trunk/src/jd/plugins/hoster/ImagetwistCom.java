@@ -20,16 +20,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52484 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagetwistCom extends XFileSharingProBasic {
     public ImagetwistCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -64,6 +64,15 @@ public class ImagetwistCom extends XFileSharingProBasic {
     }
 
     private static final Pattern PATTERN_THUMBNAIL = Pattern.compile("/(?:i|th)/\\d+/([a-z0-9]{12}).*");
+
+    @Override
+    public String getPluginContentURL(DownloadLink link) {
+        final String url = link.getPluginPatternMatcher();
+        if (PATTERN_THUMBNAIL.matcher(url).find()) {
+            return "https://" + getHost() + "/" + getFUID(link, null);
+        }
+        return super.getPluginContentURL(link);
+    }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -138,7 +147,7 @@ public class ImagetwistCom extends XFileSharingProBasic {
     protected String getFUID(final String url, URL_TYPE type) {
         if (url != null && type == null) {
             try {
-                return new Regex(new URL(url).getPath(), PATTERN_THUMBNAIL).getMatch(1);
+                return new Regex(new URL(url).getPath(), PATTERN_THUMBNAIL).getMatch(0);
             } catch (final Throwable e) {
             }
             return null;

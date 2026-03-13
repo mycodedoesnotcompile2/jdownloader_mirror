@@ -32,6 +32,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection.tests;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -267,11 +268,21 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
         final RequestContext trustAllNative = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(url);
         assertTrue(trustAllNative.getTrustResult().isTrusted(), "Native HttpsURLConnection with TrustAllProvider must reach " + url);
         // Optional: url.openStream() style – same stack, just trigger getInputStream()
-        try (InputStream stream = openStreamWithTrustProvider(url, CurrentJRETrustProvider.getInstance())) {
+        InputStream stream = null;
+        try {
+            stream = openStreamWithTrustProvider(url, CurrentJRETrustProvider.getInstance());
             assertTrue(stream != null, "url.openStream() with TrustCurrentJREProvider should return stream");
             final byte[] buf = new byte[512];
             final int n = stream.read(buf);
             assertTrue(n > 0, "Should read data from " + url);
+        } finally {
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    // ignore
+                }
+            }
         }
     }
 

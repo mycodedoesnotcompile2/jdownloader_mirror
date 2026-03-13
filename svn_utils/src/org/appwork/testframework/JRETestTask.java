@@ -36,7 +36,7 @@ package org.appwork.testframework;
 import java.io.Serializable;
 
 /**
- * Interface for tasks that can be executed in a different JRE version via {@link TestJREProvider#runInJRE(org.appwork.utils.JavaVersion, JRETestTask)}.
+ * Interface for tasks that can be executed in a different JRE version via {@link JREExecuter#runInJRE(JREExecuter.JreOptions, JRETestTask)}.
  * <p>
  * The task must be Serializable because it will be serialized and passed to a child process running the target JRE.
  * <p>
@@ -46,7 +46,7 @@ import java.io.Serializable;
  * Example usage:
  *
  * <pre>
- * TestJREProvider.runInJRE(JavaVersion.JVM_11_0, new JRETestTask() {
+ * JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_11_0), new JRETestTask() {
  *     &#64;Override
  *     public void run() throws Exception {
  *         System.out.println("Running in Java " + System.getProperty("java.version"));

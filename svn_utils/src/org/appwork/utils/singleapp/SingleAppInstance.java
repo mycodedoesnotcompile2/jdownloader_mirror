@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -555,13 +555,24 @@ public class SingleAppInstance {
     }
 
     /**
-     * @param singleApp2
-     * @param appID2
+     * Creates the client/server ID from app identifiers and root. Override {@link #createID(String, String)} to use a custom root
+     * (e.g. when running in a process with a different Application.getRoot() than the peer).
+     *
+     * @param singleApp
+     * @param appID
      * @param root
-     * @return
+     * @return singleApp + "." + appID + "." + root
      */
     protected String createID(String singleApp, String appID, String root) {
         return singleApp + "." + appID + "." + root;
+    }
+
+    /**
+     * Creates the client/server ID. Default implementation uses {@link Application#getRoot(Class)}; override to use a custom root
+     * (e.g. elevated helper that must match the client's ID).
+     */
+    protected String createID(String singleApp, String appID) {
+        return createID(singleApp, appID, Application.getRoot(SingleAppInstance.class));
     }
 
     public synchronized void start() throws AnotherInstanceRunningException, UncheckableInstanceException, AnotherInstanceRunningButFailedToConnectException, ErrorReadingResponseException, InterruptedException, ExceptionInRunningInstance {
@@ -738,6 +749,10 @@ public class SingleAppInstance {
                         try {
                             /* accept new request */
                             final Socket client = SingleAppInstance.this.serverSocket.accept();
+                            if (!isIncomingSocketAllowed(client)) {
+                                client.close();
+                                return;
+                            }
                             final Thread thread = new Thread("SingleAppInstanceClient: " + SingleAppInstance.this.appID + " - " + client.getRemoteSocketAddress()) {
                                 {
                                     setDaemon(true);
@@ -775,6 +790,17 @@ public class SingleAppInstance {
         daemon.setDaemon(true);
         this.daemon.set(daemon);
         daemon.start();
+    }
+
+    /**
+     * Override to restrict which client connections are accepted (e.g. by remote PID). Default accepts all.
+     *
+     * @param sockets
+     *            the client socket
+     * @return true to accept the connection, false to reject
+     */
+    protected boolean isIncomingSocketAllowed(Socket sockets) {
+        return true;
     }
 
     /**
@@ -910,9 +936,18 @@ public class SingleAppInstance {
             }
             final String clientID = client.readLine();
             if (!StringUtils.equals(clientID, getServerID())) {
-                client.sendResponse(new Response(GO_AWAY_INVALID_ID, "Bad clientID"));
+                try {
+                    client.sendResponse(new Response(GO_AWAY_INVALID_ID, "Bad clientID"));
+                } catch (IOException e) {
+                    LogV3.finest("SingleAppInstance: client disconnected before GO_AWAY could be sent: " + e.getMessage());
+                }
             } else {
-                client.sendResponse(new Response(CLIENT_ID_OK));
+                try {
+                    client.sendResponse(new Response(CLIENT_ID_OK));
+                } catch (IOException e) {
+                    LogV3.finest("SingleAppInstance: client disconnected before CLIENT_ID_OK could be sent: " + e.getMessage());
+                    return;
+                }
                 String line = client.readLine();
                 String[] message = null;
                 if (line != null && line.length() > 0) {
@@ -981,11 +1016,25 @@ public class SingleAppInstance {
                                         keepAliveThread.interrupt();
                                     }
                                 } catch (final Throwable e) {
-                                    client.sendResponse(new Response(EXCEPTION, Exceptions.getStackTrace(e)));
+                                    try {
+                                        client.sendResponse(new Response(EXCEPTION, Exceptions.getStackTrace(e)));
+                                    } catch (IOException e2) {
+                                        // Client likely disconnected (e.g. timeout); avoid secondary exception
+                                        if (e instanceof org.appwork.utils.singleapp.FailedToSendResponseException) {
+                                            LogV3.finest("SingleAppInstance: client disconnected before response could be sent: " + e2.getMessage());
+                                        } else {
+                                            onUncaughtExceptionDuringHandlingIncommingConnections(e);
+                                        }
+                                    }
                                 }
                             }
                         } finally {
-                            sendDone(client);
+                            try {
+                                sendDone(client);
+                            } catch (IOException e) {
+                                // Client may have disconnected; avoid uncaught exception
+                                LogV3.finest("SingleAppInstance: client disconnected before DONE could be sent: " + e.getMessage());
+                            }
                         }
                     } else {
                         onIncommingInvalidMessage(line);
@@ -1086,11 +1135,11 @@ public class SingleAppInstance {
     }
 
     public String getClientID() {
-        return createID(singleApp, appID, Application.getRoot(SingleAppInstance.class));
+        return createID(singleApp, appID);
     }
 
     public String getServerID() {
-        return createID(singleApp, appID, Application.getRoot(SingleAppInstance.class));
+        return createID(singleApp, appID);
     }
 
     /**

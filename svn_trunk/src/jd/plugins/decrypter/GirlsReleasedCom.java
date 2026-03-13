@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -37,7 +38,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 52189 $", interfaceVersion = 3, names = { "girlsreleased.com" }, urls = { "https?://(?:www\\.)?girlsreleased\\.com/.*#?(set|site|model)s?/?.*" })
+@DecrypterPlugin(revision = "$Revision: 52485 $", interfaceVersion = 3, names = {}, urls = {})
 public class GirlsReleasedCom extends antiDDoSForDecrypt {
     public GirlsReleasedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,11 +69,38 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
         }
     }
 
-    private final static Pattern PATTERN_SET    = Pattern.compile("(?i)https?://[^/]+/.*#?set/(\\d+)");
-    private final static Pattern PATTERN_SITE   = Pattern.compile("(?i)https?://[^/]+/.*#?sites/(\\d+)");
-    private final static Pattern PATTERN_SITES  = Pattern.compile("(?i)https?://[^/]+/.*#?sites/(\\d+)");
-    private final static Pattern PATTERN_MODEL  = Pattern.compile("(?i)https?://[^/]+/.*#?model/(\\d+)(/([^/]+))?");
-    private final static Pattern PATTERN_MODELS = Pattern.compile("(?i)https?://[^/]+/.*#?models/(\\d+)(/([^/]+))?");
+    private static final Pattern PATTERN_SET    = Pattern.compile("/.*#?set/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SITE   = Pattern.compile("/.*#?sites?/([\\w-\\.]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SITES  = Pattern.compile("/.*#?sites/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_MODEL  = Pattern.compile("/.*#?model/(\\d+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_MODELS = Pattern.compile("/.*#?models/(\\d+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "girlsreleased.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_SET.pattern().substring(1) + "|" + PATTERN_SITE.pattern().substring(1) + "|" + PATTERN_SITES.pattern().substring(1) + "|" + PATTERN_MODEL.pattern().substring(1) + "|" + PATTERN_MODELS.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -117,8 +145,9 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
         } else if (pageType == PageType.GR_MODELS) {
             payload = "{\"tasks\":[\"getmodels\"],\"models\":{\"page\":0,\"count\":999999999,\"site\":null,\"sort\":null,\"search\":null}}";
         }
+        final String api_base = "https://www.girlsreleased.com/api/0.3";
         if (pageType == PageType.GR_SET) {
-            final Request request = br.createGetRequest("https://girlsreleased.com/api/0.3/set/" + setID);
+            final Request request = br.createGetRequest(api_base + "/set/" + setID);
             sendRequest(br, request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -145,12 +174,13 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
             }
             final List<Object> modelInfo = (List<Object>) JavaScriptEngineFactory.walkJson(set, "{5}/{0}");
             final String modelName = modelInfo.get(1).toString();
-            String fpName = website + " - " + modelName + " - " + "Set " + setID + " - " + setTitle;
+            String fpName = website + " - " + modelName + " - " + "Set " + setID;
             if (setTitle != null) {
                 fpName += " - " + setTitle;
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(Encoding.htmlDecode(fpName).trim());
+            fp.setPackageKey("girlsreleased://set/" + setID);
             fp.setAllowMerge(true);
             fp.addLinks(ret);
         } else if (pageType == PageType.GR_MODEL) {
@@ -161,20 +191,51 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
             if (site == null || modelID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final Request request = br.createGetRequest("https://www.girlsreleased.com/api/0.3/sets/site/" + site + "/model/" + modelID + "/sort/date" + modelID);
+            final Request request = br.createGetRequest(api_base + "/sets/site/" + site + "/model/" + modelID + "/sort/date" + modelID);
             sendRequest(br, request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final List<List<Object>> sets = (List<List<Object>>) entries.get("sets");
             for (final List<Object> setInfo : sets) {
                 final String url = "https://girlsreleased.com/set/" + setInfo.get(0).toString();
                 ret.add(createDownloadlink(url));
             }
+        } else if (pageType == PageType.GR_SITE) {
+            /* Crawl all sets of a site. */
+            final String site = new Regex(contenturl, PATTERN_SITE).getMatch(0);
+            if (site == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final Request request = br.createGetRequest(api_base + "/sets/site/" + site + "/sort/date");
+            sendRequest(br, request);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final List<List<Object>> sets = (List<List<Object>>) entries.get("sets");
+            if (sets.isEmpty()) {
+                /* 2026-03-12: e.g. /site/ybt-art.com */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final FilePackage fp_filehoster_links = FilePackage.getInstance();
+            fp_filehoster_links.setName(site + " - filehoster links");
+            fp_filehoster_links.setPackageKey("girlsreleased://site/" + site + "/filehoster_links");
+            for (final List<Object> setInfo : sets) {
+                final String url = "https://girlsreleased.com/set/" + setInfo.get(0).toString();
+                ret.add(createDownloadlink(url));
+                final String filehoster_link = (String) setInfo.get(2);
+                if (!StringUtils.isEmpty(filehoster_link)) {
+                    final DownloadLink link = this.createDownloadlink(filehoster_link);
+                    link._setFilePackage(fp_filehoster_links);
+                    ret.add(link);
+                }
+            }
         } else {
             /* Old handling */
             // TODO timestamp/signature
+            // TODO: 2026-03-12: remove this
             if (payload == null) {
                 getLogger().warning("Unable to build payload!");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

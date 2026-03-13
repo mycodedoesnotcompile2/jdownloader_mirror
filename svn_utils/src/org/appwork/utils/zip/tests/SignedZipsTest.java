@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -181,7 +181,7 @@ public class SignedZipsTest extends OnClassPathZipJarTests {
         };
         zipper.setLogger(LogV3.defaultLogger());
         zipper.setSignaturePrivateKey(priv);
-        zipper.add(Application.getResource(""), true);
+        zipper.add(Application.getResource("cfg"), true);
         zipper.add(testFile, false, testFile.getName());
         zipper.close();
         final ByteArrayOutputStream damaged;
@@ -213,7 +213,7 @@ public class SignedZipsTest extends OnClassPathZipJarTests {
         };
         zipper2.setLogger(LogV3.defaultLogger());
         zipper2.setSignaturePrivateKey(priv);
-        zipper2.add(Application.getResource(""), true);
+        zipper2.add(Application.getResource("cfg"), true);
         zipper2.add(testFile, false, testFile.getName());
         zipper2.close();
         final byte[] bytes = baos.toByteArray();

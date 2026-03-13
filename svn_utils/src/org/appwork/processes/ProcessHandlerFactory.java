@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -37,7 +37,8 @@ package org.appwork.processes;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.JNAHelper;
-import org.appwork.processes.jna.JNAWindowsProcessHandler;
+import org.appwork.processes.windows.jna.JNANonWMIWindowsProcessHandler;
+import org.appwork.processes.windows.jna.JNAWindowsProcessHandler;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -49,12 +50,25 @@ public class ProcessHandlerFactory {
     private final static AtomicReference<ProcessHandler> INSTANCE = new AtomicReference<ProcessHandler>();
 
     /**
-     * @return
+     * Creates the default process handler for the current OS. On Windows with JNA: uses
+     * {@link JNANonWMIWindowsProcessHandler} (Toolhelp32, QueryFullProcessImageNameW, Restart Manager) on Windows
+     * Vista and later; on Windows XP and earlier uses {@link JNAWindowsProcessHandler} (WMI) because the non-WMI
+     * APIs (QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, Restart Manager) require Vista+.
+     * <p>
+     * The WMI variant (JNAWindowsProcessHandler) uses WMI (Win32_Process), which is available since Windows 2000,
+     * so it is used by the factory on XP and earlier. {@code getLockingProcesses} requires Vista+ (Restart Manager)
+     * and throws NotSupportedException on older Windows in both handlers.
+     * </p>
+     *
+     * @return process handler instance
      */
     private static ProcessHandler init() {
         switch (CrossSystem.getOSFamily()) {
         case WINDOWS:
             if (JNAHelper.isJNAAvailable()) {
+                if (CrossSystem.getOS().isMinimum(CrossSystem.OperatingSystem.WINDOWS_VISTA)) {
+                    return new JNANonWMIWindowsProcessHandler();
+                }
                 return new JNAWindowsProcessHandler();
             }
             break;

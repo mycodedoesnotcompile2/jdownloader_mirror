@@ -140,6 +140,8 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
      */
     private long                                           threadPoolKeepAliveTime    = 10000L;
 
+    private volatile SocketAddressValidator                 socketAddressValidator     = DefaultSocketAddressValidator.get();
+
     public HttpServer(final int port) {
         super("AppWork GmbH HttpServer");
         this.wishPort = port;
@@ -200,20 +202,6 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
      */
     public boolean isLocalhostOnly() {
         return this.localhostOnly;
-    }
-
-    /**
-     * Checks if the given IP address is a loopback (localhost) address.
-     *
-     * @param addr
-     *            The InetAddress to check
-     * @return true if the address is a loopback address, false otherwise
-     */
-    private boolean isFromLocalhost(final InetAddress addr) {
-        if (addr == null) {
-            return false;
-        }
-        return addr.isLoopbackAddress();
     }
 
     public boolean isRunning() {
@@ -355,20 +343,34 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                 }
                                 boolean closeSocket = true;
                                 try {
-                                    // Check if connection is from localhost when server is bound to localhost only
-                                    // TODO: Is this check meaningful/useful?
-                                    if (HttpServer.this.localhostOnly) {
-                                        final InetAddress clientAddress = clientSocket.getInetAddress();
-                                        if (!HttpServer.this.isFromLocalhost(clientAddress)) {
-                                            // Non-loopback address on localhost-only server - reject connection
-                                            try {
-                                                LogV3.warning("Security: Non-loopback connection rejected | Remote: " + clientSocket.getRemoteSocketAddress() + " | LocalhostOnly: " + HttpServer.this.localhostOnly + " | Closing connection");
-                                                clientSocket.close();
-                                            } catch (final Throwable ignore) {
-                                            }
-                                            closeSocket = false;
-                                            continue;
+                                    if (HttpServer.this.verboseLog) {
+                                        LogV3.fine("HttpServer: Run socket address validator");
+                                    }
+                                    final SocketAddressValidator validator = HttpServer.this.getSocketAddressValidator();
+                                    boolean allowed = true;
+                                    if (validator != null) {
+                                        try {
+                                            allowed = validator.isAllowed(clientSocket, HttpServer.this);
+                                        } catch (final IOException e) {
+                                            LogV3.log(e);
+                                            LogV3.warning("Security: Socket address validator threw IOException, rejecting connection | Remote: " + clientSocket.getRemoteSocketAddress());
+                                            allowed = false;
                                         }
+                                    }
+                                    if (!allowed) {
+                                        if (HttpServer.this.verboseLog) {
+                                            LogV3.fine("HttpServer: Rejected Connection. socket address validator returned false");
+                                        }
+                                        LogV3.warning("Security: Untrusted IPC remote rejected | Remote: " + clientSocket.getRemoteSocketAddress() + " | Closing connection without response");
+                                        try {
+                                            clientSocket.close();
+                                        } catch (final Throwable ignore) {
+                                        }
+                                        closeSocket = false;
+                                        continue;
+                                    }
+                                    if (HttpServer.this.verboseLog) {
+                                        LogV3.fine("HttpServer: socket address validator: OK");
                                     }
                                     final long createConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                     final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
@@ -445,7 +447,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Runnable#run()
      */
     /**
@@ -566,17 +568,17 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /**
      * Creates a new ServerSocket for the given socket address.
-     * 
+     *
      * <p>
-     * This method can be overridden by subclasses to create specialized server sockets (e.g., SSLServerSocket).
-     * The default implementation creates a standard ServerSocket.
+     * This method can be overridden by subclasses to create specialized server sockets (e.g., SSLServerSocket). The default implementation
+     * creates a standard ServerSocket.
      * </p>
-     * 
+     *
      * <p>
-     * Note: The socket address parameter is provided for subclasses that may need it, but the default implementation
-     * creates an unbound ServerSocket. The socket will be bound later using {@link ServerSocket#bind(SocketAddress)}.
+     * Note: The socket address parameter is provided for subclasses that may need it, but the default implementation creates an unbound
+     * ServerSocket. The socket will be bound later using {@link ServerSocket#bind(SocketAddress)}.
      * </p>
-     * 
+     *
      * @return A new ServerSocket instance
      * @throws IOException
      *             if the server socket cannot be created
@@ -688,5 +690,20 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
         if (handler != null) {
             requestHandlers.remove(handler);
         }
+    }
+
+    /**
+     * @return the socket address validator used for IPC/single-instance trust checks; null means all sockets are allowed
+     */
+    public SocketAddressValidator getSocketAddressValidator() {
+        return socketAddressValidator;
+    }
+
+    /**
+     * @param socketAddressValidator
+     *            the validator to use; null means all sockets are allowed
+     */
+    public void setSocketAddressValidator(final SocketAddressValidator socketAddressValidator) {
+        this.socketAddressValidator = socketAddressValidator;
     }
 }

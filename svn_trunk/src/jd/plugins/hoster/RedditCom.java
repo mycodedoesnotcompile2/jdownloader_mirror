@@ -21,26 +21,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.CountingPushbackInputStream;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.plugins.components.config.RedditConfig;
-import org.jdownloader.plugins.components.config.RedditConfig.VideoDownloadStreamType;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
@@ -62,7 +42,27 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.RedditComCrawler;
 
-@HostPlugin(revision = "$Revision: 52317 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.CountingPushbackInputStream;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.plugins.components.config.RedditConfig;
+import org.jdownloader.plugins.components.config.RedditConfig.VideoDownloadStreamType;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -193,7 +193,7 @@ public class RedditCom extends PluginForHost {
         if (url == null) {
             return super.getPluginContentURL(link);
         }
-        if (PluginJsonConfig.get(RedditConfig.class).isVideoUseDirecturlAsContentURL() && new Regex(url, RedditComCrawler.PATTERN_SELFHOSTED_VIDEO).patternFind()) {
+        if (get(RedditConfig.class).isVideoUseDirecturlAsContentURL() && new Regex(url, RedditComCrawler.PATTERN_SELFHOSTED_VIDEO).patternFind()) {
             final String lastUsedVideoDirecturl = link.getStringProperty(PROPERTY_DIRECTURL_LAST_USED);
             if (lastUsedVideoDirecturl != null) {
                 /* Video has been checked- or fully/partially downloaded before -> Return direct link to stream */

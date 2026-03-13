@@ -42,12 +42,14 @@ import java.lang.reflect.Modifier;
 
 import org.appwork.serializer.Deser;
 import org.appwork.storage.TypeRef;
+import org.appwork.testframework.executer.AdminExecuter;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
+import org.appwork.builddecision.BuildDecisions;
 
 /**
  * Runner class that executes a method on a class in a child JRE process. This class is used internally by
- * {@link TestJREProvider#runInJRE(org.appwork.utils.JavaVersion, Class, String, Object...)}.
+ * {@link JREExecuter#runInJRE(org.appwork.utils.JavaVersion, Class, String, Object...)}.
  * <p>
  * The runner first looks for a static method. If not found, it looks for an instance method and creates an instance of the class using the
  * default constructor.
@@ -86,6 +88,11 @@ public class JREMethodRunner {
             System.err.println("JREMethodRunner: Missing arguments. Expected: className methodName paramsFile exceptionFile");
             System.exit(EXIT_INVALID_ARGS);
             return;
+        }
+        BuildDecisions.setEnabled(false);
+        String helperAppRoot = System.getenv(AdminExecuter.ENV_HELPER_APP_ROOT);
+        if (helperAppRoot != null && helperAppRoot.length() > 0) {
+            System.setProperty("ROOT", helperAppRoot);
         }
         Application.setApplication(".JREMethodRunner");
         final String className = args[0];

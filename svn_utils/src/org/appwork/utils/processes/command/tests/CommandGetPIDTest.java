@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -41,8 +41,8 @@ import java.util.List;
 
 import org.appwork.exceptions.NotSupportedException;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.TestJREProvider;
-import org.appwork.testframework.TestJREProvider.JreOptions;
+import org.appwork.testframework.JREExecuter;
+import org.appwork.testframework.JREExecuter.JreOptions;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.JavaVersionInterface;
 import org.appwork.utils.os.CrossSystem;
@@ -79,7 +79,7 @@ public class CommandGetPIDTest extends AWTest implements Serializable {
             }
         }
         for (JavaVersion runJRE : runJREs) {
-            TestJREProvider.executeInJRE(JreOptions.version(runJRE), CommandGetPIDTest.class, "testGetPIDAfterStart");
+            JREExecuter.runInJRE(JreOptions.version(runJRE), CommandGetPIDTest.class, "testGetPIDAfterStart");
         }
         testGetPIDMatchesExpected();
     }

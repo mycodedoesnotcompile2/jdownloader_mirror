@@ -133,4 +133,10 @@ public interface ProcessHandler {
      *             If the operation is interrupted
      */
     List<ProcessInfo> getLockingProcesses(File file) throws IOException, NotSupportedException, InterruptedException;
+
+    /**
+     * @param processInfo
+     * @return
+     */
+    boolean isProcessesAlive(ProcessInfo... infos);
 }

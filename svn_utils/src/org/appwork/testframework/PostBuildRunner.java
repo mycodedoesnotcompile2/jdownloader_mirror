@@ -38,6 +38,8 @@ import static org.appwork.testframework.AWTest.logInfoAnyway;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Modifier;
@@ -52,6 +54,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeSet;
 
 import org.appwork.builddecision.BuildDecisions;
@@ -123,8 +126,12 @@ public class PostBuildRunner {
     private static final String           MUST_RUN_WITHOUT_CLASSLOADER_ERRORS_MARKER = "-force=";
     private static final int              EXIT_NO_CLASS_DEF_FOUND_1                  = 2;
     private static final String           BUILD_ID_MARKER                            = "-buildid=";
+    private static final String           MAY_FAIL_MARKER                            = "-mayfail=";
+    private static final String           BUILDSCRIPT_MARKER                         = "-buildscript=";
     /** Subdir under user.home for post-build test status cache: .appworktest/postbuild/{cacheKey}/ */
     private static final String           POSTBUILD_STATUS_CACHE_SUBDIR              = ".appworktest" + File.separator + "postbuild";
+    /** Class name of AdminExecuter; used to detect tests that need the elevated helper (ASM dependency check). */
+    private static final String           ADMIN_EXECUTER_CLASS                       = "org.appwork.testframework.executer.AdminExecuter";
     public static HashMap<String, Object> CONFIG                                     = null;
 
     /**
@@ -150,9 +157,13 @@ public class PostBuildRunner {
     static File                            BASE;
     private static HashSet<String>         MUST_RUN_WITHOUT_CLASSLOADER_ERRORS;
     private static HashSet<String>         DO_NOT_TRY_TO_RUN;
+    private static HashSet<String>         MAY_FAIL_ON_MISSING_CLASS;
+    private static String                  BUILDSCRIPT_PATH;
     private static boolean                 PRINT_CLASSLOADER_ERRORS;
     private static ArrayList<String>       TESTS_OK;
     private static HashMap<String, String> TESTS_FAILED = new HashMap<String, String>();
+    /** Env vars for tests that use AdminExecuter (lock dir, private key); set once after starting the helper. */
+    private static Map<String, String>     ADMIN_HELPER_ENV                          = null;
     private static boolean                 VERBOSE;
 
     /**
@@ -330,6 +341,8 @@ public class PostBuildRunner {
         TESTS_FAILED = new HashMap<String, String>();
         MUST_RUN_WITHOUT_CLASSLOADER_ERRORS = new HashSet<String>();
         DO_NOT_TRY_TO_RUN = new HashSet<String>();
+        MAY_FAIL_ON_MISSING_CLASS = new HashSet<String>();
+        BUILDSCRIPT_PATH = null;
         String sourceFolder = null;
         String buildId = null;
         String projectInfo = null;
@@ -344,6 +357,10 @@ public class PostBuildRunner {
                 sourceFolder = args[i].substring(SOURCE.length());
             } else if (args[i].startsWith(BUILD_ID_MARKER)) {
                 buildId = args[i].substring(BUILD_ID_MARKER.length()).trim();
+            } else if (args[i].startsWith(MAY_FAIL_MARKER)) {
+                MAY_FAIL_ON_MISSING_CLASS.add(args[i].substring(MAY_FAIL_MARKER.length()));
+            } else if (args[i].startsWith(BUILDSCRIPT_MARKER)) {
+                BUILDSCRIPT_PATH = args[i].substring(BUILDSCRIPT_MARKER.length()).trim();
             } else if (args[i].startsWith("-projectinfo=")) {
                 projectInfo = args[i].substring("-projectinfo=".length()).trim();
             } else if (StringUtils.equalsIgnoreCase(args[i], "-print_classloader_errors")) {
@@ -451,10 +468,45 @@ public class PostBuildRunner {
                 testResourceRefs.put(cls.getName(), null);
             }
         }
+        boolean testsNeedAdminHelper = false;
+        for (Map<String, String> refs : testResourceRefs.values()) {
+            if (refs != null && refs.containsKey(ADMIN_EXECUTER_CLASS)) {
+                testsNeedAdminHelper = true;
+                break;
+            }
+        }
+        if (testsNeedAdminHelper && CrossSystem.isWindows()) {
+            try {
+                Class<?> adminExecuterClass = Class.forName(ADMIN_EXECUTER_CLASS);
+                adminExecuterClass.getMethod("ensureHelperRunning").invoke(null);
+                Object envObj = adminExecuterClass.getMethod("getHelperConnectionEnv").invoke(null);
+                if (envObj instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> env = (Map<String, String>) envObj;
+                    if (env != null && !env.isEmpty()) {
+                        ADMIN_HELPER_ENV = env;
+                        LogV3.info(header("helper") + "Admin helper started; will pass connection params to tests that use AdminExecuter.");
+                    }
+                }
+            } catch (Throwable t) {
+                LogV3.warning("Could not start AdminExecuter helper for post-build tests: " + t.getMessage());
+            }
+        }
         for (Class<?> cls : testClasses) {
             PostBuildTestStatus status = statusMap.get(cls.getName());
             String currentResourceHash = testResourceHashes.get(cls.getName());
             boolean skip = currentResourceHash != null && currentResourceHash.equals(status.getResourceHash()) && !isLastRunFailure(status);
+            if (skip) {
+                try {
+                    PostBuildTestInterface inst = (PostBuildTestInterface) cls.getConstructor(new Class[] {}).newInstance(new Object[] {});
+                    if (inst != null && !inst.isSkipOnUnchangedDependencies()) {
+                        skip = false;
+                        LogV3.info("  >>" + header("run") + cls.getName() + " (always run: isSkipOnUnchangedDependencies=false)");
+                    }
+                } catch (Throwable t) {
+                    // keep skip as true
+                }
+            }
             if (skip) {
                 TESTS_OK.add(cls.getName());
                 LogV3.info("  >>" + header("skipped") + cls.getName() + " (deps unchanged, last passed)");
@@ -495,6 +547,176 @@ public class PostBuildRunner {
             }
         }
         return false;
+    }
+
+    /**
+     * @param testClassName
+     * @return true if this test is on the may-fail list (skip on missing class, no prompt)
+     */
+    private static boolean isMayFailOnMissingClass(String testClassName) {
+        if (MAY_FAIL_ON_MISSING_CLASS == null) {
+            return false;
+        }
+        for (String p : MAY_FAIL_ON_MISSING_CLASS) {
+            if (testClassName.matches(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the class should be skipped when collecting dependencies (system/third-party).
+     */
+    private static boolean skipClassForResource(String clazz) {
+        if (clazz == null) {
+            return true;
+        }
+        if (clazz.startsWith("java.") || clazz.startsWith("javax.") || clazz.startsWith("sun.") || clazz.startsWith("com.sun.")) {
+            return true;
+        }
+        if (clazz.startsWith("org.bouncycastle.") || clazz.startsWith("de.javasoft.") || clazz.startsWith("org.mozilla.")) {
+            return true;
+        }
+        if (clazz.startsWith("[") /* array */) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * When a test fails due to missing class and -buildscript= was passed: prompt user to add
+     * missing resource(s) to the build script (with ASM-collected dependencies) or add test to -mayfail list.
+     */
+    private static void handleMissingClassInBuildScript(String testClassName, String missingClass, String stdOut, String errOut) {
+        Set<String> classesToAdd = new HashSet<String>();
+        classesToAdd.add(missingClass);
+        try {
+            ClassCollector2 collector = new ClassCollector2();
+            Map<String, String> deps = collector.getClasses(missingClass, true);
+            if (deps != null) {
+                for (String c : deps.keySet()) {
+                    if (!skipClassForResource(c)) {
+                        classesToAdd.add(c);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            LogV3.info("Could not collect dependencies for " + missingClass + ", adding only that class: " + e.getMessage());
+        }
+        LogV3.info("  >>" + header("missing") + "Test " + testClassName + " needs: " + StringUtils.join(classesToAdd, ", "));
+        logInfoAnyway("Add these " + classesToAdd.size() + " resource(s) to build script for test " + testClassName + "? [y/n]");
+        String answer = readLineFromStdin();
+        if (answer != null && answer.trim().toLowerCase(Locale.ROOT).startsWith("y")) {
+            addIncludesToBuildScript(BUILDSCRIPT_PATH, testClassName, classesToAdd);
+            logInfoAnyway("Added include(s) to " + BUILDSCRIPT_PATH + ". Re-run the build to run the test.");
+        } else {
+            addMayFailToBuildScript(BUILDSCRIPT_PATH, testClassName);
+            logInfoAnyway("Added -mayfail=" + testClassName + " to " + BUILDSCRIPT_PATH + ". Test will be skipped on missing class in future.");
+        }
+    }
+
+    /**
+     * Read a single line from stdin (for interactive prompt when run from Ant).
+     */
+    private static String readLineFromStdin() {
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+            return br.readLine();
+        } catch (IOException e) {
+            LogV3.warning("Could not read from stdin: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static final String WRITE_MARKER = "<!--WRITE-->";
+
+    /**
+     * Insert include lines before <!--WRITE--> in the build script. Comment marks resources as required for the given test only.
+     */
+    private static void addIncludesToBuildScript(String buildScriptPath, String testClassName, Set<String> classNames) {
+        File buildFile = new File(buildScriptPath);
+        if (!buildFile.isFile()) {
+            LogV3.warning("Build script not found: " + buildScriptPath);
+            return;
+        }
+        try {
+            String content = IO.readFileToString(buildFile);
+            if (!content.contains(WRITE_MARKER)) {
+                LogV3.warning("Build script does not contain " + WRITE_MARKER);
+                return;
+            }
+            StringBuilder block = new StringBuilder();
+            block.append("\r\n\t\t\t\t<!-- Required by Test: ").append(testClassName).append(" (missing in JAR) -->\r\n");
+            for (String cn : new TreeSet<String>(classNames)) {
+                String path = cn.replace(".", "/") + ".java";
+                block.append("\t\t\t\t<include name=\"").append(path).append("\" />\r\n");
+            }
+            block.append("\t\t\t\t");
+            content = content.replace(WRITE_MARKER, block.toString() + WRITE_MARKER);
+            IO.secureWrite(buildFile, content, SYNC.META_AND_DATA);
+        } catch (Throwable e) {
+            LogV3.warning("Failed to add includes to build script: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Add -mayfail=testClassName to the build script so this test is not prompted again on missing class.
+     * Inserts after the last <arg value="-skip= or <arg value="-force= line.
+     */
+    private static void addMayFailToBuildScript(String buildScriptPath, String testClassName) {
+        File buildFile = new File(buildScriptPath);
+        if (!buildFile.isFile()) {
+            LogV3.warning("Build script not found: " + buildScriptPath);
+            return;
+        }
+        try {
+            String content = IO.readFileToString(buildFile);
+            String newArg = "\t\t\t\t<arg value=\"-mayfail=" + testClassName + "\" />\r\n";
+            if (content.contains("-mayfail=" + testClassName)) {
+                return;
+            }
+            int insert = -1;
+            int idx = 0;
+            while (true) {
+                int nextSkip = content.indexOf("<arg value=\"-skip=", idx);
+                int nextForce = content.indexOf("<arg value=\"-force=", idx);
+                int next = nextSkip >= 0 && nextForce >= 0 ? Math.min(nextSkip, nextForce) : (nextSkip >= 0 ? nextSkip : nextForce);
+                if (next < 0) {
+                    break;
+                }
+                insert = content.indexOf("\r\n", next);
+                if (insert < 0) {
+                    insert = content.indexOf("\n", next);
+                }
+                if (insert >= 0) {
+                    insert += 1;
+                }
+                idx = next + 1;
+            }
+            if (insert < 0) {
+                int javaClose = content.indexOf("</java>");
+                if (javaClose >= 0) {
+                    insert = content.lastIndexOf("\r\n", javaClose);
+                    if (insert < 0) {
+                        insert = content.lastIndexOf("\n", javaClose);
+                    }
+                    if (insert >= 0) {
+                        insert += 1;
+                    } else {
+                        insert = javaClose;
+                    }
+                }
+            }
+            if (insert >= 0) {
+                content = content.substring(0, insert) + newArg + content.substring(insert);
+                IO.secureWrite(buildFile, content, SYNC.META_AND_DATA);
+            } else {
+                LogV3.warning("Could not find insertion point for -mayfail in build script.");
+            }
+        } catch (Throwable e) {
+            LogV3.warning("Failed to add -mayfail to build script: " + e.getMessage());
+        }
     }
 
     protected static void runSingleTest(final String[] args) {
@@ -593,7 +815,7 @@ public class PostBuildRunner {
         final int[] exitCodeHolder = new int[] { -1 };
         final String[] errorMessageHolder = new String[] { null };
         try {
-            runTestClassImpl(cls, sourceFolder, args, successHolder, exitCodeHolder, errorMessageHolder);
+            runTestClassImpl(cls, sourceFolder, args, successHolder, exitCodeHolder, errorMessageHolder, resourceHashesForSave);
         } finally {
             long now = Time.systemIndependentCurrentJVMTimeMillis();
             PostBuildTestStatus status = loadStatus(statusFile);
@@ -624,7 +846,7 @@ public class PostBuildRunner {
         }
     }
 
-    private static void runTestClassImpl(Class<?> cls, String sourceFolder, String[] args, final boolean[] successHolder, final int[] exitCodeHolder, final String[] errorMessageHolder) throws Exception {
+    private static void runTestClassImpl(Class<?> cls, String sourceFolder, String[] args, final boolean[] successHolder, final int[] exitCodeHolder, final String[] errorMessageHolder, Map<String, String> refsForThisTest) throws Exception {
         LogV3.info(header("run test") + cls.getName());
         for (String a : args) {
             if ("-verbose".equals(a)) {
@@ -718,6 +940,9 @@ public class PostBuildRunner {
             logInfoAnyway("Command: " + cmd.toString());
             ProcessBuilder pb = ProcessBuilderFactory.create(cmd);
             pb.directory(workingcopy);
+            if (ADMIN_HELPER_ENV != null && refsForThisTest != null && refsForThisTest.containsKey(ADMIN_EXECUTER_CLASS)) {
+                pb.environment().putAll(ADMIN_HELPER_ENV);
+            }
             ProcessOutput result = ProcessBuilderFactory.runCommand(pb);
             if (result.getStdOutString().length() > 0) {
                 LogV3.info(result.getStdOutString());
@@ -750,6 +975,12 @@ public class PostBuildRunner {
                     }
                     throw new Exception("Failed test with classloader error although it is marked with -force in the build.xml: " + cls.getName());
                 }
+                if (isMayFailOnMissingClass(cls.getName())) {
+                    LogV3.info("  >>" + header("skipped") + cls.getName() + " (missing class, on -mayfail list)");
+                    TESTS_OK.add(cls.getName());
+                    successHolder[0] = true;
+                    return;
+                }
                 String missingResource = new Regex(result.getStdOutString(), "not in JAR\\:\\s*([^\r\n]+)").getMatch(0);
                 if (missingResource == null) {
                     missingResource = new Regex(result.getErrOutString(), "not in JAR\\:\\s*([^\r\n]+)").getMatch(0);
@@ -775,6 +1006,10 @@ public class PostBuildRunner {
                             missingResource = firstLine.length() > 200 ? firstLine.substring(0, 197) + "..." : firstLine;
                         }
                     }
+                }
+                if (BUILDSCRIPT_PATH != null && missingResource != null && missingResource.length() > 0) {
+                    String missingClass = missingResource.replace("/", ".").trim();
+                    handleMissingClassInBuildScript(cls.getName(), missingClass, result.getStdOutString(), result.getErrOutString());
                 }
                 if (missingResource != null) {
                     if (fromNotInJar) {

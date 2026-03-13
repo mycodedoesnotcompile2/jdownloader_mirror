@@ -38,8 +38,8 @@ import javax.net.ssl.SSLHandshakeException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.testframework.TestJREProvider;
-import org.appwork.testframework.TestJREProvider.JreOptions;
+import org.appwork.testframework.JREExecuter;
+import org.appwork.testframework.JREExecuter.JreOptions;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.net.httpclient.HttpClient;
@@ -68,12 +68,12 @@ public class SSLProtocolVersionTest extends ProxyConnectionTestBase {
 
     @Override
     public void runTest() throws Exception {
-        TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_1_8), SSLProtocolVersionTest.class, "testSSLProtocolVersionsInThisJRE");
-        TestJREProvider.executeInJRE(JreOptions.version(JavaVersion.JVM_11_0), SSLProtocolVersionTest.class, "testSSLProtocolVersionsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_1_8), SSLProtocolVersionTest.class, "testSSLProtocolVersionsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_11_0), SSLProtocolVersionTest.class, "testSSLProtocolVersionsInThisJRE");
     }
 
     /**
-     * Runs SSL/TLS protocol version tests in the current JRE. Invoked via TestJREProvider for JVM_1_8 and JVM_11_0.
+     * Runs SSL/TLS protocol version tests in the current JRE. Invoked via JREExecuter for JVM_1_8 and JVM_11_0.
      * On Java 11+ TLS 1.0/1.1 are disabled by default; on Java 8 they may still connect.
      */
     public void testSSLProtocolVersionsInThisJRE() throws Exception {

@@ -50,6 +50,7 @@ import static com.sun.jna.platform.win32.WinUser.SW_SHOW;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,6 +67,8 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.experimental.windowsexecuter.ExecuteOptions;
+import org.appwork.experimental.windowsexecuter.WindowsExecuter;
 import org.appwork.jna.windows.Kernel32Ext;
 import org.appwork.jna.windows.Rm;
 import org.appwork.jna.windows.RmProcessInfo;
@@ -77,6 +80,7 @@ import org.appwork.jna.windows.interfaces.ExplicitAccess;
 import org.appwork.jna.windows.interfaces.Trustee;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.StorableDoc;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
@@ -87,6 +91,7 @@ import org.appwork.utils.JavaVersion;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.UniqueAlltimeID;
+import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.windows.jna.HandleScanExEntry32;
 import org.appwork.utils.os.windows.jna.HandleScanExEntry64;
 import org.appwork.utils.os.windows.jna.HandleScanLegacyEntry32;
@@ -110,6 +115,7 @@ import com.sun.jna.platform.win32.Advapi32Util.Account;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.Shell32;
+import com.sun.jna.platform.win32.Tlhelp32;
 import com.sun.jna.platform.win32.W32Errors;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinBase;
@@ -145,57 +151,177 @@ import com.sun.jna.ptr.PointerByReference;
  * @date 14.10.2018
  */
 public class WindowsUtils {
-    public static enum AccessPermission {
+    public static enum AccessPermission implements LabelInterface {
         // File/Directory specific access rights
         @StorableDoc("For a file object, the right to read the corresponding file data. For a directory object, the right to read the corresponding directory data.")
-        FILE_READ_DATA(WinNT.FILE_READ_DATA),
+        FILE_READ_DATA(WinNT.FILE_READ_DATA) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_READ_DATA();
+            }
+        },
         @StorableDoc("For a directory object, the right to list the contents of the directory.")
-        FILE_LIST_DIRECTORY(WinNT.FILE_LIST_DIRECTORY),
+        FILE_LIST_DIRECTORY(WinNT.FILE_LIST_DIRECTORY) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_LIST_DIRECTORY();
+            }
+        },
         @StorableDoc("For a file object, the right to write data to the file. For a directory object, the right to create a file in the directory.")
-        FILE_WRITE_DATA(WinNT.FILE_WRITE_DATA),
+        FILE_WRITE_DATA(WinNT.FILE_WRITE_DATA) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_WRITE_DATA();
+            }
+        },
         @StorableDoc("For a directory object, the right to create a file in the directory.")
-        FILE_ADD_FILE(WinNT.FILE_ADD_FILE),
+        FILE_ADD_FILE(WinNT.FILE_ADD_FILE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_ADD_FILE();
+            }
+        },
         @StorableDoc("For a file object, the right to append data to the file. For a directory object, the right to create a subdirectory.")
-        FILE_APPEND_DATA(WinNT.FILE_APPEND_DATA),
+        FILE_APPEND_DATA(WinNT.FILE_APPEND_DATA) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_APPEND_DATA();
+            }
+        },
         @StorableDoc("For a directory object, the right to create a subdirectory.")
-        FILE_ADD_SUBDIRECTORY(WinNT.FILE_ADD_SUBDIRECTORY),
+        FILE_ADD_SUBDIRECTORY(WinNT.FILE_ADD_SUBDIRECTORY) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_ADD_SUBDIRECTORY();
+            }
+        },
         @StorableDoc("For a named pipe, the right to create a pipe instance.")
-        FILE_CREATE_PIPE_INSTANCE(WinNT.FILE_CREATE_PIPE_INSTANCE),
+        FILE_CREATE_PIPE_INSTANCE(WinNT.FILE_CREATE_PIPE_INSTANCE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_CREATE_PIPE_INSTANCE();
+            }
+        },
         @StorableDoc("The right to read extended attributes.")
-        FILE_READ_EA(WinNT.FILE_READ_EA),
+        FILE_READ_EA(WinNT.FILE_READ_EA) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_READ_EA();
+            }
+        },
         @StorableDoc("The right to write extended attributes.")
-        FILE_WRITE_EA(WinNT.FILE_WRITE_EA),
+        FILE_WRITE_EA(WinNT.FILE_WRITE_EA) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_WRITE_EA();
+            }
+        },
         @StorableDoc("The right to execute a file.")
-        FILE_EXECUTE(WinNT.FILE_EXECUTE),
+        FILE_EXECUTE(WinNT.FILE_EXECUTE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_EXECUTE();
+            }
+        },
         @StorableDoc("For a directory object, the right to traverse the directory.")
-        FILE_TRAVERSE(WinNT.FILE_TRAVERSE),
+        FILE_TRAVERSE(WinNT.FILE_TRAVERSE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_TRAVERSE();
+            }
+        },
         @StorableDoc("For a directory object, the right to delete entries within the directory.")
-        FILE_DELETE_CHILD(WinNT.FILE_DELETE_CHILD),
+        FILE_DELETE_CHILD(WinNT.FILE_DELETE_CHILD) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_DELETE_CHILD();
+            }
+        },
         @StorableDoc("The right to delete the object.")
-        DELETE(WinNT.DELETE),
+        DELETE(WinNT.DELETE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_DELETE();
+            }
+        },
         @StorableDoc("The right to read file attributes.")
-        FILE_READ_ATTRIBUTES(WinNT.FILE_READ_ATTRIBUTES),
+        FILE_READ_ATTRIBUTES(WinNT.FILE_READ_ATTRIBUTES) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_READ_ATTRIBUTES();
+            }
+        },
         @StorableDoc("The right to write file attributes.")
-        FILE_WRITE_ATTRIBUTES(WinNT.FILE_WRITE_ATTRIBUTES),
+        FILE_WRITE_ATTRIBUTES(WinNT.FILE_WRITE_ATTRIBUTES) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_WRITE_ATTRIBUTES();
+            }
+        },
         @StorableDoc("All possible access rights for a file.")
-        FILE_ALL_ACCESS(WinNT.FILE_ALL_ACCESS),
+        FILE_ALL_ACCESS(WinNT.FILE_ALL_ACCESS) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_ALL_ACCESS();
+            }
+        },
         @StorableDoc("Generic read access.")
-        FILE_GENERIC_READ(WinNT.FILE_GENERIC_READ),
+        FILE_GENERIC_READ(WinNT.FILE_GENERIC_READ) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_GENERIC_READ();
+            }
+        },
         @StorableDoc("Generic write access.")
-        FILE_GENERIC_WRITE(WinNT.FILE_GENERIC_WRITE),
+        FILE_GENERIC_WRITE(WinNT.FILE_GENERIC_WRITE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_GENERIC_WRITE();
+            }
+        },
         @StorableDoc("Generic execute access.")
-        FILE_GENERIC_EXECUTE(WinNT.FILE_GENERIC_EXECUTE),
+        FILE_GENERIC_EXECUTE(WinNT.FILE_GENERIC_EXECUTE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_FILE_GENERIC_EXECUTE();
+            }
+        },
         // Security descriptor access rights - not for CreateFile usage
         @StorableDoc("The right to read the security descriptor and ownership.")
-        READ_CONTROL(WinNT.READ_CONTROL),
+        READ_CONTROL(WinNT.READ_CONTROL) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_READ_CONTROL();
+            }
+        },
         @StorableDoc("The right to modify the discretionary access control list (DACL) in the object's security descriptor.")
-        WRITE_DAC(WinNT.WRITE_DAC),
+        WRITE_DAC(WinNT.WRITE_DAC) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_WRITE_DAC();
+            }
+        },
         @StorableDoc("The right to change the owner in the object's security descriptor.")
-        WRITE_OWNER(WinNT.WRITE_OWNER),
+        WRITE_OWNER(WinNT.WRITE_OWNER) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_WRITE_OWNER();
+            }
+        },
         @StorableDoc("The right to use the object for synchronization.")
-        SYNCHRONIZE(WinNT.SYNCHRONIZE),
+        SYNCHRONIZE(WinNT.SYNCHRONIZE) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_SYNCHRONIZE();
+            }
+        },
         @StorableDoc("Access system security.")
-        ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
+        ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY) {
+            @Override
+            public String getLabel() {
+                return _AWU.T.AccessPermission_ACCESS_SYSTEM_SECURITY();
+            }
+        };
 
         public final int mask;
 
@@ -204,89 +330,499 @@ public class WindowsUtils {
         }
     }
 
-    public static enum SID {
-        SID_NULL("S-1-0-0"),
-        SID_EVERYONE("S-1-1-0"),
-        SID_LOCAL("S-1-2-0"),
-        SID_CONSOLE_LOGON("S-1-2-1"),
-        SID_CREATOR_OWNER("S-1-3-0"),
-        SID_CREATOR_GROUP("S-1-3-1"),
-        SID_OWNER_SERVER("S-1-3-2"),
-        SID_GROUP_SERVER("S-1-3-3"),
-        SID_OWNER_RIGHTS("S-1-3-4"),
-        SID_NT_AUTHORITY("S-1-5"),
-        SID_DIALUP("S-1-5-1"),
-        SID_NETWORK("S-1-5-2"),
-        SID_BATCH("S-1-5-3"),
-        SID_INTERACTIVE("S-1-5-4"),
-        SID_SERVICE("S-1-5-6"),
-        SID_ANONYMOUS("S-1-5-7"),
-        SID_PROXY("S-1-5-8"),
-        SID_ENTERPRISE_DOMAIN_CONTROLLERS("S-1-5-9"),
-        SID_PRINCIPAL_SELF("S-1-5-10"),
-        SID_AUTHENTICATED_USERS("S-1-5-11"),
-        SID_RESTRICTED_CODE("S-1-5-12"),
-        SID_TERMINAL_SERVER_USER("S-1-5-13"),
-        SID_REMOTE_INTERACTIVE_LOGON("S-1-5-14"),
-        SID_THIS_ORGANIZATION("S-1-5-15"),
-        SID_IUSR("S-1-5-17"),
-        SID_LOCAL_SYSTEM("S-1-5-18"),
-        SID_LOCAL_SERVICE("S-1-5-19"),
-        SID_NETWORK_SERVICE("S-1-5-20"),
-        SID_COMPOUNDED_AUTHENTICATION("S-1-5-21-0-0-0-496"),
-        SID_CLAIMS_VALID("S-1-5-21-0-0-0-497"),
-        SID_BUILTIN_ADMINISTRATORS("S-1-5-32-544"),
-        SID_BUILTIN_USERS("S-1-5-32-545"),
-        SID_BUILTIN_GUESTS("S-1-5-32-546"),
-        SID_POWER_USERS("S-1-5-32-547"),
-        SID_ACCOUNT_OPERATORS("S-1-5-32-548"),
-        SID_SERVER_OPERATORS("S-1-5-32-549"),
-        SID_PRINTER_OPERATORS("S-1-5-32-550"),
-        SID_BACKUP_OPERATORS("S-1-5-32-551"),
-        SID_REPLICATOR("S-1-5-32-552"),
-        SID_ALIAS_PREW2KCOMPACC("S-1-5-32-554"),
-        SID_REMOTE_DESKTOP("S-1-5-32-555"),
-        SID_NETWORK_CONFIGURATION_OPS("S-1-5-32-556"),
-        SID_INCOMING_FOREST_TRUST_BUILDERS("S-1-5-32-557"),
-        SID_PERFMON_USERS("S-1-5-32-558"),
-        SID_PERFLOG_USERS("S-1-5-32-559"),
-        SID_WINDOWS_AUTHORIZATION_ACCESS_GROUP("S-1-5-32-560"),
-        SID_TERMINAL_SERVER_LICENSE_SERVERS("S-1-5-32-561"),
-        SID_DISTRIBUTED_COM_USERS("S-1-5-32-562"),
-        SID_IIS_IUSRS("S-1-5-32-568"),
-        SID_CRYPTOGRAPHIC_OPERATORS("S-1-5-32-569"),
-        SID_EVENT_LOG_READERS("S-1-5-32-573"),
-        SID_CERTIFICATE_SERVICE_DCOM_ACCESS("S-1-5-32-574"),
-        SID_RDS_REMOTE_ACCESS_SERVERS("S-1-5-32-575"),
-        SID_RDS_ENDPOINT_SERVERS("S-1-5-32-576"),
-        SID_RDS_MANAGEMENT_SERVERS("S-1-5-32-577"),
-        SID_HYPER_V_ADMINS("S-1-5-32-578"),
-        SID_ACCESS_CONTROL_ASSISTANCE_OPS("S-1-5-32-579"),
-        SID_REMOTE_MANAGEMENT_USERS("S-1-5-32-580"),
-        SID_WRITE_RESTRICTED_CODE("S-1-5-33"),
-        SID_NTLM_AUTHENTICATION("S-1-5-64-10"),
-        SID_SCHANNEL_AUTHENTICATION("S-1-5-64-14"),
-        SID_DIGEST_AUTHENTICATION("S-1-5-64-21"),
-        SID_THIS_ORGANIZATION_CERTIFICATE("S-1-5-65-1"),
-        SID_NT_SERVICE("S-1-5-80"),
-        SID_USER_MODE_DRIVERS("S-1-5-84-0-0-0-0-0"),
-        SID_LOCAL_ACCOUNT("S-1-5-113"),
-        SID_LOCAL_ACCOUNT_AND_MEMBER_OF_ADMINISTRATORS_GROUP("S-1-5-114"),
-        SID_OTHER_ORGANIZATION("S-1-5-1000"),
-        SID_ALL_APP_PACKAGES("S-1-15-2-1"),
-        SID_ML_UNTRUSTED("S-1-16-0"),
-        SID_ML_LOW("S-1-16-4096"),
-        SID_ML_MEDIUM("S-1-16-8192"),
-        SID_ML_MEDIUM_PLUS("S-1-16-8448"),
-        SID_ML_HIGH("S-1-16-12288"),
-        SID_ML_SYSTEM("S-1-16-16384"),
-        SID_ML_PROTECTED_PROCESS("S-1-16-20480"),
-        SID_AUTHENTICATION_AUTHORITY_ASSERTED_IDENTITY("S-1-18-1"),
-        SID_SERVICE_ASSERTED_IDENTITY("S-1-18-2"),
-        SID_FRESH_PUBLIC_KEY_IDENTITY("S-1-18-3"),
-        SID_KEY_TRUST_IDENTITY("S-1-18-4"),
-        SID_KEY_PROPERTY_MFA("S-1-18-5"),
-        SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
+    public static enum SID implements LabelInterface {
+        SID_NULL("S-1-0-0") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NULL();
+            }
+        },
+        SID_EVERYONE("S-1-1-0") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_EVERYONE();
+            }
+        },
+        SID_LOCAL("S-1-2-0") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_LOCAL();
+            }
+        },
+        SID_CONSOLE_LOGON("S-1-2-1") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_CONSOLE_LOGON();
+            }
+        },
+        SID_CREATOR_OWNER("S-1-3-0") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_CREATOR_OWNER();
+            }
+        },
+        SID_CREATOR_GROUP("S-1-3-1") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_CREATOR_GROUP();
+            }
+        },
+        SID_OWNER_SERVER("S-1-3-2") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_OWNER_SERVER();
+            }
+        },
+        SID_GROUP_SERVER("S-1-3-3") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_GROUP_SERVER();
+            }
+        },
+        SID_OWNER_RIGHTS("S-1-3-4") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_OWNER_RIGHTS();
+            }
+        },
+        SID_NT_AUTHORITY("S-1-5") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NT_AUTHORITY();
+            }
+        },
+        SID_DIALUP("S-1-5-1") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_DIALUP();
+            }
+        },
+        SID_NETWORK("S-1-5-2") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NETWORK();
+            }
+        },
+        SID_BATCH("S-1-5-3") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_BATCH();
+            }
+        },
+        SID_INTERACTIVE("S-1-5-4") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_INTERACTIVE();
+            }
+        },
+        SID_SERVICE("S-1-5-6") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_SERVICE();
+            }
+        },
+        SID_ANONYMOUS("S-1-5-7") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ANONYMOUS();
+            }
+        },
+        SID_PROXY("S-1-5-8") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_PROXY();
+            }
+        },
+        SID_ENTERPRISE_DOMAIN_CONTROLLERS("S-1-5-9") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ENTERPRISE_DOMAIN_CONTROLLERS();
+            }
+        },
+        SID_PRINCIPAL_SELF("S-1-5-10") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_PRINCIPAL_SELF();
+            }
+        },
+        SID_AUTHENTICATED_USERS("S-1-5-11") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_AUTHENTICATED_USERS();
+            }
+        },
+        SID_RESTRICTED_CODE("S-1-5-12") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_RESTRICTED_CODE();
+            }
+        },
+        SID_TERMINAL_SERVER_USER("S-1-5-13") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_TERMINAL_SERVER_USER();
+            }
+        },
+        SID_REMOTE_INTERACTIVE_LOGON("S-1-5-14") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_REMOTE_INTERACTIVE_LOGON();
+            }
+        },
+        SID_THIS_ORGANIZATION("S-1-5-15") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_THIS_ORGANIZATION();
+            }
+        },
+        SID_IUSR("S-1-5-17") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_IUSR();
+            }
+        },
+        SID_LOCAL_SYSTEM("S-1-5-18") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_LOCAL_SYSTEM();
+            }
+        },
+        SID_LOCAL_SERVICE("S-1-5-19") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_LOCAL_SERVICE();
+            }
+        },
+        SID_NETWORK_SERVICE("S-1-5-20") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NETWORK_SERVICE();
+            }
+        },
+        SID_COMPOUNDED_AUTHENTICATION("S-1-5-21-0-0-0-496") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_COMPOUNDED_AUTHENTICATION();
+            }
+        },
+        SID_CLAIMS_VALID("S-1-5-21-0-0-0-497") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_CLAIMS_VALID();
+            }
+        },
+        SID_BUILTIN_ADMINISTRATORS("S-1-5-32-544") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_BUILTIN_ADMINISTRATORS();
+            }
+        },
+        SID_BUILTIN_USERS("S-1-5-32-545") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_BUILTIN_USERS();
+            }
+        },
+        SID_BUILTIN_GUESTS("S-1-5-32-546") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_BUILTIN_GUESTS();
+            }
+        },
+        SID_POWER_USERS("S-1-5-32-547") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_POWER_USERS();
+            }
+        },
+        SID_ACCOUNT_OPERATORS("S-1-5-32-548") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ACCOUNT_OPERATORS();
+            }
+        },
+        SID_SERVER_OPERATORS("S-1-5-32-549") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_SERVER_OPERATORS();
+            }
+        },
+        SID_PRINTER_OPERATORS("S-1-5-32-550") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_PRINTER_OPERATORS();
+            }
+        },
+        SID_BACKUP_OPERATORS("S-1-5-32-551") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_BACKUP_OPERATORS();
+            }
+        },
+        SID_REPLICATOR("S-1-5-32-552") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_REPLICATOR();
+            }
+        },
+        SID_ALIAS_PREW2KCOMPACC("S-1-5-32-554") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ALIAS_PREW2KCOMPACC();
+            }
+        },
+        SID_REMOTE_DESKTOP("S-1-5-32-555") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_REMOTE_DESKTOP();
+            }
+        },
+        SID_NETWORK_CONFIGURATION_OPS("S-1-5-32-556") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NETWORK_CONFIGURATION_OPS();
+            }
+        },
+        SID_INCOMING_FOREST_TRUST_BUILDERS("S-1-5-32-557") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_INCOMING_FOREST_TRUST_BUILDERS();
+            }
+        },
+        SID_PERFMON_USERS("S-1-5-32-558") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_PERFMON_USERS();
+            }
+        },
+        SID_PERFLOG_USERS("S-1-5-32-559") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_PERFLOG_USERS();
+            }
+        },
+        SID_WINDOWS_AUTHORIZATION_ACCESS_GROUP("S-1-5-32-560") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_WINDOWS_AUTHORIZATION_ACCESS_GROUP();
+            }
+        },
+        SID_TERMINAL_SERVER_LICENSE_SERVERS("S-1-5-32-561") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_TERMINAL_SERVER_LICENSE_SERVERS();
+            }
+        },
+        SID_DISTRIBUTED_COM_USERS("S-1-5-32-562") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_DISTRIBUTED_COM_USERS();
+            }
+        },
+        SID_IIS_IUSRS("S-1-5-32-568") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_IIS_IUSRS();
+            }
+        },
+        SID_CRYPTOGRAPHIC_OPERATORS("S-1-5-32-569") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_CRYPTOGRAPHIC_OPERATORS();
+            }
+        },
+        SID_EVENT_LOG_READERS("S-1-5-32-573") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_EVENT_LOG_READERS();
+            }
+        },
+        SID_CERTIFICATE_SERVICE_DCOM_ACCESS("S-1-5-32-574") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_CERTIFICATE_SERVICE_DCOM_ACCESS();
+            }
+        },
+        SID_RDS_REMOTE_ACCESS_SERVERS("S-1-5-32-575") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_RDS_REMOTE_ACCESS_SERVERS();
+            }
+        },
+        SID_RDS_ENDPOINT_SERVERS("S-1-5-32-576") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_RDS_ENDPOINT_SERVERS();
+            }
+        },
+        SID_RDS_MANAGEMENT_SERVERS("S-1-5-32-577") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_RDS_MANAGEMENT_SERVERS();
+            }
+        },
+        SID_HYPER_V_ADMINS("S-1-5-32-578") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_HYPER_V_ADMINS();
+            }
+        },
+        SID_ACCESS_CONTROL_ASSISTANCE_OPS("S-1-5-32-579") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ACCESS_CONTROL_ASSISTANCE_OPS();
+            }
+        },
+        SID_REMOTE_MANAGEMENT_USERS("S-1-5-32-580") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_REMOTE_MANAGEMENT_USERS();
+            }
+        },
+        SID_WRITE_RESTRICTED_CODE("S-1-5-33") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_WRITE_RESTRICTED_CODE();
+            }
+        },
+        SID_NTLM_AUTHENTICATION("S-1-5-64-10") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NTLM_AUTHENTICATION();
+            }
+        },
+        SID_SCHANNEL_AUTHENTICATION("S-1-5-64-14") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_SCHANNEL_AUTHENTICATION();
+            }
+        },
+        SID_DIGEST_AUTHENTICATION("S-1-5-64-21") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_DIGEST_AUTHENTICATION();
+            }
+        },
+        SID_THIS_ORGANIZATION_CERTIFICATE("S-1-5-65-1") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_THIS_ORGANIZATION_CERTIFICATE();
+            }
+        },
+        SID_NT_SERVICE("S-1-5-80") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_NT_SERVICE();
+            }
+        },
+        SID_USER_MODE_DRIVERS("S-1-5-84-0-0-0-0-0") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_USER_MODE_DRIVERS();
+            }
+        },
+        SID_LOCAL_ACCOUNT("S-1-5-113") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_LOCAL_ACCOUNT();
+            }
+        },
+        SID_LOCAL_ACCOUNT_AND_MEMBER_OF_ADMINISTRATORS_GROUP("S-1-5-114") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_LOCAL_ACCOUNT_AND_MEMBER_OF_ADMINISTRATORS_GROUP();
+            }
+        },
+        SID_OTHER_ORGANIZATION("S-1-5-1000") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_OTHER_ORGANIZATION();
+            }
+        },
+        SID_ALL_APP_PACKAGES("S-1-15-2-1") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ALL_APP_PACKAGES();
+            }
+        },
+        SID_ML_UNTRUSTED("S-1-16-0") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_UNTRUSTED();
+            }
+        },
+        SID_ML_LOW("S-1-16-4096") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_LOW();
+            }
+        },
+        SID_ML_MEDIUM("S-1-16-8192") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_MEDIUM();
+            }
+        },
+        SID_ML_MEDIUM_PLUS("S-1-16-8448") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_MEDIUM_PLUS();
+            }
+        },
+        SID_ML_HIGH("S-1-16-12288") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_HIGH();
+            }
+        },
+        SID_ML_SYSTEM("S-1-16-16384") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_SYSTEM();
+            }
+        },
+        SID_ML_PROTECTED_PROCESS("S-1-16-20480") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_ML_PROTECTED_PROCESS();
+            }
+        },
+        SID_AUTHENTICATION_AUTHORITY_ASSERTED_IDENTITY("S-1-18-1") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_AUTHENTICATION_AUTHORITY_ASSERTED_IDENTITY();
+            }
+        },
+        SID_SERVICE_ASSERTED_IDENTITY("S-1-18-2") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_SERVICE_ASSERTED_IDENTITY();
+            }
+        },
+        SID_FRESH_PUBLIC_KEY_IDENTITY("S-1-18-3") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_FRESH_PUBLIC_KEY_IDENTITY();
+            }
+        },
+        SID_KEY_TRUST_IDENTITY("S-1-18-4") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_KEY_TRUST_IDENTITY();
+            }
+        },
+        SID_KEY_PROPERTY_MFA("S-1-18-5") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_KEY_PROPERTY_MFA();
+            }
+        },
+        SID_KEY_PROPERTY_ATTESTATION("S-1-18-6") {
+            @Override
+            public String getLabel() {
+                return _AWU.T.SID_SID_KEY_PROPERTY_ATTESTATION();
+            }
+        };
 
         public final String sid;
 
@@ -572,6 +1108,24 @@ public class WindowsUtils {
     }
 
     /**
+     * Returns true if the current process is running as NT AUTHORITY\SYSTEM (LocalSystem). Use this to skip delegating to the admin helper
+     * when already in the correct context (e.g. when runAsLocalSystem is called from inside a task that already runs as SYSTEM).
+     *
+     * @return true if current user SID is S-1-5-18 (LocalSystem), false otherwise or on error
+     */
+    public static boolean isRunningAsLocalSystem() {
+        if (!CrossSystem.isWindows()) {
+            return false;
+        }
+        try {
+            String sid = getCurrentUserSID();
+            return sid != null && sid.equals(SID_LOCAL_SYSTEM);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
      * Checks if a specific process is running with elevated privileges.
      *
      * @param pid
@@ -618,6 +1172,66 @@ public class WindowsUtils {
     }
 
     /**
+     * Returns the user SID (Security Identifier) of the process with the given PID, or null if the SID cannot be determined (e.g. process
+     * not found, access denied, or not running on Windows). Used for IPC trust checks so that only the same user can access this process's
+     * sockets.
+     *
+     * @param pid
+     *            The process ID to query
+     * @return The user SID string of the process, or null on failure
+     */
+    public static String getUserSIDForProcess(final int pid) {
+        if (!CrossSystem.isWindows() || pid <= 0) {
+            return null;
+        }
+        HANDLEByReference phToken = new HANDLEByReference();
+        try {
+            HANDLE processHandle = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (processHandle == null) {
+                return null;
+            }
+            try {
+                if (!Advapi32.INSTANCE.OpenProcessToken(processHandle, WinNT.TOKEN_QUERY, phToken)) {
+                    return null;
+                }
+                Advapi32Util.Account account = Advapi32Util.getTokenAccount(phToken.getValue());
+                return account != null ? account.sidString : null;
+            } finally {
+                if (processHandle != null) {
+                    Kernel32Util.closeHandle(processHandle);
+                }
+            }
+        } catch (Throwable e) {
+            Exceptions.resetInterruptFlag(e);
+            LogV3.fine("getUserSIDForProcess(pid=" + pid + "): " + e.getMessage());
+            return null;
+        } finally {
+            if (phToken.getValue() != null) {
+                try {
+                    Kernel32Util.closeHandle(phToken.getValue());
+                } catch (Win32Exception e) {
+                    // ignore on cleanup
+                }
+            }
+        }
+    }
+
+    /**
+     * True if the given executable path refers to cmd.exe (used for /c parameter escaping).
+     */
+    private static boolean isCmdExe(String binary) {
+        if (binary == null) {
+            return false;
+        }
+        String name = binary;
+        int last = binary.lastIndexOf('\\');
+        if (last >= 0 && last + 1 < binary.length()) {
+            name = binary.substring(last + 1);
+        }
+        return "cmd.exe".equalsIgnoreCase(name) || "cmd".equalsIgnoreCase(name);
+    }
+
+    /**
      * Starts a process with elevated privileges (UAC prompt will be shown).
      *
      * @param command
@@ -648,8 +1262,21 @@ public class WindowsUtils {
         String[] params = new String[command.length - 1];
         System.arraycopy(command, 1, params, 0, params.length);
         String finalCommand = ShellParser.createCommandLine(Style.WINDOWS, binary);
-        String args = ShellParser.createCommandLine(Style.WINDOWS, params);
-        System.out.println(finalCommand);
+        String args;
+        /*
+         * Special case for ShellExecuteEx only: cmd.exe /c <command> ShellParser.createCommandLine uses \" for embedded quotes
+         * (CreateProcess rule: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw ).
+         * When we use ShellExecuteEx with lpFile+lpParameters and "runas", the command line is not necessarily parsed the same way as by
+         * CreateProcess; using \" can lead to wrong parsing for the elevated cmd.exe. We escape inner double quotes as
+         * ^" (caret + quote): the elevated cmd receives ^" and interprets it as one literal " (cmd caret escape). The ""-only form can be
+         * mis-parsed (e.g. "C:\Program" when the path contains spaces). Do not move this into ShellParser.
+         */
+        if (isCmdExe(binary) && params.length == 2 && "/c".equals(params[0])) {
+            String cmdString = params[1];
+            args = "/c \"" + cmdString.replace("\"", "^\"") + "\"";
+        } else {
+            args = ShellParser.createCommandLine(Style.WINDOWS, params);
+        }
         // Set up ShellExecuteEx parameters
         Shell32.SHELLEXECUTEINFO sei = new Shell32.SHELLEXECUTEINFO();
         sei.cbSize = sei.size();
@@ -669,6 +1296,75 @@ public class WindowsUtils {
         return info;
     }
 
+    /**
+     * Builds Task Scheduler 1.2 XML that runs the given command as NT AUTHORITY\SYSTEM (LocalSystem). Use with schtasks /create /xml.
+     * Principal: UserId S-1-5-18, LogonType Password (no password needed for SYSTEM).
+     *
+     * @param command
+     *            executable (e.g. "cmd.exe")
+     * @param arguments
+     *            arguments string (e.g. "/c \"...\"")
+     * @param workingDir
+     *            working directory (null = omit)
+     * @return XML string (UTF-16) for schtasks /create /xml
+     */
+    public static String buildTaskXmlAsLocalSystem(String command, String arguments, String workingDir) {
+        String startTime;
+        String endTime;
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_8)) {
+            String[] times = formatTaskSchedulerBoundaryTimesJava8();
+            startTime = times[0];
+            endTime = times[1];
+        } else {
+            String[] times = formatTaskSchedulerBoundaryTimesLegacy();
+            startTime = times[0];
+            endTime = times[1];
+        }
+        String argumentsXMLNode = (arguments != null && arguments.length() > 0) ? "<Arguments>" + escapeXml(arguments) + "</Arguments>\n" : "";
+    // @formatter:off
+    // LogonType: ServiceAccount is not in Task Scheduler 1.2 schema (InteractiveToken|Password|S4U). Use Password for SYSTEM (S-1-5-18).
+    String xml =
+            "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n" +
+            "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n" +
+            "  <RegistrationInfo>\n" +
+            "    <Author>AppWork</Author>\n" +
+            "  </RegistrationInfo>\n" +
+            "  <Triggers>\n" +
+            "    <TimeTrigger>\n" +
+            "      <StartBoundary>" + escapeXml(startTime) + "</StartBoundary>\n" +
+            "      <EndBoundary>" + escapeXml(endTime) + "</EndBoundary>\n" +
+            "      <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>\n" +
+            "      <Enabled>true</Enabled>\n" +
+            "    </TimeTrigger>\n" +
+            "  </Triggers>\n" +
+            "  <Principals>\n" +
+            "    <Principal id=\"Author\">\n" +
+            "      <UserId>S-1-5-18</UserId>\n" +
+            "      <LogonType>Password</LogonType>\n" +
+            "      <RunLevel>HighestAvailable</RunLevel>\n" +
+            "    </Principal>\n" +
+            "  </Principals>\n" +
+            "  <Settings>\n" +
+            "    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>\n" +
+            "    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>\n" +
+            "    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>\n" +
+            "    <AllowHardTerminate>true</AllowHardTerminate>\n" +
+            "    <StartWhenAvailable>true</StartWhenAvailable>\n" +
+            "    <AllowStartOnDemand>true</AllowStartOnDemand>\n" +
+            "    <Enabled>true</Enabled>\n" +
+            "    <Hidden>true</Hidden>\n" +
+            "    <DeleteExpiredTaskAfter>PT1M</DeleteExpiredTaskAfter>\n" +
+            "  </Settings>\n" +
+            "  <Actions Context=\"Author\">\n" +
+            "    <Exec>\n" +
+            "      <Command>" + escapeXml(command) + "</Command>\n" + argumentsXMLNode +
+            (workingDir != null && workingDir.length() > 0 ? "      <WorkingDirectory>" + escapeXml(workingDir) + "</WorkingDirectory>\n" : "") +
+            "    </Exec>\n" +
+            "  </Actions>\n" +
+            "</Task>";
+    // @formatter:on
+        return xml;
+    }
 
     /**
      * Gets the security descriptor for a file.
@@ -1994,6 +2690,82 @@ public class WindowsUtils {
         return last >= 0 ? path.substring(last + 1) : path;
     }
 
+    /**
+     * Full executable path for the given process handle (Vista+). Returns null on failure.
+     */
+    private static String getProcessExecutableFullPath(HANDLE hProcess) {
+        if (hProcess == null || Pointer.nativeValue(hProcess.getPointer()) == 0) {
+            return null;
+        }
+        char[] buf = new char[WinBase.MAX_PATH];
+        IntByReference size = new IntByReference(buf.length);
+        if (!WindowsUtilsKernel32.INSTANCE.QueryFullProcessImageNameW(hProcess, 0, buf, size)) {
+            return null;
+        }
+        return new String(buf, 0, size.getValue()).trim();
+    }
+
+    /**
+     * Full executable path for the given PID (Vista+). Returns null on failure.
+     */
+    private static String getProcessExecutableFullPath(int pid) {
+        HANDLE h = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (h == null || WinBase.INVALID_HANDLE_VALUE.equals(h)) {
+            return null;
+        }
+        try {
+            return getProcessExecutableFullPath(h);
+        } finally {
+            Kernel32.INSTANCE.CloseHandle(h);
+        }
+    }
+
+    /**
+     * Normalize executable path for comparison (backslash, lowercase). Use the same normalization when building sets for "path in use?"
+     * checks or when comparing with paths from {@link org.appwork.processes.ProcessHandler#listByPath(String)}.
+     *
+     * @param path
+     *            absolute executable path (may be null)
+     * @return normalized path, or empty string if null
+     */
+    public static String normalizeExecutablePathForCompare(String path) {
+        if (path == null) {
+            return "";
+        }
+        return path.replace('/', '\\').toLowerCase(Locale.ROOT).trim();
+    }
+
+    /**
+     * Returns the set of absolute executable paths for which at least one process is currently running. Uses Toolhelp32 +
+     * QueryFullProcessImageNameW (no WMI). For use in fast "is path in use?" checks.
+     *
+     * @return set of normalized paths (never null)
+     */
+    public static Set<String> getRunningExecutablePaths() {
+        Set<String> paths = new HashSet<String>();
+        HANDLE snapshot = Kernel32.INSTANCE.CreateToolhelp32Snapshot(Tlhelp32.TH32CS_SNAPPROCESS, new DWORD(0));
+        if (snapshot == null || WinBase.INVALID_HANDLE_VALUE.equals(snapshot)) {
+            return paths;
+        }
+        try {
+            Tlhelp32.PROCESSENTRY32.ByReference pe = new Tlhelp32.PROCESSENTRY32.ByReference();
+            pe.dwSize = new DWORD(pe.size());
+            if (!Kernel32.INSTANCE.Process32First(snapshot, pe)) {
+                return paths;
+            }
+            do {
+                int pid = pe.th32ProcessID.intValue();
+                String path = getProcessExecutableFullPath(pid);
+                if (path != null && path.length() > 0) {
+                    paths.add(normalizeExecutablePathForCompare(path));
+                }
+            } while (Kernel32.INSTANCE.Process32Next(snapshot, pe));
+        } finally {
+            Kernel32.INSTANCE.CloseHandle(snapshot);
+        }
+        return paths;
+    }
+
     private static int getProcessSessionId(int pid) {
         IntByReference ref = new IntByReference();
         if (Kernel32Ext.INSTANCE.ProcessIdToSessionId(pid, ref)) {
@@ -2557,7 +3329,104 @@ public class WindowsUtils {
         }
     }
 
+    /**
+     * Returns the token handle of the active console user. Works only when running as LocalSystem or with sufficient privileges (e.g.
+     * service). Caller must close the returned handle.
+     *
+     * @return token handle, or null if no active console session or on failure
+     */
+    public static HANDLE getActiveConsoleUserToken() {
+        int sessionId = Kernel32Ext.INSTANCE.WTSGetActiveConsoleSessionId();
+        if (sessionId == 0xFFFFFFFF) {
+            return null;
+        }
+        final PointerByReference token = new PointerByReference();
+        if (!Wtsapi32Ext.INSTANCE.WTSQueryUserToken(sessionId, token)) {
+            LogV3.log(new Win32Exception(Kernel32.INSTANCE.GetLastError()));
+            return null;
+        }
+        return new HANDLE(token.getValue());
+    }
+
+    /**
+     * Fallback when scheduler-based run fails: run via WindowsExecuter.runAsNonElevatedUser.
+     * Used by runViaWindowsScheduler for both WTFException and RuntimeException.
+     */
+    private static void runViaWindowsExecuterFallback(String binary, String workingDir, String sid, String[] args, Throwable original) throws IOException, InterruptedException {
+        String[] cmd = new String[args.length + 1];
+        cmd[0] = binary;
+        System.arraycopy(args, 0, cmd, 1, args.length);
+        ExecuteOptions.Builder opts = ExecuteOptions.builder().workingDir(workingDir != null ? new File(workingDir) : null).cmd(cmd).waitFor(false);
+        // Only set runInActiveSession when requested SID equals active console user (no SID passed to ExecuteOptions)
+        if (sid != null && sid.trim().length() > 0) {
+            try {
+                Account activeAccount = getActiveConsoleAccount();
+                if (activeAccount != null && sid.equals(activeAccount.sidString)) {
+                    opts.runInActiveSession(true);
+                } else {
+                    throw Exceptions.addSuppressed(original, new Exception("Cannot run  process as sid " + sid));
+                }
+            } catch (Throwable t) {
+                LogV3.log(t);
+                opts.runInActiveSession(true); // fallback to active session
+            }
+        }
+        try {
+            WindowsExecuter.runAsNonElevatedUser(opts.build());
+        } catch (Exception e1) {
+            Throwable toThrow = Exceptions.addSuppressed(original, e1);
+            if (toThrow instanceof RuntimeException) {
+                throw (RuntimeException) toThrow;
+            }
+            if (toThrow instanceof Error) {
+                throw (Error) toThrow;
+            }
+            throw new RuntimeException(toThrow);
+        }
+    }
+
     public static void runViaWindowsScheduler(String binary, String workingDir, String sid, String... args) throws IOException, InterruptedException {
+        // When current process is already in the target user context (not elevated, same user), start normally via ProcessBuilderFactory.
+        if (!isElevated()) {
+            String currentSid = null;
+            try {
+                currentSid = getCurrentUserSID();
+            } catch (Throwable t) {
+                // ignore; will use scheduler path
+            }
+            if (currentSid != null && (sid == null || sid.trim().length() == 0 || sid.equals(currentSid))) {
+                List<String> cmd = new ArrayList<String>();
+                cmd.add(binary);
+                for (String a : args) {
+                    cmd.add(a);
+                }
+                ProcessBuilder pb = ProcessBuilderFactory.create(cmd.toArray(new String[cmd.size()]));
+                if (workingDir != null) {
+                    pb.directory(new File(workingDir));
+                }
+                pb.start();
+                return;
+            }
+        }
+        try {
+            startNonElevatedViaSchedulerCLI(binary, workingDir, sid, args);
+        } catch (WTFException e) {
+            runViaWindowsExecuterFallback(binary, workingDir, sid, args, e);
+        } catch (RuntimeException e) {
+            runViaWindowsExecuterFallback(binary, workingDir, sid, args, e);
+        }
+    }
+
+    /**
+     * @param binary
+     * @param workingDir
+     * @param sid
+     * @param args
+     * @throws IOException
+     * @throws UnsupportedEncodingException
+     * @throws InterruptedException
+     */
+    static void startNonElevatedViaSchedulerCLI(String binary, String workingDir, String sid, String... args) throws IOException, UnsupportedEncodingException, InterruptedException {
         String taskName = "TempAppWorkJavaTask_" + UniqueAlltimeID.next();
         LogV3.info("Launch via Scheduler: " + binary + "  " + Arrays.toString(args) + " in " + workingDir);
         File file = Application.getResource("tmp/" + taskName + ".xml");

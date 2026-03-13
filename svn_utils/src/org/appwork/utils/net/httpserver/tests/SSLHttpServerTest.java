@@ -281,8 +281,11 @@ public class SSLHttpServerTest extends AWTest {
         // Temp file only for testPFXLoading (load-from-file scenarios)
         this.tempKeystoreFile = File.createTempFile("test-server-", ".p12");
         this.tempKeystoreFile.deleteOnExit();
-        try (FileOutputStream fos = new FileOutputStream(this.tempKeystoreFile)) {
+        FileOutputStream fos = new FileOutputStream(this.tempKeystoreFile);
+        try {
             this.serverKeyStore.store(fos, password);
+        } finally {
+            fos.close();
         }
         LogV3.info("PKCS12 temp file for PFX tests: " + this.tempKeystoreFile.getAbsolutePath());
     }
