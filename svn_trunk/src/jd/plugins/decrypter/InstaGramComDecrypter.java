@@ -79,7 +79,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 52475 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52494 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -225,7 +225,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 return this.crawlUser(param, account, loggedIN, username);
             } else {
                 /* Unsupported URL */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                /**
+                 * Special case: We cannot easily filter all unwanted links via plugin pattern thus users can add garbage links for example:
+                 * https://www.instagram.com/?hl=ar <br>
+                 * --> Silently ignore such links!
+                 */
+                logger.info("User has added unsupported url: " + contenturl);
+                return new ArrayList<DownloadLink>();
             }
         } catch (final AccountUnavailableException e) {
             if (account != null) {

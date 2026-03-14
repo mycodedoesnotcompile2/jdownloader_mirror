@@ -21,13 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,7 +36,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52488 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52495 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,36 +109,34 @@ public class RlGalleriesNt extends PluginForDecrypt {
                     /* Re-use session cookie otherwise we might need to solve a captcha for each link. */
                     br.setCookie(this.getHost(), "PHPSESSID", phpsessid);
                 }
+                br.setCurrentURL("https://" + getHost());
                 br.getPage(contenturl);
                 if (br.getHttpConnection().getResponseCode() == 403) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                final Form form = br.getForm(0);
-                String finallink = null;
-                findFinallink: if (form != null) {
-                    finallink = findFinallink(br);
-                    if (finallink != null) {
-                        logger.info("Found finallink without captcha");
-                        break findFinallink;
-                    }
-                    final String previous_path = br._getURL().getPath();
-                    final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
-                    form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
-                    br.submitForm(form);
-                    final String redirect = br.getRedirectLocation();
-                    if (redirect == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    /* Check for redirect on previous URL which will then reidrect to final URL. */
-                    if (redirect.contains(previous_path)) {
-                        logger.info("Handling double-redirect");
-                        br.getPage(redirect);
-                    }
-                    finallink = findFinallink(br);
-                    if (finallink == null) {
-                        logger.info("Failed to fina finallink in html code -> Website might have changed and plugin is broken?");
+                String finallink = findFinallink(br);
+                if (finallink != null && br.containsHTML("<h1>\\s*Verify to continue\\s*</h1>")) {
+                    final Form form = br.getForm(0);
+                    findFinallink: if (form != null) {
+                        final String previous_path = br._getURL().getPath();
+                        final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+                        form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                        br.submitForm(form);
+                        final String redirect = br.getRedirectLocation();
+                        if (redirect == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        /* Check for redirect on previous URL which will then reidrect to final URL. */
+                        if (redirect.contains(previous_path)) {
+                            logger.info("Handling double-redirect");
+                            br.getPage(redirect);
+                        }
+                        finallink = findFinallink(br);
+                        if (finallink == null) {
+                            logger.info("Failed to fina finallink in html code -> Website might have changed and plugin is broken?");
+                        }
                     }
                 }
                 if (finallink == null) {

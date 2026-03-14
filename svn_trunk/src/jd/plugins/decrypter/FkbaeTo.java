@@ -35,7 +35,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52494 $", interfaceVersion = 3, names = {}, urls = {})
 public class FkbaeTo extends PluginForDecrypt {
     public FkbaeTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,19 +89,24 @@ public class FkbaeTo extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         String title = null;
         final String self_embed_url;
-        if (new Regex(contenturl, PATTERN_EMBED).patternFind()) {
+        Regex regex_embed = new Regex(contenturl, PATTERN_EMBED);
+        String fileid = null;
+        if (regex_embed.patternFind()) {
             /* We already got the embed url we need though in this case we cannot get a meaningful title. */
             self_embed_url = contenturl;
+            fileid = regex_embed.getMatch(0);
         } else {
             /* We need to find the embed url */
             br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            self_embed_url = new Regex(br.toString(), PATTERN_EMBED).getMatch(-1);
-            if (self_embed_url == null) {
+            regex_embed = new Regex(br.getRequest().getHtmlCode(), PATTERN_EMBED);
+            if (!regex_embed.patternFind()) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            fileid = regex_embed.getMatch(0);
+            self_embed_url = regex_embed.getMatch(-1);
             title = br.getRegex("class=\"fl-heading-text\"[^>]*>([^<]+)<").getMatch(0);
             if (title != null) {
                 title = Encoding.htmlDecode(title).trim();
@@ -114,21 +119,23 @@ public class FkbaeTo extends PluginForDecrypt {
         if (stream_url == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String linkid = this.getHost() + "://stream/" + fileid;
+        final DownloadLink video;
         if (StringUtils.containsIgnoreCase(stream_url, ".m3u8")) {
             /* HLS video stream */
-            final DownloadLink video = createDownloadlink(stream_url);
+            video = createDownloadlink(stream_url);
             if (title != null) {
                 video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
             }
-            ret.add(video);
         } else {
             /* Progressive video stream */
-            final DownloadLink video = createDownloadlink(DirectHTTP.createURLForThisPlugin(stream_url));
+            video = createDownloadlink(DirectHTTP.createURLForThisPlugin(stream_url));
             if (title != null && StringUtils.containsIgnoreCase(stream_url, ".mp4")) {
                 video.setFinalFileName(title + ".mp4");
             }
-            ret.add(video);
         }
+        video.setLinkID(linkid);
+        ret.add(video);
         return ret;
     }
 }
