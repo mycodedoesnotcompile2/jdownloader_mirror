@@ -34,10 +34,14 @@ import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
 import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
 import jd.controlling.linkcollector.LinkCollectorCrawler;
 import jd.controlling.linkcollector.LinkCollectorEvent;
 import jd.controlling.linkcollector.LinkCollectorListener;
 import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerEvent;
+import jd.controlling.linkcrawler.LinkCrawlerListener;
 import jd.controlling.reconnect.Reconnecter;
 import jd.controlling.reconnect.ReconnecterEvent;
 import jd.controlling.reconnect.ReconnecterListener;
@@ -78,6 +82,7 @@ import org.jdownloader.extensions.StartException;
 import org.jdownloader.extensions.StopException;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.ArchiveSandbox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.CrawledLinkSandbox;
+import org.jdownloader.extensions.eventscripter.sandboxobjects.CrawlerJobHolderSandbox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.CrawlerJobSandbox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.DownloadLinkSandBox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.DownloadlistSelectionSandbox;
@@ -104,7 +109,7 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Script;
 import org.mozilla.javascript.tools.shell.Global;
 
-public class EventScripterExtension extends AbstractExtension<EventScripterConfig, EventScripterTranslation> implements MenuExtenderHandler, DownloadWatchdogListener, GenericConfigEventListener<Object>, FileCreationListener, LinkCollectorListener, PackagizerControllerListener, ExtractionListener, ReconnecterListener, ChallengeResponseListener {
+public class EventScripterExtension extends AbstractExtension<EventScripterConfig, EventScripterTranslation> implements MenuExtenderHandler, DownloadWatchdogListener, GenericConfigEventListener<Object>, FileCreationListener, LinkCollectorListener, PackagizerControllerListener, ExtractionListener, ReconnecterListener, ChallengeResponseListener, LinkCrawlerListener {
     private EventScripterConfigPanel          configPanel = null;
     private volatile List<ScriptEntry>        entries     = new ArrayList<ScriptEntry>();
     private final AtomicReference<Subscriber> subscriber  = new AtomicReference<Subscriber>(null);
@@ -137,6 +142,7 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
         CFG_EVENT_CALLER.SCRIPTS.getEventSender().removeListener(this);
         FileCreationManager.getInstance().getEventSender().removeListener(this);
         LinkCollector.getInstance().getEventsender().removeListener(this);
+        LinkCrawler.getGlobalEventSender().removeListener(this);
         final Subscriber old = EventScripterExtension.this.subscriber.getAndSet(null);
         if (old != null) {
             RemoteAPIController.getInstance().getEventsapi().removeSubscriber(old);
@@ -167,6 +173,7 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
         Reconnecter.getInstance().getEventSender().addListener(this);
         PackagizerController.getInstance().getEventSender().addListener(this);
         LinkCollector.getInstance().getEventsender().addListener(this);
+        LinkCrawler.getGlobalEventSender().addListener(this);
         FileCreationManager.getInstance().getEventSender().addListener(this);
         DownloadWatchDog.getInstance().getEventSender().addListener(this);
         if (!Application.isHeadless()) {
@@ -910,5 +917,30 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
 
     @Override
     public void onLinkCrawlerFinished() {
+    }
+
+    @Override
+    public void onLinkCrawlerEvent(LinkCrawlerEvent event) {
+        if (LinkCrawlerEvent.Type.FINISHED.equals(event.getType())) {
+            final LinkCrawler lc = event.getCaller();
+            if (!(lc instanceof JobLinkCrawler)) {
+                return;
+            }
+            CrawlerJobHolderSandbox crawlerJobHolderSandbox = null;
+            for (ScriptEntry script : entries) {
+                if (script.isEnabled() && EventTrigger.ON_FINISHED_CRAWLER_JOB.equals(script.getEventTrigger()) && StringUtils.isNotEmpty(script.getScript())) {
+                    try {
+                        final HashMap<String, Object> props = new HashMap<String, Object>();
+                        if (crawlerJobHolderSandbox == null) {
+                            crawlerJobHolderSandbox = new CrawlerJobHolderSandbox((JobLinkCrawler) lc);
+                        }
+                        props.put("crawler", crawlerJobHolderSandbox);
+                        runScript(script, props);
+                    } catch (Throwable e) {
+                        getLogger().log(e);
+                    }
+                }
+            }
+        }
     }
 }

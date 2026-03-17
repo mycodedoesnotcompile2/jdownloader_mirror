@@ -73,7 +73,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 51462 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 52502 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -230,7 +230,7 @@ public class LinkSnappyCom extends PluginForHost {
                 trafficMaxDailyHumanReadable = SIZEUNIT.formatValue(maxSizeUnit, maxtrafficDailyBytesO.longValue());
             }
             if (trafficleftGlobalO instanceof String) {
-                /* Value should be "unlimited" */
+                /* String-Value should be "unlimited" */
                 ac.setUnlimitedTraffic();
             } else if (trafficleftGlobalO instanceof Number) {
                 /* Also check for negative traffic */
@@ -249,46 +249,43 @@ public class LinkSnappyCom extends PluginForHost {
             }
             br.getPage("/api/FILEHOSTS");
             final Map<String, Object> hosterMapResponse = this.handleErrors(br, null, account);
-            final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+            final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
             /* Connection info map */
             final Map<String, Map<String, Object>> allHosterInfoMap = new HashMap<String, Map<String, Object>>();
             final Map<String, Object> hosterMap = (Map<String, Object>) hosterMapResponse.get("return");
             final Iterator<Entry<String, Object>> it = hosterMap.entrySet().iterator();
             while (it.hasNext()) {
                 final Entry<String, Object> entry = it.next();
-                final Map<String, Object> thisHosterInformation = (Map<String, Object>) entry.getValue();
+                final Map<String, Object> hosterinfo = (Map<String, Object>) entry.getValue();
                 final String domain = entry.getKey();
-                final int status = Integer.parseInt(thisHosterInformation.get("Status").toString());
                 // final int connlimit = Integer.parseInt(thisHosterInformation.get("connlimit").toString());
                 // final long noretry = JavaScriptEngineFactory.toLong(hosterInformation.get("noretry"), 0);
-                final long usage = ((Number) thisHosterInformation.get("Usage")).longValue();
-                final boolean resume = ((Number) thisHosterInformation.get("resume")).intValue() == 1;
-                final Object quotaO = thisHosterInformation.get("Quota");
-                final long canDownload = ((Number) thisHosterInformation.get("canDownload")).longValue();
+                final long usage = ((Number) hosterinfo.get("Usage")).longValue();
+                final boolean resume = ((Number) hosterinfo.get("resume")).intValue() == 1;
+                final Object quotaO = hosterinfo.get("Quota");
                 /* Workaround to find real host. */
-                final ArrayList<String> tempList = new ArrayList<String>();
+                final List<String> tempList = new ArrayList<String>();
                 tempList.add(domain);
                 final List<String> realHosts = ac.setMultiHostSupport(this, tempList);
                 if (realHosts != null && !realHosts.isEmpty()) {
                     /* Legacy handling */
                     final String realHost = realHosts.get(0);
-                    allHosterInfoMap.put(realHost, thisHosterInformation);
+                    allHosterInfoMap.put(realHost, hosterinfo);
                 }
                 final MultiHostHost mhost = new MultiHostHost(domain);
-                if (canDownload != 1) {
+                if (((Number) hosterinfo.get("canDownload")).longValue() != 1) {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                } else if (status != 1) {
+                } else if (Integer.parseInt(hosterinfo.get("Status").toString()) != 1) {
                     /* Host is currently not working or disabled */
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 }
-                // mhost.setTrafficUsed(usage);
                 mhost.setResumable(resume);
                 // mhost.setMaxChunks(connlimit);
                 if (quotaO instanceof Number) {
-                    mhost.setTrafficMax(((Number) quotaO).longValue());
-                    mhost.setTrafficLeft(mhost.getTrafficMax() - usage);
+                    final long trafficMax = ((Number) quotaO).longValue();
+                    mhost.setTrafficLeftAndMax(trafficMax - usage, trafficMax);
                 }
-                supportedhosts.add(mhost);
+                mhosts.add(mhost);
             }
             account.setProperty(PROPERTY_HOSTER_INFO_MAP, allHosterInfoMap);
             // final List<String> mapped = ac.setMultiHostSupport(this, supportedHosts);
@@ -322,7 +319,7 @@ public class LinkSnappyCom extends PluginForHost {
                     ac.setStatus("Free Account [Failed to find number of URLs left]");
                 }
             }
-            ac.setMultiHostSupportV2(this, supportedhosts);
+            ac.setMultiHostSupportV2(this, mhosts);
             return ac;
         }
     }

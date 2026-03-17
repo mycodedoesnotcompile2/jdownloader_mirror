@@ -3970,19 +3970,39 @@ public class LinkCrawler {
     }
 
     public java.util.List<CrawledLink> getCrawledLinks() {
-        return crawledLinks;
+        synchronized (crawledLinks) {
+            if (!isRunning()) {
+                return crawledLinks;
+            }
+            return new ArrayList<CrawledLink>(crawledLinks);
+        }
     }
 
     public java.util.List<CrawledLink> getFilteredLinks() {
-        return filteredLinks;
+        synchronized (filteredLinks) {
+            if (!isRunning()) {
+                return filteredLinks;
+            }
+            return new ArrayList<CrawledLink>(filteredLinks);
+        }
     }
 
     public java.util.List<CrawledLink> getBrokenLinks() {
-        return brokenLinks;
+        synchronized (brokenLinks) {
+            if (!isRunning()) {
+                return brokenLinks;
+            }
+            return new ArrayList<CrawledLink>(brokenLinks);
+        }
     }
 
     public java.util.List<CrawledLink> getUnhandledLinks() {
-        return unhandledLinks;
+        synchronized (unhandledLinks) {
+            if (!isRunning()) {
+                return unhandledLinks;
+            }
+            return new ArrayList<CrawledLink>(unhandledLinks);
+        }
     }
 
     protected void handleBrokenCrawledLink(CrawledLink link) {

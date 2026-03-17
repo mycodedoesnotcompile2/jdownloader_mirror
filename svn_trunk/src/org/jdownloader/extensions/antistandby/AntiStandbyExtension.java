@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.linkchecker.LinkChecker;
 import jd.controlling.linkcollector.LinkCollector;
 import jd.plugins.AddonPanel;
 
@@ -63,7 +64,7 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
 
     public boolean isLinuxRunnable() {
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && CrossSystem.isLinux()) {
-            return false;
+            return true;
         }
         return false;
     }
@@ -112,7 +113,7 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
             return false;
         } else if (condition.contains(Condition.RUNNING)) {
             return true;
-        } else if (condition.contains(Condition.CRAWLING) && LinkCollector.getInstance().isCollecting()) {
+        } else if (condition.contains(Condition.CRAWLING) && (LinkCollector.getInstance().isCollecting() || LinkChecker.isChecking())) {
             return true;
         } else if (condition.contains(Condition.DOWNLOADING) && DownloadWatchDog.getInstance().getStateMachine().isState(DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.STOPPING_STATE)) {
             return true;

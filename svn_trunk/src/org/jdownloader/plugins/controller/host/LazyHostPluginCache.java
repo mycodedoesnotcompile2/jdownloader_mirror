@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +23,8 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.LazyPluginClass;
 
 public class LazyHostPluginCache {
-    private static final long CACHEVERSION = 13012025001l + LazyPlugin.FEATURE.CACHEVERSION;
+    private static final long   CACHEVERSION = 16032026002l + LazyPlugin.FEATURE.CACHEVERSION;
+    public static final Charset UTF8         = Charset.forName("UTF-8");
 
     public static ByteArrayOutputStream readFile(File file) throws IOException {
         final FileInputStream fis = new FileInputStream(file);
@@ -41,6 +43,12 @@ public class LazyHostPluginCache {
         }
     }
 
+    public static String readString(AWFCUtils is, byte[] stringBuffer) throws IOException {
+        final int length = (int) is.readLongOptimized();
+        final byte[] data = is.ensureRead(length, stringBuffer);
+        return new String(data, 0, length, UTF8);
+    }
+
     public static List<LazyHostPlugin> read(File file, final AtomicLong lastModification) throws IOException {
         final ArrayList<LazyHostPlugin> ret = new ArrayList<LazyHostPlugin>(4096);
         if (file.exists()) {
@@ -56,7 +64,7 @@ public class LazyHostPluginCache {
                 }
                 final long cacheLastModified = is.readLong();
                 final int lazyPluginClassSize = is.readShort();
-                final byte[] stringBuffer = new byte[32767];
+                final byte[] stringBuffer = new byte[1024 * 1024];
                 for (int lazyPluginClassIndex = 0; lazyPluginClassIndex < lazyPluginClassSize; lazyPluginClassIndex++) {
                     final String className = is.readString(stringBuffer);
                     final byte[] sha256 = is.ensureRead(32, null);
@@ -79,7 +87,7 @@ public class LazyHostPluginCache {
                     final LazyPluginClass lazyPluginClass = new LazyPluginClass(className, sha256, lastModified, interfaceVersion, revision, dependencies);
                     final int lazyHostPluginSize = is.readShort();
                     for (int lazyHostPluginIndex = 0; lazyHostPluginIndex < lazyHostPluginSize; lazyHostPluginIndex++) {
-                        final LazyHostPlugin lazyHostPlugin = new LazyHostPlugin(lazyPluginClass, is.readString(stringBuffer), is.readString(stringBuffer), null, null);
+                        final LazyHostPlugin lazyHostPlugin = new LazyHostPlugin(lazyPluginClass, readString(is, stringBuffer), is.readString(stringBuffer), null, null);
                         lazyHostPlugin.setPluginUsage(is.readLongOptimized());
                         final int flags = is.ensureRead();
                         lazyHostPlugin.setPremium((flags & (1 << 0)) != 0);
@@ -181,7 +189,9 @@ public class LazyHostPluginCache {
                 final List<LazyHostPlugin> plugins = lazyPluginMapEntry.getValue();
                 os.writeShort(plugins.size());
                 for (final LazyHostPlugin plugin : plugins) {
-                    os.writeString(plugin.getPatternSource());
+                    final byte[] patternSource = plugin.getPatternSource().getBytes(UTF8);
+                    os.writeLongOptimized(patternSource.length);
+                    os.getCurrentOutputStream().write(patternSource);
                     os.writeString(plugin.getDisplayName());
                     os.writeLongOptimized(plugin.getPluginUsage());
                     byte flags = 0;

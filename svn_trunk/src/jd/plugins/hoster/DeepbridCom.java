@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52492 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52501 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
     private static final int             defaultMAXCHUNKS           = 1;
@@ -441,7 +441,7 @@ public class DeepbridCom extends PluginForHost {
                 logger.info("Setting maxchunks value: " + maxConnections);
                 account.setProperty(PROPERTY_ACCOUNT_maxchunks, maxConnections.intValue());
             }
-            final Map<String, String> domain_down_mapping = new HashMap<String, String>();
+            final Map<String, Object> domain_down_mapping = new HashMap<String, Object>();
             final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
             for (final Map<String, Object> entries : supportedhostslist) {
                 /* List can be given in two different varieties */
@@ -455,6 +455,9 @@ public class DeepbridCom extends PluginForHost {
                         mhost.addDomain(domain);
                         if (downSinceDate != null) {
                             domain_down_mapping.put(domain, downSinceDate);
+                        } else if (!onlineStatus.equalsIgnoreCase("up")) {
+                            /* Domain is down but without any given "down since date" */
+                            domain_down_mapping.put(domain, true);
                         }
                     }
                     mhosts.add(mhost);
@@ -480,7 +483,7 @@ public class DeepbridCom extends PluginForHost {
              */
             for (final MultiHostHost mhost : mhosts) {
                 Map<String, Object> individual_host_limit_map = null;
-                String downSinceDate = null;
+                Object downState = null;
                 /*
                  * Same filehost can have multiple domains and we don't know how API manages this so let's go through all domains and check
                  * for a limit map -> First hit wins.
@@ -489,10 +492,10 @@ public class DeepbridCom extends PluginForHost {
                     if (individual_host_limit_map == null) {
                         individual_host_limit_map = domain_to_individual_host_limits_map.get(domain);
                     }
-                    if (downSinceDate == null) {
-                        downSinceDate = domain_down_mapping.get(domain);
+                    if (downState == null) {
+                        downState = domain_down_mapping.get(domain);
                     }
-                    if (individual_host_limit_map != null && downSinceDate != null) {
+                    if (individual_host_limit_map != null && downState != null) {
                         /* Early-break loop although it is very unlikely that a host has individual limits && is down at this moment. */
                         break;
                     }
@@ -511,9 +514,11 @@ public class DeepbridCom extends PluginForHost {
                     }
                 }
                 /* Set special down flag if any domain of this entry is down */
-                if (downSinceDate != null) {
+                if (downState != null) {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                    mhost.setStatusText("Down since " + downSinceDate);
+                    if (downState instanceof String) {
+                        mhost.setStatusText("Down since " + downState);
+                    }
                 }
             }
             account.setConcurrentUsePossible(true);

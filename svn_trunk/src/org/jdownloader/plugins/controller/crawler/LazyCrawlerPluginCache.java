@@ -21,7 +21,7 @@ import org.jdownloader.plugins.controller.LazyPluginClass;
 import org.jdownloader.plugins.controller.host.LazyHostPluginCache;
 
 public class LazyCrawlerPluginCache {
-    private static final long CACHEVERSION = 29042024001l + LazyPlugin.FEATURE.CACHEVERSION;
+    private static final long CACHEVERSION = 16032026002l + LazyPlugin.FEATURE.CACHEVERSION;
 
     public static List<LazyCrawlerPlugin> read(File file, final AtomicLong lastModification) throws IOException {
         final ArrayList<LazyCrawlerPlugin> ret = new ArrayList<LazyCrawlerPlugin>();
@@ -38,7 +38,7 @@ public class LazyCrawlerPluginCache {
                 }
                 final long lastCacheModified = is.readLong();
                 final int lazyPluginClassSize = is.readShort();
-                final byte[] stringBuffer = new byte[32767];
+                final byte[] stringBuffer = new byte[1024 * 1024];
                 for (int lazyPluginClassIndex = 0; lazyPluginClassIndex < lazyPluginClassSize; lazyPluginClassIndex++) {
                     final String className = is.readString(stringBuffer);
                     final byte[] sha256 = is.ensureRead(32, null);
@@ -61,7 +61,7 @@ public class LazyCrawlerPluginCache {
                     final LazyPluginClass lazyPluginClass = new LazyPluginClass(className, sha256, lastModified, interfaceVersion, revision, dependencies);
                     final int lazyCrawlerPluginSize = is.readShort();
                     for (int lazyCrawlerPluginIndex = 0; lazyCrawlerPluginIndex < lazyCrawlerPluginSize; lazyCrawlerPluginIndex++) {
-                        final LazyCrawlerPlugin lazyCrawlerPlugin = new LazyCrawlerPlugin(lazyPluginClass, is.readString(stringBuffer), is.readString(stringBuffer), null, null);
+                        final LazyCrawlerPlugin lazyCrawlerPlugin = new LazyCrawlerPlugin(lazyPluginClass, LazyHostPluginCache.readString(is, stringBuffer), is.readString(stringBuffer), null, null);
                         lazyCrawlerPlugin.setPluginUsage(is.readLongOptimized());
                         lazyCrawlerPlugin.setMaxConcurrentInstances((int) is.readLongOptimized());
                         final int flags = is.ensureRead();
@@ -151,7 +151,9 @@ public class LazyCrawlerPluginCache {
                 final List<LazyCrawlerPlugin> plugins = lazyPluginMapEntry.getValue();
                 os.writeShort(plugins.size());
                 for (final LazyCrawlerPlugin plugin : plugins) {
-                    os.writeString(plugin.getPatternSource());
+                    final byte[] patternSource = plugin.getPatternSource().getBytes(LazyHostPluginCache.UTF8);
+                    os.writeLongOptimized(patternSource.length);
+                    os.getCurrentOutputStream().write(patternSource);
                     os.writeString(plugin.getDisplayName());
                     os.writeLongOptimized(plugin.getPluginUsage());
                     os.writeLongOptimized(plugin.getMaxConcurrentInstances());

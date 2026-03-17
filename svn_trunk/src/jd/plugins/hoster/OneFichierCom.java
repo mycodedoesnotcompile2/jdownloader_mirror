@@ -98,7 +98,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52371 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52501 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -728,8 +728,8 @@ public class OneFichierCom extends PluginForHost {
             errorVPNUsed(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (br.containsHTML(">\\s*The free offer is intended to") && (br.containsHTML(">\\s*It is not designed for intensive or continuous use") || br.containsHTML(">\\s*These limitations are necessary to"))) {
-            final String msg = "Unusal usage detected - downloading blocked";
+        } else if (br.containsHTML(">?\\s*The free offer is intended to") && (br.containsHTML(">?\\s*You already downloaded for free more than") || (br.containsHTML(">\\s*It is not designed for intensive or continuous use") || br.containsHTML(">\\s*These limitations are necessary to")))) {
+            final String msg = "Unusual usage detected - downloading blocked";
             final long waitMillis = TimeUnit.HOURS.toMillis(1);
             if (account != null) {
                 if (AccountType.FREE != account.getType()) {

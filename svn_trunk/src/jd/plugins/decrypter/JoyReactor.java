@@ -1,7 +1,10 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -16,7 +19,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52087 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 2, names = {}, urls = {})
 public class JoyReactor extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -64,12 +67,17 @@ public class JoyReactor extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String directurls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/full/.*?(jpe?g|png|gif))").getColumn(0);
-        if (directurls == null || directurls.length == 0) {
-            /* 2026-01-13: For .webm/.mp4 items */
-            directurls = br.getRegex("data-src=\"(https://[^\"]+)\"").getColumn(0);
+        Set<String> directURLs = new HashSet<String>();
+        String urls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/full/.*?(jpe?g|png|gif|webp))").getColumn(0);
+        if (urls != null) {
+            directURLs.addAll(Arrays.asList(urls));
         }
-        if (directurls == null || directurls.length == 0) {
+        /* 2026-01-13: For .webm/.mp4 items */
+        urls = br.getRegex("data-src=\"(https://[^\"]+)\"").getColumn(0);
+        if (urls != null) {
+            directURLs.addAll(Arrays.asList(urls));
+        }
+        if (directURLs.size() == 0) {
             // Unsafe content - only for registered users (google translate)
             if (br.containsHTML("Небезопасный контент - только для зарегистрированных пользователей|joyreactor\\.cc/images/unsafe_ru\\.gif")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -77,7 +85,15 @@ public class JoyReactor extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        String title = br.getRegex("<title>([^<]+)").getMatch(0);
+        for (String directURL : new ArrayList<String>(directURLs)) {
+            if (directURL.matches(".*?/mp4/.*?\\.mp4.*")) {
+                directURLs.add(directURL.replaceFirst("/mp4/", "/webm/").replaceFirst("\\.mp4", ".webm"));
+            }
+            if (directURL.matches(".*?/webm/.*?\\.webm.*")) {
+                directURLs.add(directURL.replaceFirst("/webm/", "/mp4/").replaceFirst("\\.webm", ".mp4"));
+            }
+        }
+        String title = br.getRegex("<title>\\s*([^<]+)\\s*<").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
@@ -86,7 +102,7 @@ public class JoyReactor extends PluginForDecrypt {
             /* Fallback */
             fp.setName(br._getURL().getPath());
         }
-        for (final String url : directurls) {
+        for (final String url : directURLs) {
             final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url).toExternalForm()));
             file.setAvailable(true);
             /* Important otherwise some direct-urls may not work. */

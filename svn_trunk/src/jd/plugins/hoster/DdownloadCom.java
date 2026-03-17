@@ -18,6 +18,24 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -31,24 +49,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-
-@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -163,6 +164,15 @@ public class DdownloadCom extends XFileSharingProBasic {
         } else {
             return super.buildExternalDownloadURL(link, buildForThisPlugin);
         }
+    }
+
+    @Override
+    protected String getContentURL(DownloadLink link) {
+        if (link.hasProperty(CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY)) {
+            final String ret = buildExternalDownloadURL(link, this);
+            return ret;
+        }
+        return super.getContentURL(link);
     }
 
     @Override
@@ -417,6 +427,7 @@ public class DdownloadCom extends XFileSharingProBasic {
         if (link == null) {
             return;
         }
+        link.removeProperty(CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /* 2019-11-11: Reset final downloadurls in dev mode. */
             link.removeProperty("freelink");
@@ -425,14 +436,48 @@ public class DdownloadCom extends XFileSharingProBasic {
         }
     }
 
+    private final static String CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY = "cloudflare_block_workaround";
+
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*You don't have permission to access this resource.<") && br.containsHTML("<title>\\s*403 Forbidden\\s*</title>") && !link.hasProperty(CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY)) {
+            // cloudflare has blocked the full URL, retry with FUID only
+            link.setProperty(CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY, Boolean.TRUE);
+            throw new RuntimeException(CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY);
+        }
         /* 2020-01-17: Special */
         if (br.containsHTML(">\\s*This file was banned by copyright")) {
             /* "<strong>Oops!</strong> This file was banned by copyright owner's report" */
             return true;
         } else {
             return super.isOffline(link, br);
+        }
+    }
+
+    @Override
+    protected void resolveShortURL(Browser br, DownloadLink link, Account account) throws Exception {
+        try {
+            super.resolveShortURL(br, link, account);
+        } catch (RuntimeException e) {
+            if (CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY.equals(e.getMessage())) {
+                logger.log(e);
+                super.resolveShortURL(br, link, account);
+                return;
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
+        try {
+            return super.requestFileInformationWebsite(link, account);
+        } catch (RuntimeException e) {
+            if (CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY.equals(e.getMessage())) {
+                logger.log(e);
+                return super.requestFileInformationWebsite(link, account);
+            }
+            throw e;
         }
     }
 

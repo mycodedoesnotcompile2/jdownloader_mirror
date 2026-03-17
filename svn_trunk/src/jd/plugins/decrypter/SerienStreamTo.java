@@ -30,15 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.SerienStreamToConfig;
-import org.jdownloader.plugins.components.config.SerienStreamToConfig.SeasonCrawlMode;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.gui.UserIO;
@@ -54,7 +45,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52456 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.SerienStreamToConfig;
+import org.jdownloader.plugins.components.config.SerienStreamToConfig.SeasonCrawlMode;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+
+@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -118,17 +119,16 @@ public class SerienStreamTo extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         if (new Regex(param.getCryptedUrl(), TYPE_SINGLE_REDIRECT_OLD).patternFind() || new Regex(param.getCryptedUrl(), TYPE_SINGLE_REDIRECT_NEW).patternFind()) {
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-            ret.add(this.crawlSingleRedirect(contenturl));
+            ret.add(this.crawlSingleRedirect(br, contenturl));
             return ret;
         } else {
             return this.crawlMirrors(param, contenturl);
         }
     }
 
-    private DownloadLink crawlSingleRedirect(String url) throws PluginException, InterruptedException, DecrypterException, IOException {
+    private DownloadLink crawlSingleRedirect(final Browser br, String url) throws PluginException, InterruptedException, DecrypterException, IOException {
         /* Enforce https */
         url = url.replaceFirst("^(?i)http://", "https://");
-        final Browser br = this.br.cloneBrowser();
         br.setFollowRedirects(false);
         final String initialHost = Browser.getHost(url, true);
         String redirectPage = br.getPage(url);
@@ -142,14 +142,25 @@ public class SerienStreamTo extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final String sitekey = new Regex(redirectPage, "grecaptcha\\.execute\\('([^']+)'").getMatch(0);
-            final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, sitekey) {
+            final String response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, sitekey) {
                 @Override
                 public TYPE getType() {
                     return TYPE.INVISIBLE;
                 }
             }.getToken();
             captcha.put("original", "");
-            captcha.put("token", Encoding.urlEncode(recaptchaV2Response));
+            captcha.put("token", Encoding.urlEncode(response));
+            redirectPage = br.submitForm(captcha);
+            finallink = br.getURL();
+        } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br) || br.containsHTML("cf-turnstile")) {
+            br.setFollowRedirects(true);
+            final Form captcha = br.getForm(0);
+            if (captcha == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String response = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+            captcha.put("original", "");
+            captcha.put("cf-turnstile-response", Encoding.urlEncode(response));
             redirectPage = br.submitForm(captcha);
             finallink = br.getURL();
         }
@@ -170,7 +181,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final SerienStreamToConfig cfg = (SerienStreamToConfig) PluginJsonConfig.get(this.getConfigInterface());
+        final SerienStreamToConfig cfg = (SerienStreamToConfig) get(this.getConfigInterface());
         final boolean isNewWebsite = new Regex(contenturl, TYPE_SERIES_NEW).patternFind();
         String seriesTitle = null;
         String episodeTitle = null;
@@ -599,33 +610,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             index++;
             logger.info("Working on item " + (index + 1) + "/" + urlsToProcess.size());
             final Browser br2 = br.cloneBrowser();
-            br2.setFollowRedirects(false);
-            redirectURL = br.getURL(redirectURL).toExternalForm();
-            String redirectPage = br2.getPage(redirectURL);
-            if (br2.getRedirectLocation() != null) {
-                redirectURL = br2.getRedirectLocation();
-            } else if (br2.containsHTML("grecaptcha")) {
-                final Form captcha = br2.getForm(0);
-                if (captcha == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String sitekey = new Regex(redirectPage, "grecaptcha\\.execute\\('([^']+)'").getMatch(0);
-                final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br2, sitekey) {
-                    @Override
-                    public TYPE getType() {
-                        return TYPE.INVISIBLE;
-                    }
-                }.getToken();
-                captcha.put("original", "");
-                captcha.put("token", Encoding.urlEncode(recaptchaV2Response));
-                try {
-                    redirectPage = br2.submitForm(captcha);
-                } catch (IOException e) {
-                    logger.log(e);
-                }
-                redirectURL = br2.getURL();
-            }
-            final DownloadLink link = createDownloadlink(redirectURL);
+            final DownloadLink link = crawlSingleRedirect(br2.cloneBrowser(), redirectURL);
             link._setFilePackage(fp);
             ret.add(link);
             distribute(link);

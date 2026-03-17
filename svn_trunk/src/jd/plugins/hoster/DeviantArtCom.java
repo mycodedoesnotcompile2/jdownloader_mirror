@@ -28,17 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.DeviantArtComConfig;
-import org.jdownloader.plugins.components.config.DeviantArtComConfig.ImageDownloadMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -61,7 +50,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51286 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig.ImageDownloadMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -469,7 +468,7 @@ public class DeviantArtCom extends PluginForHost {
         final boolean isVideo = isVideo(link);
         final boolean isLiterature = isLiterature(link);
         final boolean isStatus = isStatus(link);
-        final DeviantArtComConfig cfg = PluginJsonConfig.get(DeviantArtComConfig.class);
+        final DeviantArtComConfig cfg = get(DeviantArtComConfig.class);
         final ImageDownloadMode mode = cfg.getImageDownloadMode();
         String forcedExt = null;
         String dllink = null;
@@ -477,8 +476,8 @@ public class DeviantArtCom extends PluginForHost {
             dllink = getDirecturl(br, link, account);
         } catch (final PluginException e) {
             /**
-             * This will happen if the item is not downloadable. </br>
-             * We're ignoring this during linkcheck as by now we know the file is online.
+             * This will happen if the item is not downloadable. </br> We're ignoring this during linkcheck as by now we know the file is
+             * online.
              */
             if (isDownload) {
                 throw e;
@@ -651,8 +650,7 @@ public class DeviantArtCom extends PluginForHost {
             dllink = getDirecturl(br, link, account);
         } catch (final PluginException e) {
             /**
-             * This will happen if the item is not downloadable. </br>
-             * We're ignoring this here.
+             * This will happen if the item is not downloadable. </br> We're ignoring this here.
              */
             logger.log(e);
         }
@@ -728,8 +726,7 @@ public class DeviantArtCom extends PluginForHost {
                 }
             } else if (isBlurredImageLink(dllink)) {
                 /**
-                 * Last resort errorhandling for "probably premium-only items". </br>
-                 * This should usually be catched before.
+                 * Last resort errorhandling for "probably premium-only items". </br> This should usually be catched before.
                  */
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Avoiding download of blurred image");
             }
@@ -930,12 +927,12 @@ public class DeviantArtCom extends PluginForHost {
      * Returns assumed file extension based on all information we currently have. Use this only for weak filenames e.g. before linkcheck is
      * done.
      */
-    public static String getAssumedFileExtension(final DownloadLink link) {
+    public String getAssumedFileExtension(final DownloadLink link) {
         if (isVideo(link)) {
             return ".mp4";
         } else if (isImage(link)) {
             // TODO: add isGif support
-            if (PluginJsonConfig.get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.HTML) {
+            if (get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.HTML) {
                 return ".html";
             } else {
                 return ".jpg";
@@ -981,7 +978,7 @@ public class DeviantArtCom extends PluginForHost {
         }
     }
 
-    private static String getDirecturl(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+    private String getDirecturl(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         String dllink = null;
         final String officialDownloadurl = link.getStringProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
         final String multiImageGalleryPreviewUrl = getMultiImageGalleryPreviewUrl(link);
@@ -999,7 +996,7 @@ public class DeviantArtCom extends PluginForHost {
                  */
                 dllink = multiImageGalleryPreviewUrl;
             } else {
-                if (PluginJsonConfig.get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.OFFICIAL_DOWNLOAD_ONLY) {
+                if (get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.OFFICIAL_DOWNLOAD_ONLY) {
                     /**
                      * User only wants to download only items with official download option available -> Check if that is possible for this
                      * item. <br>
@@ -1038,8 +1035,7 @@ public class DeviantArtCom extends PluginForHost {
         final int imagePosition = getImagePosition(link);
         if (imagePosition > 1) {
             /**
-             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol).
-             * <br>
+             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol). <br>
              * Removes everything until "?token=..." <br>
              * Important: This does not work for the first image, only for the images >= 2!
              */

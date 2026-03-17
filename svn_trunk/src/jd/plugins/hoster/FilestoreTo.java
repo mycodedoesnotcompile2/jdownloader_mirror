@@ -19,13 +19,6 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.config.FilestoreToConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -46,7 +39,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51777 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.config.FilestoreToConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52500 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
 public class FilestoreTo extends PluginForHost {
     public FilestoreTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -197,6 +197,10 @@ public class FilestoreTo extends PluginForHost {
         } else if (br.containsHTML(">\\s*503 - Service Temporarily Unavailable\\s*<")) {
             /* Goes along with correct header responsecode 503 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 503", 5 * 60 * 1000l);
+        } else if (br.getRequest().getHttpConnection().getResponseCode() == 404) {
+            // HTTP/1.1 404 Not Found
+            // <head><title>404 Not Found</title></head>
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String errorMsg = br.getRegex("class=\"alert alert-danger page-alert mb-2\"[^>]*>\\s*<strong>Download-Fehler</strong>\\s*<br>([^<]+)<").getMatch(0);
         if (errorMsg == null) {

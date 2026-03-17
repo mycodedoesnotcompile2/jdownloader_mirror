@@ -16,7 +16,7 @@
 
 package org.jdownloader.extensions.antistandby;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.jna.windows.Kernel32;
@@ -24,10 +24,9 @@ import org.jdownloader.logging.LogController;
 
 public class WindowsAntiStandby extends Thread implements Runnable {
 
-    private final AtomicBoolean        lastEnabledState         = new AtomicBoolean(false);
-    private final AtomicBoolean        lastDisplayRequiredState = new AtomicBoolean(false);
-    private static final int           sleep                    = 5000;
+    private static final int           sleep    = 5000;
     private final AntiStandbyExtension jdAntiStandby;
+    private final AtomicInteger        lastFlag = new AtomicInteger(0);
 
     public WindowsAntiStandby(final AntiStandbyExtension jdAntiStandby) {
         super();
@@ -59,20 +58,20 @@ public class WindowsAntiStandby extends Thread implements Runnable {
     }
 
     private void enableAntiStandby(final LogSource logger, final boolean enabled) {
-        final boolean displayRequired = jdAntiStandby.getSettings().isDisplayRequired();
-        if (lastEnabledState.compareAndSet(!enabled, enabled) || lastDisplayRequiredState.compareAndSet(!displayRequired, displayRequired)) {
-            if (enabled) {
-                if (displayRequired) {
-                    Kernel32.INSTANCE.SetThreadExecutionState(Kernel32.ES_CONTINUOUS | Kernel32.ES_SYSTEM_REQUIRED | Kernel32.ES_DISPLAY_REQUIRED);
-                    logger.fine("JDAntiStandby: Start and Prevent Screensaver");
-                } else {
-                    Kernel32.INSTANCE.SetThreadExecutionState(Kernel32.ES_CONTINUOUS | Kernel32.ES_SYSTEM_REQUIRED);
-                    logger.fine("JDAntiStandby: Start");
-                }
-            } else {
-                Kernel32.INSTANCE.SetThreadExecutionState(Kernel32.ES_CONTINUOUS);
-                logger.fine("JDAntiStandby: Stop");
+        // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate
+        int flags = Kernel32.ES_CONTINUOUS;
+        if (enabled) {
+            // must be called periodically
+            flags = flags | Kernel32.ES_SYSTEM_REQUIRED;
+            if (jdAntiStandby.getSettings().isDisplayRequired()) {
+                flags = flags | Kernel32.ES_DISPLAY_REQUIRED;
             }
+            Kernel32.INSTANCE.SetThreadExecutionState(flags);
+        } else if (lastFlag.get() != Kernel32.ES_CONTINUOUS) {
+            Kernel32.INSTANCE.SetThreadExecutionState(flags);
+        }
+        if (lastFlag.getAndSet(flags) != flags) {
+            logger.fine("JDAntiStandby: new flags=" + flags);
         }
     }
 

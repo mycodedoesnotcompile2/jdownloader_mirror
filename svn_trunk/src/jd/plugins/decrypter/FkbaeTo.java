@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,7 +33,9 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 52494 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
 public class FkbaeTo extends PluginForDecrypt {
     public FkbaeTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +119,6 @@ public class FkbaeTo extends PluginForDecrypt {
         if (stream_url == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String linkid = this.getHost() + "://stream/" + fileid;
         final DownloadLink video;
         if (StringUtils.containsIgnoreCase(stream_url, ".m3u8")) {
             /* HLS video stream */
@@ -134,7 +133,6 @@ public class FkbaeTo extends PluginForDecrypt {
                 video.setFinalFileName(title + ".mp4");
             }
         }
-        video.setLinkID(linkid);
         ret.add(video);
         return ret;
     }

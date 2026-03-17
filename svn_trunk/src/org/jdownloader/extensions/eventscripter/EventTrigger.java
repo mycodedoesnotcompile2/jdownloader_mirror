@@ -23,6 +23,7 @@ import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.ArchiveSandbox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.CrawledLinkSandbox;
+import org.jdownloader.extensions.eventscripter.sandboxobjects.CrawlerJobHolderSandbox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.CrawlerJobSandbox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.DownloadLinkSandBox;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.DownloadlistSelectionSandbox;
@@ -295,6 +296,32 @@ public enum EventTrigger implements LabelInterface {
         public HashMap<String, Object> getTestProperties() {
             final HashMap<String, Object> props = new HashMap<String, Object>();
             props.put("job", new CrawlerJobSandbox());
+            return props;
+        }
+
+        public String getAPIDescription() {
+            return defaultAPIDescription(this);
+        }
+    },
+    ON_FINISHED_CRAWLER_JOB {
+        @Override
+        public String getLabel() {
+            return T.T.ON_FINISHED_CRAWLER_JOB();
+        }
+
+        @Override
+        public boolean isDefaultSynchronous() {
+            return false;
+        }
+
+        @Override
+        public boolean isSynchronousSupported() {
+            return false;
+        }
+
+        public HashMap<String, Object> getTestProperties() {
+            final HashMap<String, Object> props = new HashMap<String, Object>();
+            props.put("crawler", new CrawlerJobHolderSandbox());
             return props;
         }
 

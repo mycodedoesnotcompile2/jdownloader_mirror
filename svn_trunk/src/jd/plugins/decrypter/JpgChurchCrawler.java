@@ -22,11 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -49,7 +44,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 52292 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -239,11 +240,21 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                     distribute(link);
                     ret.add(link);
                 } else {
+                    Map<String, Object> dataObjectMap = null;
+                    String dataObject = new Regex(html, "data-object\\s*=\\s*'(.*?)'").getMatch(0);
+                    if (dataObject != null) {
+                        dataObject = URLEncode.decodeURIComponent(dataObject);
+                        dataObjectMap = restoreFromString(dataObject, TypeRef.MAP);
+                    }
                     String url = new Regex(html, "<a href=\"((https?://|/)[^\"]+)\" class=\"image-container --media\">").getMatch(0);
                     final String urlThumbnail = new Regex(html, "<img src=\"(https:?//[^\"]+)\"\\s*alt=\"").getMatch(0);
                     String title = new Regex(html, "data-title=\"([^\"]+)\"").getMatch(0);
-                    final String filesizeBytesStr = new Regex(html, "data-size=\"(\\d+)\"").getMatch(0);
-                    if (url == null || title == null) {
+                    if (url == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else if (StringUtils.isEmpty(title)) {
+                        title = (String) JavaScriptEngineFactory.walkJson(dataObjectMap, "image/filename");
+                    }
+                    if (StringUtils.isEmpty(title)) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     if (!dupes.add(url)) {
@@ -252,11 +263,12 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                     }
                     title = Encoding.htmlDecode(title).trim();
                     final String extFallback;
-                    if (StringUtils.containsIgnoreCase(url, "/video/")) {
+                    if (StringUtils.containsIgnoreCase(url, "/video/") || StringUtils.containsIgnoreCase((String) JavaScriptEngineFactory.walkJson(dataObjectMap, "image/mime"), "video")) {
                         extFallback = ".mp4";
                     } else {
                         extFallback = ".jpg";
                     }
+
                     url = br.getURL(url).toExternalForm();
                     imagePosition++;
                     numberofNewItems++;
@@ -270,6 +282,10 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                     } else {
                         /* Fallback */
                         link.setName(this.applyFilenameExtension(title, extFallback));
+                    }
+                    String filesizeBytesStr = new Regex(html, "data-size=\"(\\d+)\"").getMatch(0);
+                    if (filesizeBytesStr == null) {
+                        filesizeBytesStr = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(dataObjectMap, "image/size"));
                     }
                     if (filesizeBytesStr != null) {
                         link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));

@@ -12,7 +12,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -68,7 +67,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 52488 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52501 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1512,9 +1511,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             final long waitMillis = this.parseWaittime(waitBetweenDownloads.getMatch(-1));
             ipBlockedOrAccountLimit(link, account, "Wait between downloads", waitMillis);
         }
-        if (br.containsHTML(">\\s*Maintenance Mode\\s*<") || br.containsHTML(">\\s*We are currently down for maintenance")) {
+        if (br._getURL().getPath().equalsIgnoreCase("/down_for_maintenance")) {
             /* 2026-03-12: anonsharing.com -> https://anonsharing.com/down_for_maintenance */
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Maintenance Mode", TimeUnit.HOURS.toMicros(1));
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Maintenance Mode", 30 * 60 * 1000l);
         }
     }
 

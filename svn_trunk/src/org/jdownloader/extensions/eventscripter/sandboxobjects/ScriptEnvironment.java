@@ -1157,6 +1157,7 @@ public class ScriptEnvironment {
 
     @ScriptAPI(description = "Set a Property. This property will be available until JD-exit or a script overwrites it. if global is true, the property will be available for al scripts", parameters = { "\"key\"", "anyValue", "global(boolean)" }, example = "var oldValue=setProperty(\"myobject\", { \"name\": true}, false);")
     public static Object setProperty(String key, Object value, boolean global) throws EnvironmentException {
+
         try {
             if (global) {
                 return PackagizerController.putGlobalProperty(key, value);
