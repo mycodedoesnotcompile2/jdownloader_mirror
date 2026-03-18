@@ -51,6 +51,7 @@ import org.appwork.jna.windows.interfaces.CMSG_SIGNER_INFO;
 import org.appwork.jna.windows.interfaces.CRYPT_ATTRIBUTE;
 import org.appwork.jna.windows.interfaces.CRYPT_ATTRIBUTES;
 import org.appwork.jna.windows.interfaces.CRYPT_ATTR_BLOB;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 
 import com.sun.jna.Memory;
@@ -110,7 +111,7 @@ public class WindowsSignature {
      */
     public static CodeSignature readCodeSignSignature(File file) throws InvalidNameException {
         if (file == null || !file.isFile()) {
-            System.err.println("ERROR: Invalid file.");
+            LogV3.info("ERROR: Invalid file.");
             return null;
         }
         // Convert Java String to native wide-character (UTF-16) array for Windows API
@@ -125,7 +126,7 @@ public class WindowsSignature {
         boolean ok = Crypt32.INSTANCE.CryptQueryObject(WinCrypt.CERT_QUERY_OBJECT_FILE, filePtr, WinCrypt.CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, WinCrypt.CERT_QUERY_FORMAT_FLAG_BINARY, 0, new IntByReference(), new IntByReference(), new IntByReference(), phCertStore, phMsg, ppvContext);
         if (!ok) {
             int lastError = Kernel32.INSTANCE.GetLastError();
-            System.err.println("ERROR: CryptQueryObject failed, error: " + lastError);
+            LogV3.info("ERROR: CryptQueryObject failed, error: " + lastError);
             return null;
         }
         HCERTSTORE hStore = new HCERTSTORE(phCertStore.getValue());
@@ -162,7 +163,7 @@ public class WindowsSignature {
                 }
             }
             if (found == null) {
-                System.err.println("WARNING: No matching signer certificate found.");
+                LogV3.info("WARNING: No matching signer certificate found.");
                 return null;
             }
             CodeSignature sig = new CodeSignature();
@@ -576,12 +577,12 @@ public class WindowsSignature {
      */
     public static boolean verifySignature(File filePath) {
         if (filePath == null) {
-            System.err.println("filePath is null");
+            LogV3.info("filePath is null");
             return false;
         }
         File file = new File(filePath.getAbsolutePath());
         if (!file.isFile()) {
-            System.err.println("ERROR: File not found: " + filePath);
+            LogV3.info("ERROR: File not found: " + filePath);
             return false;
         }
         WinTrust.WINTRUST_FILE_INFO fileInfo = new WinTrust.WINTRUST_FILE_INFO(file.getAbsolutePath());
@@ -591,13 +592,13 @@ public class WindowsSignature {
         if (result == WinError.ERROR_SUCCESS) {
             return true;
         } else if (result == WinError.TRUST_E_NOSIGNATURE) {
-            System.err.println("WARNING: No digital signature found.");
+            LogV3.info("WARNING: No digital signature found.");
         } else if (result == WinError.TRUST_E_BAD_DIGEST) {
-            System.err.println("WARNING: Signature present but invalid.");
+            LogV3.info("WARNING: Signature present but invalid.");
         } else if (result == WinError.CERT_E_REVOKED) {
-            System.err.println("WARNING: Certificate revoked.");
+            LogV3.info("WARNING: Certificate revoked.");
         } else {
-            System.err.println("WARNING: WinVerifyTrust failed, code: 0x" + Integer.toHexString(result));
+            LogV3.info("WARNING: WinVerifyTrust failed, code: 0x" + Integer.toHexString(result));
         }
         return false;
     }

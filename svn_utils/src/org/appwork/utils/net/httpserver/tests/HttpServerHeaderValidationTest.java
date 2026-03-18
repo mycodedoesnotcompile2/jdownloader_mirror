@@ -67,7 +67,6 @@ import org.appwork.utils.os.CrossSystem;
  * @author AppWork
  */
 public class HttpServerHeaderValidationTest extends HttpServerTestBase {
-
     public static void main(final String[] args) throws Exception {
         AWTest.run();
     }
@@ -268,21 +267,17 @@ public class HttpServerHeaderValidationTest extends HttpServerTestBase {
      */
     private void testDirectBrowserRequest() throws Exception {
         LogV3.info("Test: Direct Browser Request");
-
         // Setup server with header validation rules that allow direct browser requests
         this.teardownServer();
         this.setupServerWithBrowserHeaders();
-
         try {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-
             // Simulate direct browser request with sec-fetch-* headers
             // Note: We don't set x-appwork header because we're testing with custom rules
             this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, SecFetchSite.NONE.getValue());
             this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, SecFetchMode.NAVIGATE.getValue());
             this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_USER, SecFetchUser.USER_INITIATED.getValue());
             this.httpClient.putRequestHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, SecFetchDest.DOCUMENT.getValue());
-
             try {
                 final RequestContext context = this.httpClient.get(url);
                 final int responseCode = context.getCode();
@@ -306,28 +301,27 @@ public class HttpServerHeaderValidationTest extends HttpServerTestBase {
      */
     private void testRealBrowserRequest() throws Exception {
         LogV3.info("Test: Real Browser Request");
-
         // Setup server with browser header rules (allow sec-fetch-* headers, no mandatory x-appwork)
         this.teardownServer();
         this.setupServerWithBrowserHeaders();
-
         try {
             // Generate unique test ID
             final String testId = UUID.randomUUID().toString();
             final String url = "http://localhost:" + this.serverPort + "/test/browserTest?testId=" + URLEncoder.encode(testId, "UTF-8");
-
             // Use CountDownLatch to wait for browser request
             final CountDownLatch latch = new CountDownLatch(1);
-
             // Start a thread that polls the endpoint to check if browser made the request
             final Thread pollThread = new Thread("BrowserTestPoll") {
                 @Override
                 public void run() {
                     try {
                         // Wait a bit for browser to open
-                        Thread.sleep(2000);
-                        if (StringUtils.equals(DummyTestAPIImpl.RECEIVED_TEST, testId)) {
-                            latch.countDown();
+                        for (int i = 0; i < 20; i++) {
+                            if (StringUtils.equals(DummyTestAPIImpl.RECEIVED_TEST, testId)) {
+                                latch.countDown();
+                                break;
+                            }
+                            Thread.sleep(500);
                         }
                     } catch (final Exception e) {
                         LogV3.log(e);
@@ -335,7 +329,6 @@ public class HttpServerHeaderValidationTest extends HttpServerTestBase {
                 }
             };
             pollThread.start();
-
             // Open browser with the URL
             LogV3.info("Opening system browser with URL: " + url);
             final Throwable browserError = CrossSystem.openURL(url);
@@ -343,10 +336,8 @@ public class HttpServerHeaderValidationTest extends HttpServerTestBase {
                 LogV3.warning("Failed to open browser: " + browserError.getMessage());
                 // Continue anyway - browser might have opened
             }
-
             // Wait for browser request (with timeout)
-            final boolean received = latch.await(10, TimeUnit.SECONDS);
-
+            final boolean received = latch.await(20, TimeUnit.SECONDS);
             if (received) {
                 LogV3.info("Real Browser Request test successful");
             } else {

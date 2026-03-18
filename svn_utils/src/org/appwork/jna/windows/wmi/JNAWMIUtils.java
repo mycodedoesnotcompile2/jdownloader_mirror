@@ -25,6 +25,7 @@ import com.sun.jna.platform.win32.COM.COMException;
  */
 public class JNAWMIUtils {
     /** Enable verbose timing logs when system property logs.verbose.JNAWMIUtils=true */
+    
     private static final boolean VERBOSE_LOGS = Boolean.getBoolean("logs.verbose.JNAWMIUtils");
 
     /**

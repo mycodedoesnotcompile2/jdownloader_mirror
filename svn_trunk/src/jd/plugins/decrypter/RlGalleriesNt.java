@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52501 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52503 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +104,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
             synchronized (LOCK) {
                 br.setFollowRedirects(false);
                 final String property_PHPSESSID = "PHPSESSID";
-                final String phpsessid = this.getPluginConfig().getStringProperty(property_PHPSESSID);
+                final String stored_phpsessid = this.getPluginConfig().getStringProperty(property_PHPSESSID);
                 final String allowedRefererDomain = "urlgalleries.net";
                 /**
                  * The following line sets referer for the next request. <br>
@@ -125,16 +125,13 @@ public class RlGalleriesNt extends PluginForDecrypt {
                     referer = "https://" + allowedRefererDomain;
                 }
                 br.setCurrentURL(referer);
-                if (phpsessid != null) {
+                if (stored_phpsessid != null) {
                     /* Re-use session cookie otherwise we might need to solve a captcha for each link. */
-                    br.setCookie(this.getHost(), "PHPSESSID", phpsessid);
-                    br.setCookie(referer, "PHPSESSID", phpsessid);
+                    br.setCookie(this.getHost(), "PHPSESSID", stored_phpsessid);
+                    br.setCookie(referer, "PHPSESSID", stored_phpsessid);
                     /* Also set on contenturl in case that contains another domain */
-                    br.setCookie(contenturl, "PHPSESSID", phpsessid);
+                    br.setCookie(contenturl, "PHPSESSID", stored_phpsessid);
                 }
-                // br.setCurrentURL("https://" + getHost());
-                // br.setCurrentURL("https://urlgalleries.net/bla/" + new Random().nextInt(10000000) + "/bla-" + new
-                // Random().nextInt(10000000) + "/");
                 br.getPage(contenturl);
                 if (br.getHttpConnection().getResponseCode() == 403) {
                     logger.info("Invalid link or wrong referer");
@@ -153,7 +150,8 @@ public class RlGalleriesNt extends PluginForDecrypt {
                         }
                     }
                 }
-                handleCaptcha: if (finallink == null && form != null && br.containsHTML(">\\s*Verify to continue")) {
+                handleCaptcha: if (finallink == null && form != null) {
+                    logger.info("Captcha required");
                     final String previous_path = br._getURL().getPath();
                     final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
                     form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
@@ -179,14 +177,16 @@ public class RlGalleriesNt extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 ret.add(this.createDownloadlink(finallink));
-                final String phpsessid_new = br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN);
-                if (!StringUtils.isEmpty(phpsessid_new)) {
-                    if (phpsessid == null || !phpsessid_new.equals(phpsessid)) {
-                        logger.info("Remembering new phpsessid cookie: " + phpsessid_new);
-                        this.getPluginConfig().setProperty(property_PHPSESSID, phpsessid_new);
+                final String new_phpsessid = br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN);
+                if (!StringUtils.isEmpty(new_phpsessid)) {
+                    if (stored_phpsessid == null || !new_phpsessid.equals(stored_phpsessid)) {
+                        logger.info("PHPSESSID: Remembering new phpsessid cookie: " + new_phpsessid);
+                        this.getPluginConfig().setProperty(property_PHPSESSID, new_phpsessid);
+                    } else {
+                        logger.info("PHPSESSID: cookie remains the same as last time: " + stored_phpsessid);
                     }
                 } else {
-                    logger.warning("Failed to find PHPSESSID cookie");
+                    logger.warning("PHPSESSID: Failed to find PHPSESSID cookie");
                 }
                 return ret;
             }
@@ -312,6 +312,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
             /* Fallback */
             fp.setName(gallery_title_from_url.replace("-", " ").trim());
         }
+        final HashSet<String> dupes = new HashSet<String>();
         String zip_url = br.getRegex("class=\"k2sZipLink\"\\s*href=\"((https?|/)[^\"]+)").getMatch(0);
         if (zip_url != null) {
             zip_url = br.getURL(zip_url).toExternalForm();
@@ -321,10 +322,10 @@ public class RlGalleriesNt extends PluginForDecrypt {
             zip._setFilePackage(fp);
             ret.add(zip);
             distribute(zip);
+            dupes.add(zip_url);
         }
         int page = 1;
         String nextpage = null;
-        final HashSet<String> dupes = new HashSet<String>();
         final Pattern allowed_thumbnail_urls = Pattern.compile("((https?://[^/]*\\.(imagevenue\\.com|fappic\\.com|imagetwist\\.com))?/[^<>\"\\']+)");
         do {
             logger.info("Crawling page " + page + " of ??");
@@ -456,5 +457,14 @@ public class RlGalleriesNt extends PluginForDecrypt {
             return true;
         }
         return false;
+    }
+
+    @Override
+    /**
+     * 2026-03-17: Allow max 2 since single {@link #PATTERN_SINGLE_REDIRECT} redirect URLs need to be crawled sequentially anyways to
+     * prevent unnecessary captchas.
+     */
+    public int getMaxConcurrentProcessingInstances() {
+        return 2;
     }
 }

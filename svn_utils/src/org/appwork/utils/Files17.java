@@ -45,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -153,6 +154,21 @@ public class Files17 {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Renames/moves source to dest using NIO Files.move. Replaces existing destination.
+     * Use this from Java 7+ code paths for better exceptions than File.renameTo().
+     *
+     * @param source
+     *            source file
+     * @param dest
+     *            destination file
+     * @throws IOException
+     *             if move fails (e.g. access denied, cross-device link)
+     */
+    public static void rename(final File source, final File dest) throws IOException {
+        Files.move(source.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
     protected static boolean deleteIfExists(final File file) throws IOException {

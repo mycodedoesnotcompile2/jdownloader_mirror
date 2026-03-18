@@ -48,6 +48,24 @@ public class ThemeContext {
         ICON
     }
 
+    private boolean createFileNotFoundFallbackImage = true;
+
+    /**
+     * @return the createFileNotFoundFallbackImage
+     */
+    public boolean isCreateFileNotFoundFallbackImage() {
+        return createFileNotFoundFallbackImage;
+    }
+
+    /**
+     * @param createFileNotFoundFallbackImage
+     *            the createFileNotFoundFallbackImage to set
+     */
+    public ThemeContext setCreateFileNotFoundFallbackImage(boolean createFileNotFoundFallbackImage) {
+        this.createFileNotFoundFallbackImage = createFileNotFoundFallbackImage;
+        return this;
+    }
+
     private boolean              usecache                      = true;
     private boolean              createMultiResolutionImages   = true;
     private boolean              doNotUpscaleButThrowException = false;

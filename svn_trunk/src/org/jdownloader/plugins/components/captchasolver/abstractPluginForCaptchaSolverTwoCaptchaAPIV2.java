@@ -7,18 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.controlling.captcha.SkipException;
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
@@ -45,6 +33,18 @@ import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaResponse;
 import org.jdownloader.plugins.controller.LazyPlugin;
+
+import jd.PluginWrapper;
+import jd.controlling.captcha.SkipException;
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
 /**
  * Base plugin class for captcha solving via 2captcha.com APIv2: https://2captcha.com/api-docs
@@ -106,7 +106,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 }
                 if (account.getHoster().equals("2captcha.com") && challenge.isEnterprise() && StringUtils.containsIgnoreCase(challenge.getSiteUrl(this), "filer.net")) {
                     /**
-                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results. <br>
+                     * Special workaround for API bug, this should be RecaptchaV3TaskProxyless but if we use it we will get wrong results.
+                     * <br>
                      * Is: https://2captcha.com/api-docs/recaptcha-v2-enterprise#recaptcha-v2-enterprise <br>
                      * Should be: https://2captcha.com/api-docs/recaptcha-v3
                      */
@@ -305,6 +306,10 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         final HashSet<String> accountErrorsTemp = new HashSet<String>();
         accountErrorsTemp.add("ERROR_NO_SLOT_AVAILABLE");
         accountErrorsTemp.add("ERROR_IP_NOT_ALLOWED");
+        /*
+         * This should only happen if the user uses an IP black- or whitelist and when tries to solve captchas using a blocked IP ->
+         * User-induced problem!
+         */
         accountErrorsTemp.add("ERROR_IP_BLOCKED");
         final HashSet<String> captchaErrors = new HashSet<String>();
         captchaErrors.add("ERROR_ZERO_CAPTCHA_FILESIZE");

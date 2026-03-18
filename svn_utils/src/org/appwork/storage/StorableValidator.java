@@ -139,7 +139,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -197,7 +197,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#onClassFieldMissing(java.lang.Object, java.lang.String,
          * org.appwork.storage.flexijson.FlexiJSonNode)
          */
@@ -214,7 +214,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#returnFallbackOrThrowException(org.appwork.storage.flexijson.mapper.
          * FlexiMapperException)
          */
@@ -244,7 +244,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#nodeToEnum(org.appwork.storage.flexijson.FlexiJSonNode,
          * java.lang.reflect.Type)
          */
@@ -316,7 +316,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#convert(java.lang.Object, org.appwork.storage.TypeRef)
          */
         @Override
@@ -337,7 +337,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#convertStringToBoolean(org.appwork.storage.flexijson.FlexiJSonValue,
          * java.lang.String, java.lang.Class)
          */
@@ -451,7 +451,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -488,7 +488,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -670,7 +670,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -806,7 +806,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -843,7 +843,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -883,7 +883,7 @@ public class StorableValidator<T> {
             if (node instanceof FlexiJSonValue) {
                 String typeName = type.toString();
                 if (type.raw instanceof Class) {
-                    typeName = ((Class) type.raw).getSimpleName();
+                    typeName = type.raw.getSimpleName();
                 }
                 ret += "Invalid type! Cannot map " + new FlexiJSonStringBuilder().toJSONString(node) + "(" + ((FlexiJSonValue) node).getType() + ")" + " to type " + typeName + ".";
                 try {
@@ -1320,6 +1320,8 @@ public class StorableValidator<T> {
                     throw new WTFException(e);
                 } catch (InvalidPathException e) {
                     throw new WTFException(e);
+                } catch (RuntimeException e) {
+                    throw new WTFException(e);
                 }
             }
             for (String key : keys) {
@@ -1619,7 +1621,7 @@ public class StorableValidator<T> {
      * @throws InterruptedException
      */
     private void validateClassValidator(StorableValidator<T>.ValidatetoDoss toDo, Class<? extends StorableAbstractValidator> cls, String parameter, FailLevel level, String message) throws NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, InterruptedException {
-        List<? extends ValidatorException> toadd = ((StorableAbstractValidator) cls.newInstance()).validate(this, result, toDo.value, toDo.node, toDo.path, toDo.type, parameter, level, message);
+        List<? extends ValidatorException> toadd = cls.newInstance().validate(this, result, toDo.value, toDo.node, toDo.path, toDo.type, parameter, level, message);
         if (toadd != null) {
             for (ValidatorException e : toadd) {
                 add(e);

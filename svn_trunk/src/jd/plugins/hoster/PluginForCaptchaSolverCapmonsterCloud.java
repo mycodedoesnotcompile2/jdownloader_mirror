@@ -11,7 +11,7 @@ import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52170 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52505 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -68,8 +68,7 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
 
     @Override
     protected String getAPILoginHelpURL() {
-        // TODO: Put correct url here
-        return "https://" + getHost() + "/enterpage";
+        return "https://dash.capmonster.cloud/";
     }
 
     @Override

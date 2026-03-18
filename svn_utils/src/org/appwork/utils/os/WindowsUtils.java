@@ -2871,13 +2871,93 @@ public class WindowsUtils {
     /**
      * Maximum buffer size for NtQuerySystemInformation (handle list). Kept low to avoid OutOfMemoryError in test/small-heap environments.
      */
-    private static final int LIST_HANDLES_MAX_BUFFER = 50 * 1024 * 1024;
+    private static final int LIST_HANDLES_MAX_BUFFER = 128 * 1024 * 1024;
 
     /**
      * Consumer for handle entries during system-wide handle scan. Return true to continue iteration, false to stop.
      */
     private static interface HandleEntryConsumer {
         boolean accept(int pid, int handleVal, int objectType, int grantedAccess);
+    }
+
+    /**
+     * Closes native memory and always returns {@code null} so callers can compactly write
+     * {@code buffer = closeMemoryQuietly(buffer)}.
+     */
+    private static Memory closeMemoryQuietly(Memory buffer) {
+        if (buffer != null) {
+            try {
+                buffer.close();
+            } catch (Throwable t) {
+                /* ignore */
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Query helper for {@link NtDllForHandleScan#NtQuerySystemInformation(int, com.sun.jna.Pointer, int, IntByReference)} with growing
+     * buffer strategy.
+     * <p>
+     * Why this exists:
+     * <ul>
+     * <li>Avoid duplicated "allocate -> query -> resize/retry" loops for extended and legacy modes.</li>
+     * <li>Keep one place that applies the same low-memory safeguards.</li>
+     * </ul>
+     *
+     * @param systemInformationClass
+     *            either {@code SystemExtendedHandleInformation} (preferred) or {@code SystemHandleInformation} (legacy fallback)
+     * @param legacy
+     *            true when called for legacy fallback (changes logging and terminal behavior)
+     * @param maxBuffer
+     *            upper safety limit for the temporary native buffer
+     * @param returnLength
+     *            receives required size from NtQuerySystemInformation
+     * @return filled buffer on success; {@code null} on failure (caller may fallback or abort)
+     */
+    private static Memory querySystemHandleBuffer(int systemInformationClass, boolean legacy, int maxBuffer, IntByReference returnLength) {
+        int bufferSize = LIST_HANDLES_MIN_BUFFER;
+        Memory buffer = null;
+        while (bufferSize <= maxBuffer) {
+            try {
+                buffer = closeMemoryQuietly(buffer);
+                buffer = new Memory(bufferSize);
+            } catch (OutOfMemoryError e) {
+                LogV3.warning("scanAllSystemHandles: OutOfMemoryError allocating " + bufferSize + " bytes" + (legacy ? " (legacy)" : ""));
+                if (bufferSize <= LIST_HANDLES_MIN_BUFFER) {
+                    return closeMemoryQuietly(buffer);
+                }
+                bufferSize = Math.max(LIST_HANDLES_MIN_BUFFER, bufferSize / 2);
+                continue;
+            }
+            returnLength.setValue(0);
+            int status = NtDllForHandleScan.INSTANCE.NtQuerySystemInformation(systemInformationClass, buffer, bufferSize, returnLength);
+            if (status == NtDllForHandleScan.STATUS_SUCCESS) {
+                return buffer;
+            }
+            if (status == NtDllForHandleScan.STATUS_INFO_LENGTH_MISMATCH || status == NtDllForHandleScan.STATUS_NO_MEMORY) {
+                int required = returnLength.getValue();
+                if (bufferSize >= maxBuffer) {
+                    if (legacy) {
+                        LogV3.info("scanAllSystemHandles (legacy): needs " + required + " bytes but maxBuffer is " + maxBuffer + ", giving up");
+                    } else {
+                        LogV3.info("scanAllSystemHandles: extended API needs " + required + " bytes but maxBuffer is " + maxBuffer + ", falling back to legacy");
+                    }
+                    return closeMemoryQuietly(buffer);
+                }
+                if (required > 0 && required <= maxBuffer) {
+                    bufferSize = required;
+                } else {
+                    bufferSize = Math.min(bufferSize * 2, maxBuffer);
+                }
+                continue;
+            }
+            if (legacy) {
+                LogV3.warning("scanAllSystemHandles: NtQuerySystemInformation failed, status=0x" + Integer.toHexString(status));
+            }
+            return closeMemoryQuietly(buffer);
+        }
+        return closeMemoryQuietly(buffer);
     }
 
     /**
@@ -2893,6 +2973,9 @@ public class WindowsUtils {
      *            <p>
      *            Exceptions during entry read or inside the consumer (e.g. handle closed during iteration, process exited) are caught and
      *            logged; the scan continues with the next handle and is not aborted.
+     *            <p>
+     *            Mode strategy: try Extended first because it exposes full handle values and is therefore more reliable for handle
+     *            resolution. Legacy mode is only used as compatibility fallback if Extended cannot provide a buffer within memory limits.
      */
     private static void scanAllSystemHandles(HandleEntryConsumer consumer) {
         IntByReference returnLength = new IntByReference();
@@ -2901,101 +2984,11 @@ public class WindowsUtils {
         Memory buffer = null;
         boolean useExtended = false;
         try {
-            int bufferSize = LIST_HANDLES_MIN_BUFFER;
-            while (bufferSize <= maxBuffer) {
-                try {
-                    if (buffer != null) {
-                        buffer.close();
-                        buffer = null;
-                    }
-                    buffer = new Memory(bufferSize);
-                } catch (OutOfMemoryError e) {
-                    LogV3.warning("scanAllSystemHandles: OutOfMemoryError allocating " + bufferSize + " bytes");
-                    if (bufferSize <= LIST_HANDLES_MIN_BUFFER) {
-                        if (buffer != null) {
-                            try {
-                                buffer.close();
-                            } catch (Throwable t) {
-                                /* ignore */
-                            }
-                            buffer = null;
-                        }
-                        return;
-                    }
-                    bufferSize = Math.max(LIST_HANDLES_MIN_BUFFER, bufferSize / 2);
-                    continue;
-                }
-                returnLength.setValue(0);
-                int status = NtDllForHandleScan.INSTANCE.NtQuerySystemInformation(NtDllForHandleScan.SystemExtendedHandleInformation, buffer, bufferSize, returnLength);
-                if (status == NtDllForHandleScan.STATUS_SUCCESS) {
-                    useExtended = true;
-                    break;
-                }
-                if (status == NtDllForHandleScan.STATUS_INFO_LENGTH_MISMATCH || status == NtDllForHandleScan.STATUS_NO_MEMORY) {
-                    int required = returnLength.getValue();
-                    // Already at maxBuffer and still failing - give up on extended API
-                    if (bufferSize >= maxBuffer) {
-                        LogV3.info("scanAllSystemHandles: extended API needs " + required + " bytes but maxBuffer is " + maxBuffer + ", falling back to legacy");
-                        if (buffer != null) {
-                            try {
-                                buffer.close();
-                            } catch (Throwable t) {
-                                /* ignore */
-                            }
-                            buffer = null;
-                        }
-                        break;
-                    }
-                    if (required > 0 && required <= maxBuffer) {
-                        bufferSize = required;
-                    } else {
-                        bufferSize = Math.min(bufferSize * 2, maxBuffer);
-                    }
-                    continue;
-                }
-                break;
-            }
+            buffer = querySystemHandleBuffer(NtDllForHandleScan.SystemExtendedHandleInformation, false, maxBuffer, returnLength);
+            useExtended = buffer != null;
             if (!useExtended) {
-                bufferSize = LIST_HANDLES_MIN_BUFFER;
-                while (bufferSize <= maxBuffer) {
-                    try {
-                        if (buffer != null) {
-                            buffer.close();
-                            buffer = null;
-                        }
-                        buffer = new Memory(bufferSize);
-                    } catch (OutOfMemoryError e) {
-                        LogV3.warning("scanAllSystemHandles: OutOfMemoryError allocating " + bufferSize + " bytes (legacy)");
-                        if (bufferSize <= LIST_HANDLES_MIN_BUFFER) {
-                            return;
-                        }
-                        bufferSize = Math.max(LIST_HANDLES_MIN_BUFFER, bufferSize / 2);
-                        continue;
-                    }
-                    returnLength.setValue(0);
-                    int status = NtDllForHandleScan.INSTANCE.NtQuerySystemInformation(NtDllForHandleScan.SystemHandleInformation, buffer, bufferSize, returnLength);
-                    if (status == NtDllForHandleScan.STATUS_SUCCESS) {
-                        break;
-                    }
-                    if (status == NtDllForHandleScan.STATUS_INFO_LENGTH_MISMATCH || status == NtDllForHandleScan.STATUS_NO_MEMORY) {
-                        int required = returnLength.getValue();
-                        // Already at maxBuffer and still failing - give up
-                        if (bufferSize >= maxBuffer) {
-                            LogV3.info("scanAllSystemHandles (legacy): needs " + required + " bytes but maxBuffer is " + maxBuffer + ", giving up");
-                            return;
-                        }
-                        if (required > 0 && required <= maxBuffer) {
-                            bufferSize = required;
-                        } else {
-                            bufferSize = Math.min(bufferSize * 2, maxBuffer);
-                        }
-                        continue;
-                    }
-                    if (buffer != null) {
-                        buffer.close();
-                        buffer = null;
-                    }
-                    LogV3.warning("scanAllSystemHandles: NtQuerySystemInformation failed, status=0x" + Integer.toHexString(status));
+                buffer = querySystemHandleBuffer(NtDllForHandleScan.SystemHandleInformation, true, maxBuffer, returnLength);
+                if (buffer == null) {
                     return;
                 }
             }
@@ -3079,13 +3072,7 @@ public class WindowsUtils {
         } catch (Exception e) {
             LogV3.exception(WindowsUtils.class, e);
         } finally {
-            if (buffer != null) {
-                try {
-                    buffer.close();
-                } catch (Throwable t) {
-                    /* ignore */
-                }
-            }
+            closeMemoryQuietly(buffer);
         }
     }
 

@@ -39,7 +39,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 
-import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.processes.windows.jna.WindowsJNAProcessUtils;
 import org.appwork.utils.DebugMode;
@@ -58,12 +57,7 @@ import org.appwork.utils.os.WindowsUtils;
  * connections accepted on localhost.
  * </p>
  */
-@BuildDecisionRequired(tags = { WindowsTrustedIPCSocketAddressValidator.WINDOWS_TRUSTED_IPC_VALIDATOR_YES, WindowsTrustedIPCSocketAddressValidator.WINDOWS_TRUSTED_IPC_VALIDATOR_NO }, imports = { WindowsTrustedIPCSocketAddressValidator.ORG_APPWORK_UTILS_NET_HTTPSERVER_WINDOWSTRUSTEDIPCSOCKETADDRESSVALIDATOR, "" }, dependsOn = { org.appwork.JNAHelper.JNA_HELPER_USE_JNA, "" })
 public final class WindowsTrustedIPCSocketAddressValidator implements SocketAddressValidator {
-    static final String        ORG_APPWORK_UTILS_NET_HTTPSERVER_WINDOWSTRUSTEDIPCSOCKETADDRESSVALIDATOR = "org.appwork.utils.net.httpserver.WindowsTrustedIPCSocketAddressValidator";
-    public static final String WINDOWS_TRUSTED_IPC_VALIDATOR_NO                                         = "WindowsTrustedIPCSocketAddressValidator.no";
-    public static final String WINDOWS_TRUSTED_IPC_VALIDATOR_YES                                        = "WindowsTrustedIPCSocketAddressValidator.yes";
-
     @Override
     public boolean isAllowed(final Socket socket, final Object context) throws IOException {
         if (socket == null) {

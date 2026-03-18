@@ -7,19 +7,23 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.ClickCaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
@@ -40,7 +44,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52478 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52511 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -64,6 +68,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
+        // types.add(CAPTCHA_TYPE.GEETEST_V1);
+        // types.add(CAPTCHA_TYPE.GEETEST_V4);
         return types;
     }
 
@@ -152,7 +158,14 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         query.appendEncoded("json", "1");
         query.appendEncoded("apikey", account.getPass());
         /* Potentially unneeded params */
-        query.appendEncoded("jd", "2");
+        /**
+         * 2026-03-17: Do not add jd=2 parameter as this will make API return non-json responses for some cases but we want json whenever
+         * possible. </br>
+         * Known effects when this parameter is sent: <br>
+         * - Sometimes non-json responses <br>
+         * - "captcha_id" field instead of "captchaid" <br>
+         */
+        // query.appendEncoded("jd", "2");
         query.appendEncoded("source", "jd2");
         query.appendEncoded("captchaSource", "jdPlugin");
         query.appendEncoded("version", "1.2");
@@ -179,6 +192,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             return resp;
         }
         if (br.getRequest().getHtmlCode().equalsIgnoreCase("OK")) {
+            // TODO: Check if this case still exists
             return null;
         }
         /* Expect json response */
@@ -211,8 +225,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         if (captchachallenge instanceof RecaptchaV2Challenge) {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
             upload_query.appendEncoded("data-sitekey", challenge.getSiteKey());
-            upload_query.appendEncoded("oldsource", challenge.getTypeID() + "");
             upload_query.appendEncoded("isInvisible", challenge.isInvisible() == true ? "1" : "0");
+            /** TODO: Remove parameter "captchachoice": it is not in the docs anymore and parameter "oldsource" should be enough. */
             final Map<String, Object> v3action = challenge.getV3Action();
             if (v3action != null) {
                 upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
@@ -228,14 +242,18 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
                 upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
                 upload_query.appendEncoded("captchachoice", "recaptchav2");
             }
-            upload_query.appendEncoded("securetoken", challenge.getSecureToken());
             upload_query.appendEncoded("interactive", "1");
+            upload_query.appendEncoded("securetoken", challenge.getSecureToken());
+            if (v3action != null || challenge.isV3()) {
+                upload_query.appendEncoded("oldsource", "recaptchav3");
+            } else {
+                upload_query.appendEncoded("oldsource", "recaptchav2");
+            }
         } else if (captchachallenge instanceof HCaptchaChallenge) {
             final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;
             upload_query.appendEncoded("data-sitekey", challenge.getSiteKey());
             upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
             upload_query.appendEncoded("oldsource", "hcaptcha");
-            upload_query.appendEncoded("captchachoice", "hcaptcha");
             upload_query.appendEncoded("interactive", "1");
         } else if (captchachallenge instanceof CutCaptchaChallenge) {
             /* CutCaptcha: https://2captcha.com/api-docs/cutcaptcha */
@@ -275,7 +293,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         upload_query.appendEncoded("selfsolve", cfg.isSelfsolve() + "");
         upload_query.appendEncoded("confirm", cfg.isConfirm() + "");
         final Map<String, Object> uploadresp = this.callAPI(upload_query, account);
-        final String captcha_id = uploadresp.get("captcha_id").toString();
+        final String captcha_id = uploadresp.get("captchaid").toString();
         final UrlQuery polling_query = new UrlQuery();
         polling_query.appendEncoded("action", "usercaptchacorrectdata");
         polling_query.appendEncoded("id", captcha_id);
@@ -286,17 +304,50 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             checkInterruption();
             Thread.sleep(getPollingIntervalMillis(account));
             final Map<String, Object> pollingresp = this.callAPI(polling_query, account);
-            final String answer = pollingresp.get("answer").toString();
-            AbstractResponse resp = null;
-            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
+            final Number credits = (Number) pollingresp.get("credits");
+            if (credits != null) {
+                try {
+                    account.getAccountInfo().setAccountBalance(credits.doubleValue());
+                } catch (final Exception e) {
+                }
+            }
+            final Number try_again = (Number) pollingresp.get("try_again");
+            if (try_again != null && try_again.shortValue() == 1) {
+                /* {"credits":40628,"message":"OK","try_again":1,"answer":"","status":{"https":1,"success":true}} */
+                logger.info("No response yet -> Retry");
+                continue;
+            }
+            final String answer = (String) pollingresp.get("answer");
+            if (StringUtils.isEmpty(answer)) {
+                /* No error && no retry allowed && no answer -> Unsolved for unknown reasons */
+                logger.info("No answer and no retry allowed anymore -> Stopping polling");
+                job.setStatus(SolverStatus.UNSOLVED);
+                return;
+            }
+            final AbstractResponse resp;
+            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CutCaptchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, answer);
+            } else if (captchachallenge instanceof ClickCaptchaChallenge) {
+                // TODO: Test this
+                final String[] splitResult = answer.split("x");
+                final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
+                final ClickedPoint cp = new ClickedPoint(Integer.parseInt(splitResult[0]), Integer.parseInt(splitResult[1]));
+                resp = new ClickCaptchaResponse(challenge, this, cp);
+            } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
+                // TODO: Test this
+                final String[] pairs = answer.split(";"); // e.g. "68x149;81x192"
+                final int[] x = new int[pairs.length];
+                final int[] y = new int[pairs.length];
+                for (int i = 0; i < pairs.length; i++) {
+                    final String[] xy = pairs[i].split("x");
+                    x[i] = Integer.parseInt(xy[0]);
+                    y[i] = Integer.parseInt(xy[1]);
+                }
+                final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
+                resp = new MultiClickCaptchaResponse(challenge, this, new MultiClickedPoint(x, y));
             } else {
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, answer);
             }
-            /**
-             * TODO: Correct answer leads to exception in PluginForHost -> Line 676 check why this happens <br>
-             * if (!c.isSolved()) { throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-             */
             resp.setCaptchaSolverTaskID(captcha_id);
             job.setAnswer(resp);
             return;

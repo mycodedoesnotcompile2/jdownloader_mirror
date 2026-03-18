@@ -36,10 +36,18 @@ package org.appwork.testframework.tests;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.appwork.builddecision.BuildDecisions;
 import org.appwork.loggingv3.LogV3;
@@ -56,15 +64,22 @@ import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 
 /**
- * AWTest that scans all Java files, detects LF vs CRLF, stores state in cache, and if a file's line ending changed compared to cache, asks
- * via dialog whether to correct it. Does NOT implement PostBuildTestInterface so it never runs in PostBuild (IDE only).
+ * AWTest that scans all text files (excluding binary files), detects LF vs CRLF, stores state in cache, and if a file's line ending
+ * changed compared to cache, asks via dialog whether to correct it. Includes install4j files (e.g. .install4j config and templates
+ * like template_i4j10.install4j). Does NOT implement PostBuildTestInterface so it never runs in PostBuild (IDE only).
  */
 public class JavaFileLineEndingAWTest implements TestInterface {
-    private static final String CACHE_FILENAME = "cfg/lineEndingCache.json";
+    private static final String   CACHE_FILENAME = "cfg/lineEndingCache.json";
+    /** Extensions of files that are always treated as binary and skipped (no content read). */
+    private static final String[] BINARY_EXTENSIONS = { ".jar", ".zip", ".class", ".dll", ".exe", ".so", ".dylib", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".woff", ".woff2", ".ttf", ".eot", ".pyc", ".bin" };
+    /** Extensions of files that must be treated as text (e.g. install4j config/templates). Always checked for line endings. */
+    private static final String[] TEXT_EXTENSIONS_ALWAYS_INCLUDE = { ".install4j" };
     private static final String LF             = "LF";
     private static final String CRLF           = "CRLF";
     private static final byte   CR             = (byte) 0x0D;
     private static final byte   NL             = (byte) 0x0A;
+    private static final long   POLL_INTERVAL  = 10000;
+    private static final long   RETRY_SLEEP_MS = 2000;
 
     @Override
     public boolean isMaintenance() {
@@ -89,11 +104,11 @@ public class JavaFileLineEndingAWTest implements TestInterface {
             return;
         }
         Map<String, String> cache = loadCache(cacheFile);
-        List<File> javaFiles = Files.getFiles(false, true, workspace);
-        // First pass: collect all files whose line ending changed vs cache
+        List<File> allFiles = Files.getFiles(false, true, workspace);
+        // First pass: collect all text files whose line ending changed vs cache (binary files skipped)
         List<FileLineEndingEntry> toAsk = new ArrayList<FileLineEndingEntry>();
-        for (File file : javaFiles) {
-            if (!file.getName().endsWith(".java")) {
+        for (File file : allFiles) {
+            if (isLikelyBinaryByExtension(file.getName()) && !isAlwaysIncludeTextExtension(file.getName())) {
                 continue;
             }
             String relPath = Files.getRelativePath(workspace, file);
@@ -127,7 +142,7 @@ public class JavaFileLineEndingAWTest implements TestInterface {
                         LogV3.log(ex);
                     }
                 }
-                LogV3.info("JavaFileLineEndingAWTest: corrected " + toAsk.size() + " file(s)");
+                LogV3.info("JavaFileLineEndingAWTest: corrected " + toAsk.size() + " text file(s)");
             } else {
                 for (FileLineEndingEntry e : toAsk) {
                     cache.put(e.relPath, e.current);
@@ -138,12 +153,49 @@ public class JavaFileLineEndingAWTest implements TestInterface {
     }
 
     /**
-     * Detect line ending of file from raw bytes. Returns "LF", "CRLF", or null if no newline found.
+     * Returns true if the filename has an extension that typically indicates a binary file (no content read).
+     */
+    private boolean isLikelyBinaryByExtension(String filename) {
+        if (filename == null) {
+            return true;
+        }
+        String lower = filename.toLowerCase();
+        for (String ext : BINARY_EXTENSIONS) {
+            if (lower.endsWith(ext)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the file should always be treated as text (e.g. install4j config/template files).
+     */
+    private boolean isAlwaysIncludeTextExtension(String filename) {
+        if (filename == null) {
+            return false;
+        }
+        String lower = filename.toLowerCase();
+        for (String ext : TEXT_EXTENSIONS_ALWAYS_INCLUDE) {
+            if (lower.endsWith(ext)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Detect line ending of file from raw bytes. Returns "LF", "CRLF", or null if no newline found or file appears binary (contains null byte).
      */
     private String detectLineEnding(File file) throws IOException {
         byte[] bytes = IO.readFile(file, 64 * 1024);
         if (bytes == null || bytes.length == 0) {
             return null;
+        }
+        for (int i = 0; i < bytes.length; i++) {
+            if (bytes[i] == 0) {
+                return null; // binary file
+            }
         }
         boolean seenCrlf = false;
         boolean seenLf = false;
@@ -298,6 +350,218 @@ public class JavaFileLineEndingAWTest implements TestInterface {
     public static void main(String[] args) throws Exception {
         BuildDecisions.setEnabled(false);
         Application.setApplication(".tests");
-        new JavaFileLineEndingAWTest().runTest();
+        JavaFileLineEndingAWTest test = new JavaFileLineEndingAWTest();
+        if (!test.runObserverModeFromMain()) {
+            test.runPollingModeFromMain();
+        }
+    }
+
+    private void runPollingModeFromMain() throws Exception {
+        LogV3.info("JavaFileLineEndingAWTest: polling mode active");
+        while (true) {
+            runOnceFromMain();
+            Thread.sleep(POLL_INTERVAL);
+        }
+    }
+
+    private void runOnceFromMain() {
+        try {
+            LogV3.info("Run");
+            runTest();
+        } catch (Throwable e) {
+            LogV3.log(e);
+        }
+    }
+
+    private boolean runObserverModeFromMain() {
+        File workspace = IDEUtils.getWorkSpace();
+        if (workspace == null || !workspace.isDirectory()) {
+            LogV3.info("JavaFileLineEndingAWTest: no workspace found for observer mode");
+            return false;
+        }
+        File cacheFile = Application.getResource(CACHE_FILENAME);
+        if (cacheFile == null) {
+            LogV3.info("JavaFileLineEndingAWTest: no cache path for observer mode");
+            return false;
+        }
+        Map<String, String> cache = loadCache(cacheFile);
+        final Path workspacePath = workspace.toPath();
+        WatchService watchService = null;
+        try {
+            watchService = FileSystems.getDefault().newWatchService();
+            Map<WatchKey, Path> key2Directory = new HashMap<WatchKey, Path>();
+            registerDirectoryRecursive(workspacePath, watchService, key2Directory);
+            LogV3.info("JavaFileLineEndingAWTest: observer mode active for " + workspace.getAbsolutePath());
+            while (!Thread.currentThread().isInterrupted()) {
+                Set<Path> changedFiles = new LinkedHashSet<Path>();
+                WatchKey key = watchService.take();
+                boolean rescanAll = processWatchKey(workspacePath, watchService, key2Directory, key, changedFiles);
+                rescanAll |= drainPendingKeys(workspacePath, watchService, key2Directory, changedFiles);
+                if (rescanAll) {
+                    runOnceFromMain();
+                    cache = loadCache(cacheFile);
+                } else if (!changedFiles.isEmpty()) {
+                    processChangedTextFiles(workspacePath, cacheFile, cache, changedFiles);
+                }
+            }
+            return true;
+        } catch (Throwable e) {
+            LogV3.log(e);
+            LogV3.info("JavaFileLineEndingAWTest: observer mode failed, fallback to polling");
+            return false;
+        } finally {
+            if (watchService != null) {
+                try {
+                    watchService.close();
+                } catch (IOException e) {
+                    LogV3.log(e);
+                }
+            }
+        }
+    }
+
+    private boolean drainPendingKeys(Path workspace, WatchService watchService, Map<WatchKey, Path> key2Directory, Set<Path> changedFiles) throws Exception {
+        boolean rescanAll = false;
+        while (true) {
+            WatchKey key = watchService.poll();
+            if (key == null) {
+                return rescanAll;
+            }
+            rescanAll |= processWatchKey(workspace, watchService, key2Directory, key, changedFiles);
+        }
+    }
+
+    private boolean processWatchKey(Path workspace, WatchService watchService, Map<WatchKey, Path> key2Directory, WatchKey key, Set<Path> changedFiles) throws Exception {
+        if (key == null) {
+            return false;
+        }
+        boolean rescanAll = false;
+        try {
+            Path parent = key2Directory.get(key);
+            if (parent == null) {
+                return true;
+            }
+            List<WatchEvent<?>> events = key.pollEvents();
+            for (WatchEvent<?> event : events) {
+                WatchEvent.Kind<?> kind = event.kind();
+                if (StandardWatchEventKinds.OVERFLOW == kind) {
+                    rescanAll = true;
+                    continue;
+                }
+                Object contextObject = event.context();
+                if (!(contextObject instanceof Path)) {
+                    rescanAll = true;
+                    continue;
+                }
+                Path changed = parent.resolve((Path) contextObject);
+                if (StandardWatchEventKinds.ENTRY_CREATE == kind && java.nio.file.Files.isDirectory(changed)) {
+                    registerDirectoryRecursive(changed, watchService, key2Directory);
+                }
+                if (isWorkspaceTrackedFile(workspace, changed)) {
+                    changedFiles.add(changed);
+                }
+            }
+        } finally {
+            if (!key.reset()) {
+                key2Directory.remove(key);
+            }
+        }
+        return rescanAll;
+    }
+
+    //
+    private void registerDirectoryRecursive(Path directory, WatchService watchService, Map<WatchKey, Path> key2Directory) throws Exception {
+        if (directory == null || !java.nio.file.Files.isDirectory(directory)) {
+            return;
+        }
+        WatchKey key = directory.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
+        key2Directory.put(key, directory);
+        File[] children = directory.toFile().listFiles();
+        if (children != null) {
+            for (File child : children) {
+                if (child.isDirectory()) {
+                    registerDirectoryRecursive(child.toPath(), watchService, key2Directory);
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns true if the path is a regular file under the workspace (any file; binary filtering happens when reading).
+     */
+    private boolean isWorkspaceTrackedFile(Path workspace, Path file) {
+        if (file == null || !java.nio.file.Files.isRegularFile(file)) {
+            return false;
+        }
+        try {
+            Path relPath = workspace.relativize(file);
+            return relPath != null;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private void processChangedTextFiles(Path workspace, File cacheFile, Map<String, String> cache, Set<Path> changedFiles) throws IOException {
+        List<FileLineEndingEntry> toAsk = new ArrayList<FileLineEndingEntry>();
+        for (Path changed : changedFiles) {
+            String relPath = workspace.relativize(changed).toString().replace(File.separatorChar, '/');
+            File file = changed.toFile();
+            if (!file.isFile()) {
+                cache.remove(relPath);
+                continue;
+            }
+            if (isLikelyBinaryByExtension(file.getName()) && !isAlwaysIncludeTextExtension(file.getName())) {
+                continue;
+            }
+            String current = detectLineEndingWithRetry(file);
+            if (current == null) {
+                continue;
+            }
+            String cached = cache.get(relPath);
+            if (cached == null) {
+                cache.put(relPath, current);
+                continue;
+            }
+            if (!current.equals(cached)) {
+                toAsk.add(new FileLineEndingEntry(file, relPath, current, cached));
+            }
+        }
+        if (!toAsk.isEmpty()) {
+            boolean doCorrect = askCorrectAll(toAsk);
+            if (doCorrect) {
+                for (FileLineEndingEntry e : toAsk) {
+                    try {
+                        correctLineEnding(e.file, e.cached);
+                        cache.put(e.relPath, e.cached);
+                    } catch (IOException ex) {
+                        LogV3.log(ex);
+                    }
+                }
+                LogV3.info("JavaFileLineEndingAWTest: corrected " + toAsk.size() + " changed text file(s)");
+            } else {
+                for (FileLineEndingEntry e : toAsk) {
+                    cache.put(e.relPath, e.current);
+                }
+            }
+        }
+        saveCache(cacheFile, cache);
+    }
+
+    private String detectLineEndingWithRetry(File file) throws IOException {
+        while (true) {
+            try {
+                return detectLineEnding(file);
+            } catch (IOException e) {
+                if (!file.isFile()) {
+                    return null;
+                }
+                try {
+                    Thread.sleep(RETRY_SLEEP_MS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
     }
 }

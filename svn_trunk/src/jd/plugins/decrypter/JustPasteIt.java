@@ -32,7 +32,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 52095 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52508 $", interfaceVersion = 2, names = {}, urls = {})
 public class JustPasteIt extends AbstractPastebinCrawler {
     public JustPasteIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -90,7 +90,13 @@ public class JustPasteIt extends AbstractPastebinCrawler {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         br.getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            /**
+             * e.g. <div class="card-header alert-danger"><strong>Article unavailable</strong></div> <div class="card-body"> Article has
+             * been removed by the author
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 451) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

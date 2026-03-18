@@ -74,5 +74,6 @@ public interface DesktopSupport {
      * @throws InterruptedException
      */
     boolean reboot(boolean force, int waitms) throws InterruptedException;
+    ////
 
 }

@@ -144,33 +144,6 @@ public final class WindowsExecuter {
             LogV3.info("WindowsExecuter: running with lowest privilege (SID " + sid + " not available or no match)");
         }
 
-        // When running as LocalSystem without explicit SID, try active console user first so the child is the interactive user, not SYSTEM.
-        if (WindowsUtils.isRunningAsLocalSystem()) {
-            HANDLE consoleToken = null;
-            HANDLE primaryToken = null;
-            try {
-                consoleToken = WindowsUtils.getActiveConsoleUserToken();
-                if (consoleToken != null) {
-                    HANDLEByReference pPrimary = new HANDLEByReference();
-                    if (Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
-                        primaryToken = pPrimary.getValue();
-                        LogV3.info("WindowsExecuter: running as LocalSystem without SID, using active console user token");
-                        return runWithToken(primaryToken, options);
-                    }
-                }
-            } catch (Throwable t) {
-                LogV3.log(t);
-            } finally {
-                if (consoleToken != null) {
-                    Kernel32.INSTANCE.CloseHandle(consoleToken);
-                }
-                if (primaryToken != null) {
-                    Kernel32.INSTANCE.CloseHandle(primaryToken);
-                }
-            }
-            LogV3.info("WindowsExecuter: active console user token not available (e.g. no interactive session), falling back to Safer");
-        }
-
         HANDLE levelHandle = null;
         HANDLE hToken = null;
         Pointer sidToFree = null;
@@ -261,10 +234,6 @@ public final class WindowsExecuter {
         File workingDir = options.getWorkingDir();
         boolean waitFor = options.isWaitFor();
         String workDirPath = workingDir != null ? workingDir.getAbsolutePath() : null;
-        if (workDirPath == null && CrossSystem.isWindows()) {
-            String sysRoot = System.getenv("SystemRoot");
-            workDirPath = (sysRoot != null && sysRoot.length() > 0) ? sysRoot + "\\System32" : "C:\\Windows\\System32";
-        }
         String commandLine = ShellParser.createCommandLine(Style.WINDOWS, cmd);
         LogV3.info("runWithToken: commandLine.length=" + commandLine.length() + " cmdLine=\"" + (commandLine.length() > 200 ? commandLine.substring(0, 200) + "..." : commandLine) + "\" workDirPath=" + workDirPath + " waitFor=" + waitFor);
         HANDLE stdInHandle = Kernel32.INSTANCE.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
@@ -365,17 +334,6 @@ public final class WindowsExecuter {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                // Close read ends so blocked readers exit; then wait for them to finish (ensures clean shutdown on interrupt/exception).
-                closeHandleSafe(hStdOutRd);
-                closeHandleSafe(hStdErrRd);
-                hStdOutRd = null;
-                hStdErrRd = null;
-                try {
-                    outReader.join(1000);
-                    errReader.join(1000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
                 IntByReference exitCodeRef = new IntByReference();
                 Kernel32.INSTANCE.GetExitCodeProcess(pi.hProcess, exitCodeRef);
                 int exitCode = exitCodeRef.getValue();
@@ -419,36 +377,27 @@ public final class WindowsExecuter {
                 IntByReference read = new IntByReference();
                 ByteArrayOutputStream lineBuf = new ByteArrayOutputStream();
                 String charset = "UTF-8";
-                try {
-                    while (Kernel32.INSTANCE.ReadFile(hPipe, buf, buf.length, read, null)) {
-                        int n = read.getValue();
-                        if (n <= 0) {
-                            break;
-                        }
-                        out.write(buf, 0, n);
-                        if (callback != null) {
-                            for (int i = 0; i < n; i++) {
-                                byte b = buf[i];
-                                if (b == '\n') {
-                                    flushLine(lineBuf, callback, isStdOut, charset);
-                                } else if (b != '\r') {
-                                    lineBuf.write(b & 0xff);
-                                }
+                while (Kernel32.INSTANCE.ReadFile(hPipe, buf, buf.length, read, null)) {
+                    int n = read.getValue();
+                    if (n <= 0) {
+                        break;
+                    }
+                    out.write(buf, 0, n);
+                    if (callback != null) {
+                        for (int i = 0; i < n; i++) {
+                            byte b = buf[i];
+                            if (b == '\n') {
+                                flushLine(lineBuf, callback, isStdOut, charset);
+                            } else if (b != '\r') {
+                                lineBuf.write(b & 0xff);
                             }
                         }
                     }
-                } catch (Throwable ex) {
-                    LogV3.log(ex);
-                } finally {
-                    if (callback != null && lineBuf.size() > 0) {
-                        try {
-                            flushLine(lineBuf, callback, isStdOut, charset);
-                        } catch (Throwable ex) {
-                            LogV3.log(ex);
-                        }
-                    }
-                    // Handle is owned and closed by runWithToken finally block only; do not close here to avoid double-close.
                 }
+                if (callback != null && lineBuf.size() > 0) {
+                    flushLine(lineBuf, callback, isStdOut, charset);
+                }
+                closeHandleSafe(hPipe);
             }
         }, "WindowsExecuter-PipeReader");
         t.setDaemon(true);

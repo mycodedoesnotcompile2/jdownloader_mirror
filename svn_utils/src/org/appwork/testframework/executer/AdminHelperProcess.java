@@ -22,7 +22,6 @@ import java.io.PrintStream;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -380,9 +379,9 @@ public final class AdminHelperProcess {
         }
         LogV3.info("Shutdown hook finished.");
         if (showDebugWindow) {
-            LogV3.info("Exit in 3s");
+            LogV3.info("Exit in 20s");
             try {
-                Thread.sleep(3000);
+                Thread.sleep(20000);
             } catch (InterruptedException e) {
                 LogV3.log(e);
             }
@@ -1073,36 +1072,8 @@ public final class AdminHelperProcess {
                 if (resultHexFile.isFile()) {
                     stdout = IO.readFileToString(resultHexFile).trim();
                 }
-                if (stdout.length() == 0) {
-                    String debugDirList = "";
-                    try {
-                        String[] names = resultHexDir.list();
-                        debugDirList = names != null ? Arrays.asList(names).toString() : "null";
-                    } catch (Throwable t) {
-                        debugDirList = "list failed: " + t.getMessage();
-                    }
-                    String stdoutPrefix = "";
-                    String stderrPrefix = "";
-                    try {
-                        if (stdoutFile.isFile()) {
-                            byte[] buf = IO.readStream(1024, new java.io.FileInputStream(stdoutFile));
-                            stdoutPrefix = buf != null ? new String(buf, UTF8).replace("\r", " ").replace("\n", " ") : "";
-                        }
-                    } catch (Throwable t) {
-                        stdoutPrefix = "(read failed: " + t.getMessage() + ")";
-                    }
-                    try {
-                        if (stderrFile.isFile()) {
-                            byte[] buf = IO.readStream(1024, new java.io.FileInputStream(stderrFile));
-                            stderrPrefix = buf != null ? new String(buf, UTF8).replace("\r", " ").replace("\n", " ") : "";
-                        }
-                    } catch (Throwable t) {
-                        stderrPrefix = "(read failed: " + t.getMessage() + ")";
-                    }
-                    LogV3.info("[AdminHelper] runAsLocalSystemViaSchtasks result.hex missing: resultHexDir=" + resultHexDir.getAbsolutePath() + " files=" + debugDirList + " exitCode=" + exitCode);
-                    LogV3.info("[AdminHelper] runAsLocalSystemViaSchtasks task stdout.txt prefix: " + stdoutPrefix);
-                    LogV3.info("[AdminHelper] runAsLocalSystemViaSchtasks task stderr.txt prefix: " + stderrPrefix);
-                    throw new Exception("runAsLocalSystem task did not produce result.hex. exitCode=" + exitCode + " resultHexDir=" + resultHexDir.getAbsolutePath() + " files=" + debugDirList + " stdoutPrefix=" + stdoutPrefix + " stderrPrefix=" + stderrPrefix);
+                if (stdout.length() == 0 && stdoutFile.isFile()) {
+                    throw new Exception("runAsLocalSystem task did not produce result.hex. exitCode=" + exitCode);
                 }
             } else {
                 if (stdoutFile.isFile()) {

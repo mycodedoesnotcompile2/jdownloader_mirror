@@ -251,6 +251,7 @@ public class IO {
         UTF16LE(new byte[] { (byte) 0xff, (byte) 0xfe }, "UTF-16LE"), // also see x-UTF-16LE-BOM, writes out BOM
         UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 0xfe, (byte) 0xff }, "UTF-32BE"), // also see X-UTF-32BE-BOM, writes out BOM
         UTF32LE(new byte[] { (byte) 0xff, (byte) 0xfe, (byte) 0, (byte) 0 }, "UTF-32LE");// also see X-UTF-32LE-BOM, writes OUT BOM
+
         public static class BOMInputStream extends FilterInputStream {
             private final BOM bom;
 
@@ -367,9 +368,28 @@ public class IO {
                 file.mkdirs();
             } else {
                 file.getParentFile().mkdirs();
-                if (!src.renameTo(file)) {
-                    throw new IOException("Could not move file " + src + " to " + file);
-                }
+                IO.renameTo(src, file);
+            }
+        }
+    }
+
+    /**
+     * Renames source to dest. Uses NIO Files.move on Java 7+ for better exceptions; falls back to File.renameTo on
+     * Java 6. Replaces existing destination on Java 7+.
+     *
+     * @param source
+     *            source file
+     * @param dest
+     *            destination file
+     * @throws IOException
+     *             if rename fails
+     */
+    public static void renameTo(final File source, final File dest) throws IOException {
+        if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
+            Files17.rename(source, dest);
+        } else {
+            if (!source.renameTo(dest)) {
+                throw new IOException("Could not rename " + source + " to " + dest);
             }
         }
     }
@@ -800,21 +820,26 @@ public class IO {
                     }
                 }
                 if (!tmpFile.delete() && tmpFile.exists()) {
-                    throw new IOException("could not remove tmpFile" + tmpFile);
+                    throw new IOException("could not remove tmpFile " + tmpFile);
                 }
                 boolean finallyDeleteFileFlag = true;
                 try {
                     IO.writeToFile(tmpFile, writeToFileCallback, sync);
                     if (!dstFile.delete() && dstFile.exists()) {
-                        throw new IOException("could not remove dstFile" + dstFile);
+                        throw new IOException("could not remove dstFile " + dstFile);
                     }
                     final long timeStamp = Time.systemIndependentCurrentJVMTimeMillis();
                     int retry = 0;
-                    while (!tmpFile.renameTo(dstFile)) {
-                        retry++;
-                        Thread.sleep(retry * 10);
-                        if (Time.systemIndependentCurrentJVMTimeMillis() - timeStamp > 1000) {
-                            throw new IOException("could not rename " + tmpFile + " to " + dstFile.exists());
+                    while (true) {
+                        try {
+                            IO.renameTo(tmpFile, dstFile);
+                            break;
+                        } catch (final IOException e) {
+                            retry++;
+                            if (Time.systemIndependentCurrentJVMTimeMillis() - timeStamp > 1000) {
+                                throw new IOException("could not rename " + tmpFile + " to " + dstFile, e);
+                            }
+                            Thread.sleep(retry * 10);
                         }
                     }
                     finallyDeleteFileFlag = false;

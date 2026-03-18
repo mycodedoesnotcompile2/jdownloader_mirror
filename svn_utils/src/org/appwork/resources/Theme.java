@@ -267,6 +267,9 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             DebugMode.debugger();
             return null;
         }
+        if (!context.isCreateFileNotFoundFallbackImage()) {
+            return null;
+        }
         LogV3.info(NO_IMAGE_AVAILABLE + relativePath);
         if (doLogMissing) {
             org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png|svg|ico|exe", false)));

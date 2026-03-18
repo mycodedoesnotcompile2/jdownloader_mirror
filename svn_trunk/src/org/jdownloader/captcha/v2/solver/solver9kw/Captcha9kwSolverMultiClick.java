@@ -124,19 +124,11 @@ public class Captcha9kwSolverMultiClick extends AbstractCaptcha9kwSolver<MultiCl
             if (!jsonX.isEmpty()) {
                 jsonX += ",";
             }
-            if (solverJob.getChallenge().getTypeID() == "kissanime.to") {
-                jsonX += "" + (int) Math.round(Integer.parseInt(splitResultx[0]) * this.base_workaround);
-            } else {
-                jsonX += splitResultx[0];
-            }
+            jsonX += splitResultx[0];
             if (!jsonY.isEmpty()) {
                 jsonY += ",";
             }
-            if (solverJob.getChallenge().getTypeID() == "kissanime.to") {
-                jsonX += "" + (int) Math.round((Integer.parseInt(splitResultx[1]) * this.base_workaround));
-            } else {
-                jsonY += splitResultx[1];
-            }
+            jsonY += splitResultx[1];
         }
         String jsonInString = "{\"x\":[" + "],\"y\":[" + "]}";
         MultiClickedPoint res = JSonStorage.restoreFromString(jsonInString, new TypeRef<MultiClickedPoint>() {
