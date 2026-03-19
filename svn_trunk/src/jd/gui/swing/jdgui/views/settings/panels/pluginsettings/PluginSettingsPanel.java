@@ -92,28 +92,24 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
             protected Icon getIconForValue(LazyPlugin<?> value) {
                 if (value == null) {
                     return null;
-                } else {
-                    final Icon favIcon = value.getDomainInfo().getFavIcon(false);
-                    if (value instanceof LazyHostPlugin) {
-                        return favIcon;
-                    } else {
-                        final Icon ret = new ExtMergedIcon(favIcon) {
-                            @Override
-                            protected void idIconCheck(Entry entry) {
-                            };
-                        }.add(linkgrabber, 6, 6);
-                        return ret;
-                    }
                 }
+                final Icon favIcon = value.getDomainInfo().getFavIcon(false);
+                if (value instanceof LazyHostPlugin) {
+                    return favIcon;
+                }
+                return new ExtMergedIcon(favIcon) {
+                    @Override
+                    protected void idIconCheck(Entry entry) {
+                    };
+                }.add(linkgrabber, 6, 6);
             }
 
             @Override
             protected boolean matches(String element, String matches) {
                 if (super.matches(element, matches)) {
                     return true;
-                } else {
-                    return element != null && matches != null && matches.length() >= 3 && StringUtils.containsIgnoreCase(element, matches);
                 }
+                return element != null && matches != null && matches.length() >= 3 && StringUtils.containsIgnoreCase(element, matches);
             }
 
             private int booleanCompare(boolean x, boolean y) {
@@ -143,17 +139,13 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
             protected String getTextForValue(LazyPlugin<?> value) {
                 if (value == null) {
                     return "";
-                } else {
-                    return value.getDisplayName();
                 }
+                return value.getDisplayName();
             }
         };
         searchCombobox.setActualMaximumRowCount(20);
         searchCombobox.addActionListener(this);
         setOpaque(false);
-        // left.setBorder(new JTextField().getBorder());
-        // selector.setPreferredSize(new Dimension(200, 20000));
-        // sp.setBorder(null);
         resetButton = new ExtButton(new AppAction() {
             {
                 setIconKey(IconKey.ICON_RESET);
@@ -162,31 +154,32 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (configPanel != null && configPanel.isShown()) {
-                    Plugin proto = null;
-                    try {
-                        if (currentItem != null) {
-                            Dialog.getInstance().showConfirmDialog(0, _GUI.T.lit_are_you_sure(), _GUI.T.PluginSettingsPanel_are_you_sure(currentItem.getDisplayName()));
-                            proto = currentItem.getPrototype(null);
-                            PluginConfigPanelNG ccp = proto.getConfigPanel();
-                            if (ccp != null) {
-                                ccp.reset();
-                            } else {
-                                proto.getPluginConfig().reset();
-                                AddonConfig.getInstance(proto.getConfig(), "", false).reload();
-                            }
-                            // avoid that the panel saves it's data on hide;
-                            configPanel = null;
-                            show(currentItem);
-                            Dialog.getInstance().showMessageDialog(_GUI.T.PluginSettingsPanel_actionPerformed_reset_done(currentItem.getDisplayName()));
-                        }
-                    } catch (UpdateRequiredClassNotFoundException e1) {
-                        org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e1);
-                    } catch (DialogClosedException e1) {
-                        e1.printStackTrace();
-                    } catch (DialogCanceledException e1) {
-                        e1.printStackTrace();
+                if (configPanel == null || !configPanel.isShown()) {
+                    return;
+                }
+                if (currentItem == null) {
+                    return;
+                }
+                try {
+                    Dialog.getInstance().showConfirmDialog(0, _GUI.T.lit_are_you_sure(), _GUI.T.PluginSettingsPanel_are_you_sure(currentItem.getDisplayName()));
+                    final Plugin proto = currentItem.getPrototype(null);
+                    final PluginConfigPanelNG ccp = proto.getConfigPanel();
+                    if (ccp != null) {
+                        ccp.reset();
+                    } else {
+                        proto.getPluginConfig().reset();
+                        AddonConfig.getInstance(proto.getConfig(), "", false).reload();
                     }
+                    // avoid that the panel saves it's data on hide
+                    configPanel = null;
+                    show(currentItem);
+                    Dialog.getInstance().showMessageDialog(_GUI.T.PluginSettingsPanel_actionPerformed_reset_done(currentItem.getDisplayName()));
+                } catch (UpdateRequiredClassNotFoundException e1) {
+                    org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e1);
+                } catch (DialogClosedException e1) {
+                    e1.printStackTrace();
+                } catch (DialogCanceledException e1) {
+                    e1.printStackTrace();
                 }
             }
         });
@@ -209,11 +202,6 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
         }
         new Thread("Plugin Init") {
             public void run() {
-                // try {
-                // Thread.sleep(5000);
-                // } catch (InterruptedException e) {
-                // e.printStackTrace();
-                // }
                 fill();
                 new EDTRunner() {
                     @Override
@@ -238,19 +226,20 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
         new EDTRunner() {
             @Override
             protected void runInEDT() {
-                if (searchCombobox.getModel().getSize() > 0) {
-                    int selectIndex = 0;
-                    if (pluginID != null) {
-                        for (int i = 0; i < searchCombobox.getModel().getSize(); i++) {
-                            final LazyPlugin<?> plugin = ((LazyPlugin<?>) searchCombobox.getModel().getElementAt(i));
-                            if (StringUtils.startsWithCaseInsensitive(pluginID, plugin.getClassName()) && plugin.getID().equals(pluginID)) {
-                                selectIndex = i;
-                                break;
-                            }
+                if (searchCombobox.getModel().getSize() == 0) {
+                    return;
+                }
+                int selectIndex = 0;
+                if (pluginID != null) {
+                    for (int i = 0; i < searchCombobox.getModel().getSize(); i++) {
+                        final LazyPlugin<?> plugin = (LazyPlugin<?>) searchCombobox.getModel().getElementAt(i);
+                        if (StringUtils.startsWithCaseInsensitive(pluginID, plugin.getClassName()) && plugin.getID().equals(pluginID)) {
+                            selectIndex = i;
+                            break;
                         }
                     }
-                    searchCombobox.setSelectedIndex(selectIndex);
                 }
+                searchCombobox.setSelectedIndex(selectIndex);
             }
         };
     }
@@ -259,12 +248,13 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
         new EDTRunner() {
             @Override
             protected void runInEDT() {
-                if (plugin != null) {
-                    if (searchCombobox.getModel().getSize() > 0) {
-                        setPlugin(plugin.getID());
-                    } else {
-                        JsonConfig.create(GraphicalUserInterfaceSettings.class).setActivePluginConfigPanel(plugin.getID());
-                    }
+                if (plugin == null) {
+                    return;
+                }
+                if (searchCombobox.getModel().getSize() > 0) {
+                    setPlugin(plugin.getID());
+                } else {
+                    JsonConfig.create(GraphicalUserInterfaceSettings.class).setActivePluginConfigPanel(plugin.getID());
                 }
             }
         };
@@ -348,28 +338,24 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
                     if (configPanel != null) {
                         configPanel.setShown();
                         card.add(configPanel);
-                        if (selectedItem != null) {
-                            final Icon fav = selectedItem.getDomainInfo().getFavIcon(false);
-                            if (selectedItem instanceof LazyHostPlugin) {
-                                header.setText(_GUI.T.PluginSettingsPanel_runInEDT_plugin_header_text_host(selectedItem.getDisplayName()));
-                                header.setIcon(fav);
-                            } else {
-                                header.setText(_GUI.T.PluginSettingsPanel_runInEDT_plugin_header_text_decrypt(selectedItem.getDisplayName()));
-                                if (fav == null) {
-                                    header.setIcon(decryterIcon);
-                                } else {
-                                    final Icon ret = new ExtMergedIcon(fav) {
-                                        @Override
-                                        protected void idIconCheck(Entry entry) {
-                                        };
-                                    }.add(decryterIcon, 6, 6);
-                                    header.setIcon(ret);
-                                }
-                            }
-                            header.setVisible(true);
+                        final Icon fav = selectedItem.getDomainInfo().getFavIcon(false);
+                        if (selectedItem instanceof LazyHostPlugin) {
+                            header.setText(_GUI.T.PluginSettingsPanel_runInEDT_plugin_header_text_host(selectedItem.getDisplayName()));
+                            header.setIcon(fav);
                         } else {
-                            header.setVisible(false);
+                            header.setText(_GUI.T.PluginSettingsPanel_runInEDT_plugin_header_text_decrypt(selectedItem.getDisplayName()));
+                            if (fav == null) {
+                                header.setIcon(decryterIcon);
+                            } else {
+                                final Icon ret = new ExtMergedIcon(fav) {
+                                    @Override
+                                    protected void idIconCheck(Entry entry) {
+                                    };
+                                }.add(decryterIcon, 6, 6);
+                                header.setIcon(ret);
+                            }
                         }
+                        header.setVisible(true);
                     }
                 } catch (UpdateRequiredClassNotFoundException e) {
                     logger.log(e);
@@ -412,7 +398,6 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
         public boolean getScrollableTracksViewportWidth() {
             Container p = getParent();
             if (p.getSize().width < getMinimumSize().width) {
-                // enable horizontal scrolling if the viewport size is less than the minimum panel size
                 return false;
             }
             return true;
@@ -428,7 +413,6 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
         ret.setLayout(new MigLayout("ins 0", "[grow,fill]", "[grow,fill]"));
         ret.add(createConfigPanel);
         sp = new JScrollPane(ret);
-        // sp.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         sp.getVerticalScrollBar().setUnitIncrement(24);
         sp.setBorder(null);
         sp.setOpaque(false);

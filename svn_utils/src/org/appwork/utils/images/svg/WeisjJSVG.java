@@ -83,16 +83,8 @@ public class WeisjJSVG {
                 scaleHeight = scaleWidth;
                 final int width = Math.max((int) (size.getWidth() * scaleWidth), 1);
                 final int height = Math.max((int) (size.getHeight() * scaleHeight), 1);
-                int x = 0;
-                int y = 0;
-                // this centers the image in the new viewport.
-                x += (w - width) / 2;
-                y += (h - height) / 2;
                 final BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
                 final Graphics2D g = bi.createGraphics();
-                if (x != 0 || y != 0) {
-                    g.translate(x, y);
-                }
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
@@ -118,14 +110,14 @@ public class WeisjJSVG {
      * @param height
      * @return
      */
-    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height) {
+    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int w, int h) {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
             final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream, base, createLoaderContext());
             if (svgDocument == null) {
                 return null;
             }
-            return new SVGIcon(width, height) {
+            return new SVGIcon(w, h) {
                 /**
                  * @see org.appwork.utils.images.svg.SVGIcon#getIconHeight()
                  */
@@ -158,25 +150,23 @@ public class WeisjJSVG {
                  * @see org.appwork.utils.images.svg.SVGIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
                  */
                 @Override
-                public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {
+                public void paintIcon(Component c, Graphics g1D, int x, int y, int w, int h) {
                     final FloatSize size = svgDocument.size();
-                    if (width <= 0) {
-                        width = (int) size.getWidth();
+                    if (w <= 0) {
+                        w = (int) size.getWidth();
                     }
-                    if (height <= 0) {
-                        height = (int) size.getHeight();
+                    if (h <= 0) {
+                        h = (int) size.getHeight();
                     }
                     final double scaleWidth;
                     final double scaleHeight;
-                    scaleWidth = 1d / Math.max(size.getWidth() / width, size.getHeight() / height);
+                    scaleWidth = 1d / Math.max(size.getWidth() / w, size.getHeight() / h);
                     scaleHeight = scaleWidth;
-                    int orgWidth = width;
-                    int orgHeight = height;
-                    width = Math.max((int) Math.round(size.getWidth() * scaleWidth), 1);
-                    height = Math.max((int) Math.round(size.getHeight() * scaleHeight), 1);
+                    int width = Math.max((int) Math.round(size.getWidth() * scaleWidth), 1);
+                    int height = Math.max((int) Math.round(size.getHeight() * scaleHeight), 1);
                     // this centers the image in the new viewport.
-                    x += (orgWidth - width) / 2;
-                    y += (orgHeight - height) / 2;
+                    x += (w - width) / 2;
+                    y += (h - height) / 2;
                     final Graphics2D g = (Graphics2D) g1D.create();
                     RenderingHints restoreHints = g.getRenderingHints();
                     AffineTransform restoreTransform = g.getTransform();

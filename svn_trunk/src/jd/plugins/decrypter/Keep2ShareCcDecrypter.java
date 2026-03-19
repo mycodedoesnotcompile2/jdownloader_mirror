@@ -23,10 +23,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -40,10 +43,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.K2SApi;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.HexFormatter;
 import org.jdownloader.plugins.components.config.Keep2shareConfig;
 import org.jdownloader.plugins.components.config.Keep2shareConfig.FileLinkAddMode;
 
-@DecrypterPlugin(revision = "$Revision: 52482 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52517 $", interfaceVersion = 2, names = {}, urls = {})
 public class Keep2ShareCcDecrypter extends PluginForDecrypt {
     public Keep2ShareCcDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -175,106 +180,109 @@ public class Keep2ShareCcDecrypter extends PluginForDecrypt {
                 /* If we reach this line this means we found at least one file that is online. */
                 return ret;
             }
-        FilePackage fp = null;
-        String thisFolderTitle = null;
-        final Set<String> dupes = new HashSet<String>();
-        final int maxItemsPerPage = 50;
-        int offset = 0;
-        int page = 1;
-        boolean isSingleFile = false;
-        String sourceFileID = null;
-        String path = this.getAdoptedCloudFolderStructure();
-        do {
-            final Map<String, Object> postdataGetfilestatus = new HashMap<String, Object>();
-            postdataGetfilestatus.put("id", contentid);
-            postdataGetfilestatus.put("limit", maxItemsPerPage);
-            postdataGetfilestatus.put("offset", offset);
-            response = plugin.postPageRaw(br, "/getfilestatus", postdataGetfilestatus, null);
-            items = (List<Map<String, Object>>) response.get("files");
-            if (items == null && response.containsKey("is_available") && !response.containsKey("id")) {
-                /* Root map contains single loose file. */
-                isSingleFile = true;
-                sourceFileID = contentid;
-                items = new ArrayList<Map<String, Object>>();
-                items.add(response);
-            } else {
-                /* Root map is folder containing files */
-                if (fp == null) {
-                    fp = FilePackage.getInstance();
-                    thisFolderTitle = response.get("name").toString();
-                    if (path == null) {
-                        path = thisFolderTitle;
-                    } else {
-                        path += "/" + thisFolderTitle;
-                    }
-                    fp.setName(path);
+            FilePackage fp = null;
+            String thisFolderTitle = null;
+            final Set<String> dupes = new HashSet<String>();
+            final int maxItemsPerPage = 50;
+            int offset = 0;
+            int page = 1;
+            boolean isSingleFile = false;
+            String sourceFileID = null;
+            String path = this.getAdoptedCloudFolderStructure();
+            do {
+                final Map<String, Object> postdataGetfilestatus = new HashMap<String, Object>();
+                postdataGetfilestatus.put("id", contentid);
+                postdataGetfilestatus.put("limit", maxItemsPerPage);
+                postdataGetfilestatus.put("offset", offset);
+                response = plugin.postPageRaw(br, "/getfilestatus", postdataGetfilestatus, null);
+                items = (List<Map<String, Object>>) response.get("files");
+                if ((items == null || items.size() == 0) && Boolean.TRUE.equals(response.get("is_available")) && Boolean.TRUE.equals(response.get("is_folder"))) {
+                    items = listV1Files(contentid);
                 }
-            }
-            if (items.isEmpty()) {
-                if (ret.isEmpty()) {
-                    if (thisFolderTitle != null) {
-                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, contentid + "_" + thisFolderTitle);
-                    } else {
-                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, contentid);
-                    }
+                if (items == null && response.containsKey("is_available") && !response.containsKey("id")) {
+                    /* Root map contains single loose file. */
+                    isSingleFile = true;
+                    sourceFileID = contentid;
+                    items = new ArrayList<Map<String, Object>>();
+                    items.add(response);
                 } else {
-                    logger.info("Stopping because: Failed to find any items on current page");
+                    /* Root map is folder containing files */
+                    if (fp == null) {
+                        fp = FilePackage.getInstance();
+                        thisFolderTitle = response.get("name").toString();
+                        if (path == null) {
+                            path = thisFolderTitle;
+                        } else {
+                            path += "/" + thisFolderTitle;
+                        }
+                        fp.setName(path);
+                    }
+                }
+                if (items.isEmpty()) {
+                    if (ret.isEmpty()) {
+                        if (thisFolderTitle != null) {
+                            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, contentid + "_" + thisFolderTitle);
+                        } else {
+                            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, contentid);
+                        }
+                    } else {
+                        logger.info("Stopping because: Failed to find any items on current page");
+                        break;
+                    }
+                }
+                int numberofNewItems = 0;
+                for (final Map<String, Object> item : items) {
+                    final String id;
+                    if (isSingleFile) {
+                        id = contentid;
+                    } else {
+                        id = item.get("id").toString();
+                    }
+                    if (!dupes.add(id)) {
+                        continue;
+                    }
+                    numberofNewItems++;
+                    final String filenameOrFoldername = (String) item.get("name");
+                    final DownloadLink result;
+                    if (Boolean.TRUE.equals(item.get("is_folder")) || "folder".equals(item.get("type"))) {
+                        /* Folder */
+                        result = createDownloadlink(generateFolderUrl(id, filenameOrFoldername, referer));
+                    } else {
+                        /* File */
+                        result = createDownloadlink(generateFileUrl(id, filenameOrFoldername, referer));
+                        plugin.parseFileInfo(result, item, sourceFileID);
+                        if (!result.isNameSet()) {
+                            /* Fallback */
+                            result.setName(id);
+                        }
+                        if (fp != null) {
+                            result._setFilePackage(fp);
+                        }
+                    }
+                    if (path != null) {
+                        result.setRelativeDownloadFolderPath(path);
+                    }
+                    ret.add(result);
+                    distribute(result);
+                }
+                logger.info("Crawled page " + page + " | Offset: " + offset + " | New items this page: " + numberofNewItems + " | Found items so far: " + ret.size());
+                if (this.isAbort()) {
+                    logger.info("Stopping because: Aborted by user");
                     break;
-                }
-            }
-            int numberofNewItems = 0;
-            for (final Map<String, Object> item : items) {
-                final String id;
-                if (isSingleFile) {
-                    id = contentid;
+                } else if (isSingleFile) {
+                    logger.info("Stopping because: This item is a single file");
+                    break;
+                } else if (numberofNewItems == 0) {
+                    logger.info("Stopping because: Failed to find any new items on current page: " + page);
+                    break;
+                } else if (numberofNewItems < maxItemsPerPage) {
+                    logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
+                    break;
                 } else {
-                    id = item.get("id").toString();
+                    offset += maxItemsPerPage;
+                    page++;
                 }
-                if (!dupes.add(id)) {
-                    continue;
-                }
-                numberofNewItems++;
-                final String filenameOrFoldername = (String) item.get("name");
-                final DownloadLink result;
-                if (Boolean.TRUE.equals(item.get("is_folder"))) {
-                    /* Folder */
-                    result = createDownloadlink(generateFolderUrl(id, filenameOrFoldername, referer));
-                } else {
-                    /* File */
-                    result = createDownloadlink(generateFileUrl(id, filenameOrFoldername, referer));
-                    plugin.parseFileInfo(result, item, sourceFileID);
-                    if (!result.isNameSet()) {
-                        /* Fallback */
-                        result.setName(id);
-                    }
-                    if (fp != null) {
-                        result._setFilePackage(fp);
-                    }
-                }
-                if (path != null) {
-                    result.setRelativeDownloadFolderPath(path);
-                }
-                ret.add(result);
-                distribute(result);
-            }
-            logger.info("Crawled page " + page + " | Offset: " + offset + " | New items this page: " + numberofNewItems + " | Found items so far: " + ret.size());
-            if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break;
-            } else if (isSingleFile) {
-                logger.info("Stopping because: This item is a single file");
-                break;
-            } else if (numberofNewItems == 0) {
-                logger.info("Stopping because: Failed to find any new items on current page: " + page);
-                break;
-            } else if (numberofNewItems < maxItemsPerPage) {
-                logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
-                break;
-            } else {
-                offset += maxItemsPerPage;
-                page++;
-            }
-        } while (!this.isAbort());
+            } while (!this.isAbort());
         } catch (final PluginException e) {
             if (br.getHttpConnection().getResponseCode() == 400) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid fileID");
@@ -286,6 +294,61 @@ public class Keep2ShareCcDecrypter extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Private file which only the owner can download");
             } else {
                 throw e;
+            }
+        }
+        return ret;
+    }
+
+    public static AtomicBoolean LIST_V1_AVAILABLE = new AtomicBoolean(true);
+    private Browser             v1BrowserInstance = null;
+
+    private List<Map<String, Object>> listV1Files(String folderid) throws Exception {
+        if (LIST_V1_AVAILABLE.get() == false) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        Browser br = v1BrowserInstance;
+        token: if (br == null) {
+            br = this.br.createNewBrowserInstance();
+            final Map<String, Object> json = new HashMap<String, Object>();
+            json.put("client_id", "k2s_web_app");
+            json.put("client_secret", new String(HexFormatter.hexToByteArray("706A633870795A76377668736365786570464E7A6D753450"), "UTF-8"));
+            json.put("grant_type", "client_credentials");
+            final PostRequest token = br.createJSonPostRequest("https://api.k2s.cc/v1/auth/token", json);
+            br.getPage(token);
+            if (br.getRequest().getHttpConnection().getResponseCode() == 401) {
+                LIST_V1_AVAILABLE.set(false);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            v1BrowserInstance = br;
+        }
+        final List<Map<String, Object>> ret = new ArrayList<Map<String, Object>>();
+        final int limit = 50;
+        int offset = 0;
+        Number total = null;
+        pagination: while (true) {
+            br.getPage("https://api.k2s.cc/v1/files?limit=" + limit + "&offset=" + offset + "&sort=name&folderId=" + folderid + "&withFolders=true");
+            final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            total = total != null ? total : (Number) response.get("total");
+            final List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
+            if (items == null || items.size() == 0) {
+                break pagination;
+            }
+            for (Map<String, Object> item : items) {
+                if (!item.containsKey("is_available")) {
+                    final Boolean isDeleted = (Boolean) item.get("isDeleted");
+                    item.put("is_available", !Boolean.TRUE.equals(isDeleted));
+                }
+                if ("folder".equals(item.get("type"))) {
+                    item.put("is_folder", Boolean.TRUE);
+                }
+            }
+            ret.addAll(items);
+            if (isAbort()) {
+                break pagination;
+            } else if (total != null && ret.size() >= total.intValue()) {
+                break pagination;
+            } else {
+                offset += items.size();
             }
         }
         return ret;

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -919,6 +920,20 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
     public void onLinkCrawlerFinished() {
     }
 
+    private static final WeakHashMap<JobLinkCrawler, CrawlerJobHolderSandbox> CRAWLERJOBHOLDERSANDBOX_CACHE = new WeakHashMap<LinkCollector.JobLinkCrawler, CrawlerJobHolderSandbox>();
+
+    public static CrawlerJobHolderSandbox get(JobLinkCrawler linkCrawler) {
+        synchronized (CRAWLERJOBHOLDERSANDBOX_CACHE) {
+            CrawlerJobHolderSandbox ret = CRAWLERJOBHOLDERSANDBOX_CACHE.get(linkCrawler);
+            if (ret != null) {
+                return ret;
+            }
+            ret = new CrawlerJobHolderSandbox(linkCrawler);
+            CRAWLERJOBHOLDERSANDBOX_CACHE.put(linkCrawler, ret);
+            return ret;
+        }
+    }
+
     @Override
     public void onLinkCrawlerEvent(LinkCrawlerEvent event) {
         if (LinkCrawlerEvent.Type.FINISHED.equals(event.getType())) {
@@ -932,7 +947,7 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
                     try {
                         final HashMap<String, Object> props = new HashMap<String, Object>();
                         if (crawlerJobHolderSandbox == null) {
-                            crawlerJobHolderSandbox = new CrawlerJobHolderSandbox((JobLinkCrawler) lc);
+                            crawlerJobHolderSandbox = get((JobLinkCrawler) lc);
                         }
                         props.put("crawler", crawlerJobHolderSandbox);
                         runScript(script, props);

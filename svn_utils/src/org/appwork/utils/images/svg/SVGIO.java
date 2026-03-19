@@ -128,9 +128,6 @@ public class SVGIO {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
                 g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                int x = 0;
-                int y = 0;
-                g.translate(x, y);
                 final Rectangle2D.Double rect = new Rectangle2D.Double();
                 diagram.getViewRect(rect);
                 final AffineTransform scaleXform = new AffineTransform();
@@ -199,19 +196,21 @@ public class SVGIO {
                  * @see org.appwork.utils.images.svg.SVGIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
                  */
                 @Override
-                public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {
-                    if (width <= 0) {
-                        width = (int) diagram.getWidth();
+                public void paintIcon(Component c, Graphics g1D, int x, int y, int w, int h) {
+                    if (w <= 0) {
+                        w = (int) diagram.getWidth();
                     }
-                    if (height <= 0) {
-                        height = (int) diagram.getHeight();
+                    if (h <= 0) {
+                        h = (int) diagram.getHeight();
                     }
-                    final double faktor = 1d / Math.max((double) diagram.getWidth() / width, (double) diagram.getHeight() / height);
-                    width = Math.max((int) (diagram.getWidth() * faktor), 1);
-                    height = Math.max((int) (diagram.getHeight() * faktor), 1);
+                    final double faktor = 1d / Math.max((double) diagram.getWidth() / w, (double) diagram.getHeight() / h);
+                    int width = Math.max((int) (diagram.getWidth() * faktor), 1);
+                    int height = Math.max((int) (diagram.getHeight() * faktor), 1);
                     final Graphics2D g = (Graphics2D) g1D;
                     RenderingHints restoreHints = g.getRenderingHints();
                     AffineTransform restoreTransform = g.getTransform();
+                    x += (w - width) / 2;
+                    y += (h - height) / 2;
                     try {
                         g.translate(x, y);
                         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

@@ -19,7 +19,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = {}, urls = {})
 public class JoyReactor extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -68,7 +68,7 @@ public class JoyReactor extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         Set<String> directURLs = new HashSet<String>();
-        String urls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/full/.*?(jpe?g|png|gif|webp))").getColumn(0);
+        String urls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/(?:full/)?.*?(jpe?g|png|gif|webp))").getColumn(0);
         if (urls != null) {
             directURLs.addAll(Arrays.asList(urls));
         }
@@ -102,8 +102,10 @@ public class JoyReactor extends PluginForDecrypt {
             /* Fallback */
             fp.setName(br._getURL().getPath());
         }
+        final String host = br.getHost();
         for (final String url : directURLs) {
             final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getURL(url).toExternalForm()));
+            file.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, host);
             file.setAvailable(true);
             /* Important otherwise some direct-urls may not work. */
             file.setReferrerUrl(br.getURL());

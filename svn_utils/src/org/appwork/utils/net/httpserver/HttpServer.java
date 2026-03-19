@@ -139,8 +139,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
      * </p>
      */
     private long                                           threadPoolKeepAliveTime    = 10000L;
-
-    private volatile SocketAddressValidator                 socketAddressValidator     = DefaultSocketAddressValidator.get();
+    private volatile SocketAddressValidator                socketAddressValidator     = DefaultSocketAddressValidator.get();
 
     public HttpServer(final int port) {
         super("AppWork GmbH HttpServer");
@@ -330,15 +329,15 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                 final Thread controlSocketThread = new Thread(Thread.currentThread().getName() + ":Listener:" + controlSocket.getLocalSocketAddress()) {
                     @Override
                     public void run() {
-                        while (HttpServer.this.controlSockets.get() == controlSockets) {
+                        connectionLoop: while (HttpServer.this.controlSockets.get() == controlSockets) {
                             try {
                                 final long beforeAcceptTime = Time.systemIndependentCurrentJVMTimeMillis();
                                 if (HttpServer.this.verboseLog) {
                                     LogV3.fine("HttpServer: Waiting for connection on " + controlSocket.getLocalSocketAddress());
                                 }
                                 final Socket clientSocket = controlSocket.accept();
-                                final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
                                 if (HttpServer.this.verboseLog) {
+                                    final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
                                     LogV3.fine("HttpServer: Connection accepted from " + clientSocket.getRemoteSocketAddress() + " after SocketIDLE " + acceptElapsed + "ms");
                                 }
                                 boolean closeSocket = true;
@@ -347,48 +346,39 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                         LogV3.fine("HttpServer: Run socket address validator");
                                     }
                                     final SocketAddressValidator validator = HttpServer.this.getSocketAddressValidator();
-                                    boolean allowed = true;
-                                    if (validator != null) {
-                                        try {
-                                            allowed = validator.isAllowed(clientSocket, HttpServer.this);
-                                        } catch (final IOException e) {
-                                            LogV3.log(e);
+                                    boolean allowed = false;
+                                    try {
+                                        allowed = validator == null || validator.isAllowed(clientSocket, HttpServer.this);
+                                    } catch (final IOException e) {
+                                        LogV3.log(e);
+                                        if (HttpServer.this.verboseLog) {
                                             LogV3.warning("Security: Socket address validator threw IOException, rejecting connection | Remote: " + clientSocket.getRemoteSocketAddress());
-                                            allowed = false;
                                         }
                                     }
                                     if (!allowed) {
                                         if (HttpServer.this.verboseLog) {
                                             LogV3.fine("HttpServer: Rejected Connection. socket address validator returned false");
+                                            LogV3.warning("Security: Untrusted IPC remote rejected | Remote: " + clientSocket.getRemoteSocketAddress() + " | Closing connection without response");
                                         }
-                                        LogV3.warning("Security: Untrusted IPC remote rejected | Remote: " + clientSocket.getRemoteSocketAddress() + " | Closing connection without response");
-                                        try {
-                                            clientSocket.close();
-                                        } catch (final Throwable ignore) {
-                                        }
-                                        closeSocket = false;
-                                        continue;
-                                    }
-                                    if (HttpServer.this.verboseLog) {
+                                        continue connectionLoop;
+                                    } else if (HttpServer.this.verboseLog) {
                                         LogV3.fine("HttpServer: socket address validator: OK");
                                     }
                                     final long createConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                     final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
-                                    final long createConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - createConnectionStartTime;
                                     if (HttpServer.this.verboseLog) {
+                                        final long createConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - createConnectionStartTime;
                                         LogV3.fine("HttpServer: createHttpConnection completed in " + createConnectionElapsed + "ms");
                                     }
                                     if (connection != null) {
                                         final long executeStartTime = Time.systemIndependentCurrentJVMTimeMillis();
                                         threadPool.execute(connection);
-                                        final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
                                         if (HttpServer.this.verboseLog) {
+                                            final long executeElapsed = Time.systemIndependentCurrentJVMTimeMillis() - executeStartTime;
                                             LogV3.fine("HttpServer: threadPool.execute() completed in " + executeElapsed + "ms");
                                         }
                                         closeSocket = false;
                                     }
-                                } catch (final RejectedExecutionException e) {
-                                    LogV3.log(e);
                                 } catch (final Throwable e) {
                                     LogV3.log(e);
                                 } finally {

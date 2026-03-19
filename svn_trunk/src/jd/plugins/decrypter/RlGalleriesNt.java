@@ -21,13 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,7 +36,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52503 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52513 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,22 +140,22 @@ public class RlGalleriesNt extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 String finallink = findFinallink(br);
-                Form form = null;
+                Form captchaForm = null;
                 final Form[] forms = br.getForms();
                 if (forms != null && forms.length > 0) {
-                    for (final Form thisform : br.getForms()) {
+                    for (final Form thisform : forms) {
                         if (thisform.containsHTML(">\\s*Continue")) {
-                            form = thisform;
+                            captchaForm = thisform;
                             break;
                         }
                     }
                 }
-                handleCaptcha: if (finallink == null && form != null) {
+                handleCaptcha: if (finallink == null && captchaForm != null) {
                     logger.info("Captcha required");
                     final String previous_path = br._getURL().getPath();
                     final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
-                    form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
-                    br.submitForm(form);
+                    captchaForm.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                    br.submitForm(captchaForm);
                     final String redirect = br.getRedirectLocation();
                     if (redirect == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

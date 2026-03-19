@@ -29,6 +29,18 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
@@ -54,19 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
-@HostPlugin(revision = "$Revision: 51532 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52518 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepositFiles extends antiDDoSForHost {
     public static AtomicReference<String>          MAINPAGE = new AtomicReference<String>();
     /* don't touch the following! */
@@ -450,7 +450,7 @@ public class DepositFiles extends antiDDoSForHost {
                 /* Long wait -> IP limit reached */
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, preDownloadWaittimeMillis);
             }
-            final boolean isCloudflareTurnstileCaptcha = true; // TODO: add autodetect support
+            final boolean isCloudflareTurnstileCaptcha = true; // TODO: add auto detection
             final CaptchaHosterHelperInterface captchaHelper;
             if (isCloudflareTurnstileCaptcha) {
                 /* 2025-09-18 */
@@ -883,8 +883,8 @@ public class DepositFiles extends antiDDoSForHost {
             }
             saveAccountData(accountData, account);
             /**
-             * We can't validate logins so we always need to generate a fresh token. </br> API will request login captchas if we're doing
-             * this too frequently.
+             * We can't validate logins so we always need to generate a fresh token. </br>
+             * API will request login captchas if we're doing this too frequently.
              */
             account.setRefreshTimeout(5 * 60 * 60 * 1000l);
         } catch (final PluginException e) {

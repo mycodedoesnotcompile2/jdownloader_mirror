@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 52102 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52521 $", interfaceVersion = 3, names = {}, urls = {})
 public class KinoxTo extends PluginForDecrypt {
     public KinoxTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class KinoxTo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         final String[] names = new String[] { "kinos", "kinox", "kinoy", "kinoz" };
-        final String[] tlds = new String[] { "af", "ai", "am", "click", "cloud", "club", "digital", "direct", "express", "fan", "fun", "fyi", "gratis", "gs", "gy", "io", "li", "lol", "me", "mobi", "ms", "nu", "pe", "party", "pub", "sg", "si", "space", "sx", "tel", "to", "tube", "tv", "wtf" };
+        final String[] tlds = new String[] { "af", "ai", "am", "click", "cloud", "club", "digital", "direct", "express", "fan", "fun", "fyi", "gratis", "gs", "gy", "io", "li", "lol", "me", "mobi", "ms", "nu", "pe", "party", "pub", "sg", "si", "space", "sx", "tel", "to", "tube", "tv", "wtf", "salon" };
         final String[] stringarray = new String[names.length * tlds.length];
         int index = 0;
         for (final String name : names) {

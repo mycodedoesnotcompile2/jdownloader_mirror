@@ -114,7 +114,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52523 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -161,7 +161,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     public static final Pattern PATTERN_ENCRYPTION_KEY_URL    = Pattern.compile("[a-zA-Z0-9_-]{43}");
     public static final Pattern PATTERN_ENCRYPTION_KEY        = Pattern.compile("[a-zA-Z0-9+/]{43}");
     public static final Pattern PATTERN_FILE_OLD              = Pattern.compile("(?:#|%23)!([A-Za-z0-9]+)(!([a-zA-Z0-9_-]+))?");
-    public static final Pattern PATTERN_FILE_NEW              = Pattern.compile("(embed|file)/([a-zA-Z0-9]+)((?:#|%23)([a-zA-Z0-9_-]+))?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_FILE_NEW              = Pattern.compile("(embed|file)/!?([a-zA-Z0-9]+)((?:#|%23|!)([a-zA-Z0-9_-]+))?", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_FILE_IN_FOLDER        = Pattern.compile("folder/([a-zA-Z0-9]+)(?:#|%23)([a-zA-Z0-9_-]+)/file/([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
     /**
      * e.g. mipony, see https://board.jdownloader.org/showpost.php?p=537735&postcount=49

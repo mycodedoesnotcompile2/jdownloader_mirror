@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigFastfileCc;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -33,7 +29,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52503 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigFastfileCc;
+
+@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 3, names = {}, urls = {})
 public class FastfileCc extends XFileSharingProBasic {
     public FastfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +105,7 @@ public class FastfileCc extends XFileSharingProBasic {
     // concurrent
     // connections in total.
     private int getMaxDownloadSelect() {
-        return PluginJsonConfig.get(this.getConfigInterface()).getMaxSimultaneousFreeDownloads();
+        return get(this.getConfigInterface()).getMaxSimultaneousFreeDownloads();
     }
 
     @Override

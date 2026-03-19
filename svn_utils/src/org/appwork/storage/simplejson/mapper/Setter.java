@@ -89,7 +89,7 @@ public class Setter implements GetterOrSetter {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override
@@ -115,11 +115,9 @@ public class Setter implements GetterOrSetter {
             parameter = Enum.valueOf((Class<Enum>) this.type, parameter + "");
             DebugMode.logInIDEOnly(new Exception("This should not happen! This is job of the mapper"));
         }
-        // System.out.println(this.key + " = " + parameter + " " + this.type);
         try {
             this.method.invoke(inst, parameter);
         } catch (final IllegalArgumentException e) {
-            // LogV3.severe(this.method + " " + parameter + " ->" + (parameter == null ? "null" : parameter.getClass()));
             throw e;
         }
     }

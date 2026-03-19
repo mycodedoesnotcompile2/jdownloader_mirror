@@ -49,6 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DailyMotionCom;
+import jd.plugins.hoster.PornHubCom;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -59,7 +60,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52435 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,6 +85,13 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
     @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        PornHubCom.setSSLSocketStreamOptions(br);
+        return br;
     }
 
     @SuppressWarnings("deprecation")
@@ -572,6 +580,9 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             }
             brc.setFollowRedirects(true);
             brc.getPage(hlsMaster);
+            if (brc.getRequest().getHttpConnection().getResponseCode() == 403) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             final ArrayList<DownloadLink> selectedFoundQualities = new ArrayList<DownloadLink>();
             final List<HlsContainer> hlsqualities = HlsContainer.getHlsQualities(brc);
             DownloadLink bestQuality = null;
@@ -603,9 +614,9 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                     selectedFoundQualities.add(dl);
                 }
             }
-            if (best) {
+            if (best && bestQuality != null) {
                 ret.add(bestQuality);
-            } else if (selectedFoundQualities.isEmpty()) {
+            } else if (selectedFoundQualities.isEmpty() && bestQuality != null) {
                 logger.info("Fallback to BEST video quality because none of users selected qualities were found");
                 ret.add(bestQuality);
             } else {

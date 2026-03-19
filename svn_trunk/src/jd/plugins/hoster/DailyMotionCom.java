@@ -54,7 +54,7 @@ import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52435 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -442,6 +442,13 @@ public class DailyMotionCom extends PluginForHost {
                 return authCookie.getValue();
             }
         }
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        PornHubCom.setSSLSocketStreamOptions(br);
+        return br;
     }
 
     private void setGraphqlHeaders(final Browser br) {

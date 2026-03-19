@@ -42,7 +42,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51172 $", interfaceVersion = 3, names = { "bibeltv.de" }, urls = { "https?://(?:www\\.)?bibeltv\\.de/mediathek/(videos/crn/\\d+|videos/([a-z0-9\\-]+-\\d+|\\d+-[a-z0-9\\-]+))" })
+@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 3, names = { "bibeltv.de" }, urls = { "https?://(?:www\\.)?bibeltv\\.de/mediathek/(videos/crn/\\d+|videos/([a-z0-9\\-]+-\\d+|\\d+-[a-z0-9\\-]+))" })
 public class BibeltvDe extends PluginForHost {
     public BibeltvDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -399,7 +399,7 @@ public class BibeltvDe extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, hlsBest.getM3U8URL());
+            dl = new HLSDownloader(link, br, hlsBest.getStreamURL());
         } else {
             /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

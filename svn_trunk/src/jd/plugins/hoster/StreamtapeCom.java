@@ -24,6 +24,7 @@ import java.util.List;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -40,10 +41,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50177 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52518 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamtapeCom extends PluginForHost {
     public StreamtapeCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -76,9 +82,8 @@ public class StreamtapeCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
     // private static final boolean ACCOUNT_FREE_RESUME = true;
     // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
@@ -100,13 +105,15 @@ public class StreamtapeCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".mp4";
+    }
+
     /** 2020-04-21: They got an API which may be interesting for account support: https://streamtape.com/api */
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         final String extDefault = ".mp4";
-        if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + extDefault);
-        }
         this.setBrowserExclusive();
         this.br.setFollowRedirects(true);
         this.br.setAllowedResponseCodes(new int[] { 500 });
@@ -133,7 +140,7 @@ public class StreamtapeCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String titleSafe = br.getRegex("\"showtitle\":\"([^\"]+)").getMatch(0);
-        String title = this.br.getRegex("name=\"og:title\" content=\"([^<>\"]+)\"").getMatch(0);
+        String title = br.getRegex("name=\"og:title\" content=\"([^<>\"]+)\"").getMatch(0);
         if (titleSafe != null) {
             /* Safe source -> Set final filename */
             titleSafe = PluginJSonUtils.unescape(titleSafe);
@@ -145,7 +152,7 @@ public class StreamtapeCom extends PluginForHost {
             final String filename = this.applyFilenameExtension(title, extDefault);
             link.setName(filename);
         }
-        String filesize = this.br.getRegex("<p class=\"subheading\">([^<>\"]+)</p>").getMatch(0);
+        String filesize = br.getRegex("<p class=\"subheading\">([^<>\"]+)</p>").getMatch(0);
         if (filesize != null) {
             /* They're using different decimal separators than normal -> Fix that for our parser. */
             filesize = filesize.replace(",", "").replace(".", ",");
@@ -164,7 +171,7 @@ public class StreamtapeCom extends PluginForHost {
         String dllink = this.checkDirectLink(link, directlinkproperty);
         if (dllink == null) {
             /* 2021-01-04 cat/mouse */
-            dllink = this.br.getRegex("(id=[^\"'&]*&expires=\\d+&ip=[^\"'&]*&token=[^\"'&]*?)('|\"|<)").getMatch(0);
+            dllink = br.getRegex("(id=[^\"'&]*&expires=\\d+&ip=[^\"'&]*&token=[^\"'&]*?)('|\"|<)").getMatch(0);
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -172,7 +179,7 @@ public class StreamtapeCom extends PluginForHost {
             dllink = Encoding.htmlOnlyDecode(dllink);
             dllink = "//streamtape.com/get_video?" + dllink + "&stream=1";
             /* 2021-08-09: New attempt: Fix URL as we know that the "token" value may be wrong. */
-            final String correctedToken = this.br.getRegex("document\\.getElementById[^<]*\\&token=([A-Z0-9\\-_]+)").getMatch(0);
+            final String correctedToken = br.getRegex("document\\.getElementById[^<]*\\&token=([A-Z0-9\\-_]+)").getMatch(0);
             if (correctedToken != null) {
                 // final String urlWithoutParams = dllink.substring(0, dllink.lastIndexOf("?"));
                 final UrlQuery query = UrlQuery.parse(dllink);
@@ -242,14 +249,6 @@ public class StreamtapeCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return StreamtapeCom.FREE_MAXDOWNLOADS;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

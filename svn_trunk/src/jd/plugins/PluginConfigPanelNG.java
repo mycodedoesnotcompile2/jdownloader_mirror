@@ -127,13 +127,13 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         addGroup(new Group(title, regex, null));
     }
 
-    private static final String                     ACCOUNT  = "ACCOUNT";
+    private static final String                     ACCOUNT      = "ACCOUNT";
     private boolean                                 updateAccounts;
     private HashSet<Component>                      accountSettingsComponents;
     private Plugin                                  plugin;
-    private Object                                  translation;
-    private String                                  gapleft  = "0";
-    private String                                  gapright = "";
+    private final List<Object>                      translations = new ArrayList<Object>();
+    private String                                  gapleft      = "0";
+    private String                                  gapright     = "";
     private int                                     headerHight;
     private boolean                                 added;
     private PluginConfigPanelEventSenderEventSender eventSender;
@@ -673,15 +673,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                             final Map<String, Boolean> finalValue = value;
                             final MultiComboBox<String> comp = new MultiComboBox<String>(new ArrayList<String>(value.keySet())) {
                                 private final GenericConfigEventListener<Map<String, Boolean>> listener = new GenericConfigEventListener<Map<String, Boolean>>() {
-                                    @Override
-                                    public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
-                                    }
+                                                                                                            @Override
+                                                                                                            public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
+                                                                                                            }
 
-                                    @Override
-                                    public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
-                                        updateModel(newValue);
-                                    }
-                                };
+                                                                                                            @Override
+                                                                                                            public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
+                                                                                                                updateModel(newValue);
+                                                                                                            }
+                                                                                                        };
                                 {
                                     m.getEventSender().addListener(listener, true);
                                     updateModel(finalValue);
@@ -743,15 +743,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                         try {
                             final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                                 private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
-                                    @Override
-                                    public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
-                                    }
+                                                                                                 @Override
+                                                                                                 public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
+                                                                                                 }
 
-                                    @Override
-                                    public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
-                                        updateModel(newValue);
-                                    }
-                                };
+                                                                                                 @Override
+                                                                                                 public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                                                                                                     updateModel(newValue);
+                                                                                                 }
+                                                                                             };
                                 {
                                     Set<Enum> value = (Set<Enum>) m.getValue();
                                     if (value == null) {
@@ -833,24 +833,25 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
     }
 
     private String getTranslation(KeyHandler m, String ext) {
-        if (translation == null) {
+        if (translations.size() == 0) {
             return null;
         }
         String caseSensitiveGetter = m.getGetMethod().getName();
         if (caseSensitiveGetter.startsWith("is")) {
             caseSensitiveGetter = "get" + caseSensitiveGetter.substring(2);
         }
-        try {
-            Method method;
-            method = translation.getClass().getMethod(caseSensitiveGetter + ext, new Class[] {});
-            method.setAccessible(true);
-            return (String) method.invoke(translation, new Object[] {});
-        } catch (NoSuchMethodException e) {
-            if ("_label".equals(ext)) {
-                System.out.println("Missing Translation: " + translation.getClass().getName() + "." + caseSensitiveGetter + ext + "(){return ....}");
+        for (Object translation : translations) {
+            try {
+                final Method method = translation.getClass().getMethod(caseSensitiveGetter + ext, new Class[] {});
+                method.setAccessible(true);
+                return (String) method.invoke(translation, new Object[] {});
+            } catch (NoSuchMethodException ignore) {
+            } catch (Throwable e) {
+                LoggerFactory.getDefaultLogger().log(e);
             }
-        } catch (Throwable e) {
-            LoggerFactory.getDefaultLogger().log(e);
+        }
+        if ("_label".equals(ext)) {
+            System.out.println("Missing Translation: " + caseSensitiveGetter + ext + "(){return ....}");
         }
         return null;
     }
@@ -885,15 +886,38 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             LoggerFactory.getDefaultLogger().log(e);
             UIOManager.I().showException("Bad Plugin Config Interface. Contact Support.", e);
         }
-        try {
-            Field field = cfg._getStorageHandler().getConfigInterface().getField("TRANSLATION");
-            field.setAccessible(true);
-            translation = field.get(null);
-        } catch (NoSuchFieldException e) {
-            // ok
-        } catch (Throwable e) {
-            LoggerFactory.getDefaultLogger().log(e);
-            UIOManager.I().showException("Bad Plugin Config Interface. Contact Support.", e);
+        Class<? extends ConfigInterface> nextConfigInterface = cfg._getStorageHandler().getConfigInterface();
+        final Set<Class<? extends ConfigInterface>> parsed = new HashSet<Class<? extends ConfigInterface>>();
+        final List<Class<? extends ConfigInterface>> todo = new ArrayList<Class<? extends ConfigInterface>>();
+        todo.add(nextConfigInterface);
+        while (todo.size() > 0) {
+            try {
+                nextConfigInterface = todo.remove(0);
+                if (!parsed.add(nextConfigInterface)) {
+                    continue;
+                }
+                final Class<?>[] intfs = nextConfigInterface.getInterfaces();
+                for (Class<?> intf : intfs) {
+                    if (!ConfigInterface.class.isAssignableFrom(intf)) {
+                        continue;
+                    }
+                    if (PluginConfigInterface.class == intf || ConfigInterface.class == intf) {
+                        continue;
+                    }
+                    todo.add((Class<? extends ConfigInterface>) intf);
+                }
+                final Field field = nextConfigInterface.getField("TRANSLATION");
+                field.setAccessible(true);
+                final Object translation = field.get(null);
+                if (translation != null && !translations.contains(translation)) {
+                    translations.add(translation);
+                }
+            } catch (NoSuchFieldException e) {
+                // ok
+            } catch (Throwable e) {
+                LoggerFactory.getDefaultLogger().log(e);
+                UIOManager.I().showException("Bad Plugin Config Interface. Contact Support.", e);
+            }
         }
         Group defGroup = null;
         ArrayList<Group> finalGroups = new ArrayList<Group>();

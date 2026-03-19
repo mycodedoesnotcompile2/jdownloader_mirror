@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -36,7 +31,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52506 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52516 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidsonicNet extends PluginForHost {
     public VidsonicNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,9 +91,8 @@ public class VidsonicNet extends PluginForHost {
         final String fid = getFID(link);
         if (fid != null) {
             return this.getHost() + "://" + fid;
-        } else {
-            return super.getLinkID(link);
         }
+        return super.getLinkID(link);
     }
 
     private String getFID(final DownloadLink link) {
@@ -104,14 +103,6 @@ public class VidsonicNet extends PluginForHost {
         fid = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).getMatch(0);
         return fid;
     }
-    // @Override
-    // public boolean isResumeable(final DownloadLink link, final Account account) {
-    // return true;
-    // }
-    //
-    // public int getMaxChunks(final DownloadLink link, final Account account) {
-    // return 0;
-    // }
 
     @Override
     protected String getDefaultFileName(DownloadLink link) {
@@ -144,31 +135,32 @@ public class VidsonicNet extends PluginForHost {
         requestFileInformation(link);
         /* Access embed page */
         br.getPage("/e/" + this.getFID(link));
-        final String encoded_url = br.getRegex("const _0x1 = '([^']+)").getMatch(0);
+        final String encoded_url = br.getRegex("const _0x1\\s*=\\s*'([^']+)").getMatch(0);
         if (encoded_url == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String hls_master = decodeVideoUrl(encoded_url);
-        if (!StringUtils.startsWithCaseInsensitive(hls_master, "http")) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid decoded videourl");
-        }
         br.getPage(hls_master);
         final HlsContainer hlsBest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
         if (hlsBest == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         checkFFmpeg(link, "Download a HLS Stream");
-        dl = new HLSDownloader(link, br, hlsBest.getM3U8URL());
+        dl = new HLSDownloader(link, br, hlsBest.getStreamURL());
         dl.startDownload();
     }
 
-    private static String decodeVideoUrl(String encoded) {
-        String hex = encoded.replace("|", "");
-        StringBuilder ascii = new StringBuilder();
+    private static String decodeVideoUrl(String encoded) throws PluginException {
+        final String hex = encoded.replace("|", "");
+        final StringBuilder ascii = new StringBuilder();
         for (int i = 0; i < hex.length(); i += 2) {
             ascii.append((char) Integer.parseInt(hex.substring(i, i + 2), 16));
         }
-        return ascii.reverse().toString();
+        final String ret = ascii.reverse().toString();
+        if (!StringUtils.startsWithCaseInsensitive(ret, "http")) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid decoded videourl");
+        }
+        return ret;
     }
 
     @Override

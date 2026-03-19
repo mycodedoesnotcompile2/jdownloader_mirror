@@ -552,8 +552,8 @@ public class FavIcons {
     private static BufferedImage returnBestImage(List<BufferedImage> images) {
         if (images != null && images.size() > 0) {
             BufferedImage ret = null;
-            int size = -1;
-            int colors = -1;
+            int bestSize = -1;
+            int bestColors = -1;
             for (final BufferedImage img : images) {
                 /*
                  * remove transparent area
@@ -564,10 +564,10 @@ public class FavIcons {
                  */
                 if (croppedImage == null) {
                     continue;
-                } else if (ret == null || (croppedImage.getHeight() * croppedImage.getWidth()) > size || countColors(croppedImage) > colors) {
+                } else if (ret == null || (croppedImage.getHeight() * croppedImage.getWidth()) > bestSize || countColors(croppedImage) > bestColors) {
                     ret = croppedImage;
-                    size = ret.getHeight() * ret.getWidth();
-                    colors = countColors(ret);
+                    bestSize = ret.getHeight() * ret.getWidth();
+                    bestColors = countColors(ret);
                 }
             }
             if (ret != null && ret.getHeight() > 1 && ret.getWidth() > 1) {

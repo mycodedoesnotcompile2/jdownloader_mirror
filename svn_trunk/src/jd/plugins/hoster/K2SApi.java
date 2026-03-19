@@ -71,7 +71,7 @@ import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 52476 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -283,7 +283,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 52476 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 52513 $"));
     }
 
     /**
@@ -560,10 +560,10 @@ public abstract class K2SApi extends PluginForHost {
             /* ID from URL is special fileID -> Find internal/"real" fileID as we use this for better dupe-checking. */
             link.setProperty(PROPERTY_FILE_ID, id);
         }
-        if (Boolean.TRUE.equals(fileInfo.get("is_available"))) {
-            link.setAvailable(true);
-        } else {
+        if (Boolean.FALSE.equals(fileInfo.get("is_available")) || Boolean.TRUE.equals(fileInfo.get("isDeleted"))) {
             link.setAvailable(false);
+        } else {
+            link.setAvailable(true);
         }
         String name = (String) fileInfo.get("name");
         if (name != null && name.matches(".*=(\\?|_)utf-8(\\?|_).+")) {

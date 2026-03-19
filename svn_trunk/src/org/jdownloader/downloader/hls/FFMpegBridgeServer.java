@@ -66,6 +66,7 @@ public class FFMpegBridgeServer extends HttpServer {
         CorsHandler corsHandler = new CorsHandler();
         corsHandler.setAllowMethods();
         corsHandler.setMaxAge(TimeUnit.MINUTES.toSeconds(30)); // 30 minutes
+        setSocketAddressValidator(null);
         setCorsHandler(corsHandler);
     }
 }

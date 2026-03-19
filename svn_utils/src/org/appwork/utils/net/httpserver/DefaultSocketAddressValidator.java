@@ -33,23 +33,24 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver;
 
+import org.appwork.JNAHelper;
 import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.os.DesktopSupportWindows;
 
 /**
- * Factory for the default {@link SocketAddressValidator} depending on the operating system.
- * On Windows returns a validator that enforces same-user and elevation rules for IPC; on other OS returns {@link RejectLoopbackSocketAddressValidator} (reject loopback only; when bound to localhost all connections are loopback and rejected, when not bound to localhost none are loopback and all are allowed).
+ * Factory for the default {@link SocketAddressValidator} depending on the operating system. On Windows returns a validator that enforces
+ * same-user and elevation rules for IPC; on other OS returns {@link RejectLoopbackSocketAddressValidator} (reject loopback only; when bound
+ * to localhost all connections are loopback and rejected, when not bound to localhost none are loopback and all are allowed).
  */
 public final class DefaultSocketAddressValidator {
-
     private DefaultSocketAddressValidator() {
     }
 
     /**
-     * @return OS-specific validator: on Windows {@link WindowsTrustedIPCSocketAddressValidator}, otherwise {@link RejectLoopbackSocketAddressValidator}
+     * @return OS-specific validator: on Windows {@link WindowsTrustedIPCSocketAddressValidator}, otherwise
+     *         {@link RejectLoopbackSocketAddressValidator}
      */
     public static SocketAddressValidator get() {
-        if (CrossSystem.getDesktopSupport() instanceof DesktopSupportWindows) {
+        if (CrossSystem.isWindows() && JNAHelper.isJNAAvailable()) {
             return new WindowsTrustedIPCSocketAddressValidator();
         }
         return new RejectLoopbackSocketAddressValidator();

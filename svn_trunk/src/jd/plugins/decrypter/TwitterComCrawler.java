@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51929 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52519 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -1591,37 +1591,42 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid API response");
             }
         }
+        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
         final Object errorsO = entries.get("errors");
-        if (errorsO != null) {
+        if (errorsO instanceof List && (data == null || data.isEmpty())) {
             final List<Map<String, Object>> errors = (List<Map<String, Object>>) errorsO;
             for (final Map<String, Object> error : errors) {
-                final int code = ((Number) error.get("code")).intValue();
-                switch (code) {
-                case 34:
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                case 63:
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                // case 88:
-                /* {"errors":[{"message":"Rate limit exceeded","code":88}]} */
-                // final String rateLimitResetTimestamp = br.getRequest().getResponseHeader("x-rate-limit-reset");
-                // if (rateLimitResetTimestamp != null && rateLimitResetTimestamp.matches("\\d+")) {
-                // logger.info("Rate-limit reached | Resets in: " +
-                // TimeFormatter.formatMilliSeconds(Long.parseLong(rateLimitResetTimestamp) - System.currentTimeMillis() / 1000, 0));
-                // }
-                case 109:
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                case 144:
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                case 325:
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                case 421:
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                case 220:
-                    /* {"errors":[{"code":220,"message":"Your credentials do not allow access to this resource."}]} */
-                    throw new AccountRequiredException();
-                default:
-                    throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, error.get("message").toString());
+                final Number codeO = (Number) error.get("code");
+                if (codeO != null) {
+                    final int code = codeO.intValue();
+                    switch (code) {
+                    case 34:
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    case 63:
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    // case 88:
+                    /* {"errors":[{"message":"Rate limit exceeded","code":88}]} */
+                    // final String rateLimitResetTimestamp = br.getRequest().getResponseHeader("x-rate-limit-reset");
+                    // if (rateLimitResetTimestamp != null && rateLimitResetTimestamp.matches("\\d+")) {
+                    // logger.info("Rate-limit reached | Resets in: " +
+                    // TimeFormatter.formatMilliSeconds(Long.parseLong(rateLimitResetTimestamp) - System.currentTimeMillis() / 1000, 0));
+                    // }
+                    case 109:
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    case 144:
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    case 325:
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    case 421:
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    case 220:
+                        /* {"errors":[{"code":220,"message":"Your credentials do not allow access to this resource."}]} */
+                        throw new AccountRequiredException();
+                    default:
+                        throw new DecrypterRetryException(RetryReason.PLUGIN_DEFECT, error.get("message").toString());
+                    }
                 }
+                throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, error.get("message").toString());
             }
         }
         return entries;

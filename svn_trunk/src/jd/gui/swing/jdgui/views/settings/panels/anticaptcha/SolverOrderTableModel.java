@@ -31,26 +31,20 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 
 public class SolverOrderTableModel extends ExtTableModel<SolverService> {
-
     public SolverOrderTableModel() {
         super("SolverOrderTableModel");
-
         update();
     }
 
     private void update() {
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 // make sure that this class is loaded. it contains the logic to restore old settings.
-
                 List<SolverService> lst = ChallengeResponseController.getInstance().listServices();
-
                 _fireTableStructureChanged(lst, true);
             }
         };
-
     }
 
     @Override
@@ -60,13 +54,10 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
     @Override
     protected void initColumns() {
-
         this.addColumn(new ExtCheckColumn<SolverService>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
-
             private final JComponent empty = new RendererMigPanel("ins 0", "[]", "[]");
 
             public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-
                 final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
                     private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
 
@@ -78,23 +69,18 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                         setText(null);
                         return this;
                     }
-
                 };
-
                 return ret;
             }
 
             @Override
             public int getMaxWidth() {
-
                 return 30;
             }
 
             @Override
             public JComponent getRendererComponent(SolverService value, boolean isSelected, boolean hasFocus, int row, int column) {
-
                 JComponent ret = super.getRendererComponent(value, isSelected, hasFocus, row, column);
-
                 return ret;
             }
 
@@ -121,11 +107,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             protected void setBooleanValue(boolean value, final SolverService object) {
                 object.setEnabled(!object.isEnabled());
-
             }
         });
         addColumn(new ExtTextColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_service()) {
-
             @Override
             public boolean isSortable(final SolverService obj) {
                 return false;
@@ -151,9 +135,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 return value.getName();
             }
         });
-
         addColumn(new ExtTextColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_type_()) {
-
             @Override
             public boolean isSortable(final SolverService obj) {
                 return false;
@@ -174,56 +156,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 return value.getType();
             }
         });
-
-        // addColumn(new ExtSpinnerColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_startafter()) {
-        // @Override
-        // public boolean isHidable() {
-        // return false;
-        // }
-        //
-        // @Override
-        // public boolean isSortable(final SolverService obj) {
-        // return false;
-        // }
-        //
-        // @Override
-        // public boolean isEditable(SolverService obj) {
-        // return true;
-        // }
-        //
-        // @Override
-        // protected String getTooltipText(SolverService obj) {
-        // return _GUI.T.SolverOrderTableModel_getTooltipText_object_(obj.getServiceName(),
-        // TimeFormatter.formatMilliSeconds(obj.getWaittime(), 0));
-        // }
-        //
-        // @Override
-        // public boolean isEnabled(SolverService obj) {
-        // return true;
-        // }
-        //
-        // @Override
-        // public int getDefaultWidth() {
-        // return 120;
-        // }
-        //
-        // @Override
-        // protected Number getNumber(SolverService value) {
-        // return (int) (value.getWaittime() / 1000);
-        // }
-        //
-        // @Override
-        // protected void setNumberValue(Number value, SolverService object) {
-        // object.setWaittime(value.intValue() * 1000);
-        // ChallengeResponseController.getInstance().setSolverOrder(getTableData());
-        // update();
-        // }
-        //
-        // @Override
-        // public String getStringValue(SolverService value) {
-        // return (value.getWaittime() / 1000) + " seconds";
-        // }
-        // });
         this.addColumn(new ExtComponentColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_timeout()) {
             private JButton            editorBtn;
             private JButton            rendererBtn;
@@ -231,30 +163,23 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             protected MigPanel         editor;
             protected RendererMigPanel renderer;
             private RenderLabel        label;
-
             {
                 editorBtn = new JButton("");
-
                 editorBtn.addActionListener(new ActionListener() {
-
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         if (editing != null) {
                             SolverTimingDialog d = new SolverTimingDialog(editing);
                             UIOManager.I().show(null, d);
-
                         }
                     }
                 });
                 label = new RenderLabel();
                 rendererBtn = new JButton("");
-
                 this.editor = new MigPanel("ins 1", "[grow,fill]", "[grow]") {
-
                     @Override
                     public void requestFocus() {
                     }
-
                 };
                 editor.add(editorBtn);
                 this.renderer = new RendererMigPanel("ins 1", "[grow,fill]", "[grow]");
@@ -263,9 +188,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
 
             public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-
                 final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-
                     @Override
                     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                         super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
@@ -274,9 +197,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                         setText(_GUI.T.SolverOrderTableModel_initColumns_timeout());
                         return this;
                     }
-
                 };
-
                 return ret;
             }
 
@@ -305,11 +226,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
 
             public Dimension getCellSizeEstimation(SolverService element, int row) {
-
                 Component c = getTableCellRendererComponent(getModel().getTable(), element, false, false, row, 1);
                 rendererBtn.setMaximumSize(null);
                 return c.getPreferredSize();
-
             }
 
             @Override
@@ -339,10 +258,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public void configureRendererComponent(SolverService value, boolean isSelected, boolean hasFocus, int row, int column) {
-
                 // rendererBtn.setIcon(new AbstractIcon(IconKey.ICON_WAIT, 16));
                 rendererBtn.setText(_GUI.T.lit_edit());
-
                 rendererBtn.setMaximumSize(new Dimension(getWidth(), getTable().getRowHeight(row) - 2));
             }
 
@@ -351,7 +268,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 editing = value;
                 editorBtn.setText(_GUI.T.lit_edit());
                 editorBtn.setMaximumSize(new Dimension(getWidth(), getTable().getRowHeight(row) - 2));
-
             }
 
             @Override
@@ -361,7 +277,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public void resetRenderer() {
             }
-
         });
         this.addColumn(new ExtComponentColumn<SolverService>(_GUI.T.lit_settings()) {
             private JButton            editorBtn;
@@ -370,29 +285,23 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             protected MigPanel         editor;
             protected RendererMigPanel renderer;
             private RenderLabel        label;
-
             {
                 editorBtn = new JButton("");
-
                 editorBtn.addActionListener(new ActionListener() {
-
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         if (editing != null) {
                             SolverPropertiesDialog d = new SolverPropertiesDialog(editing, editing.getConfigPanel());
                             UIOManager.I().show(null, d);
-
                         }
                     }
                 });
                 label = new RenderLabel();
                 rendererBtn = new JButton("");
                 this.editor = new MigPanel("ins 0", "[grow,fill]", "[grow]") {
-
                     @Override
                     public void requestFocus() {
                     }
-
                 };
                 editor.add(editorBtn);
                 this.renderer = new RendererMigPanel("ins 0", "[grow,fill]", "[grow]");
@@ -447,11 +356,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public void configureRendererComponent(SolverService value, boolean isSelected, boolean hasFocus, int row, int column) {
-
                 // rendererBtn.setIcon(new AbstractIcon(IconKey.ICON_THUMBS_DOWN, 16));
                 rendererBtn.setText(_GUI.T.lit_edit());
                 rendererBtn.setMaximumSize(new Dimension(getWidth(), getTable().getRowHeight(row) - 2));
-
             }
 
             protected String generateID() {
@@ -459,11 +366,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
 
             public Dimension getCellSizeEstimation(SolverService element, int row) {
-
                 Component c = getTableCellRendererComponent(getModel().getTable(), element, false, false, row, 1);
                 rendererBtn.setMaximumSize(null);
                 return c.getPreferredSize();
-
             }
 
             @Override
@@ -474,9 +379,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
 
             public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-
                 final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-
                     @Override
                     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                         super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
@@ -485,9 +388,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                         setText(_GUI.T.lit_settings());
                         return this;
                     }
-
                 };
-
                 return ret;
             }
 
@@ -498,9 +399,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public void resetRenderer() {
             }
-
         });
-
     }
-
 }

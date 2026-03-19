@@ -27,7 +27,7 @@ import org.jdownloader.logging.LogController;
 
 /** https://www.cloudflare.com/products/turnstile/ */
 public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
-    private final static Pattern PATTERN_VALID_RESPONSE_TOKEN = Pattern.compile("^0\\.[a-zA-Z0-9_\\-\\.]{60,}$");
+    private final static Pattern PATTERN_VALID_RESPONSE_TOKEN = Pattern.compile("^\\d\\.[a-zA-Z0-9_\\-\\.]{60,}$");
 
     public static boolean containsCloudflareTurnstileClass(final Browser br) {
         return br != null && containsCloudflareTurnstileClass(br.toString());

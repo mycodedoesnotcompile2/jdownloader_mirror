@@ -298,7 +298,13 @@ public enum JavaVersion implements JavaVersionInterface {
         }
     }
 
+    public static final ThreadLocal<JavaVersionInterface> THREAD_VERSION = new ThreadLocal<JavaVersionInterface>();
+
     public static JavaVersionInterface getVersion() {
+        final JavaVersionInterface threadVersion = THREAD_VERSION.get();
+        if (threadVersion != null) {
+            return threadVersion;
+        }
         return VERSION;
     }
 
