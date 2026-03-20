@@ -60,7 +60,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52535 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -334,9 +334,18 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
     }
 
     private void prepGraphqlBrowser(final Browser brg) throws Exception {
-        final String traffic_segment = brg.getRegex("window\\.__TS__ = (\\d+)").getMatch(0);
-        final String client_id = br.getRegex("var r=\"([a-f0-9]{20})").getMatch(0);
-        final String client_secret = br.getRegex("o=\"([a-f0-9]{20,})").getMatch(0);
+        String traffic_segment = brg.getRegex("window\\.__TS__ = (\\d+)").getMatch(0);
+        if (traffic_segment == null) {
+            traffic_segment = brg.getCookie(getHost(), "ts", Cookies.NOTDELETEDPATTERN);
+        }
+        String client_id = br.getRegex("var r=\"([a-f0-9]{20})").getMatch(0);
+        if (client_id == null) {
+            client_id = brg.getRegex("get apiClientId\\(\\)\\{return\"([^\"]+)").getMatch(0);
+        }
+        String client_secret = br.getRegex("o=\"([a-f0-9]{20,})").getMatch(0);
+        if (client_secret == null) {
+            client_secret = brg.getRegex("get apiClientSecret\\(\\)\\{return\"([^\"]+)").getMatch(0);
+        }
         String visitor_id = br.getRegex("2v1st%22%3A%22([a-f0-9\\-]+)%22%").getMatch(0);
         if (visitor_id == null) {
             visitor_id = brg.getCookie(brg.getHost(), "v1st", Cookies.NOTDELETEDPATTERN);

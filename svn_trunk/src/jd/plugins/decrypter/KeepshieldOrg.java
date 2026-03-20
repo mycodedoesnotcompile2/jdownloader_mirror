@@ -19,10 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -37,7 +33,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52520 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
+@DecrypterPlugin(revision = "$Revision: 52535 $", interfaceVersion = 3, names = {}, urls = {})
 public class KeepshieldOrg extends PluginForDecrypt {
     public KeepshieldOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,8 +110,15 @@ public class KeepshieldOrg extends PluginForDecrypt {
         /* Handle captcha */
         final Form captchaform = this.getCaptchaForm(br);
         if (captchaform != null) {
-            final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
-            captchaform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+            if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(captchaform)) {
+                final String response = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+                captchaform.put("cf-turnstile-response", Encoding.urlEncode(response));
+            } else if (AbstractRecaptchaV2.containsRecaptchaV2Class(captchaform)) {
+                final String response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+                captchaform.put("g-recaptcha-response", Encoding.urlEncode(response));
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             br.submitForm(captchaform);
             if (this.getCaptchaForm(br) != null) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
@@ -165,6 +175,10 @@ public class KeepshieldOrg extends PluginForDecrypt {
     }
 
     private Form getCaptchaForm(final Browser br) {
-        return br.getFormbyProperty("id", "captcha-form");
+        Form ret = br.getFormbyProperty("id", "captcha-form");
+        if (ret == null) {
+            ret = br.getFormbyKey("captcha_submit");
+        }
+        return ret;
     }
 }

@@ -3,15 +3,6 @@ package org.jdownloader.plugins.components.captchasolver;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.CaptchaType;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.PluginForHost;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -23,6 +14,15 @@ import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder.AccountCaptchaTypeAccessor;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.PluginForHost;
 
 /**
  * Abstract base class for captcha solver plugins.
@@ -68,15 +68,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return List of supported captcha types
      */
     public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
-
-    /**
-     * Returns list of supported captcha types to be displayed in GUI. <br>
-     * Override this in edge cases for example when a specific captcha type is only supported for some accounts of a specific service to
-     * prevent it from being displayed in the services' list of supported captcha types in beforehand -> Prevent confuding the user.
-     */
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypesForGUI() {
-        return getSupportedCaptchaTypes();
-    }
 
     /** Returns list of captcha types supported by this account. */
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
@@ -130,10 +121,9 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             return null;
         }
         final List<CAPTCHA_TYPE> disabled_captcha_types = new ArrayList<CAPTCHA_TYPE>();
+        final AccountCaptchaTypeAccessor ata = new AccountCaptchaTypeAccessor(account);
         for (final CAPTCHA_TYPE ctype : CAPTCHA_TYPE.values()) {
-            final CaptchaType captchaType = new CaptchaType(ctype);
-            captchaType.setAccountInfo(ai);
-            if (!captchaType.isEnabled()) {
+            if (!ata.isEnabled(ctype)) {
                 disabled_captcha_types.add(ctype);
             }
         }

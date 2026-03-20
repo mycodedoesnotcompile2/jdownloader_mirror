@@ -427,16 +427,22 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     protected ArrayList<DownloadLink> addLinkCrawlerRetryTask(ArrayList<DownloadLink> results, final CrawledLink link, final DecrypterRetryException retryException) {
-        final String[] retryTasks = LinkCrawler.getConfig().getAddRetryCrawlerTasks3();
-        if (retryTasks != null && retryException != null && Arrays.asList(retryTasks).contains(retryException.getReason().name())) {
-            final DownloadLink retry = createLinkCrawlerRetry(link, retryException);
-            if (retry != null) {
-                if (results == null) {
-                    results = new ArrayList<DownloadLink>();
-                }
-                results.add(retry);
-            }
+        if (retryException == null) {
+            return results;
         }
+        final String[] ignoreRetryTasks = LinkCrawler.getConfig().getIgnoreRetryCrawlerTasks();
+        if (ignoreRetryTasks != null && Arrays.asList(ignoreRetryTasks).contains(retryException.getReason().name())) {
+            /* User wishes to ignore this RetryTask. */
+            return results;
+        }
+        final DownloadLink retry = createLinkCrawlerRetry(link, retryException);
+        if (retry == null) {
+            return results;
+        }
+        if (results == null) {
+            results = new ArrayList<DownloadLink>();
+        }
+        results.add(retry);
         return results;
     }
 

@@ -7,11 +7,16 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.api.captcha.CaptchaMyJDownloaderRemoteSolverSettings;
+import org.jdownloader.api.captcha.CaptchaMyJDownloaderRemoteSolverSettingsV3;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComConfigInterface;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfig;
+import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSettings;
 import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaConfigInterface;
+import org.jdownloader.captcha.v2.solver.gui.DialogCaptchaSolverConfig;
+import org.jdownloader.captcha.v2.solver.gui.DialogCaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzConfigInterface;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSettings;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
@@ -95,6 +100,9 @@ public class CaptchaSolverSettingsMigration {
         migrate_2captcha();
         migrate_9kw();
         /* Migrate local browser solver settings */
+        migrate_BrowserCaptchaSolverConfig();
+        migrate_CaptchaMyJDownloaderRemoteSolverSettings();
+        migrate_DialogCaptchaSolverConfig();
         // TODO: Save a property somewhere aka "migration_conmpleted_timestamp" so we can early abort this next time
     }
 
@@ -465,16 +473,63 @@ public class CaptchaSolverSettingsMigration {
     public void migrate_BrowserCaptchaSolverConfig() {
         final String name = "BrowserCaptchaSolver";
         final BrowserCaptchaSolverConfig cfgOld = JsonConfig.create(BrowserCaptchaSolverConfig.class);
-        // TODO: Create- and migrate to new settings
-        // final CaptchaSolverPluginConfigNinekw cfgNew = null;
+        final BrowserCaptchaSolverConfigV3 cfgNew = JsonConfig.create(BrowserCaptchaSolverConfigV3.class);
         /* Migrate settings, migrate all that are different from the defaults */
+        if (!cfgOld.isAutoClickEnabled()) {
+            cfgNew.setAutoClickEnabled(false);
+        }
+        if (cfgOld.getAutoClickDelay() != 500) {
+            cfgNew.setAutoClickDelay(cfgOld.getAutoClickDelay());
+        }
+        if (cfgOld.getAutoOpenDelay() != 1000) {
+            cfgNew.setAutoOpenDelay(cfgOld.getAutoOpenDelay());
+        }
+        if (!cfgOld.isAutoOpenBrowserEnabled()) {
+            cfgNew.setAutoOpenBrowserEnabled(false);
+        }
+        if (cfgOld.getBrowserCommandline() != null && cfgOld.getBrowserCommandline().length > 0) {
+            cfgNew.setBrowserCommandline(cfgOld.getBrowserCommandline());
+        }
+        if (cfgOld.getLocalHttpPort() != 24613) {
+            cfgNew.setLocalHttpPort(cfgOld.getLocalHttpPort());
+        }
         /* Migrate black-/whitelist settings */
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
         final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            // cfgNew.setFilterList(filters);
+            cfgNew.setFilterList(filters);
+        }
+        System.out.print(name + " migration successful");
+    }
+
+    public void migrate_CaptchaMyJDownloaderRemoteSolverSettings() {
+        final String name = "CaptchaMyJDownloaderRemoteSolverSettings";
+        final CaptchaMyJDownloaderRemoteSolverSettings cfgOld = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettings.class);
+        final CaptchaMyJDownloaderRemoteSolverSettingsV3 cfgNew = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettingsV3.class);
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = cfgOld.getBlacklistEntries();
+        final List<String> whitelist = cfgOld.getWhitelistEntries();
+        final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        if (filters != null) {
+            cfgNew.setFilterList(filters);
+        }
+        System.out.print(name + " migration successful");
+    }
+
+    public void migrate_DialogCaptchaSolverConfig() {
+        final String name = "DialogCaptchaSolverConfig";
+        final DialogCaptchaSolverConfig cfgOld = JsonConfig.create(DialogCaptchaSolverConfig.class);
+        final DialogCaptchaSolverConfigV3 cfgNew = JsonConfig.create(DialogCaptchaSolverConfigV3.class);
+        /* Migrate black-/whitelist settings */
+        final List<String> blacklist = cfgOld.getBlacklistEntries();
+        final List<String> whitelist = cfgOld.getWhitelistEntries();
+        final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        if (filters != null) {
+            cfgNew.setFilterList(filters);
         }
         System.out.print(name + " migration successful");
     }

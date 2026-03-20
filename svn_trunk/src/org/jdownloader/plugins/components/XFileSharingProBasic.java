@@ -91,7 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52499 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52535 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -731,7 +731,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (link == null) {
             return null;
         }
-        final String originalURL = link.getPluginPatternMatcher();
+        final String originalURL = getPluginPatternMatcher(link);
         if (originalURL == null) {
             return null;
         }
@@ -774,6 +774,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return getContentURL(link);
     }
 
+    protected String getPluginPatternMatcher(final DownloadLink link) {
+        return link.getPluginPatternMatcher();
+    }
+
     @Override
     public Browser prepBrowser(final Browser prepBr, final String host) {
         if (!(this.browserPrepped.containsKey(prepBr) && this.browserPrepped.get(prepBr) == Boolean.TRUE)) {
@@ -797,7 +801,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected String getMainPage(final DownloadLink link) {
         final URL url;
         try {
-            url = new URL(link.getPluginPatternMatcher());
+            url = new URL(getPluginPatternMatcher(link));
         } catch (final MalformedURLException e) {
             /* This should never happen */
             e.printStackTrace();
@@ -1063,27 +1067,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-        try {
-            /* Check if response is plaintext and contains any known error messages. */
-            final byte[] probe = urlConnection.peek(32);
-            if (probe.length > 0) {
-                final String probeContext = new String(probe, "UTF-8");
-                final Request clone = urlConnection.getRequest().cloneRequest();
-                clone.setHtmlCode(probeContext);
-                final Browser br = createNewBrowserInstance();
-                br.setRequest(clone);
-                try {
-                    // TODO: extract the html checks into own method to avoid Browser instance
-                    checkServerErrors(br, getDownloadLink(), null);
-                } catch (PluginException e) {
-                    logger.log(e);
-                    return false;
-                }
+    try {
+        /* Check if response is plaintext and contains any known error messages. */
+        final byte[] probe = urlConnection.peek(32);
+        if (probe.length > 0) {
+            final String probeContext = new String(probe, "UTF-8");
+            final Request clone = urlConnection.getRequest().cloneRequest();
+            clone.setHtmlCode(probeContext);
+            final Browser br = createNewBrowserInstance();
+            br.setRequest(clone);
+            try {
+                // TODO: extract the html checks into own method to avoid Browser instance
+                checkServerErrors(br, getDownloadLink(), null);
+            } catch (PluginException e) {
+                logger.log(e);
+                return false;
             }
-        } catch (IOException e) {
-            logger.log(e);
         }
-        return true;
+    } catch (IOException e) {
+        logger.log(e);
+    }
+    return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -1541,7 +1545,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected URL_TYPE getURLType(final DownloadLink link) {
-        return link != null ? getURLType(link.getPluginPatternMatcher()) : null;
+        return link != null ? getURLType(getPluginPatternMatcher(link)) : null;
     }
 
     protected URL_TYPE getURLType(final String url) {
@@ -1614,7 +1618,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected String getFUID(final DownloadLink link, final URL_TYPE type) {
-        return link != null ? getFUID(link.getPluginPatternMatcher(), type) : null;
+        return link != null ? getFUID(getPluginPatternMatcher(link), type) : null;
     }
 
     /**
@@ -2065,7 +2069,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 for (final DownloadLink link : links) {
                     if (massLinkcheckerParseFileInfo(br, link) == AvailableStatus.UNCHECKED) {
-                        logger.warning("Failed to find any information for current DownloadLink --> Possible mass-linkchecker failure for: " + link.getPluginPatternMatcher());
+                        logger.warning("Failed to find any information for current DownloadLink --> Possible mass-linkchecker failure for: " + getPluginPatternMatcher(link));
                     } else {
                         /* At least one item has been properly detected -> Assume that linkcheck is working. */
                         linkcheckerSuccess = true;
@@ -4072,7 +4076,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 result = new Regex(new URL(contentURL).getPath(), url_name_RegEx).getMatch(0);
             }
             if (result == null) {
-                result = new Regex(new URL(link.getPluginPatternMatcher()).getPath(), url_name_RegEx).getMatch(0);
+                result = new Regex(new URL(getPluginPatternMatcher(link)).getPath(), url_name_RegEx).getMatch(0);
             }
             return result;
         } catch (MalformedURLException e) {

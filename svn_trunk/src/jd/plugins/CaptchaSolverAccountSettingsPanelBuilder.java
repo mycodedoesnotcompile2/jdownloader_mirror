@@ -23,116 +23,81 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
 import org.jdownloader.captcha.v2.CaptchaHistoryManager;
+import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
-/**
- * Builds the captcha solver account settings panel UI. Takes same parameters as extendMultiHostAccountSettingsPanel and creates the table.
- *
- * Separates panel building logic from PluginForHost to keep that class smaller.
- */
 public class CaptchaSolverAccountSettingsPanelBuilder {
-    private final Account           account;
-    private final List<CaptchaType> captchaTypes;
-    private final boolean           shouldShowEnabledColumn;
-    private final boolean           shouldShowDemoUrlColumn;
-    private final boolean           shouldShowJDownloaderSupportedColumn;
-    private final boolean           shouldShowAccountSupportedColumn;
-    private final boolean           shouldShowUsedServicesColumn;
-    private final boolean           HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD = true;
+    private final CaptchaTypeAccessor accessor;
+    private final List<CAPTCHA_TYPE>  captchaTypes;
+    private final boolean             shouldShowDemoUrlColumn;
+    private final boolean             shouldShowJDownloaderSupportedColumn;
+    private final boolean             shouldShowUsedServicesColumn;
+    private int                       numberofNonJDSupportedCaptchaTypes = 0;
 
-    /**
-     * Creates a new panel builder for a captcha solver account. Same parameters as extendMultiHostAccountSettingsPanel.
-     *
-     * @param account
-     *            The account to build the panel for
-     */
-    public CaptchaSolverAccountSettingsPanelBuilder(final Account account) {
-        final AccountInfo ai = account != null ? account.getAccountInfo() : null;
-        final List<CaptchaType> ctypes = new ArrayList<CaptchaType>();
-        for (final CAPTCHA_TYPE ctype_static : CAPTCHA_TYPE.values()) {
-            if (HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD && !ctype_static.isJDownloaderSupported()) {
-                continue;
-            }
-            final CaptchaType ctype = new CaptchaType(ctype_static);
-            ctype.setAccountInfo(ai);
-            ctypes.add(ctype);
+    public CaptchaSolverAccountSettingsPanelBuilder(final CaptchaTypeAccessor accessor) {
+        if (accessor == null) {
+            throw new IllegalArgumentException("accessor must not be null");
         }
-        this.account = account;
+        this.accessor = accessor;
+        final List<CAPTCHA_TYPE> ctypes = CaptchaType.getProcessableCaptchaTypes();
         this.captchaTypes = ctypes;
         // Determine which columns should be visible by default
         boolean showDemoUrl = false;
         boolean showJDownloaderSupported = false;
-        boolean shouldShowUsedServicesColumn = false;
-        for (final CaptchaType ctype : captchaTypes) {
-            final CAPTCHA_TYPE ctype_static = ctype.getCAPTCHA_TYPE_STATIC();
-            final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype_static);
-            if (!showDemoUrl && ctype_static.getDemoUrl() != null) {
+        boolean showUsedServicesColumn = false;
+        for (final CAPTCHA_TYPE ctype : captchaTypes) {
+            final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);
+            if (!showDemoUrl && ctype.getDemoUrl() != null) {
                 showDemoUrl = true;
             }
-            if (!showJDownloaderSupported && !ctype_static.isJDownloaderSupported()) {
-                /* Only display this column if solver supports at least one item that is not supported by JDownloader */
+            if (!showJDownloaderSupported && !ctype.isJDownloaderSupported()) {
                 showJDownloaderSupported = true;
             }
-            if (!shouldShowUsedServicesColumn && entries != null && !entries.isEmpty()) {
-                shouldShowUsedServicesColumn = true;
+            if (!showUsedServicesColumn && entries != null && !entries.isEmpty()) {
+                showUsedServicesColumn = true;
             }
-            if (showDemoUrl && showJDownloaderSupported && shouldShowUsedServicesColumn) {
-                /* Early-abort loop in case all default disabled columns shall be enabled. */
-                break;
+            if (!ctype.isJDownloaderSupported()) {
+                numberofNonJDSupportedCaptchaTypes += 1;
             }
         }
-        this.shouldShowEnabledColumn = ai != null ? true : false;
-        // this.shouldShowDomainColumn = showDomain;
         this.shouldShowDemoUrlColumn = showDemoUrl;
         this.shouldShowJDownloaderSupportedColumn = showJDownloaderSupported;
-        this.shouldShowAccountSupportedColumn = this.account != null;
-        this.shouldShowUsedServicesColumn = shouldShowUsedServicesColumn;
+        this.shouldShowUsedServicesColumn = showUsedServicesColumn;
     }
 
-    public List<CaptchaType> getCaptchaTypes() {
-        return this.captchaTypes;
+    public List<CAPTCHA_TYPE> getCaptchaTypes() {
+        return captchaTypes;
     }
 
-    /**
-     * Builds and adds the panel to the given container
-     *
-     * @param panel
-     *            The panel to add the table to
-     */
     public void build(final PluginConfigPanelNG panel) {
-        final ExtTableModel<CaptchaType> tableModel = createTableModel();
-        tableModel._fireTableStructureChanged(captchaTypes, false);
-        final BasicJDTable<CaptchaType> table = new BasicJDTable<CaptchaType>(tableModel);
-        table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
-        table.setSearchEnabled(true);
+        final BasicJDTable<CAPTCHA_TYPE> table = this.getCaptchaTypesTable();
         final JScrollPane scrollPane = new JScrollPane(table);
         panel.add(scrollPane);
     }
 
-    /**
-     * Creates the table model with all columns
-     */
-    public ExtTableModel<CaptchaType> createTableModel() {
-        return new ExtTableModel<CaptchaType>("CaptchaTypeTable") {
+    public final BasicJDTable<CAPTCHA_TYPE> getCaptchaTypesTable() {
+        final ExtTableModel<CAPTCHA_TYPE> tableModel = createTableModel();
+        tableModel._fireTableStructureChanged(captchaTypes, false);
+        final BasicJDTable<CAPTCHA_TYPE> table = new BasicJDTable<CAPTCHA_TYPE>(tableModel);
+        table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
+        table.setSearchEnabled(true);
+        return table;
+    }
+
+    public ExtTableModel<CAPTCHA_TYPE> createTableModel() {
+        return new ExtTableModel<CAPTCHA_TYPE>("CaptchaTypeTable") {
             @Override
             protected void initColumns() {
-                // Enabled column
-                if (shouldShowEnabledColumn) {
-                    addColumn(createEnabledColumn());
-                }
-                // Name column
+                addColumn(createEnabledColumn());
                 addColumn(createNameColumn());
-                // Supported by this account column
-                if (shouldShowAccountSupportedColumn) {
-                    addColumn(createSupportedColumn());
-                }
-                /* Only allow to display column "Supported by JD" if we allow displaying items that are not supported by JD. */
-                if (!HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD) {
+                addColumn(createSupportedColumn());
+                if (numberofNonJDSupportedCaptchaTypes > 0) {
                     addColumn(createSupportedByJDownloaderColumn());
                 }
                 addColumn(createDomainColumn());
@@ -145,17 +110,13 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
             @Override
             public void init(final String id) {
                 super.init(id);
-                // Sort by "Last Used" (descending - newest first) with secondary sort by "Name" (alphabetical)
-                // The secondary sort is handled in the RowSorter of createLastUsedColumn()
-                /* TODO: This is super ugly and will fail once the column is named differently. Find a better solution. */
-                ExtColumn<CaptchaType> lastUsedColumn = null;
-                for (final ExtColumn<CaptchaType> column : getColumns()) {
+                ExtColumn<CAPTCHA_TYPE> lastUsedColumn = null;
+                for (final ExtColumn<CAPTCHA_TYPE> column : getColumns()) {
                     if ("Last Used by you".equals(column.getName())) {
                         lastUsedColumn = column;
                         break;
                     }
                 }
-                // Set primary sort by Last Used (descending - newest first)
                 if (lastUsedColumn != null) {
                     this.sort(CaptchaSolverAccountSettingsPanelBuilder.this.captchaTypes, lastUsedColumn);
                 }
@@ -163,11 +124,8 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
         };
     }
 
-    /**
-     * Creates the "Enabled" checkbox column
-     */
-    private ExtCheckColumn<CaptchaType> createEnabledColumn() {
-        return new ExtCheckColumn<CaptchaType>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
+    private ExtCheckColumn<CAPTCHA_TYPE> createEnabledColumn() {
+        return new ExtCheckColumn<CAPTCHA_TYPE>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
             @Override
             public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
                 final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
@@ -191,34 +149,31 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
             }
 
             @Override
-            protected boolean getBooleanValue(final CaptchaType captchaType) {
-                return captchaType.isEnabled();
+            protected boolean getBooleanValue(final CAPTCHA_TYPE ctype) {
+                return accessor.isEnabled(ctype);
             }
 
             @Override
-            public boolean isEditable(CaptchaType captchaType) {
-                return captchaType.getAccount() != null && captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported();
+            public boolean isEditable(final CAPTCHA_TYPE ctype) {
+                return ctype.isJDownloaderSupported();
             }
 
             @Override
-            protected void setBooleanValue(final boolean enabled, final CaptchaType captchaType) {
-                captchaType.setEnabled(enabled);
+            protected void setBooleanValue(final boolean enabled, final CAPTCHA_TYPE ctype) {
+                accessor.setEnabled(ctype, enabled);
                 getModel().fireTableDataChanged();
             }
         };
     }
 
-    /**
-     * Creates the "Name" column with domain favicon
-     */
-    private ExtTextColumn<CaptchaType> createNameColumn() {
-        return new ExtTextColumn<CaptchaType>("Name") {
+    private ExtTextColumn<CAPTCHA_TYPE> createNameColumn() {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Name") {
             {
-                setRowSorter(new ExtDefaultRowSorter<CaptchaType>() {
+                setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
-                    public int compare(final CaptchaType o1, final CaptchaType o2) {
-                        final String v1 = o1.getCAPTCHA_TYPE_STATIC().getDisplayName();
-                        final String v2 = o2.getCAPTCHA_TYPE_STATIC().getDisplayName();
+                    public int compare(final CAPTCHA_TYPE o1, final CAPTCHA_TYPE o2) {
+                        final String v1 = o1.getDisplayName();
+                        final String v2 = o2.getDisplayName();
                         if (v1 == null && v2 == null) {
                             return 0;
                         }
@@ -239,32 +194,28 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
             }
 
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                return captchaType.getCAPTCHA_TYPE_STATIC().getDisplayName();
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                return ctype.getDisplayName();
             }
 
             @Override
-            public Icon getIcon(CaptchaType captchaType) {
-                return captchaType.getCAPTCHA_TYPE_STATIC().getIcon();
+            public Icon getIcon(final CAPTCHA_TYPE ctype) {
+                return ctype.getIcon();
             }
         };
     }
 
-    /**
-     * Creates the "Domain" column (debug only)
-     */
-    private ExtTextColumn<CaptchaType> createDomainColumn() {
-        return new ExtTextColumn<CaptchaType>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
+    private ExtTextColumn<CAPTCHA_TYPE> createDomainColumn() {
+        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                final String domain = ctype.getDomain();
                 return domain != null ? domain : "";
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                final String domain = captchaType.getCAPTCHA_TYPE_STATIC().getDomain();
-                return domain != null ? domain : null;
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                return ctype.getDomain();
             }
 
             @Override
@@ -274,45 +225,38 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
         };
     }
 
-    /**
-     * Creates the "Description" column
-     */
-    private ExtTextColumn<CaptchaType> createDescriptionColumn() {
-        return new ExtTextColumn<CaptchaType>("Description") {
+    private ExtTextColumn<CAPTCHA_TYPE> createDescriptionColumn() {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Description") {
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                final String description = captchaType.getCAPTCHA_TYPE_STATIC().getDescription();
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                final String description = ctype.getDescription();
                 return description != null ? description : "";
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                final String description = captchaType.getCAPTCHA_TYPE_STATIC().getDescription();
-                return description != null ? description : null;
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                return ctype.getDescription();
             }
         };
     }
 
-    /**
-     * Creates the "Supported by this account" column
-     */
-    private ExtTextColumn<CaptchaType> createSupportedColumn() {
+    private ExtTextColumn<CAPTCHA_TYPE> createSupportedColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new ExtTextColumn<CaptchaType>("Supported by this service") {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Supported by this service") {
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                return captchaType.isSupported() ? "Yes" : "No";
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                return accessor.isSupported(ctype) ? "Yes" : "No";
             }
 
             @Override
-            public Icon getIcon(CaptchaType captchaType) {
-                return captchaType.isSupported() ? icon_okay : icon_error;
+            public Icon getIcon(final CAPTCHA_TYPE ctype) {
+                return accessor.isSupported(ctype) ? icon_okay : icon_error;
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                if (captchaType.isSupported()) {
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                if (accessor.isSupported(ctype)) {
                     return "This captcha type is supported by this service";
                 } else {
                     return "This captcha type is NOT supported by this service";
@@ -321,21 +265,17 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
         };
     }
 
-    /**
-     * Creates the "Last Used" column using CaptchaHistoryManager
-     */
-    private ExtTextColumn<CaptchaType> createLastUsedColumn() {
-        return new ExtTextColumn<CaptchaType>("Last Used by you") {
+    private ExtTextColumn<CAPTCHA_TYPE> createLastUsedColumn() {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Last Used by you") {
             {
-                setRowSorter(new ExtDefaultRowSorter<CaptchaType>() {
+                setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
-                    public int compare(final CaptchaType o1, final CaptchaType o2) {
+                    public int compare(final CAPTCHA_TYPE o1, final CAPTCHA_TYPE o2) {
                         final long v1 = getTimestamp(o1);
                         final long v2 = getTimestamp(o2);
                         if (v1 == v2) {
-                            // Secondary sort: by Name (alphabetical)
-                            final String name1 = o1.getCAPTCHA_TYPE_STATIC().getDisplayName();
-                            final String name2 = o2.getCAPTCHA_TYPE_STATIC().getDisplayName();
+                            final String name1 = o1.getDisplayName();
+                            final String name2 = o2.getDisplayName();
                             if (name1 == null && name2 == null) {
                                 return 0;
                             }
@@ -348,16 +288,14 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                             return name1.compareTo(name2);
                         }
                         if (this.getSortOrderIdentifier() != ExtColumn.SORT_ASC) {
-                            // Descending: newest first
                             if (v1 == 0 && v2 > 0) {
-                                return 1; // "never" goes to end
+                                return 1;
                             }
                             if (v2 == 0 && v1 > 0) {
                                 return -1;
                             }
                             return v1 > v2 ? -1 : 1;
                         } else {
-                            // Ascending: oldest first
                             if (v1 == 0 && v2 > 0) {
                                 return -1;
                             }
@@ -368,17 +306,16 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                         }
                     }
 
-                    private long getTimestamp(CaptchaType ct) {
-                        final CaptchaHistoryEntry entry = CaptchaHistoryManager.getInstance().getLastUsedTimestampByCaptchaType(ct.getCAPTCHA_TYPE_STATIC());
+                    private long getTimestamp(final CAPTCHA_TYPE ctype) {
+                        final CaptchaHistoryEntry entry = CaptchaHistoryManager.getInstance().getLastUsedTimestampByCaptchaType(ctype);
                         return entry != null ? entry.getTimestamp() : 0;
                     }
                 });
             }
 
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                final CAPTCHA_TYPE typeStatic = captchaType.getCAPTCHA_TYPE_STATIC();
-                final CaptchaHistoryEntry lastEntry = CaptchaHistoryManager.getInstance().getLastUsedTimestampByCaptchaType(typeStatic);
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                final CaptchaHistoryEntry lastEntry = CaptchaHistoryManager.getInstance().getLastUsedTimestampByCaptchaType(ctype);
                 if (lastEntry == null) {
                     return "never";
                 }
@@ -386,9 +323,8 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                final CAPTCHA_TYPE typeStatic = captchaType.getCAPTCHA_TYPE_STATIC();
-                final CaptchaHistoryEntry lastEntry = CaptchaHistoryManager.getInstance().getLastUsedTimestampByCaptchaType(typeStatic);
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                final CaptchaHistoryEntry lastEntry = CaptchaHistoryManager.getInstance().getLastUsedTimestampByCaptchaType(ctype);
                 if (lastEntry == null) {
                     return "This captcha type has never been used";
                 }
@@ -398,20 +334,15 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
         };
     }
 
-    /**
-     * Creates the "Demo URL" column
-     */
-    private ExtTextColumn<CaptchaType> createUsedForServicesColumn() {
-        return new ExtTextColumn<CaptchaType>("Used by you for services") {
+    private ExtTextColumn<CAPTCHA_TYPE> createUsedForServicesColumn() {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Used by you for services") {
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                final CAPTCHA_TYPE typeStatic = captchaType.getCAPTCHA_TYPE_STATIC();
-                final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(typeStatic);
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);
                 final String text_none = "none";
                 if (entries == null || entries.isEmpty()) {
                     return text_none;
                 }
-                // Collect unique domains in order of last usage (entries are already sorted)
                 final List<String> domains = new ArrayList<String>();
                 for (final CaptchaHistoryEntry entry : entries) {
                     final String domain = entry.getDomain();
@@ -422,7 +353,6 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                 if (domains.isEmpty()) {
                     return text_none;
                 }
-                // Join domains with comma separator
                 final StringBuilder sb = new StringBuilder();
                 for (final String domain : domains) {
                     if (sb.length() > 0) {
@@ -434,13 +364,11 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                final CAPTCHA_TYPE typeStatic = captchaType.getCAPTCHA_TYPE_STATIC();
-                final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(typeStatic);
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);
                 if (entries == null || entries.isEmpty()) {
                     return "This captcha type has never been used";
                 }
-                // Collect unique domains in order of last usage (entries are already sorted)
                 final List<String> domains = new ArrayList<String>();
                 for (final CaptchaHistoryEntry entry : entries) {
                     final String domain = entry.getDomain();
@@ -449,7 +377,6 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                     }
                 }
                 if (domains.isEmpty()) {
-                    /* This should never happen */
                     return "";
                 }
                 final StringBuilder sb = new StringBuilder("Used for: ");
@@ -469,26 +396,22 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
         };
     }
 
-    /**
-     * Creates the "Demo URL" column
-     */
-    private ExtTextColumn<CaptchaType> createDemoUrlColumn() {
-        return new ExtTextColumn<CaptchaType>("Demo URL") {
+    private ExtTextColumn<CAPTCHA_TYPE> createDemoUrlColumn() {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Demo URL") {
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                final String demoUrl = ctype.getDemoUrl();
                 return demoUrl != null ? demoUrl : "";
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
-                return demoUrl != null ? demoUrl : null;
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                return ctype.getDemoUrl();
             }
 
             @Override
-            public boolean onDoubleClick(MouseEvent e, CaptchaType captchaType) {
-                final String demoUrl = captchaType.getCAPTCHA_TYPE_STATIC().getDemoUrl();
+            public boolean onDoubleClick(final MouseEvent e, final CAPTCHA_TYPE ctype) {
+                final String demoUrl = ctype.getDemoUrl();
                 if (!StringUtils.isEmpty(demoUrl) && CrossSystem.isOpenBrowserSupported()) {
                     CrossSystem.openURL(demoUrl);
                     return true;
@@ -503,26 +426,23 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
         };
     }
 
-    /**
-     * Creates the "Supported by JDownloader" column
-     */
-    private ExtTextColumn<CaptchaType> createSupportedByJDownloaderColumn() {
+    private ExtTextColumn<CAPTCHA_TYPE> createSupportedByJDownloaderColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new ExtTextColumn<CaptchaType>("Supported by JD") {
+        return new ExtTextColumn<CAPTCHA_TYPE>("Supported by JD") {
             @Override
-            public String getStringValue(final CaptchaType captchaType) {
-                return captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported() ? "Yes" : "No";
+            public String getStringValue(final CAPTCHA_TYPE ctype) {
+                return ctype.isJDownloaderSupported() ? "Yes" : "No";
             }
 
             @Override
-            public Icon getIcon(CaptchaType captchaType) {
-                return captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported() ? icon_okay : icon_error;
+            public Icon getIcon(final CAPTCHA_TYPE ctype) {
+                return ctype.isJDownloaderSupported() ? icon_okay : icon_error;
             }
 
             @Override
-            protected String getTooltipText(final CaptchaType captchaType) {
-                if (captchaType.getCAPTCHA_TYPE_STATIC().isJDownloaderSupported()) {
+            protected String getTooltipText(final CAPTCHA_TYPE ctype) {
+                if (ctype.isJDownloaderSupported()) {
                     return "This captcha type is supported by JDownloader";
                 } else {
                     return "This captcha type is NOT supported by JDownloader";
@@ -534,5 +454,75 @@ public class CaptchaSolverAccountSettingsPanelBuilder {
                 return shouldShowJDownloaderSupportedColumn;
             }
         };
+    }
+
+    public interface CaptchaTypeAccessor {
+        boolean isEnabled(CAPTCHA_TYPE ctype);
+
+        void setEnabled(CAPTCHA_TYPE ctype, boolean enabled);
+
+        boolean isSupported(CAPTCHA_TYPE ctype);
+    }
+
+    public static class AccountCaptchaTypeAccessor implements CaptchaTypeAccessor {
+        private final Account account;
+
+        public AccountCaptchaTypeAccessor(final Account account) {
+            if (account == null) {
+                throw new IllegalArgumentException("account must not be null");
+            }
+            this.account = account;
+        }
+
+        private static String getEnabledPropertyKey(final CAPTCHA_TYPE ctype) {
+            return "captcha_type_enabled_" + ctype;
+        }
+
+        @Override
+        public boolean isEnabled(final CAPTCHA_TYPE ctype) {
+            return account.getBooleanProperty(getEnabledPropertyKey(ctype), true);
+        }
+
+        @Override
+        public void setEnabled(final CAPTCHA_TYPE ctype, final boolean enabled) {
+            account.setProperty(getEnabledPropertyKey(ctype), enabled);
+        }
+
+        @Override
+        public boolean isSupported(final CAPTCHA_TYPE ctype) {
+            final PluginForHost plg = account.getPlugin();
+            if (!(plg instanceof abstractPluginForCaptchaSolver)) {
+                return false;
+            }
+            final List<CAPTCHA_TYPE> supportedTypes = ((abstractPluginForCaptchaSolver) plg).getSupportedCaptchaTypes(account);
+            if (supportedTypes == null) {
+                return false;
+            }
+            return supportedTypes.contains(ctype);
+        }
+    }
+
+    public static class SolverServiceCaptchaTypeAccessor implements CaptchaTypeAccessor {
+        private final SolverService solver;
+
+        public SolverServiceCaptchaTypeAccessor(final SolverService solver) {
+            this.solver = solver;
+        }
+
+        @Override
+        public boolean isEnabled(final CAPTCHA_TYPE ctype) {
+            return solver.isEnabled();
+        }
+
+        @Override
+        public void setEnabled(final CAPTCHA_TYPE ctype, final boolean enabled) {
+            solver.setEnabled(enabled);
+        }
+
+        @Override
+        public boolean isSupported(final CAPTCHA_TYPE ctype) {
+            // TODO: implement per-type support check
+            return true;
+        }
     }
 }

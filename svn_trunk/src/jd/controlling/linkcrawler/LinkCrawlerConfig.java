@@ -49,12 +49,12 @@ public interface LinkCrawlerConfig extends ConfigInterface {
 
     void setDeepDecryptFileSizeLimit(int l);
 
-    @DefaultStringArrayValue({ "AGE_VERIFICATION_REQUIRED", "CAPTCHA", "EMPTY_FOLDER", "EMPTY_PROFILE", "FILE_NOT_FOUND", "HOST", "NO_ACCOUNT", "PLUGIN_DEFECT", "PLUGIN_SETTINGS", "PASSWORD", "GEO", "IP", "HOST_RATE_LIMIT", "UNSUPPORTED_LIVESTREAM", "BLOCKED_BY" })
+    @DefaultStringArrayValue({ "EXAMPLE_VALUE_1", "EXAMPLE_VALUE_2" })
     @AboutConfig
-    @DescriptionForConfigEntry("Add a retry task for following crawling errors")
-    String[] getAddRetryCrawlerTasks3();
+    @DescriptionForConfigEntry("Formerly known as 'AddRetryCrawlerTasks'. Define RetryTasks that should be ignored meaning they will not show up in linkgrabber. Exemplaric ENUM string values (the list may be incomplete/outdated): AGE_VERIFICATION_REQUIRED, CAPTCHA, EMPTY_FOLDER, EMPTY_PROFILE, FILE_NOT_FOUND, HOST, NO_ACCOUNT, PLUGIN_DEFECT, PLUGIN_SETTINGS, PASSWORD, GEO, IP, HOST_RATE_LIMIT, UNSUPPORTED_LIVESTREAM, BLOCKED_BY")
+    String[] getIgnoreRetryCrawlerTasks();
 
-    public void setAddRetryCrawlerTasks3(String[] origins);
+    public void setIgnoreRetryCrawlerTasks(String[] origins);
 
     @DefaultBooleanValue(true)
     @AboutConfig

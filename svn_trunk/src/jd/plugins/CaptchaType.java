@@ -1,5 +1,6 @@
 package jd.plugins;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.Icon;
@@ -15,7 +16,6 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 public class CaptchaType {
     public enum CAPTCHA_TYPE {
@@ -531,80 +531,16 @@ public class CaptchaType {
         }
     }
 
-    private Boolean     enabled     = null;
-    private AccountInfo accountInfo = null;
-    final CAPTCHA_TYPE  ctype;
+    public static final boolean HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD = true;
 
-    public AccountInfo getAccountInfo() {
-        return accountInfo;
-    }
-
-    public void setAccountInfo(AccountInfo accountInfo) {
-        this.accountInfo = accountInfo;
-    }
-
-    public CaptchaType(final CAPTCHA_TYPE ctype) {
-        this.ctype = ctype;
-    }
-
-    private String getEnabledProperty() {
-        return "captcha_type_" + ctype + "_enabled";
-    }
-
-    public boolean isEnabled() {
-        final Account ac = getAccount();
-        if (ac == null) {
-            return true;
+    public static List<CAPTCHA_TYPE> getProcessableCaptchaTypes() {
+        final List<CAPTCHA_TYPE> ctypes = new ArrayList<CAPTCHA_TYPE>();
+        for (final CAPTCHA_TYPE ctype : CAPTCHA_TYPE.values()) {
+            if (HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD && !ctype.isJDownloaderSupported()) {
+                continue;
+            }
+            ctypes.add(ctype);
         }
-        return ac.getBooleanProperty(getEnabledProperty(), true);
-    }
-
-    protected Account getAccount() {
-        final AccountInfo ai = getAccountInfo();
-        if (ai == null) {
-            return null;
-        }
-        return ai.getAccount();
-    }
-
-    public void setEnabled(final boolean enabled) {
-        this.enabled = enabled;
-        final Account ac = getAccount();
-        if (ac != null) {
-            ac.setProperty(getEnabledProperty(), this.enabled);
-        }
-    }
-
-    public CAPTCHA_TYPE getCAPTCHA_TYPE_STATIC() {
-        return this.ctype;
-    }
-
-    public boolean isSupported() {
-        final AccountInfo ai = getAccountInfo();
-        if (ai == null) {
-            return false;
-        }
-        final Account acc = ai.getAccount();
-        if (acc == null) {
-            return false;
-        }
-        final PluginForHost plg = acc.getPlugin();
-        if (!(plg instanceof abstractPluginForCaptchaSolver)) {
-            return false;
-        }
-        final abstractPluginForCaptchaSolver captchaSolverPlugin = (abstractPluginForCaptchaSolver) plg;
-        final List<CAPTCHA_TYPE> supportedTypes = captchaSolverPlugin.getSupportedCaptchaTypes(acc);
-        if (supportedTypes == null) {
-            return false;
-        }
-        if (supportedTypes.contains(this.ctype)) {
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public String toString() {
-        return this.ctype + " | enabled: " + this.enabled;
+        return ctypes;
     }
 }

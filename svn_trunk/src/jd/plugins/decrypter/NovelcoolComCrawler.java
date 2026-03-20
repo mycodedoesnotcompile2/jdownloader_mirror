@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52532 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
+        NovelcoolCom.prepBR(br);
         return br;
     }
 
@@ -80,9 +80,13 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage(param.getCryptedUrl());
+        /**
+         * 2026-03-19: Website is GEO-blocking IPs + users with certain browser languages. In my tests, Accept-Language header with "en" and
+         * French IP via VPN worked fine.
+         */
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("<title>404 Not Found")) {
+        } else if (br.containsHTML("<title>\\s*404 Not Found")) {
             /* Error 404 with response code 200 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

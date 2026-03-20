@@ -3,6 +3,7 @@ package org.jdownloader.captcha.v2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
@@ -15,6 +16,8 @@ import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
+
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
@@ -158,6 +161,15 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     int getPollingIntervalSeconds();
 
     void setPollingIntervalSeconds(int seconds);
+
+    @AboutConfig(inGUIVisible = false)
+    @DescriptionForConfigEntry("ENUM StringList of captcha types which are disabled for this solver.")
+    @Order(800)
+    // @DefaultEnumArrayValue(value = { "" })
+    // @DefaultOnNull
+    Set<CAPTCHA_TYPE> getDisabledCaptchaTypes();
+
+    void setDisabledCaptchaTypes(Set<CAPTCHA_TYPE> enumset);
 
     /** TODO: Remove all methods down below, they're only temporary dummy items. */
     @AboutConfig

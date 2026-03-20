@@ -86,6 +86,7 @@ public class JREProvider {
          * 64-bit JRE
          */
         BIT_64;
+
         /**
          * Returns the current system's bitness.
          */
@@ -122,7 +123,8 @@ public class JREProvider {
     }
 
     /**
-     * Central JRE lookup: cache → download → prompt. Use this when you have version/bitness/detailedVersion (e.g. from {@link JREExecuter.JreOptions}).
+     * Central JRE lookup: cache → download → prompt. Use this when you have version/bitness/detailedVersion (e.g. from
+     * {@link JREExecuter.JreOptions}).
      *
      * @param version
      *            Java version to resolve
@@ -172,7 +174,6 @@ public class JREProvider {
         final String bitnessString = bitness == Bitness.BIT_32 ? "x86" : "x64";
         return Application.getResource(JRE_CACHE_FOLDER + "/" + featureVersion + "/" + osString + "/" + bitnessString);
     }
-
     // --------------- ensureJRE API (convenience; delegates to internal lookup + download) ---------------
 
     /**
@@ -285,7 +286,6 @@ public class JREProvider {
         LogV3.info("JRE installed at: " + extractedJavaBinary.getAbsolutePath());
         return extractedJavaBinary;
     }
-
     // --------------- findOrDownload helpers ---------------
 
     private static JreLookupResult findOrDownloadExplicitBitness(final JavaVersion version, final OSFamily osFamily, final Bitness bitness, final String detailedVersion) throws Exception {
@@ -504,6 +504,17 @@ public class JREProvider {
         urls.add(buildAzulZuluUrl(featureVersion, os, arch, osFamily, "jdk"));
         urls.addAll(buildAzulZuluCDNUrls(featureVersion, os, arch, osFamily, "jre"));
         urls.addAll(buildAzulZuluCDNUrls(featureVersion, os, arch, osFamily, "jdk"));
+        if (featureVersion == 27) {
+            if ("windows".equals(os) && "x64".equals(arch)) {
+                urls.add("https://download.java.net/java/early_access/jdk27/13/GPL/openjdk-27-ea+13_windows-x64_bin.zip");
+            } else if ("linux".equals(os) && "x64".equals(arch)) {
+                urls.add("https://download.java.net/java/early_access/jdk27/13/GPL/openjdk-27-ea+13_linux-x64_bin.tar.gz");
+            } else if ("mac".equals(os) && "x64".equals(arch)) {
+                urls.add("https://download.java.net/java/early_access/jdk27/13/GPL/openjdk-27-ea+13_macos-x64_bin.tar.gz");
+            } else if ("mac".equals(os) && "aarch64".equals(arch)) {
+                urls.add("https://download.java.net/java/early_access/jdk27/13/GPL/openjdk-27-ea+13_macos-aarch64_bin.tar.gz");
+            }
+        }
         for (final String url : urls) {
             if (url == null) {
                 continue;
@@ -731,7 +742,7 @@ public class JREProvider {
     }
 
     private static final String[][] ZULU_KNOWN_VERSIONS = {
-                                                        // Java 6
+        // Java 6
         { "6", "6.22.0.3", "6.0.119" },
         // Java 7
         { "7", "7.56.0.11", "7.0.352" },
@@ -770,7 +781,7 @@ public class JREProvider {
         // Java 24
         { "24", "24.28.79", "24" },
         // Java 25
-        { "25", "25.32.21", "25.0.2" }                 };
+        { "25", "25.32.21", "25.0.2" } };
 
     private static String[] findKnownZuluVersion(final int featureVersion) {
         for (final String[] entry : ZULU_KNOWN_VERSIONS) {

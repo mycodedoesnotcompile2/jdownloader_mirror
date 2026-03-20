@@ -19,13 +19,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -33,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52186 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52533 $", interfaceVersion = 3, names = {}, urls = {})
 public class LocknexCom extends PluginForDecrypt {
     public LocknexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,9 +86,42 @@ public class LocknexCom extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final Form captcha_or_password_form = br.getForm(0);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            // TODO: Test this with a link where we know the correct password
+            if (captcha_or_password_form != null) {
+                if (captcha_or_password_form.hasInputFieldByName("password")) {
+                    String passCode = param.getDecrypterPassword();
+                    if (passCode == null) {
+                        /* Ask user */
+                        passCode = getUserInput("Password?", param);
+                    }
+                    captcha_or_password_form.put("password", Encoding.urlEncode(passCode));
+                }
+                if (captcha_or_password_form.hasInputFieldByName("cc_x")) {
+                    final String captcha_url = br.getRegex("(/captcha_circle\\.php\\?ts=\\d+)").getMatch(0);
+                    if (captcha_url == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captcha_url), param, "Click in the circle");
+                    captcha_or_password_form.put("cc_x", Integer.toString(cp.getX()));
+                    captcha_or_password_form.put("cc_y", Integer.toString(cp.getY()));
+                }
+                br.submitForm(captcha_or_password_form);
+                if (br.containsHTML(">\\s*Passwort ist falsch")) {
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
+                if (br.containsHTML(">\\s*Captcha-Klick war falsch")) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                }
+            }
+        }
         String title = br.getRegex("class=\"fa-duotone fa-folder-open\"[^>]*>\\s*</i>([^<]+)<span").getMatch(0);
         String urls_json = br.getRegex("window\\.CNL_LINKS = (\\[[^\\]]+\\])").getMatch(0);
         if (urls_json == null) {
+            if (captcha_or_password_form != null && captcha_or_password_form.hasInputFieldByName("password")) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Password protected links aren't supported yet");
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final List<String> links = (List<String>) restoreFromString(urls_json, TypeRef.OBJECT);

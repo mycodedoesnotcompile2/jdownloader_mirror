@@ -34,10 +34,23 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.NovelcoolComCrawler;
 
-@HostPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52532 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolCom extends PluginForHost {
     public NovelcoolCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        prepBR(br);
+        return br;
+    }
+
+    public static void prepBR(final Browser br) {
+        br.setFollowRedirects(true);
+        /* 2026-03-19: Important as website is blocking users with certain browser language settings. */
+        br.getHeaders().put("Accept-Language", "en");
     }
 
     @Override
@@ -52,7 +65,7 @@ public class NovelcoolCom extends PluginForHost {
     public static final String PROPERTY_CHAPTER_NUMBER = "chapter_number";
     public static final String PROPERTY_PAGE_NUMBER    = "page_number";
     public static final String PROPERTY_PAGE_MAX       = "page_max";
-    public static final String extDefault              = ".jpg";
+    public static final String extDefault              = ".webp";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -80,7 +93,7 @@ public class NovelcoolCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.novelcool.com/";
+        return "https://www." + getHost();
     }
 
     @Override
@@ -105,15 +118,17 @@ public class NovelcoolCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getLinkID(link) + extDefault;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, false);
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         dllink = null;
-        if (!link.isNameSet()) {
-            link.setName(this.getLinkID(link) + extDefault);
-        }
         final String contenturl = link.getPluginPatternMatcher();
         final Regex urlinfo = new Regex(contenturl, this.getSupportedLinks());
         final String chapterNumber = NovelcoolComCrawler.getChapterNumberFromURL(contenturl);

@@ -5,20 +5,20 @@ import java.awt.Dimension;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 
-import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.swing.SwingUtils;
 import org.jdownloader.captcha.v2.SolverService;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
 import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder;
-import jd.plugins.CaptchaType;
+import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class SolverOrderContainer extends org.appwork.swing.MigPanel implements SettingsComponent {
-    private final SolverOrderTable    solverOrder;
-    private BasicJDTable<CaptchaType> detailTable;
-    private JScrollPane               detailScrollPane;
-    private JLabel                    detailLabel;
+    private final SolverOrderTable     solverOrder;
+    private BasicJDTable<CAPTCHA_TYPE> detailTable;
+    private JScrollPane                detailScrollPane;
+    private JLabel                     detailLabel;
 
     public SolverOrderContainer(SolverOrderTable urlOrder) {
         super("ins 0", "[grow,fill]", "[][][]");
@@ -49,10 +49,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     detailLabel.setText(solver.getName() + ": Supported captcha types overview");
                     detailLabel.setVisible(true);
                     // Build detail table from a no-account builder
-                    final CaptchaSolverAccountSettingsPanelBuilder builder = new CaptchaSolverAccountSettingsPanelBuilder(null);
-                    final ExtTableModel<CaptchaType> model = builder.createTableModel();
-                    model._fireTableStructureChanged(builder.getCaptchaTypes(), false);
-                    detailTable = new BasicJDTable<CaptchaType>(model);
+                    final CaptchaSolverAccountSettingsPanelBuilder builder = new CaptchaSolverAccountSettingsPanelBuilder(new SolverServiceCaptchaTypeAccessor(solver));
+                    detailTable = builder.getCaptchaTypesTable();
                     // Set preferred size to show all rows without scrollbar
                     detailTable.setPreferredScrollableViewportSize(new Dimension(detailTable.getPreferredSize().width, detailTable.getRowHeight() * detailTable.getRowCount()));
                     detailScrollPane.setViewportView(detailTable);

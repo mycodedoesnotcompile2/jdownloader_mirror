@@ -14,7 +14,6 @@ import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
-import javax.swing.JScrollPane;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.TableModelEvent;
@@ -23,7 +22,6 @@ import javax.swing.event.TableModelListener;
 import org.appwork.swing.components.tooltips.PanelToolTip;
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.components.tooltips.TooltipPanel;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.locator.AbstractLocator;
 import org.jdownloader.DomainInfo;
@@ -34,6 +32,7 @@ import org.jdownloader.updatev2.gui.LAFOptions;
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.MultiHostHost;
 import jd.plugins.PluginForHost;
@@ -89,7 +88,6 @@ public class AccountTooltip extends PanelToolTip {
         table.getTableHeader().setOpaque(false);
         final boolean account_collection_is_multi = accountCollection.isMulti();
         final boolean account_collection_is_captcha_solver = accountCollection.isCaptchaSolver();
-        JScrollPane sp;
         String txt = accountCollection.getDomainInfo().getTld();
         if (account_collection_is_multi) {
             txt = _GUI.T.AccountTooltip_AccountTooltip_multi(accountCollection.getDomainInfo().getTld());
@@ -137,28 +135,27 @@ public class AccountTooltip extends PanelToolTip {
             SwingUtils.toBold(label);
             label.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
             panel.add(label);
-            List<CAPTCHA_TYPE> dis = new ArrayList<CAPTCHA_TYPE>();
-            for (final Account acc : accountCollection) {
-                final PluginForHost plg = acc.getPlugin();
+            List<CAPTCHA_TYPE> captchatypes = new ArrayList<CAPTCHA_TYPE>();
+            for (final Account account : accountCollection) {
+                final PluginForHost plg = account.getPlugin();
                 if (plg == null) {
                     continue;
                 } else if (!(plg instanceof abstractPluginForCaptchaSolver)) {
                     continue;
                 }
                 final abstractPluginForCaptchaSolver captchaplugin = (abstractPluginForCaptchaSolver) plg;
-                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes(acc);
+                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes(account);
                 if (supported_captcha_types == null) {
                     continue;
                 }
                 for (final CAPTCHA_TYPE ctype : supported_captcha_types) {
-                    if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && !ctype.isJDownloaderSupported()) {
-                        /* In stable, skip items which are not supported by JDownloader to avoid confusing our users. */
+                    if (CaptchaType.HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD && !ctype.isJDownloaderSupported()) {
                         continue;
                     }
-                    dis.add(ctype);
+                    captchatypes.add(ctype);
                 }
             }
-            final JList list = new JList(dis.toArray(new CAPTCHA_TYPE[] {}));
+            final JList list = new JList(captchatypes.toArray(new CAPTCHA_TYPE[] {}));
             // list.setPreferredSize(new Dimension(400, 750));
             list.setLayoutOrientation(JList.VERTICAL_WRAP);
             final ListCellRenderer org = list.getCellRenderer();
@@ -174,7 +171,7 @@ public class AccountTooltip extends PanelToolTip {
                     return ret;
                 }
             });
-            list.setVisibleRowCount(dis.size() / 5);
+            list.setVisibleRowCount(captchatypes.size() / 5);
             // list.setFixedCellHeight(22);
             // list.setFixedCellWidth(22);
             list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);

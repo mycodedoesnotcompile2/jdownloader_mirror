@@ -35,6 +35,7 @@ package org.appwork.utils.net.httpconnection.tests;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
@@ -45,17 +46,17 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
-import java.security.spec.ECGenParameterSpec;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Vector;
 
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.encoding.Base64;
 
-import sun.security.util.ObjectIdentifier;
 import sun.security.x509.AlgorithmId;
 import sun.security.x509.AuthorityKeyIdentifierExtension;
 import sun.security.x509.BasicConstraintsExtension;
@@ -87,6 +88,8 @@ import sun.security.x509.X509CertInfo;
  * <ul>
  * <li>Uses internal JDK classes (sun.security.x509) -> Java 9+ needs --add-exports.</li>
  * <li>Uses SHA256withRSA (avoid SHA1).</li>
+ * <li>Compatible with Java 8 through Java 21+: {@link CertificateFactoryBridge} uses reflection for X509CertInfo/CertificateExtensions
+ * set/get and for ObjectIdentifier creation, which changed in JDK 21.</li>
  * </ul>
  */
 public class CertificateFactory {
@@ -202,7 +205,6 @@ public class CertificateFactory {
             return new SANConfig();
         }
     }
-
     // =========================================================================================
     // Public API
     // =========================================================================================
@@ -224,29 +226,30 @@ public class CertificateFactory {
         final Date notAfter = new Date(now + (validityDays * 24L * 60L * 60L * 1000L));
         final X500Name subject = new X500Name("CN=" + cn);
         final X509CertInfo info = new X509CertInfo();
-        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
-        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
-        info.set(X509CertInfo.SUBJECT, subject);
-        info.set(X509CertInfo.ISSUER, subject);
-        info.set(X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
-        info.set(X509CertInfo.KEY, new CertificateX509Key(caKeyPair.getPublic()));
-        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SUBJECT, subject);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ISSUER, subject);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.KEY, new CertificateX509Key(caKeyPair.getPublic()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
         final CertificateExtensions exts = new CertificateExtensions();
         // Basic Constraints: CA=true (critical)
-        exts.set(BasicConstraintsExtension.NAME, new BasicConstraintsExtension(true, true, 0));
+        CertificateFactoryBridge.invokeSet(exts, BasicConstraintsExtension.NAME, new BasicConstraintsExtension(true, true, 0));
         // Key Usage: keyCertSign, cRLSign (critical)
         final boolean[] keyUsageBits = new boolean[9];
         keyUsageBits[5] = true; // keyCertSign
         keyUsageBits[6] = true; // cRLSign
-        exts.set(KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
+        CertificateFactoryBridge.invokeSet(exts, KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
         // Extended Key Usage: CA for TLS server/client auth (Zweck sichtbar in Windows)
-        final Vector<ObjectIdentifier> caEku = new Vector<ObjectIdentifier>();
-        caEku.add(new ObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 1 })); // id-kp-serverAuth
-        caEku.add(new ObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 2 })); // id-kp-clientAuth
-        exts.set(ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(caEku));
+        @SuppressWarnings("unchecked")
+        final Vector caEku = new Vector();
+        caEku.add(CertificateFactoryBridge.createObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 1 })); // id-kp-serverAuth
+        caEku.add(CertificateFactoryBridge.createObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 2 })); // id-kp-clientAuth
+        CertificateFactoryBridge.invokeSet(exts, ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(caEku));
         // Subject Key Identifier (non-critical)
-        exts.set(SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(caKeyPair.getPublic()).getIdentifier()));
-        info.set(X509CertInfo.EXTENSIONS, exts);
+        CertificateFactoryBridge.invokeSet(exts, SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(caKeyPair.getPublic()).getIdentifier()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.EXTENSIONS, exts);
         final X509Certificate caCert = signTwice(info, caKeyPair.getPrivate(), "SHA256withRSA");
         return new CACertificateResult(caCert, caKeyPair);
     }
@@ -282,25 +285,26 @@ public class CertificateFactory {
         final X500Name subject = new X500Name("CN=" + cn);
         final X500Name issuer = X500Name.asX500Name(caCertificate.getSubjectX500Principal());
         final X509CertInfo info = new X509CertInfo();
-        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
-        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
-        info.set(X509CertInfo.SUBJECT, subject);
-        info.set(X509CertInfo.ISSUER, issuer);
-        info.set(X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
-        info.set(X509CertInfo.KEY, new CertificateX509Key(serverKeyPair.getPublic()));
-        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SUBJECT, subject);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ISSUER, issuer);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.KEY, new CertificateX509Key(serverKeyPair.getPublic()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
         final CertificateExtensions exts = new CertificateExtensions();
         // Basic Constraints: CA=false (critical)
-        exts.set(BasicConstraintsExtension.NAME, new BasicConstraintsExtension(false, true, -1));
+        CertificateFactoryBridge.invokeSet(exts, BasicConstraintsExtension.NAME, new BasicConstraintsExtension(false, true, -1));
         // Key Usage: digitalSignature + keyEncipherment (critical)
         final boolean[] keyUsageBits = new boolean[9];
         keyUsageBits[0] = true; // digitalSignature
         keyUsageBits[2] = true; // keyEncipherment
-        exts.set(KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
+        CertificateFactoryBridge.invokeSet(exts, KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
         // Extended Key Usage: serverAuth (non-critical but recommended)
-        final Vector<ObjectIdentifier> eku = new Vector<ObjectIdentifier>();
-        eku.add(new ObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 1 }));
-        exts.set(ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(eku));
+        @SuppressWarnings("unchecked")
+        final Vector eku = new Vector();
+        eku.add(CertificateFactoryBridge.createObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 1 }));
+        CertificateFactoryBridge.invokeSet(exts, ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(eku));
         // Subject Alternative Names: configurable DNS names and IP addresses
         if (sanConfig != null && (!sanConfig.getDnsNames().isEmpty() || !sanConfig.getIpAddresses().isEmpty())) {
             final GeneralNames generalNames = new GeneralNames();
@@ -322,16 +326,16 @@ public class CertificateFactory {
                 }
             }
             if (generalNames.size() > 0) {
-                exts.set(SubjectAlternativeNameExtension.NAME, new SubjectAlternativeNameExtension(false, generalNames));
+                CertificateFactoryBridge.invokeSet(exts, SubjectAlternativeNameExtension.NAME, new SubjectAlternativeNameExtension(false, generalNames));
             }
         }
         // Subject Key Identifier
         final PublicKey serverPub = serverKeyPair.getPublic();
-        exts.set(SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(serverPub).getIdentifier()));
+        CertificateFactoryBridge.invokeSet(exts, SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(serverPub).getIdentifier()));
         // Authority Key Identifier (from CA)
         final KeyIdentifier caKeyId = new KeyIdentifier(caCertificate.getPublicKey());
-        exts.set(AuthorityKeyIdentifierExtension.NAME, new AuthorityKeyIdentifierExtension(caKeyId, null, null));
-        info.set(X509CertInfo.EXTENSIONS, exts);
+        CertificateFactoryBridge.invokeSet(exts, AuthorityKeyIdentifierExtension.NAME, new AuthorityKeyIdentifierExtension(caKeyId, null, null));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.EXTENSIONS, exts);
         final X509Certificate serverCert = signTwice(info, caPrivateKey, "SHA256withRSA");
         return new ServerCertificateResult(serverCert, serverKeyPair, caCertificate);
     }
@@ -398,32 +402,33 @@ public class CertificateFactory {
         final X500Name subject = new X500Name("CN=" + cn);
         final X500Name issuer = X500Name.asX500Name(caCertificate.getSubjectX500Principal());
         final X509CertInfo info = new X509CertInfo();
-        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
-        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
-        info.set(X509CertInfo.SUBJECT, subject);
-        info.set(X509CertInfo.ISSUER, issuer);
-        info.set(X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
-        info.set(X509CertInfo.KEY, new CertificateX509Key(clientKeyPair.getPublic()));
-        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SUBJECT, subject);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ISSUER, issuer);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.KEY, new CertificateX509Key(clientKeyPair.getPublic()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
         final CertificateExtensions exts = new CertificateExtensions();
         // Basic Constraints: CA=false (critical)
-        exts.set(BasicConstraintsExtension.NAME, new BasicConstraintsExtension(false, true, -1));
+        CertificateFactoryBridge.invokeSet(exts, BasicConstraintsExtension.NAME, new BasicConstraintsExtension(false, true, -1));
         // Key Usage: digitalSignature + keyEncipherment (critical)
         final boolean[] keyUsageBits = new boolean[9];
         keyUsageBits[0] = true; // digitalSignature
         keyUsageBits[2] = true; // keyEncipherment
-        exts.set(KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
+        CertificateFactoryBridge.invokeSet(exts, KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
         // Extended Key Usage: clientAuth (non-critical but recommended)
-        final Vector<ObjectIdentifier> eku = new Vector<ObjectIdentifier>();
-        eku.add(new ObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 2 })); // clientAuth
-        exts.set(ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(eku));
+        @SuppressWarnings("unchecked")
+        final Vector eku = new Vector();
+        eku.add(CertificateFactoryBridge.createObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 2 })); // clientAuth
+        CertificateFactoryBridge.invokeSet(exts, ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(eku));
         // Subject Key Identifier
         final PublicKey clientPub = clientKeyPair.getPublic();
-        exts.set(SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(clientPub).getIdentifier()));
+        CertificateFactoryBridge.invokeSet(exts, SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(clientPub).getIdentifier()));
         // Authority Key Identifier (from CA)
         final KeyIdentifier caKeyId = new KeyIdentifier(caCertificate.getPublicKey());
-        exts.set(AuthorityKeyIdentifierExtension.NAME, new AuthorityKeyIdentifierExtension(caKeyId, null, null));
-        info.set(X509CertInfo.EXTENSIONS, exts);
+        CertificateFactoryBridge.invokeSet(exts, AuthorityKeyIdentifierExtension.NAME, new AuthorityKeyIdentifierExtension(caKeyId, null, null));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.EXTENSIONS, exts);
         final X509Certificate clientCert = signTwice(info, caPrivateKey, "SHA256withRSA");
         return new ClientCertificateResult(clientCert, clientKeyPair);
     }
@@ -436,13 +441,15 @@ public class CertificateFactory {
     }
 
     /**
-     * Creates a client certificate with an EC (elliptic curve) key, signed by the given CA.
-     * Use this when the server's CertificateRequest asks for EC (e.g. "No X.509 cert selected for EC");
-     * RSA client certs are then not sent by the JSSE.
+     * Creates a client certificate with an EC (elliptic curve) key, signed by the given CA. Use this when the server's CertificateRequest
+     * asks for EC (e.g. "No X.509 cert selected for EC"); RSA client certs are then not sent by the JSSE.
      *
-     * @param caCertificate CA cert
-     * @param caPrivateKey  CA private key
-     * @param cn            Common Name (e.g. "testclient")
+     * @param caCertificate
+     *            CA cert
+     * @param caPrivateKey
+     *            CA private key
+     * @param cn
+     *            Common Name (e.g. "testclient")
      * @return client cert and EC key pair
      */
     public static ClientCertificateResult createClientCertificateEC(final X509Certificate caCertificate, final PrivateKey caPrivateKey, final String cn) throws Exception {
@@ -453,25 +460,26 @@ public class CertificateFactory {
         final X500Name subject = new X500Name("CN=" + cn);
         final X500Name issuer = X500Name.asX500Name(caCertificate.getSubjectX500Principal());
         final X509CertInfo info = new X509CertInfo();
-        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
-        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
-        info.set(X509CertInfo.SUBJECT, subject);
-        info.set(X509CertInfo.ISSUER, issuer);
-        info.set(X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
-        info.set(X509CertInfo.KEY, new CertificateX509Key(clientKeyPair.getPublic()));
-        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(randomSerial()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.SUBJECT, subject);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ISSUER, issuer);
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.VALIDITY, new CertificateValidity(notBefore, notAfter));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.KEY, new CertificateX509Key(clientKeyPair.getPublic()));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(AlgorithmId.get("SHA256withRSA")));
         final CertificateExtensions exts = new CertificateExtensions();
-        exts.set(BasicConstraintsExtension.NAME, new BasicConstraintsExtension(false, true, -1));
+        CertificateFactoryBridge.invokeSet(exts, BasicConstraintsExtension.NAME, new BasicConstraintsExtension(false, true, -1));
         final boolean[] keyUsageBits = new boolean[9];
         keyUsageBits[0] = true; // digitalSignature
         keyUsageBits[4] = true; // keyAgreement (typical for EC)
-        exts.set(KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
-        final Vector<ObjectIdentifier> eku = new Vector<ObjectIdentifier>();
-        eku.add(new ObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 2 })); // clientAuth
-        exts.set(ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(eku));
-        exts.set(SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(clientKeyPair.getPublic()).getIdentifier()));
-        exts.set(AuthorityKeyIdentifierExtension.NAME, new AuthorityKeyIdentifierExtension(new KeyIdentifier(caCertificate.getPublicKey()), null, null));
-        info.set(X509CertInfo.EXTENSIONS, exts);
+        CertificateFactoryBridge.invokeSet(exts, KeyUsageExtension.NAME, new KeyUsageExtension(keyUsageBits));
+        @SuppressWarnings("unchecked")
+        final Vector ekuEc = new Vector();
+        ekuEc.add(CertificateFactoryBridge.createObjectIdentifier(new int[] { 1, 3, 6, 1, 5, 5, 7, 3, 2 })); // clientAuth
+        CertificateFactoryBridge.invokeSet(exts, ExtendedKeyUsageExtension.NAME, new ExtendedKeyUsageExtension(ekuEc));
+        CertificateFactoryBridge.invokeSet(exts, SubjectKeyIdentifierExtension.NAME, new SubjectKeyIdentifierExtension(new KeyIdentifier(clientKeyPair.getPublic()).getIdentifier()));
+        CertificateFactoryBridge.invokeSet(exts, AuthorityKeyIdentifierExtension.NAME, new AuthorityKeyIdentifierExtension(new KeyIdentifier(caCertificate.getPublicKey()), null, null));
+        CertificateFactoryBridge.invokeSet(info, X509CertInfo.EXTENSIONS, exts);
         final X509Certificate clientCert = signTwice(info, caPrivateKey, "SHA256withRSA");
         return new ClientCertificateResult(clientCert, clientKeyPair);
     }
@@ -484,8 +492,8 @@ public class CertificateFactory {
     }
 
     /**
-     * Creates an in-memory PKCS12 KeyStore with the given certificate, private key, and optionally the CA cert.
-     * Use this when you do not need to persist to a file (e.g. in tests).
+     * Creates an in-memory PKCS12 KeyStore with the given certificate, private key, and optionally the CA cert. Use this when you do not
+     * need to persist to a file (e.g. in tests).
      */
     public static KeyStore createPKCS12KeyStore(final X509Certificate certificate, final PrivateKey privateKey, final char[] password, final String alias, final X509Certificate caCertificate) throws Exception {
         final KeyStore keyStore = KeyStore.getInstance("PKCS12");
@@ -541,7 +549,6 @@ public class CertificateFactory {
             }
         }
     }
-
     // =========================================================================================
     // Internals
     // =========================================================================================
@@ -568,53 +575,65 @@ public class CertificateFactory {
 
     /**
      * Signs a certificate twice to work around JDK bug with inconsistent AlgorithmId.
-     * 
-     * <p><b>Why this is necessary:</b>
+     *
+     * <p>
+     * <b>Why this is necessary:</b>
      * <ul>
-     *   <li>During the first {@code cert.sign(...)}, the JDK computes the actual AlgorithmId</li>
-     *   <li>However, the AlgorithmId in {@code X509CertInfo} is not updated automatically</li>
-     *   <li>This causes inconsistency between {@code tbsCertificate.signature.algorithm} and 
-     *       {@code signatureAlgorithm} in the final certificate</li>
-     *   <li>Result: Certificate looks OK but verification/TLS fails sporadically with 
-     *       "Signature algorithm mismatch" errors</li>
+     * <li>During the first {@code cert.sign(...)}, the JDK computes the actual AlgorithmId</li>
+     * <li>However, the AlgorithmId in {@code X509CertInfo} is not updated automatically</li>
+     * <li>This causes inconsistency between {@code tbsCertificate.signature.algorithm} and {@code signatureAlgorithm} in the final
+     * certificate</li>
+     * <li>Result: Certificate looks OK but verification/TLS fails sporadically with "Signature algorithm mismatch" errors</li>
      * </ul>
-     * 
-     * <p><b>What this method does:</b>
+     *
+     * <p>
+     * <b>What this method does:</b>
      * <ol>
-     *   <li>First sign: JDK computes the real AlgorithmId</li>
-     *   <li>Copy the actual AlgorithmId back into CertInfo</li>
-     *   <li>Sign again with consistent AlgorithmId</li>
+     * <li>First sign: JDK computes the real AlgorithmId</li>
+     * <li>Copy the actual AlgorithmId back into CertInfo</li>
+     * <li>Sign again with consistent AlgorithmId</li>
      * </ol>
-     * 
-     * <p><b>When needed:</b>
+     *
+     * <p>
+     * <b>When needed:</b>
      * <ul>
-     *   <li>Required for {@code sun.security.x509} usage</li>
-     *   <li>Critical for Java 8u &lt; ~242</li>
-     *   <li>Recommended for Java 11/17 (doesn't hurt, prevents edge cases)</li>
-     *   <li>Not needed for BouncyCastle or keytool</li>
+     * <li>Required for {@code sun.security.x509} usage</li>
+     * <li>Critical for Java 8u &lt; ~242</li>
+     * <li>Recommended for Java 11/17 (doesn't hurt, prevents edge cases)</li>
+     * <li>Not needed for BouncyCastle or keytool</li>
      * </ul>
-     * 
-     * <p>This is a defensive workaround for broken JDK behavior - ugly but correct.
-     * Removing this can cause intermittent TLS failures that are hard to debug.
-     * 
-     * @param info Certificate info to sign
-     * @param signingKey Private key for signing
-     * @param algo Signature algorithm (e.g., "SHA256withRSA")
+     *
+     * <p>
+     * This is a defensive workaround for broken JDK behavior - ugly but correct. Removing this can cause intermittent TLS failures that are
+     * hard to debug.
+     *
+     * @param info
+     *            Certificate info to sign
+     * @param signingKey
+     *            Private key for signing
+     * @param algo
+     *            Signature algorithm (e.g., "SHA256withRSA")
      * @return Properly signed certificate with consistent AlgorithmId
      */
     private static X509Certificate signTwice(final X509CertInfo info, final PrivateKey signingKey, final String algo) throws Exception {
-        // Step 1: First sign -> JDK computes the real AlgorithmId
-        X509CertImpl cert = new X509CertImpl(info);
-        cert.sign(signingKey, algo);
-        
-        // Step 2: Copy the actual AlgorithmId back into CertInfo
-        // This ensures consistency between tbsCertificate.signature.algorithm and signatureAlgorithm
-        final AlgorithmId actualAlgId = (AlgorithmId) cert.get(X509CertImpl.SIG_ALG);
-        info.set(CertificateAlgorithmId.NAME + "." + CertificateAlgorithmId.ALGORITHM, actualAlgId);
-        
+        // JDK 21+: X509CertImpl(X509CertInfo) constructor was removed; use newSigned (sets AlgorithmId correctly in one step)
+        try {
+            final Method newSigned = X509CertImpl.class.getMethod("newSigned", X509CertInfo.class, PrivateKey.class, String.class);
+            final Object cert = newSigned.invoke(null, info, signingKey, algo);
+            return (X509Certificate) cert;
+        } catch (NoSuchMethodException e) {
+            // Java 8..20: use constructor + sign (twice for AlgorithmId consistency)
+        }
+        // Step 1: First sign -> JDK computes the real AlgorithmIdX509CertImpl
+        X509CertImpl cert = X509CertImpl.class.getConstructor(X509CertInfo.class).newInstance(info);
+        ReflectionUtils.invoke(cert.getClass(), "sign", cert, void.class, signingKey, algo);
+        // Step 2: Copy the actual AlgorithmId back into CertInfo (via reflection for JDK 21+ compatibility)
+        final Object actualAlgId = CertificateFactoryBridge.invokeGet(cert, "x509.algorithm");
+        final String algAttrName = CertificateAlgorithmId.NAME + "." + "algorithm";
+        CertificateFactoryBridge.invokeSet(info, algAttrName, actualAlgId);
         // Step 3: Sign again with consistent AlgorithmId
-        cert = new X509CertImpl(info);
-        cert.sign(signingKey, algo);
+        cert = X509CertImpl.class.getConstructor(X509CertInfo.class).newInstance(info);
+        ReflectionUtils.invoke(cert.getClass(), "sign", cert, void.class, signingKey, algo);
         return cert;
     }
 }

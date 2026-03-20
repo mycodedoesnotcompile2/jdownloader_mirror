@@ -73,7 +73,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
-@HostPlugin(revision = "$Revision: 52010 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52535 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,7 @@ public class RapidGatorNet extends PluginForHost {
         br.getHeaders().put("Pragma", null);
         br.setCookie(getHost(), "lang", "en");
         br.setCustomCharset("UTF-8");
-        final int customReadTimeoutSeconds = PluginJsonConfig.get(RapidGatorConfig.class).getReadTimeout();
+        final int customReadTimeoutSeconds = get(RapidGatorConfig.class).getReadTimeout();
         br.setReadTimeout(customReadTimeoutSeconds * 1000);
         br.setConnectTimeout(1 * 60 * 1000);
         /* For API */

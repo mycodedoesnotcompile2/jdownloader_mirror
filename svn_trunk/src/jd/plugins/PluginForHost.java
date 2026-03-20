@@ -189,6 +189,7 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.Formatter;
 import jd.nutils.JDHash;
 import jd.plugins.Account.AccountError;
+import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder.AccountCaptchaTypeAccessor;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.download.DownloadInterface;
@@ -3190,7 +3191,7 @@ public abstract class PluginForHost extends Plugin {
             /* Not a captcha solver plugin */
             return;
         }
-        new CaptchaSolverAccountSettingsPanelBuilder(acc).build(panel);
+        new CaptchaSolverAccountSettingsPanelBuilder(new AccountCaptchaTypeAccessor(acc)).build(panel);
     }
 
     public void extendAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {

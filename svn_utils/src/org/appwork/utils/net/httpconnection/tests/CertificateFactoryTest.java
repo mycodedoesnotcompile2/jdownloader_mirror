@@ -51,26 +51,33 @@ import org.appwork.remoteapi.ParseException;
 import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.tests.DummyTestAPIImpl;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.JREExecuter;
+import org.appwork.testframework.JREExecuter.JreOptions;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
-import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.AllTrustProvider;
+import org.appwork.utils.net.httpconnection.trust.CustomTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpserver.ExperimentalAutoSSLHttpServer;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 
 /**
- * Tests for CertificateFactory functionality.
+ * Tests for CertificateFactory functionality. Executed via {@link JREExecuter} under JRE 1.8, 11, 21, and the current (newest) runtime
+ * version to ensure certificate creation works on all supported Java versions (reflection bridge in Java 21+).
  *
- * Important changes vs your version: - Avoid reusing a HttpClient that was switched to TrustAll (prevents false-green tests). - Actually
- * verify SAN values via X509Certificate.getSubjectAlternativeNames(). - Keep a dedicated client for TrustAll and another dedicated client
- * for CA-trust.
+ * <p>
+ * Important: Avoid reusing a HttpClient that was switched to TrustAll (prevents false-green tests). Actually verify SAN values via
+ * X509Certificate.getSubjectAlternativeNames(). Keep a dedicated client for TrustAll and another dedicated client for CA-trust.
  */
 public class CertificateFactoryTest extends AWTest {
+    /** JVM args required for Java 9+ to access sun.security.x509 / sun.security.util (CertificateFactory). */
+    private static final String[] ADD_EXPORTS_JVM_ARGS = new String[] { "--add-exports", "java.base/sun.security.x509=ALL-UNNAMED", "--add-exports", "java.base/sun.security.util=ALL-UNNAMED" };
+
     /**
      * JSSE-based SSL-enabled HTTP server for testing
      */
@@ -106,6 +113,26 @@ public class CertificateFactoryTest extends AWTest {
 
     @Override
     public void runTest() throws Exception {
+        // Run CertificateFactory tests in JRE 1.8, 11, 21, and current (newest) runtime version (Java 9+ need --add-exports)
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_1_8), CertificateFactoryTest.class, "runCertificateFactoryTestsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_11_0).jvmArgs(ADD_EXPORTS_JVM_ARGS), CertificateFactoryTest.class, "runCertificateFactoryTestsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_21_0).jvmArgs(ADD_EXPORTS_JVM_ARGS), CertificateFactoryTest.class, "runCertificateFactoryTestsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_25_0).jvmArgs(ADD_EXPORTS_JVM_ARGS), CertificateFactoryTest.class, "runCertificateFactoryTestsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_26_0).jvmArgs(ADD_EXPORTS_JVM_ARGS), CertificateFactoryTest.class, "runCertificateFactoryTestsInThisJRE");
+        JREExecuter.runInJRE(JreOptions.version(JavaVersion.JVM_27_0).jvmArgs(ADD_EXPORTS_JVM_ARGS), CertificateFactoryTest.class, "runCertificateFactoryTestsInThisJRE");
+    }
+
+    /**
+     * Entry point for execution in a specific JRE via JREExecuter. Runs the full CertificateFactory test in the current JRE.
+     */
+    public static void runCertificateFactoryTestsInThisJRE() throws Exception {
+        new CertificateFactoryTest().runCertificateFactoryTestsInThisJREInstance();
+    }
+
+    /**
+     * Actual test logic: create certs, keystore, SSL server, run HTTPS and SAN checks. Invoked in child JRE (1.8, 11, 21, current).
+     */
+    private void runCertificateFactoryTestsInThisJREInstance() throws Exception {
         try {
             createCertificates();
             createKeystore();
