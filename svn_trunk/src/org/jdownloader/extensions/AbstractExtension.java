@@ -135,6 +135,10 @@ public abstract class AbstractExtension<ConfigType extends ExtensionConfigInterf
         return ret;
     }
 
+    public <T> T invoke(String method, Class<T> returnType, Object... args) throws NoSuchMethodException, Exception {
+        throw new NoSuchMethodException("method:" + method);
+    }
+
     /**
      * Returns the internal storage. Most of the configvalues are for internal use only. This config only contains values which are valid
      * for all extensions

@@ -1,3 +1,4 @@
+gui_config_antistandby_extension=A extensão requer ficar ativa
 gui_config_antistandby_whilecrawl=Captura em andamento
 gui_config_antistandby_whiledl2=Downloads estiverem em progresso
 gui_config_antistandby_whileextract=O arquivo está sendo extraído

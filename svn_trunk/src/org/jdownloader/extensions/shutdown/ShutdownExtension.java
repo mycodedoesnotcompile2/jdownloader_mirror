@@ -15,6 +15,9 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package org.jdownloader.extensions.shutdown;
 
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.plugins.AddonPanel;
+
 import org.appwork.controlling.StateEvent;
 import org.appwork.controlling.StateEventListener;
 import org.appwork.controlling.StateMachine;
@@ -41,13 +44,9 @@ import org.jdownloader.gui.mainmenu.MenuManagerMainmenu;
 import org.jdownloader.gui.mainmenu.container.ExtensionsMenuContainer;
 import org.jdownloader.gui.toolbar.MenuManagerMainToolbar;
 
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.plugins.AddonPanel;
-
 public class ShutdownExtension extends AbstractExtension<ShutdownConfig, ShutdownTranslation> implements StateEventListener, MenuExtenderHandler {
     private ShutdownConfigPanel     configPanel;
     private final ShutdownInterface shutdownInterface;
-    private ShutdownThread          thread = null;
 
     public ShutdownConfigPanel getConfigPanel() {
         return configPanel;
@@ -88,14 +87,15 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
 
     @Override
     protected void stop() throws StopException {
-        if (shutdownInterface != null) {
-            DownloadWatchDog.getInstance().getStateMachine().removeListener(this);
-            if (!Application.isHeadless()) {
-                MenuManagerMainToolbar.getInstance().unregisterExtender(this);
-                MenuManagerMainmenu.getInstance().unregisterExtender(this);
-            }
-            logger.info("ShutdownExtension:Stopped");
+        if (shutdownInterface == null) {
+            return;
         }
+        DownloadWatchDog.getInstance().getStateMachine().removeListener(this);
+        if (!Application.isHeadless()) {
+            MenuManagerMainToolbar.getInstance().unregisterExtender(this);
+            MenuManagerMainmenu.getInstance().unregisterExtender(this);
+        }
+        logger.info("ShutdownExtension:Stopped");
     }
 
     @Override
@@ -142,6 +142,20 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
         }
     }
 
+    @Override
+    public <T> T invoke(String method, Class<T> returnType, Object... args) throws NoSuchMethodException, Exception {
+        if ("requiresAntiStandby".equals(method) && Boolean.class == returnType && args.length == 0) {
+            final ShutdownConfig settings = getSettings();
+            final Mode mode = settings.getShutdownMode();
+            boolean requiresAntiStandby = !Mode.STANDBY.equals(mode);// we don't need anti standby when standby is requested mode
+            requiresAntiStandby = requiresAntiStandby && (shutdownInterface != null && shutdownInterface.isSupported(mode));
+            requiresAntiStandby = requiresAntiStandby && settings.isShutdownActive();
+            requiresAntiStandby = requiresAntiStandby && DownloadWatchDog.getInstance().getStateMachine().containsListener(this);
+            return returnType.cast(requiresAntiStandby);
+        }
+        return super.invoke(method, returnType, args);
+    }
+
     public void onStateChange(StateEvent event) {
         if (event.getNewState() == DownloadWatchDog.STOPPED_STATE) {
             final boolean active = getSettings().isShutdownActive();
@@ -149,22 +163,11 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
                 logger.info("ShutdownExtension is not active!");
                 return;
             }
-            logger.info("ShutdownExtension is active!");
             if (DownloadWatchDog.getInstance().getSession().getDownloadsStarted() == 0) {
                 logger.info("No downloads have been started in last session! ByPass ShutdownExtension!");
                 return;
             }
-            final ShutdownRequest request = ShutdownController.getInstance().collectVetos(new BasicShutdownRequest(true));
-            if (!request.hasVetos()) {
-                startShutdownThread();
-                return;
-            }
-            logger.info("Vetos: " + request.getVetos().size() + " Wait until there is no veto");
-            for (ShutdownVetoException e : request.getVetos()) {
-                logger.log(e);
-                logger.info(e.getSource() + "");
-            }
-            new Thread("Wait to Shutdown") {
+            new Thread("ShutdownExtension") {
                 public void run() {
                     while (true) {
                         final StateMachine sm = DownloadWatchDog.getInstance().getStateMachine();
@@ -172,6 +175,7 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
                             logger.info("Cancel Shutdown.");
                             return;
                         }
+                        logger.info("ShutdownExtension is active!");
                         final ShutdownRequest request = ShutdownController.getInstance().collectVetos(new BasicShutdownRequest(true));
                         if (!request.hasVetos()) {
                             logger.info("No Vetos");
@@ -196,7 +200,9 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
         }
     }
 
-    protected void startShutdownThread() {
+    private ShutdownThread thread = null;
+
+    protected synchronized void startShutdownThread() {
         final Thread thread = this.thread;
         if (thread == null || !thread.isAlive()) {
             final ShutdownThread shutdown = new ShutdownThread(this);

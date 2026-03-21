@@ -50,7 +50,7 @@ import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52535 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52539 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -120,9 +120,9 @@ public class DdownloadCom extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "ddownload.com", "ddl.to", "api.ddl.to", "esimpurcuesc.ddownload.com",
-                /*
-                 * download cdn, dedicated to ddownload?
-                 */"ucdn.to" });
+        /*
+         * download cdn, dedicated to ddownload?
+         */"ucdn.to" });
         return ret;
     }
 
@@ -544,15 +544,6 @@ public class DdownloadCom extends XFileSharingProBasic {
         return looksLikeValidAPIKey(this.getAPIKey());
     }
 
-    // @Override
-    // public String regexFilenameAbuse(final Browser br) {
-    // String filename = br.getRegex("label>Filename</label>\\s*<input[^>]*value=\"([^<>\"]+)\"").getMatch(0);
-    // if (StringUtils.isEmpty(filename)) {
-    // /* Fallback to template */
-    // filename = super.regexFilenameAbuse(br);
-    // }
-    // return filename;
-    // }
     @Override
     public Class<? extends XFSConfigDdownloadCom> getConfigInterface() {
         return XFSConfigDdownloadCom.class;

@@ -37,6 +37,7 @@ import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.dialog.ExceptionDialog;
 import org.jdownloader.extensions.AbstractExtension;
 import org.jdownloader.extensions.ExtensionConfigPanel;
+import org.jdownloader.extensions.ExtensionController;
 import org.jdownloader.extensions.StartException;
 import org.jdownloader.extensions.StopException;
 import org.jdownloader.extensions.antistandby.translate.AntistandbyTranslation;
@@ -121,6 +122,17 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
             final ExtractionExtension extension = ArchiveValidator.EXTENSION;
             if (extension != null && !extension.getJobQueue().isEmpty()) {
                 return true;
+            }
+        } else if (condition.contains(Condition.EXTENSION)) {
+            for (AbstractExtension<?, ?> extension : ExtensionController.getInstance().getEnabledExtensions()) {
+                try {
+                    if (extension instanceof AntiStandbyExtension) {
+                        continue;
+                    } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
+                        return true;
+                    }
+                } catch (Throwable e) {
+                }
             }
         }
         return false;

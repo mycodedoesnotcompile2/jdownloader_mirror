@@ -27,6 +27,12 @@ public enum Condition implements LabelInterface {
         public String getLabel() {
             return T.T.gui_config_antistandby_whileextract();
         }
+    },
+    EXTENSION {
+        @Override
+        public String getLabel() {
+            return T.T.gui_config_antistandby_extension();
+        }
     };
 
     @Override

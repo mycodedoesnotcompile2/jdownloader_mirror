@@ -571,7 +571,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                              * </p>
                              */
                             continue;
-                        } else if (!getTrustProvider().equals(((KeepAliveSSLSocketStream) socketStream).getTrustProvider() != getTrustProvider())) {
+                        } else if (!getTrustProvider().equals(((KeepAliveSSLSocketStream) socketStream).getTrustProvider())) {
                             // different trust provider
                             continue;
                         } else if (!Arrays.equals(getKeyManagers(), ((KeepAliveSSLSocketStream) socketStream).getKeyManager())) {

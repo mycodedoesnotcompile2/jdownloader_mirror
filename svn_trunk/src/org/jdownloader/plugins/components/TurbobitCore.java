@@ -62,7 +62,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52442 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52536 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -461,6 +461,58 @@ public abstract class TurbobitCore extends PluginForHost {
         return br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(<div class=\"code-404\">404</div>|Файл не найден\\. Возможно он был удален\\.<br|(?:Document|File|Page)\\s*(was)?\\s*not found|It could possibly be deleted\\.)");
     }
 
+    protected AccountType parseAccountInfo(final Account account, AccountInfo ai, Map<String, Object> entries) throws Exception {
+        if (ai == null) {
+            ai = new AccountInfo();
+        }
+        synchronized (account) {
+            try {
+                final Map<String, Object> entries_premium = (Map<String, Object>) entries.get("premium");
+                final String status = entries_premium.get("status").toString();
+                if (status.equalsIgnoreCase("banned")) {
+                    account.setType(AccountType.PREMIUM);
+                    // for example:Status: Banned. You have reached the limit of your daily traffic quota
+                    try {
+                        getAndSetPremiumInformationWebsiteV1(account, ai);
+                        throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+                    } catch (PluginException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        throw new AccountUnavailableException(e, "You have reached limit of premium downloads", 30 * 60 * 1000l);
+                    }
+                } else if (status.equalsIgnoreCase("active")) {
+                    account.setType(AccountType.PREMIUM);
+                    final String expiredateStr = entries_premium.get("expiredAt").toString();
+                    ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
+                    if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
+                        // only check/update for normal account check
+                        try {
+                            getAndSetPremiumInformationWebsiteV1(account, ai);
+                        } catch (PluginException e) {
+                            throw e;
+                        } catch (Exception e) {
+                            logger.log(e);
+                        }
+                    }
+                    return AccountType.PREMIUM;
+                } else {
+                    /**
+                     * 2025-08-15: At this moment multiple simultaneous downloads are possible via free account, see: <br>
+                     * https://board.jdownloader.org/showthread.php?t=97715
+                     */
+                    // account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
+                    account.setType(AccountType.FREE);
+                    return AccountType.FREE;
+                }
+            } catch (PluginException e) {
+                if (account.getAccountInfo() != ai) {
+                    account.setAccountInfo(ai);
+                }
+                throw e;
+            }
+        }
+    }
+
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final Map<String, Object> userinfo = login(account, true);
@@ -474,26 +526,7 @@ public abstract class TurbobitCore extends PluginForHost {
             } else {
                 entries = getUserInformationWebsiteV2(br, account);
             }
-            final Map<String, Object> entries_premium = (Map<String, Object>) entries.get("premium");
-            final String status = entries_premium.get("status").toString();
-            if (status.equalsIgnoreCase("banned")) {
-                account.setType(AccountType.PREMIUM);
-                // for example:Status: Banned. You have reached the limit of your daily traffic quota
-                getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(account, ai);
-                throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
-            } else if (status.equalsIgnoreCase("active")) {
-                account.setType(AccountType.PREMIUM);
-                final String expiredateStr = entries_premium.get("expiredAt").toString();
-                ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
-                getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(account, ai);
-            } else {
-                /**
-                 * 2025-08-15: At this moment multiple simultaneous downloads are possible via free account, see: <br>
-                 * https://board.jdownloader.org/showthread.php?t=97715
-                 */
-                // account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
-                account.setType(AccountType.FREE);
-            }
+            parseAccountInfo(account, ai, entries);
         } else {
             // >Turbo access till 27.09.2015</span>
             String expire = br.getRegex(">\\s*Turbo access till\\s*(.*?)\\s*</span>").getMatch(0);
@@ -512,17 +545,6 @@ public abstract class TurbobitCore extends PluginForHost {
         return ai;
     }
 
-    private void getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(final Account account, final AccountInfo ai) throws AccountUnavailableException {
-        try {
-            getAndSetPremiumInformationWebsiteV1(account, ai);
-        } catch (final AccountUnavailableException e) {
-            throw e;
-        } catch (final Exception e) {
-            logger.log(e);
-            logger.warning("Exception happened during obtaining premium traffic");
-        }
-    }
-
     /**
      * Only call this for premium accounts!!
      *
@@ -532,44 +554,46 @@ public abstract class TurbobitCore extends PluginForHost {
         if (account.getType() != AccountType.PREMIUM) {
             logger.warning("DEVELOPER MISTAKE!! ONLY CALL THIS FUNCTION FOR PREMIUM ACCOUNTS!!");
         }
-        logger.info("Obtaining premium traffic information");
-        final Browser brc = br.cloneBrowser();
-        brc.getPage("https://" + br.getHost(false) + "/premium/info?site_version=1&from_mirror=1");
-        ai.setProperty("getAndSetPremiumInformationWebsiteV1", true);
-        final Regex traffic_daily = brc.getRegex("The rest of the traffic until the end of the day:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/day\\)");
-        if (traffic_daily.patternFind()) {
-            final long traffic_daily_left = SizeFormatter.getSize(traffic_daily.getMatch(0));
-            final long traffic_daily_max = SizeFormatter.getSize(traffic_daily.getMatch(1));
-            ai.setTrafficLeft(traffic_daily_left);
-            ai.setTrafficMax(traffic_daily_max);
-        } else {
-            logger.warning("Failed to find daily traffic left information");
-        }
-        final Regex traffic_monthly = brc.getRegex("The rest of the monthly traffic:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/month\\)");
-        String monthlyTrafficLeftInfo = "N/A";
-        if (traffic_monthly.patternFind()) {
-            final String traffic_monthly_left = traffic_monthly.getMatch(0);
-            final String traffic_monthly_max = traffic_monthly.getMatch(1);
-            monthlyTrafficLeftInfo = traffic_monthly_left + "/" + traffic_monthly_max;
-        } else {
-            logger.warning("Failed to find monthly traffic left information");
-        }
-        ai.setStatus(account.getType().getLabel() + " | Monthly traffic left: " + monthlyTrafficLeftInfo);
-        final long dateEndTime = getDateEndTimeWebsiteV1(brc, account);
-        if (dateEndTime != -1) {
-            ai.setValidUntil(dateEndTime);
-        }
-        Long endBlockingTime = null;
-        if (brc.containsHTML("<span class='glyphicon glyphicon-ok banturbo'>") || (endBlockingTime = getBlockingEndTime(brc, account)) > 0) {
-            if (endBlockingTime == null) {
-                endBlockingTime = getBlockingEndTime(brc, account);
-            }
-            if (endBlockingTime > 0) {
-                final String readableTime = new SimpleDateFormat("yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH).format(new Date(endBlockingTime));
-                final long wait = Math.max(5 * 60 * 1000l, Math.min(endBlockingTime - System.currentTimeMillis(), 30 * 60 * 1000l));
-                throw new AccountUnavailableException("You have reached limit of premium downloads:" + readableTime, wait);
+        synchronized (account) {
+            logger.info("Obtaining premium traffic information");
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("https://" + br.getHost(false) + "/premium/info?site_version=1&from_mirror=1");
+            ai.setProperty("getAndSetPremiumInformationWebsiteV1", true);
+            final Regex traffic_daily = brc.getRegex("The rest of the traffic until the end of the day:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/day\\)");
+            if (traffic_daily.patternFind()) {
+                final long traffic_daily_left = SizeFormatter.getSize(traffic_daily.getMatch(0));
+                final long traffic_daily_max = SizeFormatter.getSize(traffic_daily.getMatch(1));
+                ai.setTrafficLeft(traffic_daily_left);
+                ai.setTrafficMax(traffic_daily_max);
             } else {
-                throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+                logger.warning("Failed to find daily traffic left information");
+            }
+            final Regex traffic_monthly = brc.getRegex("The rest of the monthly traffic:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/month\\)");
+            String monthlyTrafficLeftInfo = "N/A";
+            if (traffic_monthly.patternFind()) {
+                final String traffic_monthly_left = traffic_monthly.getMatch(0);
+                final String traffic_monthly_max = traffic_monthly.getMatch(1);
+                monthlyTrafficLeftInfo = traffic_monthly_left + "/" + traffic_monthly_max;
+            } else {
+                logger.warning("Failed to find monthly traffic left information");
+            }
+            ai.setStatus(account.getType().getLabel() + " | Monthly traffic left: " + monthlyTrafficLeftInfo);
+            final long dateEndTime = getDateEndTimeWebsiteV1(brc, account);
+            if (dateEndTime != -1) {
+                ai.setValidUntil(dateEndTime);
+            }
+            Long endBlockingTime = null;
+            if (brc.containsHTML("<span class='glyphicon glyphicon-ok banturbo'>") || (endBlockingTime = getBlockingEndTime(brc, account)) > 0) {
+                if (endBlockingTime == null) {
+                    endBlockingTime = getBlockingEndTime(brc, account);
+                }
+                if (endBlockingTime > 0) {
+                    final String readableTime = new SimpleDateFormat("yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH).format(new Date(endBlockingTime));
+                    final long wait = Math.max(5 * 60 * 1000l, Math.min(endBlockingTime - System.currentTimeMillis(), 30 * 60 * 1000l));
+                    throw new AccountUnavailableException("You have reached limit of premium downloads:" + readableTime, wait);
+                } else {
+                    throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+                }
             }
         }
     }
@@ -783,7 +807,11 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         boolean verifiedLogin = false;
         if (account != null) {
-            verifiedLogin = this.login(account, false) != null;
+            final Map<String, Object> entries = this.login(account, false);
+            verifiedLogin = entries != null;
+            if (entries != null) {
+                parseAccountInfo(account, account.getAccountInfo(), entries);
+            }
         } else {
             if (checkShowFreeDialog(getHost())) {
                 super.showFreeDialog(getHost());
@@ -1110,7 +1138,10 @@ public abstract class TurbobitCore extends PluginForHost {
             }
         }
         requestFileInformation_WebsiteV1(link, account);
-        login(account, false);
+        final Map<String, Object> entries = this.login(account, false);
+        if (entries != null) {
+            parseAccountInfo(account, account.getAccountInfo(), entries);
+        }
         sleep(2000, link);
         accessContentURLWebsiteV1(br, link);
         handlePremiumCaptchaWebsiteV1(br, link, account);

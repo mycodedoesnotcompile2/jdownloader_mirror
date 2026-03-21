@@ -60,16 +60,13 @@ public class WindowsAntiStandby extends Thread implements Runnable {
         // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate
         int flags = WinBase.ES_CONTINUOUS;
         if (enabled) {
-            // must be called periodically
             flags = flags | WinBase.ES_SYSTEM_REQUIRED;
             if (jdAntiStandby.getSettings().isDisplayRequired()) {
                 flags = flags | WinBase.ES_DISPLAY_REQUIRED;
             }
-            Kernel32.INSTANCE.SetThreadExecutionState(flags);
-        } else if (lastFlag.get() != WinBase.ES_CONTINUOUS) {
-            Kernel32.INSTANCE.SetThreadExecutionState(flags);
         }
         if (lastFlag.getAndSet(flags) != flags) {
+            Kernel32.INSTANCE.SetThreadExecutionState(flags);
             logger.fine("JDAntiStandby: new flags=" + flags);
         }
     }

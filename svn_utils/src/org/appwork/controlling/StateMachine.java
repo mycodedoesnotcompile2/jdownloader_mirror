@@ -92,6 +92,10 @@ public class StateMachine {
         this.eventSender.addListener(listener);
     }
 
+    public boolean containsListener(final StateEventListener listener) {
+        return this.eventSender.containsListener(listener);
+    }
+
     /**
      * synchronized execution of a runnable if statemachine is currently in a given state
      *

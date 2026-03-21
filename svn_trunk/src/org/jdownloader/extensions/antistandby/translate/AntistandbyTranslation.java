@@ -25,6 +25,9 @@ public interface AntistandbyTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Archive is extracting" })
     String gui_config_antistandby_whileextract();
 
+    @Default(lngs = { "en" }, values = { "Extension requires to stay active" })
+    String gui_config_antistandby_extension();
+
     @Default(lngs = { "en" }, values = { "Prevent standby/sleep when" })
     String mode();
 
