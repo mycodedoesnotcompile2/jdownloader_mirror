@@ -1072,8 +1072,15 @@ public final class AdminHelperProcess {
                 if (resultHexFile.isFile()) {
                     stdout = IO.readFileToString(resultHexFile).trim();
                 }
-                if (stdout.length() == 0 && stdoutFile.isFile()) {
-                    throw new Exception("runAsLocalSystem task did not produce result.hex. exitCode=" + exitCode);
+                if (stdout.length() == 0) {
+                    if (stderrFile.isFile()) {
+                        stderr = new String(IO.readStream(-1, new java.io.FileInputStream(stderrFile)), UTF8);
+                    }
+                    String msg = "runAsLocalSystem task did not produce result.hex. exitCode=" + exitCode;
+                    if (stderr != null && stderr.trim().length() > 0) {
+                        msg += ". Subprocess stderr: " + stderr.trim();
+                    }
+                    throw new Exception(msg);
                 }
             } else {
                 if (stdoutFile.isFile()) {

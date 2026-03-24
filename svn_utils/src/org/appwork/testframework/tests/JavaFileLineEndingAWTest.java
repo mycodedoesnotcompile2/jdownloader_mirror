@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.testframework.tests;
 
+import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -49,27 +50,43 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.swing.JLabel;
+import javax.swing.JScrollPane;
+import javax.swing.table.TableCellEditor;
+
 import org.appwork.builddecision.BuildDecisions;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.exttable.ExtTable;
+import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.swing.exttable.columns.ExtCheckColumn;
+import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.testframework.TestInterface;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.ide.IDEUtils;
+import org.appwork.utils.swing.dialog.ContainerDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 
 /**
  * AWTest that scans all text files (excluding binary files), detects LF vs CRLF, stores state in cache, and if a file's line ending
- * changed compared to cache, asks via dialog whether to correct it. Includes install4j files (e.g. .install4j config and templates
+ * changed compared to cache, asks via dialog (ExtTable with per-file correct checkbox, all checked by default). Includes install4j files (e.g. .install4j config and templates
  * like template_i4j10.install4j). Does NOT implement PostBuildTestInterface so it never runs in PostBuild (IDE only).
+ * When started from main in observer mode, a full workspace scan runs once before file watching begins.
+ * Paths under excluded directory names (VCS/IDE/build/tooling noise, e.g. .metadata, .svn, .settings, .cursor) are not scanned or watched.
  */
 public class JavaFileLineEndingAWTest implements TestInterface {
     private static final String   CACHE_FILENAME = "cfg/lineEndingCache.json";
+    /**
+     * Single path segment (directory name): do not recurse, scan, or register a watch under these (any depth).
+     */
+    private static final String[] EXCLUDED_DIRECTORY_NAMES = { ".metadata", ".svn", ".settings", ".git", ".hg", ".bzr", ".idea", ".cursor", "node_modules" };
     /** Extensions of files that are always treated as binary and skipped (no content read). */
     private static final String[] BINARY_EXTENSIONS = { ".jar", ".zip", ".class", ".dll", ".exe", ".so", ".dylib", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".woff", ".woff2", ".ttf", ".eot", ".pyc", ".bin" };
     /** Extensions of files that must be treated as text (e.g. install4j config/templates). Always checked for line endings. */
@@ -104,7 +121,8 @@ public class JavaFileLineEndingAWTest implements TestInterface {
             return;
         }
         Map<String, String> cache = loadCache(cacheFile);
-        List<File> allFiles = Files.getFiles(false, true, workspace);
+        List<File> allFiles = new ArrayList<File>();
+        collectScannableWorkspaceFiles(workspace, allFiles);
         // First pass: collect all text files whose line ending changed vs cache (binary files skipped)
         List<FileLineEndingEntry> toAsk = new ArrayList<FileLineEndingEntry>();
         for (File file : allFiles) {
@@ -116,7 +134,10 @@ public class JavaFileLineEndingAWTest implements TestInterface {
                 continue;
             }
             relPath = relPath.replace(File.separatorChar, '/');
-            String current = detectLineEnding(file);
+            if (relativePathContainsExcludedDirectorySegment(relPath)) {
+                continue;
+            }
+            String current = detectLineEndingWithRetry(file, relPath);
             if (current == null) {
                 continue;
             }
@@ -132,24 +153,69 @@ public class JavaFileLineEndingAWTest implements TestInterface {
         }
         // Single dialog for all collected files
         if (!toAsk.isEmpty()) {
-            boolean doCorrect = askCorrectAll(toAsk);
-            if (doCorrect) {
-                for (FileLineEndingEntry e : toAsk) {
-                    try {
-                        correctLineEnding(e.file, e.cached);
-                        cache.put(e.relPath, e.cached);
-                    } catch (IOException ex) {
-                        LogV3.log(ex);
-                    }
-                }
-                LogV3.info("JavaFileLineEndingAWTest: corrected " + toAsk.size() + " text file(s)");
-            } else {
-                for (FileLineEndingEntry e : toAsk) {
-                    cache.put(e.relPath, e.current);
-                }
+            presentLineEndingCorrectionDialog(toAsk, cache);
+        }
+        try {
+            saveCache(cacheFile, cache);
+        } catch (IOException ex) {
+            LogV3.info("JavaFileLineEndingAWTest: could not write line-ending cache");
+            LogV3.log(ex);
+        }
+    }
+
+    private static boolean isExcludedWorkspaceDirectoryName(String dirName) {
+        if (dirName == null) {
+            return false;
+        }
+        for (int i = 0; i < EXCLUDED_DIRECTORY_NAMES.length; i++) {
+            if (EXCLUDED_DIRECTORY_NAMES[i].equals(dirName)) {
+                return true;
             }
         }
-        saveCache(cacheFile, cache);
+        return false;
+    }
+
+    /**
+     * True if any path segment of a workspace-relative path (forward slashes) is an excluded directory name.
+     */
+    private static boolean relativePathContainsExcludedDirectorySegment(String relPathForwardSlashes) {
+        if (relPathForwardSlashes == null || relPathForwardSlashes.length() == 0) {
+            return false;
+        }
+        int start = 0;
+        for (int p = 0; p <= relPathForwardSlashes.length(); p++) {
+            if (p == relPathForwardSlashes.length() || relPathForwardSlashes.charAt(p) == '/') {
+                if (p > start) {
+                    String seg = relPathForwardSlashes.substring(start, p);
+                    if (isExcludedWorkspaceDirectoryName(seg)) {
+                        return true;
+                    }
+                }
+                start = p + 1;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Lists all files under {@code root} without descending into excluded directory names.
+     */
+    private void collectScannableWorkspaceFiles(File root, List<File> out) {
+        File[] children = root.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (int i = 0; i < children.length; i++) {
+            File child = children[i];
+            if (child.isDirectory()) {
+                if (isExcludedWorkspaceDirectoryName(child.getName())) {
+                    continue;
+                }
+                collectScannableWorkspaceFiles(child, out);
+            } else if (child.isFile()) {
+                out.add(child);
+            }
+        }
     }
 
     /**
@@ -277,30 +343,125 @@ public class JavaFileLineEndingAWTest implements TestInterface {
     }
 
     /**
-     * Show one dialog for all collected files: list paths and ask whether to correct all to cached line ending.
+     * One row per file: checkbox (default: correct to cached) and path / line-ending change. OK applies choices; Cancel keeps on-disk files and updates cache to current for all.
      */
-    private boolean askCorrectAll(List<FileLineEndingEntry> entries) {
-        StringBuilder msg = new StringBuilder();
-        msg.append(entries.size()).append(" file(s) have line ending changed compared to cache.\n\n");
-        int maxList = 30;
-        for (int i = 0; i < entries.size() && i < maxList; i++) {
-            FileLineEndingEntry e = entries.get(i);
-            msg.append("  ").append(e.relPath).append("  (").append(e.current).append(" -> ").append(e.cached).append(")\n");
+    private void presentLineEndingCorrectionDialog(final List<FileLineEndingEntry> entries, final Map<String, String> cache) {
+        final ExtTableModel<LineEndingChoiceRow> model = new ExtTableModel<LineEndingChoiceRow>(JavaFileLineEndingAWTest.class.getName() + ".LineEndingChoice") {
+            @Override
+            protected void initColumns() {
+                this.addColumn(new ExtCheckColumn<LineEndingChoiceRow>("Correct to cached", this) {
+                    @Override
+                    protected boolean getBooleanValue(final LineEndingChoiceRow value) {
+                        return value.correctToCached;
+                    }
+
+                    @Override
+                    protected void setBooleanValue(final boolean value, final LineEndingChoiceRow object) {
+                        object.correctToCached = value;
+                    }
+
+                    @Override
+                    public boolean isEditable(final LineEndingChoiceRow obj) {
+                        return true;
+                    }
+                });
+                this.addColumn(new ExtTextColumn<LineEndingChoiceRow>("File", this) {
+                    @Override
+                    public String getStringValue(final LineEndingChoiceRow value) {
+                        return value.entry.relPath;
+                    }
+
+                    @Override
+                    public int getDefaultWidth() {
+                        return 320;
+                    }
+                });
+                this.addColumn(new ExtTextColumn<LineEndingChoiceRow>("Line ending (now -> cached)", this) {
+                    @Override
+                    public String getStringValue(final LineEndingChoiceRow value) {
+                        return value.entry.current + " -> " + value.entry.cached;
+                    }
+
+                    @Override
+                    public int getDefaultWidth() {
+                        return 160;
+                    }
+                });
+            }
+        };
+        // Single batch update: addElement() from a non-EDT thread races (each call sees stale empty tableData and replaces with one row).
+        final ArrayList<LineEndingChoiceRow> rows = new ArrayList<LineEndingChoiceRow>(entries.size());
+        for (int i = 0; i < entries.size(); i++) {
+            rows.add(new LineEndingChoiceRow(entries.get(i)));
         }
-        if (entries.size() > maxList) {
-            msg.append("  ... and ").append(entries.size() - maxList).append(" more.\n");
-        }
-        msg.append("\nCorrect all to cached line ending?");
+        model.addAllElements(rows);
+        final ExtTable<LineEndingChoiceRow> table = new ExtTable<LineEndingChoiceRow>(model);
+        final JScrollPane scroll = new JScrollPane(table);
+        scroll.setPreferredSize(new Dimension(720, 400));
+        final MigPanel panel = new MigPanel("ins 10,wrap 1", "[grow,fill]", "[][]");
+        panel.add(new JLabel(entries.size() + " file(s) have line ending changed compared to cache. Uncheck to keep the file as-is and only update the cache."), "growx,wrap");
+        panel.add(scroll, "push,grow,width 480:720:,height 240:400:");
+        final ContainerDialog dlg = new ContainerDialog(0, "Line ending changed", panel, null, null, null);
         try {
-            int ret = Dialog.getInstance().showConfirmDialog(0, "Line ending changed", msg.toString(), null, "Yes", "No");
-            return BinaryLogic.containsSome(ret, Dialog.RETURN_OK);
+            final Integer ret = Dialog.getInstance().showDialog(dlg);
+            if (ret != null && BinaryLogic.containsSome(ret.intValue(), Dialog.RETURN_OK)) {
+                final TableCellEditor ed = table.getCellEditor();
+                if (ed != null) {
+                    ed.stopCellEditing();
+                }
+            }
+            if (ret == null || !BinaryLogic.containsSome(ret.intValue(), Dialog.RETURN_OK)) {
+                for (int i = 0; i < entries.size(); i++) {
+                    final FileLineEndingEntry e = entries.get(i);
+                    cache.put(e.relPath, e.current);
+                }
+                return;
+            }
+            int corrected = 0;
+            final List<LineEndingChoiceRow> choiceRows = model.getElements();
+            for (int i = 0; i < choiceRows.size(); i++) {
+                final LineEndingChoiceRow row = choiceRows.get(i);
+                final FileLineEndingEntry e = row.entry;
+                if (row.correctToCached) {
+                    try {
+                        correctLineEnding(e.file, e.cached);
+                        cache.put(e.relPath, e.cached);
+                        corrected++;
+                    } catch (IOException ex) {
+                        LogV3.log(ex);
+                    }
+                } else {
+                    cache.put(e.relPath, e.current);
+                }
+            }
+            if (corrected > 0) {
+                LogV3.info("JavaFileLineEndingAWTest: corrected " + corrected + " text file(s)");
+            }
         } catch (DialogCanceledException e) {
-            return false;
+            for (int i = 0; i < entries.size(); i++) {
+                final FileLineEndingEntry fe = entries.get(i);
+                cache.put(fe.relPath, fe.current);
+            }
         } catch (DialogClosedException e) {
-            return false;
+            for (int i = 0; i < entries.size(); i++) {
+                final FileLineEndingEntry fe = entries.get(i);
+                cache.put(fe.relPath, fe.current);
+            }
         } catch (Throwable e) {
             LogV3.log(e);
-            return false;
+            for (int i = 0; i < entries.size(); i++) {
+                final FileLineEndingEntry fe = entries.get(i);
+                cache.put(fe.relPath, fe.current);
+            }
+        }
+    }
+
+    private static final class LineEndingChoiceRow {
+        final FileLineEndingEntry entry;
+        boolean                     correctToCached = true;
+
+        LineEndingChoiceRow(final FileLineEndingEntry entry) {
+            this.entry = entry;
         }
     }
 
@@ -392,6 +553,9 @@ public class JavaFileLineEndingAWTest implements TestInterface {
             Map<WatchKey, Path> key2Directory = new HashMap<WatchKey, Path>();
             registerDirectoryRecursive(workspacePath, watchService, key2Directory);
             LogV3.info("JavaFileLineEndingAWTest: observer mode active for " + workspace.getAbsolutePath());
+            LogV3.info("JavaFileLineEndingAWTest: initial full workspace scan");
+            runOnceFromMain();
+            cache = loadCache(cacheFile);
             while (!Thread.currentThread().isInterrupted()) {
                 Set<Path> changedFiles = new LinkedHashSet<Path>();
                 WatchKey key = watchService.take();
@@ -474,6 +638,10 @@ public class JavaFileLineEndingAWTest implements TestInterface {
         if (directory == null || !java.nio.file.Files.isDirectory(directory)) {
             return;
         }
+        Path fileName = directory.getFileName();
+        if (fileName != null && isExcludedWorkspaceDirectoryName(fileName.toString())) {
+            return;
+        }
         WatchKey key = directory.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
         key2Directory.put(key, directory);
         File[] children = directory.toFile().listFiles();
@@ -495,16 +663,26 @@ public class JavaFileLineEndingAWTest implements TestInterface {
         }
         try {
             Path relPath = workspace.relativize(file);
-            return relPath != null;
+            if (relPath == null) {
+                return false;
+            }
+            String rel = relPath.toString().replace(File.separatorChar, '/');
+            if (relativePathContainsExcludedDirectorySegment(rel)) {
+                return false;
+            }
+            return true;
         } catch (IllegalArgumentException e) {
             return false;
         }
     }
 
-    private void processChangedTextFiles(Path workspace, File cacheFile, Map<String, String> cache, Set<Path> changedFiles) throws IOException {
+    private void processChangedTextFiles(Path workspace, File cacheFile, Map<String, String> cache, Set<Path> changedFiles) {
         List<FileLineEndingEntry> toAsk = new ArrayList<FileLineEndingEntry>();
         for (Path changed : changedFiles) {
             String relPath = workspace.relativize(changed).toString().replace(File.separatorChar, '/');
+            if (relativePathContainsExcludedDirectorySegment(relPath)) {
+                continue;
+            }
             File file = changed.toFile();
             if (!file.isFile()) {
                 cache.remove(relPath);
@@ -513,7 +691,7 @@ public class JavaFileLineEndingAWTest implements TestInterface {
             if (isLikelyBinaryByExtension(file.getName()) && !isAlwaysIncludeTextExtension(file.getName())) {
                 continue;
             }
-            String current = detectLineEndingWithRetry(file);
+            String current = detectLineEndingWithRetry(file, relPath);
             if (current == null) {
                 continue;
             }
@@ -527,41 +705,44 @@ public class JavaFileLineEndingAWTest implements TestInterface {
             }
         }
         if (!toAsk.isEmpty()) {
-            boolean doCorrect = askCorrectAll(toAsk);
-            if (doCorrect) {
-                for (FileLineEndingEntry e : toAsk) {
-                    try {
-                        correctLineEnding(e.file, e.cached);
-                        cache.put(e.relPath, e.cached);
-                    } catch (IOException ex) {
-                        LogV3.log(ex);
-                    }
-                }
-                LogV3.info("JavaFileLineEndingAWTest: corrected " + toAsk.size() + " changed text file(s)");
-            } else {
-                for (FileLineEndingEntry e : toAsk) {
-                    cache.put(e.relPath, e.current);
-                }
-            }
+            presentLineEndingCorrectionDialog(toAsk, cache);
         }
-        saveCache(cacheFile, cache);
+        try {
+            saveCache(cacheFile, cache);
+        } catch (IOException ex) {
+            LogV3.info("JavaFileLineEndingAWTest: could not write line-ending cache");
+            LogV3.log(ex);
+        }
     }
 
-    private String detectLineEndingWithRetry(File file) throws IOException {
-        while (true) {
+    /**
+     * Reads line ending with a few retries for transient locks; logs and returns null if reading still fails.
+     */
+    private String detectLineEndingWithRetry(File file, String relPathForLog) {
+        final int maxAttempts = 3;
+        IOException last = null;
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 return detectLineEnding(file);
             } catch (IOException e) {
+                last = e;
                 if (!file.isFile()) {
                     return null;
                 }
-                try {
-                    Thread.sleep(RETRY_SLEEP_MS);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    throw e;
+                if (attempt + 1 < maxAttempts) {
+                    try {
+                        Thread.sleep(RETRY_SLEEP_MS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
                 }
             }
         }
+        if (last != null) {
+            LogV3.info("JavaFileLineEndingAWTest: skip line-ending check after retries (IO): " + relPathForLog);
+            LogV3.log(last);
+        }
+        return null;
     }
 }

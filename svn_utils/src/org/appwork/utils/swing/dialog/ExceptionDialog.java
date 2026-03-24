@@ -50,8 +50,6 @@ import javax.swing.SwingConstants;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.exceptions.ErrorReporter;
 import org.appwork.resources.AWUTheme;
 import org.appwork.swing.MigPanel;
@@ -62,6 +60,8 @@ import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.CrossSystem;
+
+import net.miginfocom.swing.MigLayout;
 
 /**
  * @author thomas
@@ -113,7 +113,7 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
         final MigPanel ret = new MigPanel("ins 0", "[]10[]20[grow,fill][]", "[]");
         ret.add(new ExtButton(new BasicAction(er.getActionName()) {
             {
-                setSmallIcon(er.getActionIcon() == null ? null : er.getActionIcon().icon(20));
+                setSmallIcon(er.getActionIcon() == null ? null : er.getActionIcon().icon(16));
             }
 
             @Override

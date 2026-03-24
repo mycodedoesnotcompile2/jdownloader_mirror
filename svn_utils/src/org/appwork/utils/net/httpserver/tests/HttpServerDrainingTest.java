@@ -497,7 +497,7 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                     byte[] bytes;
                     ThrottledInputStream in = new ThrottledInputStream(new ByteArrayInputStream(bytes = jsonData.getBytes("UTF-8")));
                     in.setLimit((int) ReadableBytes.Unit.MB.toKibiBytes(10));
-                    final RequestContext context = httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(in).setPostDataLength(bytes.length));
+                    final RequestContext context = httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(in).setPostDataLength(bytes.length));
                     final int responseCode = context.getCode();
                     final long elapsed = System.currentTimeMillis() - startTime;
                     // Server should close connection after drain timeout - no response should be received
@@ -652,7 +652,7 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 lastServerException = null;
                 try {
                     // Use RequestContext with postDataLength = -1 to enable chunked encoding
-                    final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(postDataStream).setPostDataLength(-1));
+                    final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(postDataStream).setPostDataLength(-1));
                     final int responseCode = context.getCode();
                     final long elapsed = System.currentTimeMillis() - startTime;
                     // Chunked POST exceeding limit should return 413 (REQUEST_ENTITY_TOO_LARGE)
@@ -716,7 +716,7 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 lastServerException = null;
                 try {
                     // Use RequestContext with postDataLength = -1 to enable chunked encoding
-                    final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(postDataStream).setPostDataLength(-1));
+                    final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(postDataStream).setPostDataLength(-1));
                     final int responseCode = context.getCode();
                     final long elapsed = System.currentTimeMillis() - startTime;
                     // Server should close connection after drain timeout - no response should be received
@@ -783,7 +783,7 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 lastServerException = null;
                 try {
                     // Use RequestContext with postDataLength = -1 to enable chunked encoding
-                    final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(postDataStream).setPostDataLength(-1));
+                    final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(postDataStream).setPostDataLength(-1));
                     final int responseCode = context.getCode();
                     final long elapsed = System.currentTimeMillis() - startTime;
                     // Server should close connection when drain limit is exceeded - no response should be received
@@ -872,7 +872,7 @@ public class HttpServerDrainingTest extends HttpServerTestBase {
                 lastServerException = null;
                 try {
                     // Use RequestContext with postDataLength = -1 to enable chunked encoding
-                    final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(postDataStream).setPostDataLength(-1));
+                    final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(postDataStream).setPostDataLength(-1));
                     final int responseCode = context.getCode();
                     final long elapsed = System.currentTimeMillis() - startTime;
                     // Must return 413 Request Entity Too Large (exceeds 2MB POST limit)

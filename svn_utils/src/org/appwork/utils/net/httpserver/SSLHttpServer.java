@@ -204,7 +204,7 @@ public class SSLHttpServer extends HttpServer {
     }
 
     @Override
-    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket) throws IOException {
+    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket, final TimingContext timingContext) throws IOException {
         if (clientSocket == null) {
             throw new IOException("ClientSocket is null");
         }
@@ -233,7 +233,7 @@ public class SSLHttpServer extends HttpServer {
             if (trustResult == null && clientCertChain != null && clientCertChain.length > 0) {
                 trustResult = new TrustResult(null, clientCertChain, null, TrustResult.TrustType.CLIENT);
             }
-            return createSSLHttpServerConnection(sslSocket, trustResult);
+            return createSSLHttpServerConnection(sslSocket, trustResult, timingContext);
         } catch (final SocketException e) {
             // Client closed/aborted (e.g. browser cancelled connection, TLS abort, recv failed)
             closeQuietly(sslSocket);
@@ -252,11 +252,13 @@ public class SSLHttpServer extends HttpServer {
     /**
      * @param sslSocket
      * @param trustResult
+     * @param timingContext
+     *            timing at socket accept, or null if unknown
      * @return
      * @throws IOException
      */
-    protected HttpConnectionRunnable createSSLHttpServerConnection(final SSLSocket sslSocket, TrustResult trustResult) throws IOException {
-        return new HttpServerConnection(this, sslSocket, sslSocket.getInputStream(), sslSocket.getOutputStream(), true, trustResult);
+    protected HttpConnectionRunnable createSSLHttpServerConnection(final SSLSocket sslSocket, TrustResult trustResult, final TimingContext timingContext) throws IOException {
+        return new HttpServerConnection(this, sslSocket, sslSocket.getInputStream(), sslSocket.getOutputStream(), true, trustResult, timingContext);
     }
 
     private static void closeQuietly(final SSLSocket sslSocket) {

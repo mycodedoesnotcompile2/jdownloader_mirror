@@ -133,7 +133,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         try {
             final String postUrl = "http://localhost:" + this.serverPort + "/test/postData";
             final byte[] postData = "{\"params\":[\"test\"]}".getBytes("UTF-8");
-            final RequestContext requestContext = new RequestContext().setMethod(RequestMethod.POST).setUrl(postUrl).setPostDataStream(new ByteArrayInputStream(postData)).setPostDataLength(postData.length);
+            final RequestContext requestContext = new RequestContext(RequestMethod.POST, postUrl).setPostDataStream(new ByteArrayInputStream(postData)).setPostDataLength(postData.length);
             requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
             context = this.httpClient.execute(requestContext);
             final int postAllowedResponseCode = context.getCode();
@@ -154,7 +154,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
     private void testPreflightOptionsBlockedByDefault() throws Exception {
         LogV3.info("Test: Preflight OPTIONS blocked by default (CORS disabled)");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).setUrl(url).addHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://example.com").addHeader("Access-Control-Request-Method", RequestMethod.GET.name()));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://example.com").addHeader("Access-Control-Request-Method", RequestMethod.GET.name()));
         final int responseCode = context.getCode();
         assertTrue(responseCode == ResponseCode.METHOD_NOT_ALLOWED.getCode(), "Preflight OPTIONS should return " + ResponseCode.METHOD_NOT_ALLOWED.getCode() + ", was: " + responseCode);
         LogV3.info("Preflight OPTIONS blocked test passed: " + responseCode);
@@ -174,7 +174,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
         try {
             final byte[] postData = "{\"params\":[\"test\"]}".getBytes("UTF-8");
-            final RequestContext requestContext = new RequestContext().setMethod(RequestMethod.POST).setUrl(echoUrl).setPostDataStream(new ByteArrayInputStream(postData)).setPostDataLength(postData.length);
+            final RequestContext requestContext = new RequestContext(RequestMethod.POST, echoUrl).setPostDataStream(new ByteArrayInputStream(postData)).setPostDataLength(postData.length);
             requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
             final RequestContext context = this.httpClient.execute(requestContext);
             final int responseCode = context.getCode();
@@ -191,7 +191,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         final String postDataUrl = "http://localhost:" + this.serverPort + "/test/postData?data";
         final Set<RequestMethod> previousMethods2 = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
         try {
-            final RequestContext requestContext = new RequestContext().setMethod(RequestMethod.GET).setUrl(postDataUrl);
+            final RequestContext requestContext = new RequestContext(RequestMethod.GET, postDataUrl);
             final RequestContext context = this.httpClient.execute(requestContext);
             final int responseCode = context.getCode();
             // GET to /test/postData should return 400 (Bad Request) because postData only accepts PostRequest
@@ -215,12 +215,12 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             // Methods that require output stream
             final byte[] data = "{\"params\":[\"test\"]}".getBytes("UTF-8");
             final String targetUrl = postUrl;
-            final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
+            final RequestContext requestContext = new RequestContext(method, targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
             requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
             context = this.httpClient.execute(requestContext);
         } else {
             // Methods that don't require output stream
-            final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(url);
+            final RequestContext requestContext = new RequestContext(method, url);
             context = this.httpClient.execute(requestContext);
         }
         final int responseCode = context.getCode();
@@ -259,12 +259,12 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
                 // Methods that require output stream
                 final byte[] data = "{\"params\":[\"test\"]}".getBytes("UTF-8");
                 final String targetUrl = postUrl;
-                final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
+                final RequestContext requestContext = new RequestContext(method, targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
                 requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 context = this.httpClient.execute(requestContext);
             } else {
                 // Methods that don't require output stream
-                final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(url);
+                final RequestContext requestContext = new RequestContext(method, url);
                 context = this.httpClient.execute(requestContext);
             }
             final String responseBody = context.getResponseString();
@@ -363,12 +363,12 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             // Methods that require output stream
             final byte[] data = "{\"params\":[\"test\"]}".getBytes("UTF-8");
             final String targetUrl = postUrl;
-            final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
+            final RequestContext requestContext = new RequestContext(method, targetUrl).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length);
             requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
             context = this.httpClient.execute(requestContext);
         } else {
             // Methods that don't require output stream
-            final RequestContext requestContext = new RequestContext().setMethod(method).setUrl(url);
+            final RequestContext requestContext = new RequestContext(method, url);
             context = this.httpClient.execute(requestContext);
         }
         final int responseCode = context.getCode();
@@ -403,7 +403,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final byte[] bodyData = "This is body data that should not be sent with GET".getBytes("UTF-8");
         // Create a GET request with body data
-        final RequestContext requestContext = new RequestContext().setMethod(RequestMethod.GET).setUrl(url).setPostDataStream(new ByteArrayInputStream(bodyData)).setPostDataLength(bodyData.length);
+        final RequestContext requestContext = new RequestContext(RequestMethod.GET, url).setPostDataStream(new ByteArrayInputStream(bodyData)).setPostDataLength(bodyData.length);
         requestContext.addHeader(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "text/plain");
         RequestContext context = null;
         try {

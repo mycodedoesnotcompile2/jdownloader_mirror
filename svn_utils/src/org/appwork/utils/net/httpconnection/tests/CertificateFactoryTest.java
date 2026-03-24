@@ -100,7 +100,7 @@ public class CertificateFactoryTest extends AWTest {
     }
 
     private TestExperimentalAutoSSLHttpServer sslHttpServer;
-    private RemoteAPI                         remoteAPI;
+    private RemoteAPI                         remoteAPI; 
     private int                               serverPort;
     private SSLContext                        sslContext;
     private KeyStore                          serverKeyStore;

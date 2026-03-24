@@ -188,7 +188,7 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
 
         final Set<RequestMethod> previousMethods = this.allowHttpMethods(RequestMethod.GET, RequestMethod.POST);
         try {
-            final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(postData)).setPostDataLength(postDataLength));
+            final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(new ByteArrayInputStream(postData)).setPostDataLength(postDataLength));
             assertTrue(context.getCode() == ResponseCode.SUCCESS_OK.getCode(), "Request should return 200");
 
             final Map<String, String> actualRequestHeaders = this.parseHeadersJson(context.getResponseString());
@@ -351,7 +351,7 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
 
             final byte[] smallBody = "test=data".getBytes("UTF-8");
             final int smallBodyLength = smallBody.length;
-            context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(smallBody)).setPostDataLength(smallBodyLength));
+            context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(new ByteArrayInputStream(smallBody)).setPostDataLength(smallBodyLength));
             assertTrue(context.getCode() == ResponseCode.SUCCESS_OK.getCode(), "Request should return 200");
             requestHeaders = this.parseHeadersJson(context.getResponseString());
             assertTrue(String.valueOf(smallBodyLength).equals(requestHeaders.get("Content-Length")), "POST request should have Content-Length=" + smallBodyLength);
@@ -363,7 +363,7 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
             for (int i = 0; i < largeBody.length; i++) {
                 largeBody[i] = (byte) (i % 256);
             }
-            context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(largeBody)).setPostDataLength(largeBody.length));
+            context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(new ByteArrayInputStream(largeBody)).setPostDataLength(largeBody.length));
             assertTrue(context.getCode() == ResponseCode.SUCCESS_OK.getCode(), "Request should return 200");
             requestHeaders = this.parseHeadersJson(context.getResponseString());
             assertTrue(String.valueOf(largeBody.length).equals(requestHeaders.get("Content-Length")), "POST request should have Content-Length=" + largeBody.length);
@@ -371,7 +371,7 @@ public class HttpServerHeaderVerificationTest extends HttpServerTestBase {
             expectedResponseHeaders = this.getExpectedResponseHeaders(responseHeaders);
             this.verifyHeadersMatchExactly(expectedResponseHeaders, responseHeaders, "POST large body response headers", context);
 
-            context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(new byte[0])).setPostDataLength(0));
+            context = this.httpClient.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(new ByteArrayInputStream(new byte[0])).setPostDataLength(0));
             assertTrue(context.getCode() == ResponseCode.SUCCESS_OK.getCode(), "Request should return 200");
             requestHeaders = this.parseHeadersJson(context.getResponseString());
             assertTrue("0".equals(requestHeaders.get("Content-Length")), "POST request with empty body should have Content-Length=0");

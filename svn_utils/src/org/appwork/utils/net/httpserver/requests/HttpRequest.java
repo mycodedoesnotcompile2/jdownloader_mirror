@@ -155,6 +155,25 @@ public abstract class HttpRequest implements HttpRequestInterface {
     }
 
     /**
+     * Returns the raw query string from the request URL (the part after '?').
+     *
+     * @return the query string without leading '?', or null if the URL has no query part
+     */
+    public String getQuery() {
+        if (requestedURL == null) {
+            return null;
+        }
+        final int q = requestedURL.indexOf('?');
+        if (q < 0) {
+            return null;
+        }
+        if (q + 1 >= requestedURL.length()) {
+            return "";
+        }
+        return requestedURL.substring(q + 1);
+    }
+
+    /**
      * @return the requestedURLParameters
      */
     public List<KeyValuePair> getRequestedURLParameters() {

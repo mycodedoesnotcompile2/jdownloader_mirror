@@ -135,13 +135,24 @@ public class HttpClient {
         }
 
         /**
-         * @param delete
+         * @param method
+         *            HTTP method (must not be null)
+         * @param url
+         *            request URL (must not be null)
          */
-        public RequestContext() {
+        public RequestContext(final RequestMethod method, final String url) {
+            if (method == null) {
+                throw new IllegalArgumentException("method is null");
+            }
+            if (url == null) {
+                throw new IllegalArgumentException("url is null");
+            }
+            this.method = method;
+            this.url = url;
         }
 
         public static RequestContext get(final String url) {
-            return new RequestContext().setMethod(RequestMethod.GET).setUrl(url);
+            return new RequestContext(RequestMethod.GET, url);
         }
 
         /**
@@ -390,6 +401,9 @@ public class HttpClient {
         }
 
         public RequestContext setMethod(final RequestMethod method) {
+            if (method == null) {
+                throw new IllegalArgumentException("method is null");
+            }
             this.method = method;
             return this;
         }
@@ -435,6 +449,9 @@ public class HttpClient {
         }
 
         public RequestContext setUrl(final String url) {
+            if (url == null) {
+                throw new IllegalArgumentException("url is null");
+            }
             this.url = url;
             return this;
         }
@@ -805,7 +822,7 @@ public class HttpClient {
      * instead
      */
     public RequestContext delete(final String url) throws IOException, InterruptedException {
-        return this.execute(new RequestContext().setMethod(RequestMethod.DELETE).setUrl(url));
+        return this.execute(new RequestContext(RequestMethod.DELETE, url));
     }
 
     public boolean followRedirect(final RequestContext context) throws IOException, InterruptedException {
@@ -832,7 +849,7 @@ public class HttpClient {
     }
 
     public RequestContext get(final String url) throws IOException, InterruptedException {
-        return this.execute(new RequestContext().setMethod(RequestMethod.GET).setUrl(url));
+        return this.execute(new RequestContext(RequestMethod.GET, url));
     }
 
     public Set<Integer> getAllowedResponseCodes() {
@@ -913,7 +930,7 @@ public class HttpClient {
      * instead
      */
     public RequestContext post(final String url, final byte[] data) throws IOException, InterruptedException {
-        return this.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length));
+        return this.execute(new RequestContext(RequestMethod.POST, url).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length));
     }
 
     /**

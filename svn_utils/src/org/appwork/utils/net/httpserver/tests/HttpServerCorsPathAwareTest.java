@@ -122,7 +122,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request to allowed path "/connect/probe" should succeed
         final String urlWithPath = "http://localhost:" + this.serverPort + "/connect/probe";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://example.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Request to allowed path should return 200, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -132,7 +132,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request to different allowed path "/api/v1" should succeed
         final String urlWithPath2 = "http://localhost:" + this.serverPort + "/api/v1";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath2));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath2).addHeader("Origin", "https://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == 200, "Request to different allowed path should return 200, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -142,7 +142,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/connect/probeX" (extra character) should be blocked
         final String urlWrongPath1 = "http://localhost:" + this.serverPort + "/connect/probeX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath1).addHeader("Origin", "https://example.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with extra character should be blocked, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -151,35 +151,35 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/connect/probe/" (trailing slash) should be blocked
         final String urlWrongPath2 = "http://localhost:" + this.serverPort + "/connect/probe/";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath2));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath2).addHeader("Origin", "https://example.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with trailing slash should be blocked, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/extra" (sub-path) should be blocked
         final String urlWrongPath3 = "http://localhost:" + this.serverPort + "/connect/probe/extra";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath3));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath3).addHeader("Origin", "https://example.com"));
         final int responseCode5 = context.getCode();
         this.assertTrueWithContext(responseCode5 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Sub-path should be blocked, was: " + responseCode5, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect" (prefix only) should be blocked
         final String urlWrongPath4 = "http://localhost:" + this.serverPort + "/connect";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath4));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath4).addHeader("Origin", "https://example.com"));
         final int responseCode6 = context.getCode();
         this.assertTrueWithContext(responseCode6 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Prefix-only path should be blocked, was: " + responseCode6, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/v1X" (extra character) should be blocked
         final String urlWrongPath5 = "http://localhost:" + this.serverPort + "/api/v1X";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath5));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath5).addHeader("Origin", "https://example.com"));
         final int responseCode7 = context.getCode();
         this.assertTrueWithContext(responseCode7 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with extra character should be blocked, was: " + responseCode7, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/v10" (different version) should be blocked
         final String urlWrongPath6 = "http://localhost:" + this.serverPort + "/api/v10";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath6));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath6).addHeader("Origin", "https://example.com"));
         final int responseCode8 = context.getCode();
         this.assertTrueWithContext(responseCode8 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Different version should be blocked, was: " + responseCode8, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -205,7 +205,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request from any origin to "/connect/probe" should succeed
         final String urlWithPath = "http://localhost:" + this.serverPort + "/connect/probe";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWithPath));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://any-origin.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Wildcard path should allow any origin, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -214,7 +214,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         assertEquals("https://any-origin.com", allowOrigin1, "Wildcard path should return Access-Control-Allow-Origin with the requesting origin");
         // Test: Request from different origin to same path should also succeed
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://another-origin.com").setUrl(urlWithPath));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://another-origin.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == 200, "Wildcard path should allow any origin, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -224,35 +224,35 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/connect/probeX" (extra character) should be blocked
         final String urlWrongPath1 = "http://localhost:" + this.serverPort + "/connect/probeX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath1).addHeader("Origin", "https://any-origin.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with extra character should be blocked, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/" (trailing slash) should be blocked
         final String urlWrongPath2 = "http://localhost:" + this.serverPort + "/connect/probe/";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath2));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath2).addHeader("Origin", "https://any-origin.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with trailing slash should be blocked, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/extra" (sub-path) should be blocked
         final String urlWrongPath3 = "http://localhost:" + this.serverPort + "/connect/probe/extra";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath3));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath3).addHeader("Origin", "https://any-origin.com"));
         final int responseCode5 = context.getCode();
         this.assertTrueWithContext(responseCode5 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Sub-path should be blocked, was: " + responseCode5, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect" (prefix only) should be blocked
         final String urlWrongPath4 = "http://localhost:" + this.serverPort + "/connect";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath4));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath4).addHeader("Origin", "https://any-origin.com"));
         final int responseCode6 = context.getCode();
         this.assertTrueWithContext(responseCode6 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Prefix-only path should be blocked, was: " + responseCode6, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/publicX" (extra character) should be blocked
         final String urlWrongPath5 = "http://localhost:" + this.serverPort + "/api/publicX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath5));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath5).addHeader("Origin", "https://any-origin.com"));
         final int responseCode7 = context.getCode();
         this.assertTrueWithContext(responseCode7 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with extra character should be blocked, was: " + responseCode7, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -277,7 +277,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Case-insensitive exact match should work
         final String urlWithPath = "http://localhost:" + this.serverPort + "/connect/probe";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://example.com"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200, "Case-insensitive path match should succeed, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -287,28 +287,28 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/connect/probeX" (extra character) should be blocked
         final String urlWrongPath1 = "http://localhost:" + this.serverPort + "/connect/probeX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath1).addHeader("Origin", "https://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with extra character should be blocked, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/" (trailing slash) should be blocked
         final String urlWrongPath2 = "http://localhost:" + this.serverPort + "/connect/probe/";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath2));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath2).addHeader("Origin", "https://example.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with trailing slash should be blocked, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/extra" (sub-path) should be blocked
         final String urlWrongPath3 = "http://localhost:" + this.serverPort + "/connect/probe/extra";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath3));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath3).addHeader("Origin", "https://example.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Sub-path should be blocked, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect" (prefix only) should be blocked
         final String urlWrongPath4 = "http://localhost:" + this.serverPort + "/connect";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath4));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath4).addHeader("Origin", "https://example.com"));
         final int responseCode5 = context.getCode();
         this.assertTrueWithContext(responseCode5 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Prefix-only path should be blocked, was: " + responseCode5, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -334,35 +334,35 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Regex pattern "/connect/.*" should match "/connect/probe"
         final String urlWithPath1 = "http://localhost:" + this.serverPort + "/connect/probe";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath1));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath1).addHeader("Origin", "https://example.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Regex path pattern should match, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Regex pattern "/connect/.*" should match "/connect/api/v2"
         final String urlWithPath2 = "http://localhost:" + this.serverPort + "/connect/api/v2";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath2));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath2).addHeader("Origin", "https://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == 200, "Regex path pattern should match sub-paths, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Wildcard regex pattern "* /api/v[0-9]+" (asterisk space slash) should match "/api/v1"
         final String urlWithPath3 = "http://localhost:" + this.serverPort + "/api/v1";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWithPath3));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath3).addHeader("Origin", "https://any-origin.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == 200, "Wildcard regex path pattern should match, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Wildcard regex pattern "* /api/v[0-9]+" should match "/api/v99"
         final String urlWithPath4 = "http://localhost:" + this.serverPort + "/api/v99";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWithPath4));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath4).addHeader("Origin", "https://any-origin.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == 200, "Wildcard regex path pattern should match version numbers, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Regex pattern "/connect/.*" should also match "/connect/" (.* matches zero or more characters)
         final String urlWithPath5 = "http://localhost:" + this.serverPort + "/connect/";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath5));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath5).addHeader("Origin", "https://example.com"));
         final int responseCode5 = context.getCode();
         this.assertTrueWithContext(responseCode5 == 200, "Regex path pattern /connect/.* should match /connect/ (.* matches zero characters), was: " + responseCode5, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for /connect/, but got: " + this.lastServerException, context);
@@ -370,14 +370,14 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/connect" (without trailing slash) should be blocked
         final String urlWrongPath1 = "http://localhost:" + this.serverPort + "/connect";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath1).addHeader("Origin", "https://example.com"));
         final int responseCodeWrong1 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong1 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path without trailing slash should be blocked for regex pattern /connect/.*, was: " + responseCodeWrong1, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connectX" (different prefix) should be blocked
         final String urlWrongPath3 = "http://localhost:" + this.serverPort + "/connectX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath3));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath3).addHeader("Origin", "https://example.com"));
         final int responseCodeWrong3 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Different prefix should be blocked, was: " + responseCodeWrong3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -385,35 +385,35 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/api/v" (without version number) should be blocked
         final String urlWrongPath4 = "http://localhost:" + this.serverPort + "/api/v";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath4));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath4).addHeader("Origin", "https://any-origin.com"));
         final int responseCodeWrong4 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path without version number should be blocked, was: " + responseCodeWrong4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/vX" (non-numeric version) should be blocked
         final String urlWrongPath5 = "http://localhost:" + this.serverPort + "/api/vX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath5));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath5).addHeader("Origin", "https://any-origin.com"));
         final int responseCodeWrong5 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong5 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with non-numeric version should be blocked, was: " + responseCodeWrong5, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/v10X" (version with extra character) should be blocked
         final String urlWrongPath6 = "http://localhost:" + this.serverPort + "/api/v10X";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath6));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath6).addHeader("Origin", "https://any-origin.com"));
         final int responseCodeWrong6 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong6 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with version and extra character should be blocked, was: " + responseCodeWrong6, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/v1/" (trailing slash) should be blocked
         final String urlWrongPath7 = "http://localhost:" + this.serverPort + "/api/v1/";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath7));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath7).addHeader("Origin", "https://any-origin.com"));
         final int responseCodeWrong7 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong7 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with trailing slash should be blocked, was: " + responseCodeWrong7, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/v1/extra" (sub-path) should be blocked
         final String urlWrongPath8 = "http://localhost:" + this.serverPort + "/api/v1/extra";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWrongPath8));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath8).addHeader("Origin", "https://any-origin.com"));
         final int responseCodeWrong8 = context.getCode();
         this.assertTrueWithContext(responseCodeWrong8 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Sub-path should be blocked, was: " + responseCodeWrong8, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -438,7 +438,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request to wrong path should be blocked
         final String urlWithPath = "http://localhost:" + this.serverPort + "/connect/other";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://example.com"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Request to wrong path should return 403 Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -466,7 +466,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request without path restriction should fall back to origin-only check
         // Since "https://example.com" (without path) is in allowedOrigins, it should succeed
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(url));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "https://example.com"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200, "Request without path header should fall back to origin-only check, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -495,7 +495,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Wildcard path should allow any origin
         final String urlWithPath = "http://localhost:" + this.serverPort + "/connect/probe";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://any-origin.com").setUrl(urlWithPath));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://any-origin.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Wildcard path should allow any origin, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -503,7 +503,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         assertEquals("https://any-origin.com", allowOrigin1, "Wildcard path should return Access-Control-Allow-Origin with the requesting origin");
         // Test: Specific origin+path should also work
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWithPath));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWithPath).addHeader("Origin", "https://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == 200, "Specific origin+path should work, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -513,28 +513,28 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/connect/probeX" (extra character) should be blocked
         final String urlWrongPath1 = "http://localhost:" + this.serverPort + "/connect/probeX";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath1).addHeader("Origin", "https://example.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with extra character should be blocked, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/" (trailing slash) should be blocked
         final String urlWrongPath2 = "http://localhost:" + this.serverPort + "/connect/probe/";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath2));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath2).addHeader("Origin", "https://example.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path with trailing slash should be blocked, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect/probe/extra" (sub-path) should be blocked
         final String urlWrongPath3 = "http://localhost:" + this.serverPort + "/connect/probe/extra";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath3));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath3).addHeader("Origin", "https://example.com"));
         final int responseCode5 = context.getCode();
         this.assertTrueWithContext(responseCode5 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Sub-path should be blocked, was: " + responseCode5, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/connect" (prefix only) should be blocked
         final String urlWrongPath4 = "http://localhost:" + this.serverPort + "/connect";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(urlWrongPath4));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlWrongPath4).addHeader("Origin", "https://example.com"));
         final int responseCode6 = context.getCode();
         this.assertTrueWithContext(responseCode6 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Prefix-only path should be blocked, was: " + responseCode6, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -559,7 +559,7 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request to root path "/" should succeed
         final String urlRoot = "http://localhost:" + this.serverPort + "/";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlRoot));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlRoot).addHeader("Origin", "http://example.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Request to root path should succeed with trailing slash origin, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed root path, but got: " + this.lastServerException, context);
@@ -570,21 +570,21 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/api" should be blocked
         final String urlApi = "http://localhost:" + this.serverPort + "/api";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi).addHeader("Origin", "http://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /api should be blocked for origin with trailing slash, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/test" should be blocked
         final String urlTest = "http://localhost:" + this.serverPort + "/test";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlTest));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlTest).addHeader("Origin", "http://example.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /test should be blocked for origin with trailing slash, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api/v1" should be blocked
         final String urlApiV1 = "http://localhost:" + this.serverPort + "/api/v1";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApiV1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApiV1).addHeader("Origin", "http://example.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /api/v1 should be blocked for origin with trailing slash, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -609,28 +609,28 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request to root path "/" should succeed
         final String urlRoot = "http://localhost:" + this.serverPort + "/";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlRoot));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlRoot).addHeader("Origin", "http://example.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Request to root path should succeed without trailing slash origin, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed root path, but got: " + this.lastServerException, context);
         // Test: Request to "/api" should succeed
         final String urlApi = "http://localhost:" + this.serverPort + "/api";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi).addHeader("Origin", "http://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == 200, "Request to /api should succeed without trailing slash origin, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Request to "/test" should succeed
         final String urlTest = "http://localhost:" + this.serverPort + "/test";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlTest));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlTest).addHeader("Origin", "http://example.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == 200, "Request to /test should succeed without trailing slash origin, was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Request to "/api/v1" should succeed
         final String urlApiV1 = "http://localhost:" + this.serverPort + "/api/v1";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApiV1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApiV1).addHeader("Origin", "http://example.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == 200, "Request to /api/v1 should succeed without trailing slash origin, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -656,14 +656,14 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: Request to "/api1/test" should succeed
         final String urlApi1Test = "http://localhost:" + this.serverPort + "/api1/test";
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi1Test));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi1Test).addHeader("Origin", "http://example.com"));
         final int responseCode1 = context.getCode();
         this.assertTrueWithContext(responseCode1 == 200, "Request to /api1/test should succeed, was: " + responseCode1, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
         // Test: Request to "/api1/v1/data" should succeed
         final String urlApi1V1 = "http://localhost:" + this.serverPort + "/api1/v1/data";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi1V1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi1V1).addHeader("Origin", "http://example.com"));
         final int responseCode2 = context.getCode();
         this.assertTrueWithContext(responseCode2 == 200, "Request to /api1/v1/data should succeed, was: " + responseCode2, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed path, but got: " + this.lastServerException, context);
@@ -671,35 +671,35 @@ public class HttpServerCorsPathAwareTest extends HttpServerTestBase {
         // Test: "/api2/test" should be blocked
         final String urlApi2Test = "http://localhost:" + this.serverPort + "/api2/test";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi2Test));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi2Test).addHeader("Origin", "http://example.com"));
         final int responseCode3 = context.getCode();
         this.assertTrueWithContext(responseCode3 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /api2/test should be blocked (outside /api1/), was: " + responseCode3, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api1" (without trailing slash) should be blocked (pattern requires /api1/.*)
         final String urlApi1 = "http://localhost:" + this.serverPort + "/api1";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi1));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi1).addHeader("Origin", "http://example.com"));
         final int responseCode4 = context.getCode();
         this.assertTrueWithContext(responseCode4 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /api1 (without trailing content) should be blocked, was: " + responseCode4, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api10/test" should be blocked (different prefix)
         final String urlApi10Test = "http://localhost:" + this.serverPort + "/api10/test";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi10Test));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi10Test).addHeader("Origin", "http://example.com"));
         final int responseCode5 = context.getCode();
         this.assertTrueWithContext(responseCode5 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /api10/test should be blocked (different prefix), was: " + responseCode5, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/api1X/test" should be blocked (different prefix)
         final String urlApi1XTest = "http://localhost:" + this.serverPort + "/api1X/test";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlApi1XTest));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlApi1XTest).addHeader("Origin", "http://example.com"));
         final int responseCode6 = context.getCode();
         this.assertTrueWithContext(responseCode6 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /api1X/test should be blocked (different prefix), was: " + responseCode6, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
         // Test: "/test" should be blocked (completely different path)
         final String urlTest = "http://localhost:" + this.serverPort + "/test";
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://example.com").setUrl(urlTest));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, urlTest).addHeader("Origin", "http://example.com"));
         final int responseCode7 = context.getCode();
         this.assertTrueWithContext(responseCode7 == ResponseCode.ERROR_FORBIDDEN.getCode(), "Path /test should be blocked (outside /api1/), was: " + responseCode7, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);

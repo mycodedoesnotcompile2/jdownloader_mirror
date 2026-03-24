@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 51797 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52549 $", interfaceVersion = 2, names = {}, urls = {})
 public class FcLc extends PluginForDecrypt {
     private static final String[] domains = { "fc.lc", "fcc.lc", "short.fc-lc.com", "short.articlix.com", "fc-lc.com", "fc-lc.xyz" };
 
@@ -254,6 +254,14 @@ public class FcLc extends PluginForDecrypt {
             } else {
                 logger.info("Failed to find locationReplace");
             }
+        }
+        /* 2026-03-23: New: another form */
+        final Form verify0 = br.getFormbyProperty("id", "verificationForm");
+        if (verify0 != null) {
+            logger.info("Found verify0 form");
+            br.submitForm(verify0);
+        } else {
+            logger.info("Failed to find verify0 form");
         }
         int counter = -1;
         handle_verify_steps: do {

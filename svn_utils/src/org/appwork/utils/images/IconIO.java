@@ -772,7 +772,7 @@ public class IconIO {
                 }
             }
         } catch (ClassNotFoundException e) {
-            LogV3.log(e);
+            LogV3.info("No Image4J found. *.ico support is not available");
             ICO_SUPPORTED = false;
         } catch (NoSuchMethodException e) {
             LogV3.log(e);

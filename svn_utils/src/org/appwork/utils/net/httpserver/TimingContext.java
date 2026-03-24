@@ -10,20 +10,20 @@
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
  *     Some parts of the [The Product] use or reference 3rd party libraries and classes. These parts may have different licensing conditions. Please check the *.license and *.info files of included libraries
  *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header.
  *
- * === Definition: Commercial Usage ===
+ * === Definition of Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: e-mail@appwork.org
+ *     Contact AppWork for further details: <e-mail@appwork.org>
  * === Non-Commercial Usage ===
  *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
@@ -33,56 +33,41 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
-import org.appwork.utils.net.httpconnection.TrustResult;
-import org.appwork.utils.net.httpserver.TimingContext;
-import org.appwork.utils.net.httpserver.HttpServerConnection.ConnectionHook;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-
 /**
- * @author daniel
- * @date 26.10.2017
- *
+ * Immutable context capturing the same instant in wall-clock time (ms) and monotonic time (nanos), e.g. when a socket was accepted.
+ * Used for time-sync and elapsed-time calculations without exposing separate fields.
  */
-public interface RawHttpConnectionInterface {
-    public OutputStream getOutputStream(boolean b) throws IOException;
+public class TimingContext {
 
-    public InputStream getInputStream() throws IOException;
+    private final long connectionTimeMs;
+    private final long connectionNanos;
 
-    public boolean closableStreams();
-
-    public HttpRequest getRequest();
-
-    public HttpRequest.HTTP_VERSION getHTTPVersion();
-
-    public void closeConnection();
-
-    public void close();
-
-    public void setHook(ConnectionHook hook);
-
-    public ConnectionHook getHook();
     /**
-     * Returns the client certificate trust result (chain, provider, exception). Use {@link TrustResult#getChain()} for the certificate
-     * chain.
+     * @param connectionTimeMs
+     *            wall-clock time in milliseconds (e.g. {@link org.appwork.utils.Time#timestamp()}) at connection/socket-accept
+     * @param connectionNanos
+     *            monotonic time in nanoseconds (e.g. {@link org.appwork.utils.Time#getNanoSeconds()}) at the same instant
+     */
+    public TimingContext(final long connectionTimeMs, final long connectionNanos) {
+        this.connectionTimeMs = connectionTimeMs;
+        this.connectionNanos = connectionNanos;
+    }
+
+    /**
+     * Wall-clock time in milliseconds at the connection moment (e.g. for server time sync).
      *
-     * @return The client cert trust result, or null if none
+     * @return connection time in ms, or 0 if unknown
      */
-    TrustResult getTrustResult();
+    public long getConnectionTimeMs() {
+        return this.connectionTimeMs;
+    }
 
     /**
-     * @return true if this connection is over SSL/TLS
-     */
-    boolean isSSL();
-
-    /**
-     * Returns the timing context at socket/connection accept (wall-clock ms and monotonic nanos), if available.
+     * Monotonic time in nanoseconds at the connection moment (for computing elapsed durations).
      *
-     * @return the timing context, or null if not available (e.g. connection type does not track it)
+     * @return connection time in nanos, or 0 if unknown
      */
-    TimingContext getTimingContext();
-
+    public long getConnectionNanos() {
+        return this.connectionNanos;
+    }
 }

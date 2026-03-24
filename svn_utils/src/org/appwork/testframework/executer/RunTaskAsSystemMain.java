@@ -109,8 +109,17 @@ public final class RunTaskAsSystemMain {
                 System.exit(0);
             }
         } catch (Throwable t) {
-            System.err.println("RunTaskAsSystemMain: Task execution failed: " + Exceptions.getStackTrace(t));
+            String stack = Exceptions.getStackTrace(t);
+            System.err.println("RunTaskAsSystemMain: Task execution failed: " + stack);
             System.err.flush();
+            try {
+                AdminTaskResultWrapper failureWrapper = new AdminTaskResultWrapper(null, "", stack, stack);
+                byte[] wrapperBytes = serializeWrapper(failureWrapper);
+                String hex = HexFormatter.byteArrayToHex(wrapperBytes);
+                IO.writeToFile(new File(tempDir, resultHexFile), hex.getBytes(UTF8));
+            } catch (Throwable writeEx) {
+                System.err.println("RunTaskAsSystemMain: failed to write result.hex with exception: " + writeEx.getMessage());
+            }
             System.exit(1);
         }
     }

@@ -540,11 +540,11 @@ public final class AdminExecuter {
         }
     }
 
-    private static Object deserializeTaskResult(String hexResult) throws IOException, ClassNotFoundException {
+    private static Object deserializeTaskResult(String hexResult) throws IOException, ClassNotFoundException, Exception {
         return deserializeTaskResult(hexResult, null);
     }
 
-    private static Object deserializeTaskResult(String hexResult, LogCallback logCallback) throws IOException, ClassNotFoundException {
+    private static Object deserializeTaskResult(String hexResult, LogCallback logCallback) throws IOException, ClassNotFoundException, Exception {
         if (hexResult == null || hexResult.length() == 0) {
             return null;
         }
@@ -574,6 +574,9 @@ public final class AdminExecuter {
                     streamRemoteOutputToLogV3("runAsAdmin", wrapper.getStdout(), wrapper.getStderr(), logCallback);
                 } else {
                     forwardTaskOutput(wrapper.getStdout(), wrapper.getStderr());
+                }
+                if (wrapper.hasTaskFailure()) {
+                    throw new Exception("Task failed: " + wrapper.getExceptionStackTrace());
                 }
                 return wrapper.getReturnValue();
             }

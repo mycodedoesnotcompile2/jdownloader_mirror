@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -65,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52501 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52546 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
     private static final int             defaultMAXCHUNKS           = 1;
@@ -403,7 +404,7 @@ public class DeepbridCom extends PluginForHost {
             br.getPage(this.getApiBase() + "/user/limits");
             final Map<String, Object> user_limits = (Map<String, Object>) this.handleErrorsAPI(br, account, null);
             br.getPage(this.getApiBase() + "/hosts");
-            final List<Map<String, Object>> supportedhostslist = (List<Map<String, Object>>) this.handleErrorsAPI(br, account, null);
+            final Object supportedHostsListsObject = this.handleErrorsAPI(br, account, null);
             final Number points = (Number) user.get("fidelity_points");
             if (points != null) {
                 ai.setPremiumPoints(points.intValue());
@@ -443,7 +444,17 @@ public class DeepbridCom extends PluginForHost {
             }
             final Map<String, Object> domain_down_mapping = new HashMap<String, Object>();
             final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
-            for (final Map<String, Object> entries : supportedhostslist) {
+            final Collection<Object> supportedHostsLists;
+            if (supportedHostsListsObject instanceof Map) {
+                supportedHostsLists = ((Map) supportedHostsListsObject).values();
+            } else if (supportedHostsListsObject instanceof List) {
+                supportedHostsLists = (List<Object>) supportedHostsListsObject;
+            } else {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid API response");
+            }
+            for (final Object value : supportedHostsLists) {
+                final Map<String, Object> entries = (Map<String, Object>) value;
                 /* List can be given in two different varieties */
                 for (final Map.Entry<String, Object> entry : entries.entrySet()) {
                     final MultiHostHost mhost = new MultiHostHost();

@@ -107,7 +107,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type, Authorization").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type, Authorization"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS preflight request should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -143,7 +143,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String forbiddenOrigin = "https://boeseseite.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", forbiddenOrigin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", forbiddenOrigin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Preflight request with forbidden origin should return 403 Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -169,7 +169,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String origin = "https://example.com";
         this.lastServerException = null;
         // Request PUT method which is not allowed
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "PUT").addHeader("Access-Control-Request-Headers", "Content-Type").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "PUT").addHeader("Access-Control-Request-Headers", "Content-Type"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Preflight request with forbidden method should return 403 Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -192,23 +192,23 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String origin = "https://example.com";
         // Test GET method
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "GET").setUrl(url));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "GET"));
         int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request for GET should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed method GET", context);
         // Test POST method
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").setUrl(url));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST"));
         responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request for POST should return 200/204, was: " + responseCode, context);
         // Test PUT method
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "PUT").setUrl(url));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "PUT"));
         responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request for PUT should return 200/204, was: " + responseCode, context);
         // Test DELETE method
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "DELETE").setUrl(url));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "DELETE"));
         responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request for DELETE should return 200/204, was: " + responseCode, context);
         // Verify Access-Control-Allow-Methods contains all methods
@@ -234,14 +234,14 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String origin = "https://example.com";
         // Test with single header
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type").setUrl(url));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type"));
         int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request with single header should return 200/204, was: " + responseCode, context);
         String allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
         this.assertTrueWithContext(allowHeaders != null && allowHeaders.contains("Content-Type"), "Access-Control-Allow-Headers should contain Content-Type, was: " + allowHeaders, context);
         // Test with multiple headers
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type, Authorization, X-Custom-Header").setUrl(url));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type, Authorization, X-Custom-Header"));
         responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request with multiple headers should return 200/204, was: " + responseCode, context);
         allowHeaders = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS);
@@ -265,7 +265,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         // OPTIONS request without Origin header
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Access-Control-Request-Method", "POST").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Access-Control-Request-Method", "POST"));
         final int responseCode = context.getCode();
         // Without Origin, it's not a CORS request, so it should be handled normally (may return 200, 204, or 501 depending on handler)
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204 || responseCode == 501, "OPTIONS request without Origin should return 200/204/501, was: " + responseCode, context);
@@ -290,7 +290,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://any-origin.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request with wildcard origin should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for wildcard origin", context);
@@ -315,7 +315,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/connect/probe";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "Preflight request with matching path should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for matching path", context);
@@ -339,7 +339,7 @@ public class HttpServerCorsPreflightTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/connect/other";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", "Content-Type"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Preflight request with non-matching path should return 403 Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);

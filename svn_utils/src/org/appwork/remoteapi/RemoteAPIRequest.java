@@ -45,10 +45,10 @@ import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.net.HeaderCollection;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequestInterface;
 import org.appwork.utils.net.httpserver.requests.KeyValuePair;
-import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
 
 /**
  * @author daniel
@@ -63,7 +63,6 @@ public class RemoteAPIRequest implements HttpRequestInterface {
     // GET,
     // UNKNOWN
     // }
-
     private final InterfaceHandler<?> iface;
     private final String[]            parameters;
     protected final HttpRequest       request;
@@ -238,5 +237,13 @@ public class RemoteAPIRequest implements HttpRequestInterface {
     @Override
     public long getId() {
         return request.getId();
+    }
+
+    /**
+     * @see org.appwork.utils.net.httpserver.requests.HttpRequestInterface#getQuery()
+     */
+    @Override
+    public String getQuery() {
+        return request.getQuery();
     }
 }

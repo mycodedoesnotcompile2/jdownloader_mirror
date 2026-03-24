@@ -86,6 +86,33 @@ public final class WindowsExecuter {
         String commandLine = ShellParser.createCommandLine(Style.WINDOWS, cmd);
         LogV3.info("WindowsExecuter.runAsNonElevatedUser: " + commandLine);
 
+        // When running as Local System, prefer the active console user token so the child runs as the logged-in user (e.g. thomas), not as SYSTEM with reduced integrity.
+        if (WindowsUtils.isRunningAsLocalSystem()) {
+            HANDLE consoleToken = null;
+            HANDLE primaryToken = null;
+            try {
+                consoleToken = WindowsUtils.getActiveConsoleUserToken();
+                if (consoleToken != null) {
+                    HANDLEByReference pPrimary = new HANDLEByReference();
+                    if (Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
+                        primaryToken = pPrimary.getValue();
+                        LogV3.info("WindowsExecuter: running as LocalSystem, using active console user token for runAsNonElevatedUser");
+                        return runWithToken(primaryToken, options);
+                    }
+                }
+            } catch (Throwable t) {
+                LogV3.log(t);
+            } finally {
+                if (consoleToken != null) {
+                    Kernel32.INSTANCE.CloseHandle(consoleToken);
+                }
+                if (primaryToken != null) {
+                    Kernel32.INSTANCE.CloseHandle(primaryToken);
+                }
+            }
+            LogV3.info("WindowsExecuter: LocalSystem but active console token unavailable, falling back to lowest privilege (child may still be SYSTEM)");
+        }
+
         // When runInActiveSession is set (e.g. by runViaWindowsScheduler fallback), run under active console token without SID check.
         if (options.isRunInActiveSession()) {
             HANDLE consoleToken = null;

@@ -43,7 +43,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.LibGenInfo;
 
-@DecrypterPlugin(revision = "$Revision: 50284 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52549 $", interfaceVersion = 2, names = {}, urls = {})
 public class LibGenCrawler extends PluginForDecrypt {
     public LibGenCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class LibGenCrawler extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         /* Keep in sync with hoster- and crawler plugin! */
-        ret.add(new String[] { "libgen.gs", "libgen.lc", "libgen.rocks", "libgen.li", "libgen.org", "libgen.vg", "libgen.io", "gen.lib.rus.ec", "booksdl.org", "libgen.pm", "libgen.rs", "libgen.is", "libgen.st", "library.lol", "libgen.fun", "llhlf.com" });
+        ret.add(new String[] { "libgen.li", "libgen.gs", "libgen.lc", "libgen.rocks", "libgen.org", "libgen.vg", "libgen.io", "gen.lib.rus.ec", "booksdl.org", "libgen.pm", "libgen.rs", "libgen.is", "libgen.st", "library.lol", "libgen.fun", "libgen.la", "libgen.bz", "libgen.gl", "llhlf.com" });
         return ret;
     }
 
@@ -80,6 +80,12 @@ public class LibGenCrawler extends PluginForDecrypt {
         deadDomains.add("libgen.io");
         deadDomains.add("booksdl.org");
         deadDomains.add("libgen.fun");
+        deadDomains.add("libgen.li");
+        deadDomains.add("libgen.gs");
+        deadDomains.add("libgen.is");
+        deadDomains.add("libgen.pm");
+        deadDomains.add("libgen.rocks");
+        deadDomains.add("libgen.st");
         return deadDomains;
     }
 

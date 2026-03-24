@@ -66,6 +66,13 @@ public interface HttpRequestInterface {
     public String getRequestedURL();
 
     /**
+     * Returns the raw query string from the request URL (the part after '?').
+     *
+     * @return the query string without leading '?', or null if the URL has no query part
+     */
+    public String getQuery();
+
+    /**
      * @return the requestedURLParameters
      */
     public List<KeyValuePair> getRequestedURLParameters();

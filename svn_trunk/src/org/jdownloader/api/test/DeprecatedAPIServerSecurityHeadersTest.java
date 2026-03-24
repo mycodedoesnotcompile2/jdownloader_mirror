@@ -191,7 +191,7 @@ public class DeprecatedAPIServerSecurityHeadersTest extends AWTest {
         if (allowedOrigin == null || allowedOrigin.isEmpty()) {
             // No CORS origin configured - test that cross-origin requests are blocked
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-            final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(url));
+            final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "https://example.com"));
             final int responseCode = context.getCode();
             // Cross-origin requests should be blocked (403 Forbidden)
             assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Cross-origin request should be blocked (403) when no CORS origin is configured. Response code: " + responseCode);
@@ -199,7 +199,7 @@ public class DeprecatedAPIServerSecurityHeadersTest extends AWTest {
         } else {
             // CORS origin configured - test that it's allowed
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-            final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", allowedOrigin).addHeader("Access-Control-Request-Method", "GET").setUrl(url));
+            final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", allowedOrigin).addHeader("Access-Control-Request-Method", "GET"));
             final String allowOrigin = context.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN);
             if ("*".equals(allowedOrigin)) {
                 assertTrue("*".equals(allowOrigin), "Access-Control-Allow-Origin should be '*' when config is '*'. Actual: " + allowOrigin);

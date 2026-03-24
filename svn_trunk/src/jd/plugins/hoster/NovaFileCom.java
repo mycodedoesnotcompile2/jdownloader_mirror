@@ -42,15 +42,16 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52055 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52546 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
         this.setConfigElements();
-        /*
+        /**
          * 2020-01-16: Without waiting between downloads, users are more likely to experience error-response 503 and will get more captchas
-         * in premium mode. Captchas in premium mode will always happen - even with long delays between starting downloads!
+         * in premium mode. <br>
+         * Captchas in premium mode will always happen - even with long delays between starting downloads!
          */
         this.setStartIntervall(10000l);
     }
@@ -78,6 +79,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
         return buildAnnotationNames(getPluginDomains());
     }
 
+    @Override
     protected URL_TYPE getURLType(final String url) {
         /* 2023-05-18: Legacy: Those URLs are now processed by separate crawler plugin NfileCc. */
         if (url != null && url.matches("(?i)https?://[^/]*nfile\\.cc/([A-Za-z0-9]+)$")) {
@@ -94,17 +96,21 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     }
 
     protected String getFUID(final String url, URL_TYPE type) {
-        if (url != null && type != null) {
-            try {
-                switch (type) {
-                case SHORT:
-                    return new Regex(new URL(url).getPath(), "/([A-Za-z0-9]+)").getMatch(0);
-                default:
-                    return super.getFUID(url, type);
-                }
-            } catch (MalformedURLException e) {
-                logger.log(e);
+        if (url == null) {
+            return null;
+        }
+        if (type == null) {
+            return null;
+        }
+        try {
+            switch (type) {
+            case SHORT:
+                return new Regex(new URL(url).getPath(), "/([A-Za-z0-9]+)").getMatch(0);
+            default:
+                return super.getFUID(url, type);
             }
+        } catch (MalformedURLException e) {
+            logger.log(e);
         }
         return null;
     }
@@ -392,5 +398,17 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     @Override
     protected String getRelativeAPILoginParamsFormatAPIZeusCloudManager() {
         return "?op=login&login=%s&pass=%s";
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("id=\"file-not-found\"")) {
+            return true;
+        }
+        if (!StringUtils.containsIgnoreCase(this.getContentURL(link), "/file/") && !br.containsHTML("name=\"id\"[^>]*>") && !br.containsHTML("name=\"F1\"")) {
+            /* 2026-03-23: Offline link without error message, example: https://novafile.org/premium1199999 */
+            return true;
+        }
+        return super.isOffline(link, br);
     }
 }

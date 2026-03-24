@@ -91,7 +91,7 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
     }
 
     @Override
-    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket) throws IOException {
+    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket, final TimingContext timingContext) throws IOException {
         if (clientSocket == null) {
             throw new IOException("ClientSocket is null");
         }
@@ -108,14 +108,14 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
                     if (ExperimentalAutoSSLHttpServer.this.sslContext != null) {
                         if (ExperimentalAutoSSLHttpServer.this.autoUpgrade) {
                             // Auto-upgrade enabled: detect HTTP/HTTPS on same port
-                            run = ExperimentalAutoSSLHttpServer.this.autoWrapSSLConnection(ExperimentalAutoSSLHttpServer.this, clientSocket);
+                            run = ExperimentalAutoSSLHttpServer.this.autoWrapSSLConnection(ExperimentalAutoSSLHttpServer.this, clientSocket, timingContext);
                         } else {
                             // Auto-upgrade disabled: HTTPS-only, direct SSL connection
-                            run = ExperimentalAutoSSLHttpServer.this.directSSLConnection(ExperimentalAutoSSLHttpServer.this, clientSocket);
+                            run = ExperimentalAutoSSLHttpServer.this.directSSLConnection(ExperimentalAutoSSLHttpServer.this, clientSocket, timingContext);
                         }
                     } else {
                         // Fall back to plain HTTP handling when no SSL context is configured
-                        run = ExperimentalAutoSSLHttpServer.super.createHttpConnection(clientSocket);
+                        run = ExperimentalAutoSSLHttpServer.super.createHttpConnection(clientSocket, timingContext);
                     }
                     run.run();
                 } catch (final Throwable e) {
@@ -192,7 +192,7 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
      * @throws IOException
      *             if SSL handshake fails
      */
-    private HttpConnectionRunnable directSSLConnection(final AbstractServerBasics server, final Socket clientSocket) throws IOException {
+    private HttpConnectionRunnable directSSLConnection(final AbstractServerBasics server, final Socket clientSocket, final TimingContext timingContext) throws IOException {
         boolean finallyCloseSocket = true;
         try {
             clientSocket.setSoTimeout(60 * 1000);
@@ -218,7 +218,7 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
                 // Just continue without client certificate
             }
             finallyCloseSocket = false;
-            return this.createSSLHttpConnection(server, true, clientSocket, httpIS, httpOS, clientCertificate.get());
+            return this.createSSLHttpConnection(server, true, clientSocket, httpIS, httpOS, clientCertificate.get(), timingContext);
         } finally {
             try {
                 if (finallyCloseSocket) {
@@ -253,12 +253,12 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
      * @throws IOException
      *             if the connection cannot be created
      */
-    protected HttpConnectionRunnable createSSLHttpConnection(final AbstractServerBasics server, final boolean ssl, final Socket clientSocket, final InputStream httpIS, final OutputStream httpOS, final Object clientCertificate) throws IOException {
+    protected HttpConnectionRunnable createSSLHttpConnection(final AbstractServerBasics server, final boolean ssl, final Socket clientSocket, final InputStream httpIS, final OutputStream httpOS, final Object clientCertificate, final TimingContext timingContext) throws IOException {
         // Default implementation: create HttpServerConnection with ssl and client cert TrustResult
         // Subclasses can override to provide their own implementation
         final X509Certificate[] chain = toClientCertificateChain(clientCertificate);
         final org.appwork.utils.net.httpconnection.TrustResult trustResult = (chain != null && chain.length > 0) ? new org.appwork.utils.net.httpconnection.TrustResult(null, chain, null, org.appwork.utils.net.httpconnection.TrustResult.TrustType.CLIENT) : null;
-        return new HttpServerConnection(server, clientSocket, httpIS, httpOS, true, trustResult);
+        return new HttpServerConnection(server, clientSocket, httpIS, httpOS, true, trustResult, timingContext);
     }
 
     /**
@@ -277,7 +277,7 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
         return null;
     }
 
-    private HttpServerConnection autoWrapSSLConnection(final AbstractServerBasics server, final Socket clientSocket) throws IOException {
+    private HttpConnectionRunnable autoWrapSSLConnection(final AbstractServerBasics server, final Socket clientSocket, final TimingContext timingContext) throws IOException {
         boolean finallyCloseSocket = true;
         try {
             clientSocket.setSoTimeout(60 * 1000);
@@ -332,7 +332,7 @@ public class ExperimentalAutoSSLHttpServer extends HttpServer {
                 }
             }
             finallyCloseSocket = false;
-            return this.createSSLHttpConnection(server, ssl, clientSocket, httpIS, httpOS, clientCertificate);
+            return this.createSSLHttpConnection(server, ssl, clientSocket, httpIS, httpOS, clientCertificate, timingContext);
         } finally {
             try {
                 if (finallyCloseSocket) {

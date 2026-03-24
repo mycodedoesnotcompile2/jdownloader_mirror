@@ -138,7 +138,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://boeseseite.com").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "https://boeseseite.com"));
         final int responseCode = context.getCode();
         // Cross-origin requests should be rejected with 403 Forbidden
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Cross-Origin request should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
@@ -179,7 +179,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://localhost:" + this.serverPort).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "http://localhost:" + this.serverPort));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Localhost Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -216,7 +216,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", originValue).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", originValue));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), label + " should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -239,7 +239,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://boeseseite.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", origin));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Non-allowed Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -278,7 +278,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", origin));
         final int responseCode = context.getCode();
         // Request should succeed (origin is explicitly allowed)
         this.assertTrueWithContext(responseCode == 200, "Cross-origin request with CORS enabled should return 200, was: " + responseCode, context);
@@ -305,7 +305,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", origin));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200, "Request should return 200, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -332,7 +332,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String requestedHeaders = "X-Custom-Header, Authorization";
         // Make a preflight OPTIONS request with Access-Control-Request-Headers
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", requestedHeaders).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Headers", requestedHeaders));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS preflight request should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -357,7 +357,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS request should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -382,7 +382,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", origin).addHeader("Access-Control-Request-Method", "POST"));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200 || responseCode == 204, "OPTIONS request should return 200/204, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -408,7 +408,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://example.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", origin));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200, "GET request should return 200, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
@@ -457,7 +457,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         final String origin = "https://boeseseite.com";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", origin));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == 200, "Wildcard CORS should allow any Origin, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for wildcard CORS, but got: " + this.lastServerException, context);
@@ -480,7 +480,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         this.httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://localhost:" + this.serverPort).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "http://localhost:" + this.serverPort));
         final int responseCode = context.getCode();
         this.assertTrueWithContext(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "allowedOrigins=null should reject Origin requests, was: " + responseCode, context);
         this.assertTrueWithContext(this.lastServerException instanceof ForbiddenOriginException, "Server-side exception should be ForbiddenOriginException, but was: " + this.lastServerException, context);
@@ -676,13 +676,13 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         this.httpServer.setCorsHandler(corsHandler);
         // Test: Request from example.com - credentials should NOT be allowed
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(url));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "https://example.com"));
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
         final String allowCredentials1 = context.getConnection().getHeaderField(HTTPConstants.ACCESS_CONTROL_ALLOW_CREDENTIALS);
         this.assertTrueWithContext(allowCredentials1 == null, "Credentials header should not be present for example.com, but was: " + allowCredentials1, context);
         // Test: Request from trusted.com - credentials SHOULD be allowed
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://trusted.com").setUrl(url));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "https://trusted.com"));
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
         final String allowCredentials2 = context.getConnection().getHeaderField(HTTPConstants.ACCESS_CONTROL_ALLOW_CREDENTIALS);
         this.assertTrueWithContext("true".equals(allowCredentials2), "Credentials header should be 'true' for trusted.com, but was: " + allowCredentials2, context);
@@ -711,13 +711,13 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         this.httpServer.setCorsHandler(corsHandler);
         // Test: Preflight request from example.com with Access-Control-Request-Private-Network - should NOT be allowed
         this.lastServerException = null;
-        RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", "https://example.com").addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Private-Network", "true").setUrl(url));
+        RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", "https://example.com").addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Private-Network", "true"));
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
         final String allowPrivateNetwork1 = context.getConnection().getHeaderField(HTTPConstants.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK);
         this.assertTrueWithContext(allowPrivateNetwork1 == null, "Private Network Access header should not be present for example.com, but was: " + allowPrivateNetwork1, context);
         // Test: Preflight request from trusted.com with Access-Control-Request-Private-Network - SHOULD be allowed
         this.lastServerException = null;
-        context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.OPTIONS).addHeader("Origin", "https://trusted.com").addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Private-Network", "true").setUrl(url));
+        context = this.httpClient.execute(new RequestContext(RequestMethod.OPTIONS, url).addHeader("Origin", "https://trusted.com").addHeader("Access-Control-Request-Method", "POST").addHeader("Access-Control-Request-Private-Network", "true"));
         this.assertTrueWithContext(this.lastServerException == null, "No server-side exception expected for allowed origin, but got: " + this.lastServerException, context);
         final String allowPrivateNetwork2 = context.getConnection().getHeaderField(HTTPConstants.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK);
         this.assertTrueWithContext("true".equals(allowPrivateNetwork2), "Private Network Access header should be 'true' for trusted.com, but was: " + allowPrivateNetwork2, context);

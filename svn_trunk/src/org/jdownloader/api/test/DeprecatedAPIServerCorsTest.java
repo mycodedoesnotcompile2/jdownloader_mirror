@@ -168,7 +168,7 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testCrossOriginRequestBlocked() throws Exception {
         LogV3.info("Test 1: Cross-origin request from foreign domain blocked");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "https://example.com").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "https://example.com"));
         final int responseCode = context.getCode();
         // Cross-origin requests should be rejected with 403 Forbidden
         assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Cross-Origin request should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
@@ -208,7 +208,7 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testLocalhostOriginBlocked() throws Exception {
         LogV3.info("Test 3: Localhost Origin blocked");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "http://localhost:" + this.serverPort).setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", "http://localhost:" + this.serverPort));
         final int responseCode = context.getCode();
         assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Localhost Origin should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
         this.assertNoCorsHeaders(context, "Localhost Origin blocked");
@@ -221,7 +221,7 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
     private void testEmptyOriginHeaderBlocked() throws Exception {
         LogV3.info("Test 4: Empty Origin header blocked");
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-        final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", "").setUrl(url));
+        final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", ""));
         final int responseCode = context.getCode();
         assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Empty Origin header should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
         this.assertNoCorsHeaders(context, "Empty Origin header blocked");
@@ -260,7 +260,7 @@ public class DeprecatedAPIServerCorsTest extends AWTest {
         final String[] origins = { "https://example.com", "https://evil.com", "http://localhost", "http://127.0.0.1", "null", "   " };
         for (final String origin : origins) {
             final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
-            final RequestContext context = this.httpClient.execute(new RequestContext().setMethod(RequestMethod.GET).addHeader("Origin", origin).setUrl(url));
+            final RequestContext context = this.httpClient.execute(new RequestContext(RequestMethod.GET, url).addHeader("Origin", origin));
             final int responseCode = context.getCode();
             assertTrue(responseCode == ResponseCode.ERROR_FORBIDDEN.getCode(), "Origin '" + origin + "' should return " + ResponseCode.ERROR_FORBIDDEN.getCode() + " Forbidden, was: " + responseCode);
             this.assertNoCorsHeaders(context, "Origin '" + origin + "' blocked");

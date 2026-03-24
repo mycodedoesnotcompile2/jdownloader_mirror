@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52065 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52546 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -115,12 +115,14 @@ public class UploadyIo extends XFileSharingProBasic {
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return -1;
+        /* 2026-03-23: Tested */
+        return 1;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return -1;
+        /* 2026-03-23: Tested */
+        return 1;
     }
 
     @Override

@@ -56,6 +56,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
     private static final String PATTERN_TAB                   = "{tab}";
     private static final String PATTERN_DOWNLOADLINK_PROPERTY = "{jd:prop:yourWishedProperty}";
     private static final String PATTERN_COMMENT               = "{comment}";
+    private static final String PATTERN_AVAILABILITY          = "{availability}";
     private static final String PATTERN_HASH                  = "{hash}";
     private static final String PATTERN_FILESIZE_RAW          = "{filesize_raw}";
     private static final String PATTERN_FILESIZE_B            = "{filesize}";
@@ -97,7 +98,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         sb.append("<html>");
         sb.append(_JDT.T.CopyGenericContextAction_getTranslationForPatternLinks_v3());
         sb.append("<br><ul>");
-        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_HOST, PATTERN_NAME_NOEXT, PATTERN_EXTENSION, PATTERN_HASH, PATTERN_URL, PATTERN_URL_CONTAINER, PATTERN_URL_CONTENT, PATTERN_URL_ORIGIN, PATTERN_URL_REFERRER, PATTERN_ARCHIVE_PASSWORD, PATTERN_DOWNLOADLINK_PROPERTY }) {
+        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_AVAILABILITY, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_HOST, PATTERN_NAME_NOEXT, PATTERN_EXTENSION, PATTERN_HASH, PATTERN_URL, PATTERN_URL_CONTAINER, PATTERN_URL_CONTENT, PATTERN_URL_ORIGIN, PATTERN_URL_REFERRER, PATTERN_ARCHIVE_PASSWORD, PATTERN_DOWNLOADLINK_PROPERTY }) {
             sb.append("<li>").append(pattern).append("</li>");
         }
         sb.append("</ul></html>");
@@ -165,38 +166,13 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
 
             @Override
             public void onSelectionInfo(SelectionInfo<ParentType, ChildrenType> selectionInfo) {
-                final StringBuilder sb = new StringBuilder();
-                if (isSmartSelection()) {
-                    int children = 0;
-                    for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
-                        final List<ChildrenType> childs = pv.getChildren();
-                        children += childs.size();
-                        if (children > 1) {
-                            break;
-                        }
-                    }
-                    final boolean contentPermission = children == 1;
-                    for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
-                        final ParentType pkg = pv.getPackage();
-                        add(sb, pkg, false);
-                        final List<ChildrenType> childs = pv.getChildren();
-                        for (final ChildrenType c : childs) {
-                            add(sb, c, contentPermission);
-                        }
-                    }
-                } else {
-                    final List<AbstractNode> selection = selectionInfo.getRawSelection();
-                    final boolean contentPermission = selection.size() == 1 && selection.get(0) instanceof AbstractPackageChildrenNode;
-                    for (final AbstractNode pv : selection) {
-                        add(sb, pv, contentPermission);
-                    }
-                }
+                final String string = fromSelectionInfo(selectionInfo);
                 final TransferHandler transferHandler = table.getTransferHandler();
                 if (transferHandler instanceof PackageControllerTableTransferHandler) {
-                    ((PackageControllerTableTransferHandler) transferHandler).setTransferableStringContent(sb.toString());
+                    ((PackageControllerTableTransferHandler) transferHandler).setTransferableStringContent(string);
                     transferHandler.getCopyAction().actionPerformed(new ActionEvent(table, ActionEvent.ACTION_FIRST, "copy"));
                 } else {
-                    ClipboardMonitoring.getINSTANCE().setCurrentContent(sb.toString());
+                    ClipboardMonitoring.getINSTANCE().setCurrentContent(string);
                 }
             }
 
@@ -205,6 +181,36 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
                 return false;
             }
         };
+    }
+
+    public <ParentType extends AbstractPackageNode<ChildrenType, ParentType>, ChildrenType extends AbstractPackageChildrenNode<ParentType>> String fromSelectionInfo(SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+        final StringBuilder sb = new StringBuilder();
+        if (isSmartSelection()) {
+            int children = 0;
+            for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
+                final List<ChildrenType> childs = pv.getChildren();
+                children += childs.size();
+                if (children > 1) {
+                    break;
+                }
+            }
+            final boolean contentPermission = children == 1;
+            for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
+                final ParentType pkg = pv.getPackage();
+                add(sb, pkg, false);
+                final List<ChildrenType> childs = pv.getChildren();
+                for (final ChildrenType c : childs) {
+                    add(sb, c, contentPermission);
+                }
+            }
+        } else {
+            final List<AbstractNode> selection = selectionInfo.getRawSelection();
+            final boolean contentPermission = selection.size() == 1 && selection.get(0) instanceof AbstractPackageChildrenNode;
+            for (final AbstractNode pv : selection) {
+                add(sb, pv, contentPermission);
+            }
+        }
+        return sb.toString();
     }
 
     @Override
@@ -342,6 +348,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
                 }
                 line = line.replace("{" + hashType.name().replace("-", "").toLowerCase(Locale.ENGLISH) + "}", nulltoString(hashString));
             }
+            line = line.replace(PATTERN_AVAILABILITY, nulltoString(link.getAvailableStatus()));
             line = line.replace(PATTERN_HASH, nulltoString(hashInfo != null ? hashInfo.getHash() : null));
             line = line.replace(PATTERN_URL, nulltoString(link.getView().getDisplayUrl()));
             line = line.replace(PATTERN_URL_CONTAINER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.CONTAINER, link)));
@@ -386,6 +393,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
                 }
                 line = line.replace("{" + hashType.name().replace("-", "").toLowerCase(Locale.ENGLISH) + "}", nulltoString(hashString));
             }
+            line = line.replace(PATTERN_AVAILABILITY, nulltoString(link.getLinkState()));
             line = line.replace(PATTERN_HASH, nulltoString(hashInfo != null ? hashInfo.getHash() : null));
             line = line.replace(PATTERN_URL, nulltoString(link.getDownloadLink().getView().getDisplayUrl()));
             line = line.replace(PATTERN_URL_CONTAINER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.CONTAINER, link)));

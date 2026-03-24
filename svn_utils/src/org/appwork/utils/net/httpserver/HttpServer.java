@@ -146,9 +146,13 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
         this.wishPort = port;
     }
 
-    protected HttpConnectionRunnable createHttpConnection(Socket clientSocket) throws IOException {
+    /**
+     * @param timingContext
+     *            timing at socket accept (wall-clock ms + monotonic nanos), or null if unknown
+     */
+    protected HttpConnectionRunnable createHttpConnection(Socket clientSocket, TimingContext timingContext) throws IOException {
         InputStream inputStream = clientSocket.getInputStream();
-        HttpServerConnection con = new HttpServerConnection(this, clientSocket, inputStream, null);
+        HttpServerConnection con = new HttpServerConnection(this, clientSocket, inputStream, null, timingContext);
         return con;
     }
 
@@ -336,8 +340,11 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                     LogV3.fine("HttpServer: Waiting for connection on " + controlSocket.getLocalSocketAddress());
                                 }
                                 final Socket clientSocket = controlSocket.accept();
+                                final long acceptTimeMs = Time.timestamp();
+                                final long acceptNanos = Time.getNanoSeconds();
+                                final TimingContext timingContext = new TimingContext(acceptTimeMs, acceptNanos);
+                                final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
                                 if (HttpServer.this.verboseLog) {
-                                    final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
                                     LogV3.fine("HttpServer: Connection accepted from " + clientSocket.getRemoteSocketAddress() + " after SocketIDLE " + acceptElapsed + "ms");
                                 }
                                 boolean closeSocket = true;
@@ -365,7 +372,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                         LogV3.fine("HttpServer: socket address validator: OK");
                                     }
                                     final long createConnectionStartTime = Time.systemIndependentCurrentJVMTimeMillis();
-                                    final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket);
+                                    final HttpConnectionRunnable connection = HttpServer.this.createHttpConnection(clientSocket, timingContext);
                                     if (HttpServer.this.verboseLog) {
                                         final long createConnectionElapsed = Time.systemIndependentCurrentJVMTimeMillis() - createConnectionStartTime;
                                         LogV3.fine("HttpServer: createHttpConnection completed in " + createConnectionElapsed + "ms");
