@@ -687,10 +687,10 @@ public class Account extends Property {
         setEnabled(enabled, true);
     }
 
-    public void setEnabled(final boolean enabled, final boolean forceAccountCheckOnChange) {
+    public void setEnabled(final boolean enabled, final boolean allowAccountCheckOnChange) {
         if (this.enabled != enabled) {
             this.enabled = enabled;
-            if (forceAccountCheckOnChange) {
+            if (allowAccountCheckOnChange) {
                 notifyUpdate(AccountProperty.Property.ENABLED, enabled);
             }
         }
@@ -768,11 +768,11 @@ public class Account extends Property {
         setPass(newPass, true);
     }
 
-    public void setPass(String newPass, final boolean forceAccountCheckOnChange) {
+    public void setPass(String newPass, final boolean allowAccountCheckOnChange) {
         newPass = updateAccountPassword(trim(newPass));
         if (!StringUtils.equals(this.pass, newPass)) {
             this.pass = newPass;
-            if (forceAccountCheckOnChange) {
+            if (allowAccountCheckOnChange) {
                 notifyUpdate(AccountProperty.Property.PASSWORD, newPass);
             }
         }

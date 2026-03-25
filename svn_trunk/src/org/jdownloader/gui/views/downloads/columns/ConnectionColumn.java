@@ -16,24 +16,6 @@ import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 import javax.swing.UIManager;
 
-import org.appwork.scheduler.DelayedRunnable;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.tooltips.ExtTooltip;
-import org.appwork.swing.components.tooltips.ToolTipController;
-import org.appwork.swing.components.tooltips.TooltipPanel;
-import org.appwork.swing.exttable.ExtColumn;
-import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.SwingUtils;
-import org.appwork.utils.swing.renderer.RenderLabel;
-import org.appwork.utils.swing.renderer.RendererMigPanel;
-import org.jdownloader.DomainInfo;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.NewTheme;
-import org.jdownloader.plugins.SkipReason;
-
 import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.packagecontroller.AbstractNode;
@@ -52,6 +34,24 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 import net.miginfocom.swing.MigLayout;
+
+import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.tooltips.ExtTooltip;
+import org.appwork.swing.components.tooltips.ToolTipController;
+import org.appwork.swing.components.tooltips.TooltipPanel;
+import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.SwingUtils;
+import org.appwork.utils.swing.renderer.RenderLabel;
+import org.appwork.utils.swing.renderer.RendererMigPanel;
+import org.jdownloader.DomainInfo;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.SkipReason;
 
 public class ConnectionColumn extends ExtColumn<AbstractNode> {
     /**
@@ -384,7 +384,7 @@ public class ConnectionColumn extends ExtColumn<AbstractNode> {
                     final DomainInfo domainInfo = DomainInfo.getInstance(plugin.getHost(link, sdc.getAccount(), false));
                     if (domainInfo != null) {
                         final Icon icon = domainInfo.getFavIcon();
-                        add(new JLabel(_GUI.T.ConnectionColumn_DownloadUsesAccount(GUIUtils.getAccountName(sdc.getAccount().getUser())), icon, JLabel.LEADING));
+                        add(new JLabel(_GUI.T.ConnectionColumn_DownloadUsesAccount(GUIUtils.getAccountName(sdc.getAccount())), icon, JLabel.LEADING));
                     }
                 }
             }

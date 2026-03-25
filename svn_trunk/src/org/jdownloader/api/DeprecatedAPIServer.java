@@ -54,6 +54,7 @@ import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.RawHttpConnectionInterface;
 import org.appwork.utils.net.httpserver.ReferrerPolicy;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
+import org.appwork.utils.net.httpserver.TimingContext;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
 import org.appwork.utils.net.httpserver.XFrameOptions;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
@@ -269,8 +270,8 @@ public class DeprecatedAPIServer extends HttpServer {
     }
 
     public class CustomHttpConnection extends HttpServerConnection {
-        protected CustomHttpConnection(HttpServer server, Socket clientSocket, InputStream is, OutputStream os) throws IOException {
-            super(server, clientSocket, is, os);
+        protected CustomHttpConnection(HttpServer server, Socket clientSocket, InputStream is, OutputStream os, TimingContext timingContext) throws IOException {
+            super(server, clientSocket, is, os, timingContext);
         }
 
         protected AbstractGetRequest buildGetRequest() {
@@ -558,7 +559,7 @@ public class DeprecatedAPIServer extends HttpServer {
     }
 
     @Override
-    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket) throws IOException {
+    protected HttpConnectionRunnable createHttpConnection(final Socket clientSocket, final TimingContext timingContext) throws IOException {
         return new HttpConnectionRunnable() {
             @Override
             public void run() {
@@ -566,7 +567,7 @@ public class DeprecatedAPIServer extends HttpServer {
                     final HttpServerConnection httpConnection = autoWrapSSLConnection(clientSocket, new AutoSSLHttpConnectionFactory() {
                         @Override
                         public HttpServerConnection create(Socket clientSocket, InputStream is, OutputStream os) throws IOException {
-                            return new CustomHttpConnection(DeprecatedAPIServer.this, clientSocket, is, os);
+                            return new CustomHttpConnection(DeprecatedAPIServer.this, clientSocket, is, os, timingContext);
                         }
                     });
                     if (httpConnection != null) {
@@ -583,4 +584,5 @@ public class DeprecatedAPIServer extends HttpServer {
             }
         };
     }
+
 }

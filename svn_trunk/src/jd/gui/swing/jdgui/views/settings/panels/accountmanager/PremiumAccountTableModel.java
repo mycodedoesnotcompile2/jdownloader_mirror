@@ -291,7 +291,6 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
             @Override
             public void delayedrun() {
-                System.out.println("Update");
                 _update();
             }
         };
@@ -418,7 +417,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
             @Override
             public String getStringValue(AccountEntry value) {
-                return GUIUtils.getAccountName(value.getAccount().getUser());
+                return GUIUtils.getAccountName(value.getAccount());
             }
         });
     }

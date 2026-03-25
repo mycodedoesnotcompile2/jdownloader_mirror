@@ -1,20 +1,5 @@
 package jd.plugins.hoster;
 
-//jDownloader - Downloadmanager
-//Copyright (C) 2013  JD-Team support@jdownloader.org
-//
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
-//
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-//GNU General Public License for more details.
-//
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <http://www.gnu.org/licenses/>.;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -24,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasicSpecialFilejoker;
@@ -42,7 +28,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52546 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52550 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +41,9 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
          */
         this.setStartIntervall(10000l);
     }
+
+    private static final Pattern PATTERN_LEGACY_SHORT = Pattern.compile("https?://[^/]*nfile\\.cc/([A-Za-z0-9]+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_COMMON       = Pattern.compile("/(?:embed-|file/)?([a-z0-9]{8,})(?:/[^/]+(?:\\.html)?)?", Pattern.CASE_INSENSITIVE);
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -82,7 +71,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     @Override
     protected URL_TYPE getURLType(final String url) {
         /* 2023-05-18: Legacy: Those URLs are now processed by separate crawler plugin NfileCc. */
-        if (url != null && url.matches("(?i)https?://[^/]*nfile\\.cc/([A-Za-z0-9]+)$")) {
+        if (url != null && new Regex(url, PATTERN_LEGACY_SHORT).patternFind()) {
             return URL_TYPE.SHORT;
         } else {
             return super.getURLType(url);
@@ -95,24 +84,25 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
         return true;
     }
 
-    protected String getFUID(final String url, URL_TYPE type) {
+    @Override
+    protected String getFUID(final String url, final URL_TYPE type) {
         if (url == null) {
             return null;
         }
-        if (type == null) {
-            return null;
+        String fuid = null;
+        if (type == URL_TYPE.SHORT) {
+            fuid = new Regex(url, PATTERN_LEGACY_SHORT).getMatch(0);
+            return fuid;
         }
         try {
-            switch (type) {
-            case SHORT:
-                return new Regex(new URL(url).getPath(), "/([A-Za-z0-9]+)").getMatch(0);
-            default:
-                return super.getFUID(url, type);
+            fuid = new Regex(new URL(url).getPath(), PATTERN_COMMON).getMatch(0);
+            if (fuid != null) {
+                return fuid;
             }
         } catch (MalformedURLException e) {
             logger.log(e);
         }
-        return null;
+        return super.getFUID(url, type);
     }
 
     @Override
@@ -125,7 +115,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     }
 
     public static String getAnnotationPatternPart() {
-        return "/(?:embed-|file/)?[a-z0-9]{8,}(?:/[^/]+(?:\\.html)?)?";
+        return PATTERN_COMMON.pattern();
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {

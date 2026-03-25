@@ -1650,6 +1650,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Abort all" })
     String literally_abort_all();
+    
+    @Default(lngs = { "en" }, values = { "Retry crawling" })
+    String literally_retry_crawling();
 
     @Default(lngs = { "en" }, values = { "Crawler Window hidden!" })
     String AddLinksProgress_setReturnmask_title_();

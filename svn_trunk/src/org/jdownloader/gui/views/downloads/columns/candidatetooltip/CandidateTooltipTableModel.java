@@ -182,9 +182,9 @@ public class CandidateTooltipTableModel extends ExtTableModel<HistoryEntry> {
                     break;
                 }
                 if (!StringUtils.isEmpty(accountType)) {
-                    str = _GUI.T.CandidateAccountColumn_getStringValue_account_type(GUIUtils.getAccountName(account.getUser()), account.getHosterByPlugin(), accountType);
+                    str = _GUI.T.CandidateAccountColumn_getStringValue_account_type(GUIUtils.getAccountName(account), account.getHosterByPlugin(), accountType);
                 } else {
-                    str = _GUI.T.CandidateAccountColumn_getStringValue_account(GUIUtils.getAccountName(account.getUser()), account.getHosterByPlugin());
+                    str = _GUI.T.CandidateAccountColumn_getStringValue_account(GUIUtils.getAccountName(account), account.getHosterByPlugin());
                 }
             } else {
                 if (icon == null) {

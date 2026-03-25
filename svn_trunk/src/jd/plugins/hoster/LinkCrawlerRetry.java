@@ -10,6 +10,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 
+import org.appwork.swing.action.BasicAction;
+import org.appwork.utils.event.queue.QueueAction;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.SelectionInfo.PluginView;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -31,16 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.swing.action.BasicAction;
-import org.appwork.utils.event.queue.QueueAction;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.gui.views.SelectionInfo.PluginView;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
-@HostPlugin(revision = "$Revision: 52037 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52551 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     private final static String ON_LINKCHECK = "onlinkcheck";
 
@@ -185,7 +185,7 @@ public class LinkCrawlerRetry extends PluginForHost {
         final List<JComponent> ret = new ArrayList<JComponent>();
         ret.add(new JMenuItem(new BasicAction() {
             {
-                setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
+                setName(_GUI.T.literally_retry_crawling());
                 setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
             }
 

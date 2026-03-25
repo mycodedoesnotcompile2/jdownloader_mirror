@@ -16,9 +16,25 @@
 
 package jd.gui.swing.jdgui;
 
+import jd.plugins.Account;
+import jd.plugins.PluginForHost;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 public class GUIUtils {
+
+    public static String getAccountName(Account account) {
+        String username = account.getUser();
+        if (StringUtils.isEmpty(username) && account != null) {
+            final PluginForHost plugin = account.getPlugin();
+            if (plugin != null && plugin.hasFeature(FEATURE.API_KEY_LOGIN)) {
+                username = "No Username";
+            }
+        }
+        return getAccountName(username);
+    }
 
     public static String getAccountName(final String username) {
         String output = username;

@@ -38,6 +38,8 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -139,16 +141,32 @@ public class Crypto {
         return cipher.doFinal(data);
     }
 
-    private static final String CHAR_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"§$%&/()=?{[]}\\'#*+~,.-;:_'";
+    public static final String CHAR_POOL_ALPHA_UPPER_CASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    public static final String CHAR_POOL_ALPHA_LOWER_CASE = "abcdefghijklmnopqrstuvwxyz";
+    public static final String CHAR_POOL_DIGIT            = "0123456789";
+    public static final String CHAR_POOL_DEFAULT          = CHAR_POOL_ALPHA_UPPER_CASE + CHAR_POOL_ALPHA_LOWER_CASE + CHAR_POOL_DIGIT + "!\"§$%&/()=?{[]}\\'#*+~,.-;:_'";
 
     public static String generateRandomString(int length) {
+        return generateRandomString(length, CHAR_POOL_DEFAULT);
+    }
+
+    public static String generateRandomString(final int length, String... allowPool) {
         final SecureRandom secureRandom = new SecureRandom();
-        final StringBuilder stringBuilder = new StringBuilder(length);
-        final int poolSize = CHAR_POOL.length();
-        for (int i = 0; i < length; i++) {
-            int randomIndex = secureRandom.nextInt(poolSize);
-            stringBuilder.append(CHAR_POOL.charAt(randomIndex));
+        final Set<Character> poolSet = new HashSet<Character>();
+        final StringBuilder charPool = new StringBuilder();
+        for (final String allow : allowPool) {
+            for (char c : allow.toCharArray()) {
+                if (poolSet.add(c)) {
+                    charPool.append(c);
+                }
+            }
         }
-        return stringBuilder.toString();
+        final StringBuilder ret = new StringBuilder(length);
+        final int poolSize = charPool.length();
+        for (int i = 0; i < length; i++) {
+            final int randomIndex = secureRandom.nextInt(poolSize);
+            ret.append(charPool.charAt(randomIndex));
+        }
+        return ret.toString();
     }
 }
