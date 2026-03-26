@@ -447,6 +447,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Download Traffic left" })
     String premiumaccounttablemodel_column_trafficleft();
 
+    @Default(lngs = { "en" }, values = { "Balance" })
+    String premiumaccounttablemodel_column_balance();
+
     @Default(lngs = { "en" }, values = { "Unlimited" })
     String premiumaccounttablemodel_column_trafficleft_unlimited();
 
@@ -1650,7 +1653,7 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Abort all" })
     String literally_abort_all();
-    
+
     @Default(lngs = { "en" }, values = { "Retry crawling" })
     String literally_retry_crawling();
 

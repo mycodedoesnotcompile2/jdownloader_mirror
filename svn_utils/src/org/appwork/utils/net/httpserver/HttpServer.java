@@ -340,11 +340,9 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
                                     LogV3.fine("HttpServer: Waiting for connection on " + controlSocket.getLocalSocketAddress());
                                 }
                                 final Socket clientSocket = controlSocket.accept();
-                                final long acceptTimeMs = Time.timestamp();
-                                final long acceptNanos = Time.getNanoSeconds();
-                                final TimingContext timingContext = new TimingContext(acceptTimeMs, acceptNanos);
-                                final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
+                                final TimingContext timingContext = new TimingContext();
                                 if (HttpServer.this.verboseLog) {
+                                    final long acceptElapsed = Time.systemIndependentCurrentJVMTimeMillis() - beforeAcceptTime;
                                     LogV3.fine("HttpServer: Connection accepted from " + clientSocket.getRemoteSocketAddress() + " after SocketIDLE " + acceptElapsed + "ms");
                                 }
                                 boolean closeSocket = true;

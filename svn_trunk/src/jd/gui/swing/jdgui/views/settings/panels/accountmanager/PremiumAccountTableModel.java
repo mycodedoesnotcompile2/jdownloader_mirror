@@ -7,6 +7,7 @@ import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.text.FieldPosition;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,6 +40,7 @@ import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtComponentColumn;
+import org.appwork.swing.exttable.columns.ExtCurrencyColumn;
 import org.appwork.swing.exttable.columns.ExtDateColumn;
 import org.appwork.swing.exttable.columns.ExtPasswordEditorColumn;
 import org.appwork.swing.exttable.columns.ExtProgressColumn;
@@ -52,16 +54,16 @@ import org.jdownloader.gui.components.ColumnButton;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implements AccountCheckerEventListener {
-    public static class TrafficColumn extends ExtProgressColumn<AccountEntry> {
-        private static final long              serialVersionUID = -8376056840172682617L;
-        private final PremiumAccountTableModel tableModel;
-        private final DecimalFormat            formatter;
-        private final SIZEUNIT                 maxSizeUnit;
+    protected class TrafficColumn extends ExtProgressColumn<AccountEntry> {
+        private static final long   serialVersionUID = -8376056840172682617L;
+        private final DecimalFormat formatter;
+        private final SIZEUNIT      maxSizeUnit;
         {
             setRowSorter(new ExtDefaultRowSorter<AccountEntry>() {
                 private int compareLong(long x, long y) {
@@ -96,7 +98,6 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
         public TrafficColumn(PremiumAccountTableModel tableModel, String title) {
             super(title);
-            this.tableModel = tableModel;
             maxSizeUnit = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit();
             this.formatter = new DecimalFormat() {
                 final StringBuffer        sb               = new StringBuffer();
@@ -120,7 +121,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
         @Override
         public boolean isSortable(AccountEntry obj) {
-            return tableModel.isSortable();
+            return PremiumAccountTableModel.this.isSortable();
         }
 
         @Override
@@ -129,7 +130,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         }
 
         protected boolean isIndeterminated(final AccountEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-            if (tableModel != null && tableModel.checkRunning) {
+            if (PremiumAccountTableModel.this.checkRunning) {
                 return AccountChecker.getInstance().contains(value.getAccount());
             }
             if (value.getAccount().isValid() && value.getAccount().isEnabled() && value.getAccount().isTempDisabled()) {
@@ -140,80 +141,132 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
         @Override
         protected String getString(AccountEntry ac, long current, long total) {
-            if (!ac.getAccount().isValid()) {
+            final Account acc = ac.getAccount();
+            final PluginForHost plg = acc.getPlugin();
+            if (!acc.isValid()) {
                 return "";
-            } else {
-                long timeout = -1;
-                if (ac.getAccount().isEnabled() && ac.getAccount().isTempDisabled() && ((timeout = ac.getAccount().getTmpDisabledTimeout() - System.currentTimeMillis()) > 0)) {
-                    return _GUI.T.premiumaccounttablemodel_column_trafficleft_tempdisabled(TimeFormatter.formatMilliSeconds(timeout, 0));
-                } else {
-                    final AccountTrafficView accountTrafficView = ac.getAccount().getAccountTrafficView();
-                    if (accountTrafficView == null) {
-                        return "";
-                    } else {
-                        // COL_PROGRESS = COL_PROGRESS_NORMAL;
-                        if (accountTrafficView.isUnlimitedTraffic()) {
-                            return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
-                        } else {
-                            synchronized (formatter) {
-                                return _GUI.T.premiumaccounttablemodel_column_trafficleft_left_(SIZEUNIT.formatValue(maxSizeUnit, formatter, accountTrafficView.getTrafficLeft()), SIZEUNIT.formatValue(maxSizeUnit, formatter, accountTrafficView.getTrafficMax()));
-                            }
-                        }
-                    }
+            }
+            final long tmpDisabledTimeout = acc.getTmpDisabledTimeout();
+            final long timeout = tmpDisabledTimeout - System.currentTimeMillis();
+            if (acc.isEnabled() && acc.isTempDisabled() && timeout > 0) {
+                return _GUI.T.premiumaccounttablemodel_column_trafficleft_tempdisabled(TimeFormatter.formatMilliSeconds(timeout, 0));
+            }
+            if (plg != null && plg.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                /* Captcha solver accounts have no download traffic */
+                String balanceStr = "0";
+                final AccountInfo ai = acc.getAccountInfo();
+                if (ai != null) {
+                    balanceStr = ai.getAccountBalanceFormatted();
                 }
+                return "Balance: " + balanceStr;
+            }
+            final AccountTrafficView accountTrafficView = acc.getAccountTrafficView();
+            if (accountTrafficView == null) {
+                return "";
+            }
+            if (accountTrafficView.isUnlimitedTraffic()) {
+                return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
+            }
+            synchronized (formatter) {
+                return _GUI.T.premiumaccounttablemodel_column_trafficleft_left_(SIZEUNIT.formatValue(maxSizeUnit, formatter, accountTrafficView.getTrafficLeft()), SIZEUNIT.formatValue(maxSizeUnit, formatter, accountTrafficView.getTrafficMax()));
             }
         }
 
         @Override
         protected long getMax(AccountEntry ac) {
-            if (!ac.getAccount().isValid()) {
+            final Account acc = ac.getAccount();
+            final PluginForHost plg = acc.getPlugin();
+            if (!acc.isValid()) {
                 return 0;
-            } else {
-                final AccountTrafficView accountTrafficView = ac.getAccount().getAccountTrafficView();
-                if (accountTrafficView == null) {
-                    return 0;
-                } else {
-                    if (accountTrafficView.isUnlimitedTraffic()) {
-                        return Long.MAX_VALUE;
-                    } else {
-                        return accountTrafficView.getTrafficMax();
-                    }
-                }
             }
+            if (plg != null && plg.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                /* Captcha solver accounts have no download traffic */
+                return Long.MAX_VALUE;
+            }
+            final AccountTrafficView accountTrafficView = acc.getAccountTrafficView();
+            if (accountTrafficView == null) {
+                return 0;
+            }
+            if (accountTrafficView.isUnlimitedTraffic()) {
+                return Long.MAX_VALUE;
+            }
+            return accountTrafficView.getTrafficMax();
         }
 
         @Override
         protected long getValue(AccountEntry ac) {
-            if (!ac.getAccount().isValid()) {
+            final Account acc = ac.getAccount();
+            final PluginForHost plg = acc.getPlugin();
+            if (!acc.isValid()) {
                 return 0;
-            } else {
-                final AccountTrafficView accountTrafficView = ac.getAccount().getAccountTrafficView();
-                if (accountTrafficView == null) {
-                    return 0;
-                } else {
-                    if (accountTrafficView.isUnlimitedTraffic()) {
-                        return Long.MAX_VALUE;
-                    } else {
-                        return accountTrafficView.getTrafficLeft();
-                    }
-                }
             }
+            if (plg != null && plg.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                /* Captcha solver accounts have no download traffic */
+                return Long.MAX_VALUE;
+            }
+            final AccountTrafficView accountTrafficView = acc.getAccountTrafficView();
+            if (accountTrafficView == null) {
+                return 0;
+            }
+            if (accountTrafficView.isUnlimitedTraffic()) {
+                return Long.MAX_VALUE;
+            }
+            return accountTrafficView.getTrafficLeft();
         }
     }
 
-    public static class ExpireColumn extends ExtDateColumn<AccountEntry> {
-        private static final long        serialVersionUID = 5067606909520874358L;
-        private PremiumAccountTableModel tableModel;
+    protected class BalanceColumn extends ExtCurrencyColumn<AccountEntry> {
+        private static final long serialVersionUID = 1L;
+
+        public BalanceColumn(final PremiumAccountTableModel tableModel, final String title) {
+            super(title, tableModel);
+        }
+
+        @Override
+        protected Currency getCurrency(final AccountEntry value) {
+            final AccountInfo ai = value.getAccount().getAccountInfo();
+            if (ai != null) {
+                return ai.getCurrency();
+            }
+            return null;
+        }
+
+        @Override
+        protected long getValue(final Object o) {
+            final AccountEntry entry = (AccountEntry) o;
+            final AccountInfo ai = entry.getAccount().getAccountInfo();
+            if (ai == null) {
+                return 0L;
+            }
+            return Math.round(ai.getAccountBalance() * 100);
+        }
+
+        @Override
+        public boolean isEnabled(final AccountEntry obj) {
+            return obj.getAccount().isEnabled();
+        }
+
+        @Override
+        public boolean isSortable(final AccountEntry obj) {
+            return PremiumAccountTableModel.this.isSortable();
+        }
+
+        @Override
+        public void configureEditorComponent(AccountEntry value, boolean isSelected, int row, int column) {
+        }
+    }
+
+    protected class ExpireColumn extends ExtDateColumn<AccountEntry> {
+        private static final long serialVersionUID = 5067606909520874358L;
 
         public ExpireColumn(PremiumAccountTableModel model, String string) {
             super(string);
             replaceSorter(this);
-            this.tableModel = model;
         }
 
         @Override
         public boolean isSortable(AccountEntry obj) {
-            return tableModel.isSortable();
+            return PremiumAccountTableModel.this.isSortable();
         }
 
         @Override
@@ -251,12 +304,11 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             final AccountInfo ai = o2.getAccount().getAccountInfo();
             if (ai == null) {
                 return null;
+            }
+            if (ai.getValidUntil() <= 0) {
+                return null;
             } else {
-                if (ai.getValidUntil() <= 0) {
-                    return null;
-                } else {
-                    return new Date(ai.getValidUntil());
-                }
+                return new Date(ai.getValidUntil());
             }
         }
     }
@@ -347,11 +399,22 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         addPasswordColumn();
         addExpireColumn();
         addTrafficColumn();
+        addBalanceColumn();
         addColumnSettingsButton();
     }
 
     protected void addTrafficColumn() {
         this.addColumn(new TrafficColumn(this, _GUI.T.premiumaccounttablemodel_column_trafficleft()));
+    }
+
+    protected void addBalanceColumn() {
+        this.addColumn(new BalanceColumn(this, _GUI.T.premiumaccounttablemodel_column_balance()) {
+            @Override
+            public boolean isDefaultVisible() {
+                /* Default invisible since balance is not important for most use cases. */
+                return false;
+            }
+        });
     }
 
     protected void addExpireColumn() {
@@ -404,6 +467,15 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             public boolean isEditable(AccountEntry obj) {
                 // prevent hash values from been edited...
                 if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                    return false;
+                }
+                final Account acc = obj.getAccount();
+                final PluginForHost plg = acc.getPlugin();
+                if (plg != null && plg.hasFeature(FEATURE.API_KEY_LOGIN)) {
+                    /*
+                     * Login happens via API key -> There is either no username available or username shall not be edited by user since it
+                     * is set during account-check.
+                     */
                     return false;
                 } else {
                     return PremiumAccountTableModel.this.isEditable();
@@ -792,21 +864,20 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
     }
 
     protected void _refill() {
-        if (accountManagerSettings.isShown()) {
-            final java.util.List<AccountEntry> newtableData = new ArrayList<AccountEntry>(this.getRowCount());
-            List<Account> accs = AccountController.getInstance().list(null);
-            if (accs != null) {
-                for (Account acc : accs) {
-                    PluginForHost plugin = acc.getPlugin();
-                    if (plugin == null) {
-                        continue;
-                    }
-                    AccountEntry ae;
-                    newtableData.add(ae = new AccountEntry(acc));
-                }
-            }
-            _fireTableStructureChanged(newtableData, true);
+        if (!accountManagerSettings.isShown()) {
+            return;
         }
+        final List<AccountEntry> newtableData = new ArrayList<AccountEntry>(this.getRowCount());
+        final List<Account> accs = AccountController.getInstance().list(null);
+        if (accs != null) {
+            for (Account acc : accs) {
+                if (acc.getPlugin() == null) {
+                    continue;
+                }
+                newtableData.add(new AccountEntry(acc));
+            }
+        }
+        _fireTableStructureChanged(newtableData, true);
     }
 
     public static String accountToStatusString(Account value) {

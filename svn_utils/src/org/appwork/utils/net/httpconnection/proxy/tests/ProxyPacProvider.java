@@ -23,14 +23,10 @@ import org.appwork.builddecision.BuildDecisions;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
-import org.appwork.processes.ProcessHandlerFactory;
-import org.appwork.processes.ProcessInfo;
-import org.appwork.processes.windows.jna.WindowsJNAProcessUtils;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpserver.HttpServer;
-import org.appwork.utils.net.httpserver.HttpServerConnection;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
 import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
@@ -72,6 +68,7 @@ public class ProxyPacProvider {
         server.getHeaderValidationRules().removeForbiddenHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE);
         server.getHeaderValidationRules().removeForbiddenHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_USER);
         server.getHeaderValidationRules().removeForbiddenHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST);
+        server.setSocketAddressValidator(null);
         this.server.setLocalhostOnly(true);
         this.server.registerRequestHandler(new ProxyPacHandler());
     }
@@ -132,17 +129,6 @@ public class ProxyPacProvider {
         public boolean onGetRequest(final AbstractGetRequest request, final HttpResponse response) {
             if (!"/proxy.pac".equals(request.getRequestedPath())) {
                 return false;
-            }
-            // request.getConnection().get
-            int PID;
-            try {
-                PID = WindowsJNAProcessUtils.getPIDForRemoteAddress(((HttpServerConnection) request.getConnection()).getClientSocket().getRemoteSocketAddress());
-                ProcessInfo process = ProcessHandlerFactory.getProcessHandler().listByPids(PID).get(0);
-                LogV3.info("Requesting Process:" + process.getExecutableName());
-            } catch (InterruptedException e) {
-                LogV3.log(e);
-            } catch (Exception e) {
-                LogV3.log(e);
             }
             LogV3.info(request + "");
             final URL resource = ProxyPacProvider.class.getResource("proxy.pac");

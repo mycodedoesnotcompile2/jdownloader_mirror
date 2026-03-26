@@ -33,12 +33,13 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpserver;
 
+import org.appwork.utils.Time;
+
 /**
- * Immutable context capturing the same instant in wall-clock time (ms) and monotonic time (nanos), e.g. when a socket was accepted.
- * Used for time-sync and elapsed-time calculations without exposing separate fields.
+ * Immutable context capturing the same instant in wall-clock time (ms) and monotonic time (nanos), e.g. when a socket was accepted. Used
+ * for time-sync and elapsed-time calculations without exposing separate fields.
  */
 public class TimingContext {
-
     private final long connectionTimeMs;
     private final long connectionNanos;
 
@@ -51,6 +52,10 @@ public class TimingContext {
     public TimingContext(final long connectionTimeMs, final long connectionNanos) {
         this.connectionTimeMs = connectionTimeMs;
         this.connectionNanos = connectionNanos;
+    }
+
+    public TimingContext() {
+        this(Time.timestamp(), Time.getNanoSeconds());
     }
 
     /**

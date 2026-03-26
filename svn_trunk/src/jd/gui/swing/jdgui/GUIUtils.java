@@ -13,23 +13,25 @@
 //
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package jd.gui.swing.jdgui;
-
-import jd.plugins.Account;
-import jd.plugins.PluginForHost;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-public class GUIUtils {
+import jd.plugins.Account;
+import jd.plugins.PluginForHost;
 
+public class GUIUtils {
     public static String getAccountName(Account account) {
+        if (account == null) {
+            return null;
+        }
         String username = account.getUser();
-        if (StringUtils.isEmpty(username) && account != null) {
+        if (StringUtils.isEmpty(username)) {
             final PluginForHost plugin = account.getPlugin();
             if (plugin != null && plugin.hasFeature(FEATURE.API_KEY_LOGIN)) {
+                /* Some plugins which support API key login have no username set. */
                 username = "No Username";
             }
         }
@@ -39,7 +41,7 @@ public class GUIUtils {
     public static String getAccountName(final String username) {
         String output = username;
         if (CFG_GUI.CFG.isPresentationModeEnabled()) {
-            if (username == null || "".equals(username)) {
+            if (StringUtils.isEmpty(username)) {
                 output = "";
             } else if (username.length() <= 1) {
                 output = "*********";
