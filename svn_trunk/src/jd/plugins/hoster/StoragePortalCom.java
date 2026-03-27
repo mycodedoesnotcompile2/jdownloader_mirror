@@ -45,8 +45,9 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52554 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52567 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
 public class StoragePortalCom extends PluginForHost {
+    /* API docs: https://www.storage-portal.com/docs/download-client-api */
     private static final String          API_BASE           = "https://www.storage-portal.com/api/external/v1";
     private static final String          PROPERTY_DIRECTURL = "storageportalcom_directlink";
     private static final String          PROPERTY_LINKID    = "storageportalcom_linkid";
@@ -57,7 +58,7 @@ public class StoragePortalCom extends PluginForHost {
 
     public StoragePortalCom(PluginWrapper wrapper) {
         super(wrapper);
-        enablePremium("https://www.storage-portal.com/");
+        enablePremium("https://www." + getHost());
     }
 
     @Override
@@ -193,6 +194,10 @@ public class StoragePortalCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final Map<String, Object> data = login(account);
         final AccountInfo ai = new AccountInfo();
+        final Number login_check_interval_millis = (Number) data.get("login_check_interval");
+        if (login_check_interval_millis != null) {
+            account.setRefreshTimeout(login_check_interval_millis.longValue());
+        }
         if ("premium".equalsIgnoreCase((String) data.get("accountType"))) {
             account.setType(AccountType.PREMIUM);
             ai.setTrafficLeft(((Number) data.get("trafficleft")).longValue());
@@ -202,11 +207,17 @@ public class StoragePortalCom extends PluginForHost {
             account.setMaxSimultanDownloads(1);
             ai.setTrafficLeft(0);
         }
-        br.getPage(API_BASE + "/hosts");
+        br.getPage(API_BASE + "/hosts/grouped");
         final Map<String, Object> hostsData = handleAPIErrors(account, null);
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostinfo : (List<Map<String, Object>>) hostsData.get("supportedhosts")) {
-            final MultiHostHost mhost = new MultiHostHost(hostinfo.get("host").toString());
+            final List<String> domains = (List<String>) hostinfo.get("domains");
+            if (domains.isEmpty()) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.addDomains(domains);
             if (!Boolean.TRUE.equals(hostinfo.get("currently_working"))) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
@@ -242,6 +253,7 @@ public class StoragePortalCom extends PluginForHost {
             }
         }
         if (Boolean.TRUE.equals(entries.get("success"))) {
+            /* No error */
             return (Map<String, Object>) entries.get("data");
         }
         /* Error: parse numeric status code */
@@ -285,10 +297,10 @@ public class StoragePortalCom extends PluginForHost {
             /* File offline */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         default:
-            if (link != null) {
-                mhm.handleErrorGeneric(account, link, msg, 50, retryWait);
-            } else {
+            if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
                 throw new AccountUnavailableException(msg, retryWait);
+            } else {
+                mhm.handleErrorGeneric(account, link, msg, 50, retryWait);
             }
         }
         /* Unreachable after mhm.handleErrorGeneric / mhm.putError, but compiler needs it */

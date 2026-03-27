@@ -15,11 +15,9 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -31,8 +29,12 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48047 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 52566 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornpicsCom extends PluginForDecrypt {
     public PornpicsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +75,7 @@ public class PornpicsCom extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String galleryTitle = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
+        String galleryTitle = br.getRegex("<h1>\\s*([^<]+)\\s*</h1>").getMatch(0);
         if (galleryTitle != null) {
             galleryTitle = Encoding.htmlDecode(galleryTitle).trim();
         } else {
@@ -85,12 +87,16 @@ public class PornpicsCom extends PluginForDecrypt {
         if (modelNamesCommaSeparated != null) {
             modelNamesCommaSeparated = Encoding.htmlDecode(modelNamesCommaSeparated).trim();
         }
-        final String[] links = br.getRegex("class='thumbwook'><a class='rel-link' href='(https?://[^<>\"\\']+)").getColumn(0);
+        final String[] links = br.getRegex("class='thumbwook'[^>]*>\\s*<a class='rel-link' href='(https?://[^']+)").getColumn(0);
         if (links == null || links.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (final String singleLink : links) {
             final DownloadLink link = createDownloadlink(singleLink);
+            if (StringUtils.containsIgnoreCase(new URL(singleLink).getHost(), getHost())) {
+                link.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
+                link.setProperty(DirectHTTP.PROPERTY_REQUEST_TYPE, "HEAD");
+            }
             link.setProperty("gallerytitle", galleryTitle);
             if (!StringUtils.isEmpty(modelNamesCommaSeparated)) {
                 link.setProperty("models", modelNamesCommaSeparated);

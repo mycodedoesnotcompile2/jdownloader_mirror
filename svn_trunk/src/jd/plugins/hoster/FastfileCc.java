@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigFastfileCc;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -29,10 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigFastfileCc;
-
-@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52571 $", interfaceVersion = 3, names = {}, urls = {})
 public class FastfileCc extends XFileSharingProBasic {
     public FastfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -137,7 +137,7 @@ public class FastfileCc extends XFileSharingProBasic {
     protected String regExTrafficLeft(final Browser br) {
         String betterTrafficLeft = br.getRegex("Traffic available today:\\s*<strong>\\s*?(\\d+[^<]+)</strong>").getMatch(0);
         if (betterTrafficLeft == null) {
-            betterTrafficLeft = br.getRegex(">Traffic available today</div>\\s*<div[^>]*>\\s*?(\\d+[^<]+)</div>").getMatch(0);
+            betterTrafficLeft = br.getRegex(">\\s*Traffic available today\\s*</div>\\s*<div[^>]*>\\s*?(\\d+[^<]+)</div>").getMatch(0);
         }
         if (betterTrafficLeft != null) {
             return betterTrafficLeft;
