@@ -5,6 +5,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -27,6 +28,7 @@ import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.columns.CommentColumn;
 import org.jdownloader.gui.views.downloads.action.CopyGenericContextAction;
 import org.jdownloader.gui.views.downloads.columns.AvailabilityColumn;
@@ -171,18 +173,56 @@ public class LinkURLEditor<PackageType extends AbstractPackageNode<ChildrenType,
             @Override
             protected JPopupMenu onContextMenu(JPopupMenu popup, AbstractNode contextObject, java.util.List<AbstractNode> selection, final ExtColumn<AbstractNode> column, MouseEvent mouseEvent) {
 
+                if (column != urlColumn) {
+                    popup.add(new AppAction() {
+                        {
+                            setName(_GUI.T.CopyGenericContextAction_tt(column.getName()));
+                            setSmallIcon(new AbstractIcon(IconKey.ICON_COPY, 20));
+                        }
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            onShortcutCopy(model.getSelectedObjects(), null, column);
+                        }
+                    });
+                }
                 popup.add(new AppAction() {
                     {
-                        setName(_GUI.T.CopyGenericContextAction_tt(column.getName()));
+                        setName(_GUI.T.LinkURLEditor_onContextMenu_copy_());
                         setSmallIcon(new AbstractIcon(IconKey.ICON_COPY, 20));
                     }
 
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        onShortcutCopy(model.getSelectedObjects(), null, column);
+                        onShortcutCopy(model.getSelectedObjects(), null);
                     }
                 });
                 return popup;
+            }
+
+            protected boolean onShortcutCopy(final List<AbstractNode> selectedObjects, final KeyEvent evt) {
+                TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+
+                    @Override
+                    protected Void run() throws RuntimeException {
+                        final Set<String> urls;
+                        if (selectedObjects.size() == 0) {
+                            urls = LinkTreeUtils.getURLs(si, false);
+                        } else {
+                            urls = LinkTreeUtils.getURLs(new SelectionInfo<PackageType, ChildrenType>(null, selectedObjects), false);
+                        }
+                        final StringBuilder sb = new StringBuilder();
+                        for (final String url : urls) {
+                            if (sb.length() > 0) {
+                                sb.append("\r\n");
+                            }
+                            sb.append(url);
+                        }
+                        ClipboardMonitoring.getINSTANCE().setCurrentContent(sb.toString());
+                        return null;
+                    }
+                });
+                return true;
             }
 
             protected boolean onShortcutCopy(final List<AbstractNode> selectedObjects, final KeyEvent evt, final ExtColumn<AbstractNode> column) {

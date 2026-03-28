@@ -9,8 +9,6 @@ import javax.swing.Icon;
 import javax.swing.JTable;
 import javax.swing.table.JTableHeader;
 
-import jd.gui.swing.jdgui.GUIUtils;
-
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
@@ -210,12 +208,15 @@ public class AuthTableModel extends ExtTableModel<AuthenticationInfo> implements
 
             @Override
             public String getStringValue(AuthenticationInfo value) {
-                return GUIUtils.getAccountName(value.getUsername());
+                if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                    return CFG_GUI.CFG.getPresentationModeText();
+                }
+                return value.getUsername();
             }
 
             @Override
             public boolean isEditable(AuthenticationInfo obj) {
-                // prevent hash values from been edited...
+                /* prevent username value from been edited in presentation mode */
                 if (CFG_GUI.CFG.isPresentationModeEnabled()) {
                     return false;
                 }

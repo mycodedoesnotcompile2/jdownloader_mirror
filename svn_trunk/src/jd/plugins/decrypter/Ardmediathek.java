@@ -28,27 +28,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginBrowser;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.MediathekHelper;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.hoster.ARDMediathek;
-
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
@@ -73,7 +52,30 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52387 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginBrowser;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.MediathekHelper;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.ARDMediathek;
+
+@DecrypterPlugin(revision = "$Revision: 52577 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -86,6 +88,7 @@ public class Ardmediathek extends PluginForDecrypt {
     private String[]             audioStringPrioList                    = null;
     private static final boolean FILESIZE_NEEDED_FOR_QUALITY_COMPARISON = false;
     private final String         PROPERTY_INTERNAL_IS_SINGLE_VIDEO      = "internal_is_single_video";
+    private static final String  ARDMEDIATHEK_API_BASE                  = "https://api.ardmediathek.de";
 
     public Ardmediathek(final PluginWrapper wrapper) {
         super(wrapper);
@@ -424,7 +427,7 @@ public class Ardmediathek extends PluginForDecrypt {
             br.setAllowedResponseCodes(400);
             if (param.getDownloadLink() == null || !param.getDownloadLink().hasProperty(PROPERTY_INTERNAL_IS_SINGLE_VIDEO)) {
                 /* Determine the type of this link if we don't know it already. */
-                br.getPage("https://api.ardmediathek.de/page-gateway/widgets/ard/asset/" + Encoding.urlEncode(ardBase64) + "?single=true&embedded=false&mcV6=true");
+                br.getPage(ARDMEDIATHEK_API_BASE + "/page-gateway/widgets/ard/asset/" + Encoding.urlEncode(ardBase64) + "?single=true&embedded=false&mcV6=true");
                 if (br.getHttpConnection().getResponseCode() == 400) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else if (br.getHttpConnection().getResponseCode() == 404) {
@@ -463,7 +466,14 @@ public class Ardmediathek extends PluginForDecrypt {
                 logger.info("Added link leads to a single video");
             }
             /* Crawl single video */
-            br.getPage("https://api.ardmediathek.de/page-gateway/pages/ard/item/" + Encoding.urlEncode(ardBase64) + "?embedded=false&mcV6=true");
+            final Account account = AccountController.getInstance().getValidAccount("ardmediathek.de");
+            String videourl = ARDMEDIATHEK_API_BASE + "/page-gateway/pages/ard/item/" + Encoding.urlEncode(ardBase64) + "?embedded=false&mcV6=true";
+            if (account != null) {
+                final ARDMediathek hosterplugin = (ARDMediathek) this.getNewPluginForHostInstance("ardmediathek.de");
+                hosterplugin.setAuthHeader(br, account);
+                videourl += "&userId=" + hosterplugin.getStoredUserID(account);
+            }
+            br.getPage(videourl);
             /*
              * Old request -> 2024-07-02: This would preferably only return audio-description versions of video streams so I replaced it
              * with the new request.
@@ -918,9 +928,10 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in ardmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
-     * hosted on their other website on ardmediathek instead as ardmediathek is providing a fairly stable API while other websites hosting
-     * the same content such as sportschau.de can be complicated to parse. </br> This does not (yet) support pagination!
+     * Searches for videos in ardmediathek that match the given search term. </br>
+     * This is mostly used as a workaround to find stuff that is hosted on their other website on ardmediathek instead as ardmediathek is
+     * providing a fairly stable API while other websites hosting the same content such as sportschau.de can be complicated to parse. </br>
+     * This does not (yet) support pagination!
      */
     private ArrayList<DownloadLink> crawlARDMediathekSearchResultsVOD(final String searchTerm, final int maxResults) throws Exception {
         if (StringUtils.isEmpty(searchTerm)) {
@@ -934,7 +945,7 @@ public class Ardmediathek extends PluginForDecrypt {
         query.add("pageNumber", Integer.toString(pageNumber));
         query.add("pageSize", "24");
         logger.info("Searching ardmediathek videos for term: " + searchTerm);
-        br.getPage("https://api.ardmediathek.de/search-system/mediathek/ard/search/vods?query=" + query.toString());
+        br.getPage(ARDMEDIATHEK_API_BASE + "/search-system/mediathek/ard/search/vods?query=" + query.toString());
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /* 2023-01-13: Pagination is not needed and not supported atm. */
         // final Map<String, Object> pagination = (Map<String, Object>) entries.get("pagination");
@@ -1017,8 +1028,8 @@ public class Ardmediathek extends PluginForDecrypt {
         }
         metadata.setChannel(trackerData.get("trackerClipCategory").toString());
         /**
-         * 2022-03-10: Do not use trackerClipId as unique ID as there can be different IDs for the same streams. </br> Let the handling go
-         * into fallback and use the final downloadurls as unique trait!
+         * 2022-03-10: Do not use trackerClipId as unique ID as there can be different IDs for the same streams. </br>
+         * Let the handling go into fallback and use the final downloadurls as unique trait!
          */
         // metadata.setContentID(trackerData.get("trackerClipId").toString());
         metadata.setRequiresContentIDToBeSet(false);

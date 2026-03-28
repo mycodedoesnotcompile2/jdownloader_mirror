@@ -6,10 +6,6 @@ import java.util.List;
 import javax.swing.Icon;
 import javax.swing.JLabel;
 
-import jd.controlling.downloadcontroller.HistoryEntry;
-import jd.gui.swing.jdgui.GUIUtils;
-import jd.plugins.Account;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtTableModel;
@@ -21,6 +17,10 @@ import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.columns.CandidateAccountColumn;
 import org.jdownloader.images.BadgeIcon;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.controlling.downloadcontroller.HistoryEntry;
+import jd.plugins.Account;
 
 public class CandidateTooltipTableModel extends ExtTableModel<HistoryEntry> {
     public static interface MaxWidthProvider {
@@ -181,10 +181,16 @@ public class CandidateTooltipTableModel extends ExtTableModel<HistoryEntry> {
                     accountType = _GUI.T.CandidateAccountColumn_account_original(account.getType().getLabel());
                     break;
                 }
-                if (!StringUtils.isEmpty(accountType)) {
-                    str = _GUI.T.CandidateAccountColumn_getStringValue_account_type(GUIUtils.getAccountName(account), account.getHosterByPlugin(), accountType);
+                final String usernameText;
+                if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                    usernameText = CFG_GUI.CFG.getPresentationModeText();
                 } else {
-                    str = _GUI.T.CandidateAccountColumn_getStringValue_account(GUIUtils.getAccountName(account), account.getHosterByPlugin());
+                    usernameText = account.getUser();
+                }
+                if (!StringUtils.isEmpty(accountType)) {
+                    str = _GUI.T.CandidateAccountColumn_getStringValue_account_type(usernameText, account.getHosterByPlugin(), accountType);
+                } else {
+                    str = _GUI.T.CandidateAccountColumn_getStringValue_account(usernameText, account.getHosterByPlugin());
                 }
             } else {
                 if (icon == null) {

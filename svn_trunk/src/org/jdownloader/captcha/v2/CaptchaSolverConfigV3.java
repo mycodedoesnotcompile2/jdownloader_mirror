@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultDoubleValue;
@@ -16,8 +18,6 @@ import org.appwork.storage.config.annotations.DoubleSpinnerValidator;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
-
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
@@ -180,21 +180,22 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     @Deprecated
     void setBlackWhiteListingEnabled(boolean b);
 
-    @AboutConfig
+    @AboutConfig(inGUIVisible = false)
     @Deprecated
     Map<String, Integer> getWaitForMap();
 
     @Deprecated
     void setWaitForMap(Map<String, Integer> map);
 
-    @AboutConfig
+    @AboutConfig(inGUIVisible = false)
     @Deprecated
     ArrayList<String> getBlacklistEntries();
 
-    @AboutConfig
+    @AboutConfig(inGUIVisible = false)
     @Deprecated
     ArrayList<String> getWhitelistEntries();
 
+    @AboutConfig(inGUIVisible = false)
     @Deprecated
     void setBlacklistEntries(ArrayList<String> list);
 

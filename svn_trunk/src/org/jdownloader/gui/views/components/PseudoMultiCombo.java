@@ -23,6 +23,7 @@ import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.JScrollPopupMenu;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -122,26 +123,21 @@ public class PseudoMultiCombo<Type> extends ExtButton {
         };
     }
 
-    protected void onPopup() {
-        long timeSinceLastHide = System.currentTimeMillis() - lastHide;
-        if (timeSinceLastHide < 250) {
-            //
-            return;
-        }
-        JScrollPopupMenu popup = new JScrollPopupMenu() {
+    public JScrollPopupMenu getPopup() {
+        final JScrollPopupMenu popup = new JScrollPopupMenu() {
             @Override
             public void setVisible(boolean b) {
+                closed = !b;
                 if (!b) {
                     lastHide = System.currentTimeMillis();
                 }
                 super.setVisible(b);
-                closed = true;
                 PseudoMultiCombo.this.repaint();
             }
         };
         final AtomicInteger integer = new AtomicInteger(0);
         for (final Type sc : values) {
-            ExtRealCheckBoxMenuItem mi;
+            final ExtRealCheckBoxMenuItem mi;
             popup.add(mi = createMenuItem(sc, new AppAction() {
                 private Type value;
                 {
@@ -158,24 +154,29 @@ public class PseudoMultiCombo<Type> extends ExtButton {
 
                 public void actionPerformed(ActionEvent e) {
                     setSelected(isSelected());
-                    System.out.println(isSelected());
                     setItemSelected(value, isSelected());
                 }
             }));
             mi.setHideOnClick(false);
         }
-        Insets insets = LAFOptions.getInstance().getExtension().customizePopupBorderInsets();
-        Dimension pref = popup.getPreferredSize();
-        // pref.width = positionComp.getWidth() + ((Component)
-        // e.getSource()).getWidth() + insets[1] + insets[3];
+        return popup;
+    }
+
+    protected void onPopup() {
+        long timeSinceLastHide = System.currentTimeMillis() - lastHide;
+        if (timeSinceLastHide < 250) {
+            //
+            return;
+        }
+        final JScrollPopupMenu popup = getPopup();
+        final Insets insets = LAFOptions.getInstance().getExtension().customizePopupBorderInsets();
+        final Dimension pref = popup.getPreferredSize();
         popup.setPreferredSize(new Dimension((int) Math.max(getWidth() + insets.left + insets.right, pref.getWidth()), (int) pref.getHeight()));
-        // PseudoCombo.this.repaint();
         if (isPopDown()) {
             popup.show(this, -insets.left, getHeight() + insets.top);
         } else {
             popup.show(this, -insets.left, -popup.getPreferredSize().height + insets.bottom);
         }
-        closed = false;
     }
 
     public boolean isItemSelected(Type sc) {
@@ -212,7 +213,7 @@ public class PseudoMultiCombo<Type> extends ExtButton {
         if (sc instanceof LabelInterface) {
             return ((LabelInterface) sc).getLabel();
         }
-        return sc + "";
+        return StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(sc));
     }
 
     protected void paintComponent(Graphics g) {

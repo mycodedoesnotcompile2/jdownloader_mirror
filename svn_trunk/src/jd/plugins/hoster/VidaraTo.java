@@ -17,11 +17,13 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -37,7 +39,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52326 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52580 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidaraTo extends PluginForHost {
     public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +121,11 @@ public class VidaraTo extends PluginForHost {
         this.hls_master = null;
         final String fid = this.getFID(link);
         this.setBrowserExclusive();
-        br.getPage("https://" + getHost() + "/api/stream?filecode=" + fid);
+        Map<String, Object> json = new HashMap<String, Object>();
+        json.put("filecode", fid);
+        json.put("device", "web");
+        PostRequest request = br.createJSonPostRequest("https://" + getHost() + "/api/stream", json);
+        br.getPage(request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* {"error":"Video not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

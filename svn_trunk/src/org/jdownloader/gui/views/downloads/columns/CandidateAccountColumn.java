@@ -7,12 +7,6 @@ import java.util.List;
 import javax.swing.Icon;
 import javax.swing.SwingUtilities;
 
-import jd.controlling.downloadcontroller.HistoryEntry;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.GUIUtils;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
@@ -23,6 +17,12 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.columns.candidatetooltip.CandidateTooltip;
 import org.jdownloader.images.BadgeIcon;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.controlling.downloadcontroller.HistoryEntry;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
 
 public class CandidateAccountColumn extends ExtTextColumn<AbstractNode> {
     private final Icon iconDownload = NewTheme.I().getIcon(IconKey.ICON_DOWNLOAD, 20);
@@ -92,10 +92,16 @@ public class CandidateAccountColumn extends ExtTextColumn<AbstractNode> {
                         accountType = _GUI.T.CandidateAccountColumn_account_original(account.getType().getLabel());
                         break;
                     }
-                    if (!StringUtils.isEmpty(accountType)) {
-                        str = _GUI.T.CandidateAccountColumn_getStringValue_account_type(GUIUtils.getAccountName(account), account.getHosterByPlugin(), accountType);
+                    final String usernameText;
+                    if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                        usernameText = CFG_GUI.CFG.getPresentationModeText();
                     } else {
-                        str = _GUI.T.CandidateAccountColumn_getStringValue_account(GUIUtils.getAccountName(account), account.getHosterByPlugin());
+                        usernameText = account.getUser();
+                    }
+                    if (!StringUtils.isEmpty(accountType)) {
+                        str = _GUI.T.CandidateAccountColumn_getStringValue_account_type(usernameText, account.getHosterByPlugin(), accountType);
+                    } else {
+                        str = _GUI.T.CandidateAccountColumn_getStringValue_account(usernameText, account.getHosterByPlugin());
                     }
                 } else {
                     if (icon == null) {

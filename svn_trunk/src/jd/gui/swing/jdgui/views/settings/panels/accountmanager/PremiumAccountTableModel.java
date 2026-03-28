@@ -23,7 +23,6 @@ import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
 import jd.controlling.accountchecker.AccountChecker;
 import jd.controlling.accountchecker.AccountCheckerEventListener;
-import jd.gui.swing.jdgui.GUIUtils;
 import jd.gui.swing.jdgui.interfaces.SwitchPanelEvent;
 import jd.gui.swing.jdgui.interfaces.SwitchPanelListener;
 import jd.plugins.Account;
@@ -64,37 +63,6 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         private static final long   serialVersionUID = -8376056840172682617L;
         private final DecimalFormat formatter;
         private final SIZEUNIT      maxSizeUnit;
-        {
-            setRowSorter(new ExtDefaultRowSorter<AccountEntry>() {
-                private int compareLong(long x, long y) {
-                    return (x < y) ? -1 : ((x == y) ? 0 : 1);
-                }
-
-                private int compareTraffic(final AccountEntry o1, final AccountEntry o2) {
-                    final long t1 = getValue(o1);
-                    final long t2 = getValue(o2);
-                    return compareLong(t1, t2);
-                }
-
-                private int compareEnabled(boolean x, boolean y) {
-                    return (x == y) ? 0 : (x ? -1 : 1);
-                }
-
-                @Override
-                public int compare(final AccountEntry o1, final AccountEntry o2) {
-                    final boolean b1 = o1.getAccount().isEnabled();
-                    final boolean b2 = o2.getAccount().isEnabled();
-                    if (b1 == b2) {
-                        if (getSortOrderIdentifier() != ExtColumn.SORT_ASC) {
-                            return compareTraffic(o1, o2);
-                        } else {
-                            return -compareTraffic(o1, o2);
-                        }
-                    }
-                    return compareEnabled(b1, b2);
-                }
-            });
-        }
 
         public TrafficColumn(PremiumAccountTableModel tableModel, String title) {
             super(title);
@@ -112,6 +80,9 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                     return super.format(number, sb, pos);
                 }
             };
+
+            replaceSorter(this);
+
         }
 
         @Override
@@ -220,6 +191,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
         public BalanceColumn(final PremiumAccountTableModel tableModel, final String title) {
             super(title, tableModel);
+            replaceSorter(this);
         }
 
         @Override
@@ -465,7 +437,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
             @Override
             public boolean isEditable(AccountEntry obj) {
-                // prevent hash values from been edited...
+                /* prevent username value from been edited in presentation mode */
                 if (CFG_GUI.CFG.isPresentationModeEnabled()) {
                     return false;
                 }
@@ -489,7 +461,10 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
             @Override
             public String getStringValue(AccountEntry value) {
-                return GUIUtils.getAccountName(value.getAccount());
+                if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                    return CFG_GUI.CFG.getPresentationModeText();
+                }
+                return value.getAccount().getUser();
             }
         });
     }
@@ -544,6 +519,9 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
     protected void addPasswordColumn() {
         this.addColumn(new ExtPasswordEditorColumn<AccountEntry>(_GUI.T.premiumaccounttablemodel_column_password()) {
+            {
+                replaceSorter(this);
+            }
             private static final long serialVersionUID = 3180414754658474808L;
 
             @Override

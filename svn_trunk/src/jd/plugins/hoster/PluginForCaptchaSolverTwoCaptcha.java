@@ -5,19 +5,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigTwoCaptcha;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52531 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigTwoCaptcha;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52580 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     private final Map<Account, Object> hcaptcha_account_status_map = new HashMap<Account, Object>();
 
@@ -52,7 +52,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         final List<Account> accounts = AccountController.getInstance().getValidAccounts(this.getHost());
         if (accounts != null && accounts.size() > 0) {
             for (final Account account : accounts) {
-                final boolean hcStatus = this.supportsHcaptcha(account);
+                final Boolean hcStatus = this.supportsHcaptcha(account);
                 if (hcStatus != Boolean.FALSE) {
                     /*
                      * If we got at least one account that has either never been tried for hCaptcha or even is confirmed working for
@@ -95,6 +95,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         /* Last failure timestamp must be given -> We know that this account doesn't support hCaptcha */
         return Boolean.FALSE;
     }
+
     /* Returns true if any account supported hCaptcha in current session */
     // private Boolean supportsHcaptcha() {
     // synchronized (hcaptcha_account_status_map) {

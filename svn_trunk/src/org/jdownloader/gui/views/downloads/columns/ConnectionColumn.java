@@ -16,25 +16,6 @@ import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 import javax.swing.UIManager;
 
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.PacProxySelectorImpl;
-import jd.controlling.proxy.ProxyController;
-import jd.controlling.proxy.SelectedProxy;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IP;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.gui.swing.jdgui.GUIUtils;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.PluginForHost;
-import jd.plugins.download.DownloadInterface;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.tooltips.ExtTooltip;
@@ -52,6 +33,25 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.PacProxySelectorImpl;
+import jd.controlling.proxy.ProxyController;
+import jd.controlling.proxy.SelectedProxy;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IP;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.PluginForHost;
+import jd.plugins.download.DownloadInterface;
+import net.miginfocom.swing.MigLayout;
 
 public class ConnectionColumn extends ExtColumn<AbstractNode> {
     /**
@@ -384,7 +384,13 @@ public class ConnectionColumn extends ExtColumn<AbstractNode> {
                     final DomainInfo domainInfo = DomainInfo.getInstance(plugin.getHost(link, sdc.getAccount(), false));
                     if (domainInfo != null) {
                         final Icon icon = domainInfo.getFavIcon();
-                        add(new JLabel(_GUI.T.ConnectionColumn_DownloadUsesAccount(GUIUtils.getAccountName(sdc.getAccount())), icon, JLabel.LEADING));
+                        final String usernameText;
+                        if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                            usernameText = CFG_GUI.CFG.getPresentationModeText();
+                        } else {
+                            usernameText = sdc.getAccount().getUser();
+                        }
+                        add(new JLabel(_GUI.T.ConnectionColumn_DownloadUsesAccount(usernameText), icon, JLabel.LEADING));
                     }
                 }
             }

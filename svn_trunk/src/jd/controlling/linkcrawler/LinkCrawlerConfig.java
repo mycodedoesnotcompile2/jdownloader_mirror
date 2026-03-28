@@ -1,13 +1,18 @@
 package jd.controlling.linkcrawler;
 
 import java.util.List;
+import java.util.Set;
+
+import jd.plugins.DecrypterRetryException.RetryReason;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultJsonObject;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringArrayValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.RequiresRestart;
@@ -49,12 +54,13 @@ public interface LinkCrawlerConfig extends ConfigInterface {
 
     void setDeepDecryptFileSizeLimit(int l);
 
-    @DefaultStringArrayValue({ "EXAMPLE_VALUE_1", "EXAMPLE_VALUE_2" })
+    @DefaultEnumArrayValue(value = {})
+    @DefaultOnNull
     @AboutConfig
     @DescriptionForConfigEntry("Formerly known as 'AddRetryCrawlerTasks'. Define RetryTasks that should be ignored meaning they will not show up in linkgrabber. Exemplaric ENUM string values (the list may be incomplete/outdated): AGE_VERIFICATION_REQUIRED, CAPTCHA, EMPTY_FOLDER, EMPTY_PROFILE, FILE_NOT_FOUND, HOST, NO_ACCOUNT, PLUGIN_DEFECT, PLUGIN_SETTINGS, PASSWORD, GEO, IP, HOST_RATE_LIMIT, UNSUPPORTED_LIVESTREAM, BLOCKED_BY")
-    String[] getIgnoreRetryCrawlerTasks();
+    Set<RetryReason> getIgnoreRetryCrawlerTasks();
 
-    public void setIgnoreRetryCrawlerTasks(String[] origins);
+    public void setIgnoreRetryCrawlerTasks(Set<RetryReason> origins);
 
     @DefaultBooleanValue(true)
     @AboutConfig

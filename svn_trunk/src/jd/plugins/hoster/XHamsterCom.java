@@ -77,7 +77,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52572 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52573 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -2077,12 +2077,18 @@ public class XHamsterCom extends PluginForHost {
 
     /** Returns monthly max official downloads limit. */
     private int getPremiumMonthlyOfficialDownloadsMax(final Account account) {
-        /* Fallback values obtained from website 2026-03-26. */
+        /* Fallback values obtained from website. */
+        /**
+         * 2026-03-27: <br>
+         * Normal premium: 5 <br>
+         * Ultra: 500 <br>
+         * Lifetime: 300
+         */
         final int fallbackValue;
         if (AccountType.LIFETIME == account.getType()) {
             fallbackValue = 300;
         } else {
-            fallbackValue = 500;
+            fallbackValue = 5;
         }
         return account.getIntegerProperty(PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_MAX, fallbackValue);
     }

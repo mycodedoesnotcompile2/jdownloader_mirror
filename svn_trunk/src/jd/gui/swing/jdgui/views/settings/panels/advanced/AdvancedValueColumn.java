@@ -7,22 +7,30 @@ import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JColorChooser;
 import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.EnumLabel;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
@@ -30,6 +38,10 @@ import org.appwork.swing.exttable.columns.ExtCompoundColumn;
 import org.appwork.swing.exttable.columns.ExtSpinnerColumn;
 import org.appwork.swing.exttable.columns.ExtTextAreaColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.event.DefaultEvent;
+import org.appwork.utils.event.DontThrowFromCurrentThreadEventSuppressor;
+import org.appwork.utils.event.EventSuppressor;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.actions.AppAction;
@@ -37,6 +49,7 @@ import org.jdownloader.controlling.contextmenu.gui.ExtPopupMenu;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.advanced.AdvancedConfigEntry;
 import org.jdownloader.settings.advanced.RangeValidator;
 import org.jdownloader.updatev2.gui.LAFOptions;
@@ -49,6 +62,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
     private java.util.List<ExtColumn<AdvancedConfigEntry>> columns;
     private ExtSpinnerColumn<AdvancedConfigEntry>          numberColumn;
     private ExtTextColumn<AdvancedConfigEntry>             enumColumn;
+    private ExtTextColumn<AdvancedConfigEntry>             enumSetColumn;
     private ExtTextColumn<AdvancedConfigEntry>             colorColumn;
 
     // private ExtComponentColumn<AdvancedConfigEntry> actionColumn;
@@ -309,126 +323,288 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
             }
         };
         register(numberColumn);
-        enumColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
-            private static final long serialVersionUID = 1L;
-            {
-                renderer.removeAll();
-                renderer.setLayout(new MigLayout("ins 0", "[grow,fill]0[12]5", "[grow,fill]"));
-                renderer.add(rendererField);
-                renderer.add(rendererIcon);
-            }
-
-            @Override
-            public void configureRendererComponent(final AdvancedConfigEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                Icon icon;
-                this.rendererIcon.setIcon(icon = this.getIcon(value));
-                String str = this.getStringValue(value);
-                if (str == null) {
-                    // under substance, setting setText(null) somehow sets the label
-                    // opaque.
-                    str = "";
+        {
+            enumColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
+                private static final long serialVersionUID = 1L;
+                {
+                    renderer.removeAll();
+                    renderer.setLayout(new MigLayout("ins 0", "[grow,fill]0[12]5", "[grow,fill]"));
+                    renderer.add(rendererField);
+                    renderer.add(rendererIcon);
                 }
-                if (this.getTableColumn() != null) {
-                    try {
-                        this.rendererField.setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this.rendererField, this.rendererField.getFontMetrics(this.rendererField.getFont()), str, this.getTableColumn().getWidth() - 18 - (icon != null ? icon.getIconWidth() : 0)));
-                    } catch (Throwable e) {
-                        // fallback if org.appwork.swing.sunwrapper.SwingUtilities2 disappears someday
-                        e.printStackTrace();
+
+                @Override
+                public void configureRendererComponent(final AdvancedConfigEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    Icon icon;
+                    this.rendererIcon.setIcon(icon = this.getIcon(value));
+                    String str = this.getStringValue(value);
+                    if (str == null) {
+                        // under substance, setting setText(null) somehow sets the label
+                        // opaque.
+                        str = "";
+                    }
+                    if (this.getTableColumn() != null) {
+                        try {
+                            this.rendererField.setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this.rendererField, this.rendererField.getFontMetrics(this.rendererField.getFont()), str, this.getTableColumn().getWidth() - 18 - (icon != null ? icon.getIconWidth() : 0)));
+                        } catch (Throwable e) {
+                            // fallback if org.appwork.swing.sunwrapper.SwingUtilities2 disappears someday
+                            e.printStackTrace();
+                            this.rendererField.setText(str);
+                        }
+                    } else {
                         this.rendererField.setText(str);
                     }
-                } else {
-                    this.rendererField.setText(str);
                 }
-            }
 
-            public boolean onSingleClick(final MouseEvent e, final AdvancedConfigEntry value) {
-                ExtPopupMenu popup = new ExtPopupMenu();
-                try {
-                    Object[] values = (Object[]) ((Class) value.getClazz()).getMethod("values", new Class[] {}).invoke(null, new Object[] {});
-                    for (final Object o : values) {
-                        popup.add(new JMenuItem(new AppAction() {
-                            {
-                                EnumLabel lbl = value.getClazz().getDeclaredField(o.toString()).getAnnotation(EnumLabel.class);
-                                if (lbl != null) {
-                                    setName(lbl.value());
-                                } else {
-                                    if (o instanceof LabelInterface) {
-                                        setName(((LabelInterface) o).getLabel());
+                public boolean onSingleClick(final MouseEvent e, final AdvancedConfigEntry value) {
+                    ExtPopupMenu popup = new ExtPopupMenu();
+                    try {
+                        Object[] values = (Object[]) ((Class) value.getClazz()).getMethod("values", new Class[] {}).invoke(null, new Object[] {});
+                        for (final Object o : values) {
+                            popup.add(new JMenuItem(new AppAction() {
+                                {
+                                    EnumLabel lbl = value.getClazz().getDeclaredField(o.toString()).getAnnotation(EnumLabel.class);
+                                    if (lbl != null) {
+                                        setName(lbl.value());
                                     } else {
-                                        setName(o.toString());
+                                        if (o instanceof LabelInterface) {
+                                            setName(((LabelInterface) o).getLabel());
+                                        } else {
+                                            setName(o.toString());
+                                        }
+                                    }
+                                    if (value.getValue() == o) {
+                                        setSmallIcon(CheckBoxIcon.TRUE);
+                                    } else {
+                                        setSmallIcon(CheckBoxIcon.FALSE);
                                     }
                                 }
-                                if (value.getValue() == o) {
-                                    setSmallIcon(CheckBoxIcon.TRUE);
+
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    value.setValue(o);
+                                    AdvancedValueColumn.this.getModel().getTable().repaint();
+                                }
+                            }));
+                        }
+                        Rectangle bounds = getModel().getTable().getCellRect(getModel().getTable().rowAtPoint(new Point(e.getX(), e.getY())), getModel().getTable().columnAtPoint(new Point(e.getX(), e.getY())), true);
+                        Dimension pref = popup.getPreferredSize();
+                        popup.setPreferredSize(new Dimension(Math.max(pref.width, bounds.width), pref.height));
+                        popup.show(getModel().getTable(), bounds.x, bounds.y + bounds.height);
+                        return true;
+                    } catch (Exception e1) {
+                        e1.printStackTrace();
+                    }
+                    return false;
+                }
+
+                protected int getSelectedIndex(AdvancedConfigEntry value) {
+                    return ((Enum<?>) value.getValue()).ordinal();
+                }
+
+                protected void setSelectedIndex(int value, AdvancedConfigEntry object) {
+                    Object[] values;
+                    try {
+                        values = (Object[]) object.getClazz().getMethod("values", new Class[] {}).invoke(null, new Object[] {});
+                        object.setValue(values[value]);
+                        AdvancedValueColumn.this.getModel().getTable().repaint();
+                    } catch (IllegalArgumentException e) {
+                        e.printStackTrace();
+                    } catch (SecurityException e) {
+                        e.printStackTrace();
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
+                    } catch (InvocationTargetException e) {
+                        e.printStackTrace();
+                    } catch (NoSuchMethodException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                protected Icon getIcon(final AdvancedConfigEntry value) {
+                    return NewTheme.I().getIcon(IconKey.ICON_POPDOWNLARGE, -1);
+                }
+
+                @Override
+                public String getStringValue(AdvancedConfigEntry value) {
+                    try {
+                        EnumLabel lbl = value.getClazz().getDeclaredField(value.getValue().toString()).getAnnotation(EnumLabel.class);
+                        if (lbl != null) {
+                            return lbl.value();
+                        }
+                        if (value.getValue() instanceof LabelInterface) {
+                            return ((LabelInterface) value.getValue()).getLabel();
+                        }
+                        if (value instanceof LabelInterface) {
+                            return ((LabelInterface) value).getLabel();
+                        }
+                    } catch (Exception e) {
+                    }
+                    return value.getValue().toString();
+                }
+            };
+            register(enumColumn);
+        }
+        {
+            enumSetColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
+                private static final long serialVersionUID = 1L;
+                {
+                    renderer.removeAll();
+                    renderer.setLayout(new MigLayout("ins 0", "[grow,fill]0[12]5", "[grow,fill]"));
+                    renderer.add(rendererField);
+                    renderer.add(rendererIcon);
+                }
+
+                @Override
+                public void configureRendererComponent(final AdvancedConfigEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    Icon icon;
+                    this.rendererIcon.setIcon(icon = this.getIcon(value));
+                    String str = this.getStringValue(value);
+                    if (str == null) {
+                        // under substance, setting setText(null) somehow sets the label
+                        // opaque.
+                        str = "";
+                    }
+                    if (this.getTableColumn() != null) {
+                        try {
+                            this.rendererField.setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this.rendererField, this.rendererField.getFontMetrics(this.rendererField.getFont()), str, this.getTableColumn().getWidth() - 18 - (icon != null ? icon.getIconWidth() : 0)));
+                        } catch (Throwable e) {
+                            // fallback if org.appwork.swing.sunwrapper.SwingUtilities2 disappears someday
+                            e.printStackTrace();
+                            this.rendererField.setText(str);
+                        }
+                    } else {
+                        this.rendererField.setText(str);
+                    }
+                }
+
+                public boolean onSingleClick(final MouseEvent e, final AdvancedConfigEntry configEntry) {
+                    try {
+                        final KeyHandler<Set<Enum>> m = (KeyHandler<Set<Enum>>) configEntry.getKeyHandler();
+                        final Type[] types = ((ParameterizedType) configEntry.getType()).getActualTypeArguments();
+                        final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
+                            private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
+                                @Override
+                                public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
+                                }
+
+                                @Override
+                                public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                                    updateModel(newValue);
+                                }
+                            };
+                            {
+                                Set<Enum> value = (Set<Enum>) configEntry.getValue();
+                                if (value == null) {
+                                    value = newSetInstance(m);
+                                    for (Object e : ((Class) types[0]).getEnumConstants()) {
+                                        value.add((Enum) e);
+                                    }
+                                }
+                                m.getEventSender().addListener(listener, true);
+                                updateModel(value);
+                            }
+
+                            @Override
+                            protected String getLabel(List<Object> list) {
+                                return "[" + list.size() + "/" + getValues().size() + "] " + super.getLabel(list);
+                            }
+
+                            protected Set<Enum> newSetInstance(KeyHandler m) throws InstantiationException, IllegalAccessException {
+                                Class raw = ReflectionUtils.getRaw(m.getTypeRef().getType());
+                                if (raw.isInterface()) {
+                                    raw = HashSet.class;
+                                }
+                                final Set<Enum> value = (Set<Enum>) raw.newInstance();
+                                return value;
+                            }
+
+                            protected void updateModel(final Set<Enum> newValue) {
+                                if (newValue == null) {
+                                    setSelectedItems(((Class) types[0]).getEnumConstants());
                                 } else {
-                                    setSmallIcon(CheckBoxIcon.FALSE);
+                                    setSelectedItems((Object[]) newValue.toArray(new Enum[0]));
                                 }
                             }
 
                             @Override
-                            public void actionPerformed(ActionEvent e) {
-                                value.setValue(o);
-                                AdvancedValueColumn.this.getModel().getTable().repaint();
+                            public void setVisible(boolean aFlag) {
+                                super.setVisible(aFlag);
+                                if (!aFlag) {
+                                    m.getEventSender().removeListener(listener);
+                                }
+                            };
+
+                            @Override
+                            public void onChanged() {
+                                super.onChanged();
+                                final EventSuppressor added = new DontThrowFromCurrentThreadEventSuppressor<DefaultEvent>();
+                                m.getEventSender().addEventSuppressor(added);
+                                try {
+                                    final Set<Enum> set = newSetInstance(m);
+                                    for (Object e : getSelectedItems()) {
+                                        set.add((Enum) e);
+                                    }
+                                    m.setValue(set);
+                                } catch (InstantiationException e1) {
+                                    LogController.CL().log(e1);
+                                } catch (IllegalAccessException e1) {
+                                    LogController.CL().log(e1);
+                                } finally {
+                                    m.getEventSender().removeEventSuppressor(added);
+                                }
                             }
-                        }));
+                        };
+                        final JPopupMenu popup = comp.getPopup();
+                        final Rectangle bounds = getModel().getTable().getCellRect(getModel().getTable().rowAtPoint(new Point(e.getX(), e.getY())), getModel().getTable().columnAtPoint(new Point(e.getX(), e.getY())), true);
+                        final Dimension pref = popup.getPreferredSize();
+                        popup.setPreferredSize(new Dimension(Math.max(pref.width, bounds.width), pref.height));
+                        popup.show(getModel().getTable(), bounds.x, bounds.y + bounds.height);
+                        return true;
+                    } catch (Throwable ign) {
+                        LogController.CL().log(ign);
                     }
-                    Rectangle bounds = getModel().getTable().getCellRect(getModel().getTable().rowAtPoint(new Point(e.getX(), e.getY())), getModel().getTable().columnAtPoint(new Point(e.getX(), e.getY())), true);
-                    Dimension pref = popup.getPreferredSize();
-                    popup.setPreferredSize(new Dimension(Math.max(pref.width, bounds.width), pref.height));
-                    popup.show(getModel().getTable(), bounds.x, bounds.y + bounds.height);
-                    return true;
-                } catch (Exception e1) {
-                    e1.printStackTrace();
+                    return false;
                 }
-                return false;
-            }
 
-            protected int getSelectedIndex(AdvancedConfigEntry value) {
-                return ((Enum<?>) value.getValue()).ordinal();
-            }
-
-            protected void setSelectedIndex(int value, AdvancedConfigEntry object) {
-                Object[] values;
-                try {
-                    values = (Object[]) object.getClazz().getMethod("values", new Class[] {}).invoke(null, new Object[] {});
-                    object.setValue(values[value]);
-                    AdvancedValueColumn.this.getModel().getTable().repaint();
-                } catch (IllegalArgumentException e) {
-                    e.printStackTrace();
-                } catch (SecurityException e) {
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
-                    e.printStackTrace();
-                } catch (NoSuchMethodException e) {
-                    e.printStackTrace();
+                protected Icon getIcon(final AdvancedConfigEntry value) {
+                    return NewTheme.I().getIcon(IconKey.ICON_POPDOWNLARGE, -1);
                 }
-            }
 
-            protected Icon getIcon(final AdvancedConfigEntry value) {
-                return NewTheme.I().getIcon(IconKey.ICON_POPDOWNLARGE, -1);
-            }
+                @Override
+                public String getStringValue(AdvancedConfigEntry configEntry) {
+                    final Type[] types = ((ParameterizedType) configEntry.getType()).getActualTypeArguments();
+                    final List<String> list = new ArrayList<String>();
+                    labels: try {
+                        final Set<Enum> set = (Set<Enum>) configEntry.getValue();
+                        if (set == null || set.size() == 0) {
+                            break labels;
+                        }
+                        for (Enum entry : set) {
+                            String label = null;
+                            try {
+                                final EnumLabel lbl = entry.getClass().getDeclaredField(entry.name()).getAnnotation(EnumLabel.class);
+                                if (lbl != null) {
+                                    label = lbl.value();
+                                }
+                            } catch (Exception e) {
+                            }
+                            if (label == null && entry instanceof LabelInterface) {
+                                label = ((LabelInterface) entry).getLabel();
+                            }
+                            if (label == null) {
+                                label = entry.name();
+                            }
+                            list.add(label);
+                        }
 
-            @Override
-            public String getStringValue(AdvancedConfigEntry value) {
-                try {
-                    EnumLabel lbl = value.getClazz().getDeclaredField(value.getValue().toString()).getAnnotation(EnumLabel.class);
-                    if (lbl != null) {
-                        return lbl.value();
+                    } catch (Exception e) {
                     }
-                    if (value.getValue() instanceof LabelInterface) {
-                        return ((LabelInterface) value.getValue()).getLabel();
-                    }
-                    if (value instanceof LabelInterface) {
-                        return ((LabelInterface) value).getLabel();
-                    }
-                } catch (Exception e) {
+                    return "[" + list.size() + "/" + ((Class) types[0]).getEnumConstants().length + "] " + list.toString();
                 }
-                return value.getValue().toString();
-            }
-        };
-        register(enumColumn);
+            };
+            register(enumSetColumn);
+        }
     }
 
     private void register(ExtColumn<AdvancedConfigEntry> col) {
@@ -463,8 +639,12 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
             return numberColumn;
         } else if (Enum.class.isAssignableFrom(object.getClazz())) {
             return enumColumn;
-        } else {
-            return defaultColumn;
+        } else if (Set.class.isAssignableFrom(object.getClazz())) {
+            final Type[] types = ((ParameterizedType) object.getType()).getActualTypeArguments();
+            if (types[0] instanceof Class && ((Class) types[0]).isEnum()) {
+                return enumSetColumn;
+            }
         }
+        return defaultColumn;
     }
 }

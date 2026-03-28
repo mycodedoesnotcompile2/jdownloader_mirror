@@ -20,8 +20,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49713 $", interfaceVersion = 3, names = {}, urls = {})
-/** Formerly known as: porncomix.one */
+@DecrypterPlugin(revision = "$Revision: 52579 $", interfaceVersion = 3, names = {}, urls = {})
+/** Formerly known as: porncomix.one / porncomixone.net */
 public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -49,13 +49,14 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
     }
 
     private static final Pattern PATTERN_1 = Pattern.compile("/allporn/comics/([\\w-]+)/([\\w-]+)/?", Pattern.CASE_INSENSITIVE);
+    /* 2026-03-27: ilikecomix.com */
     private static final Pattern PATTERN_2 = Pattern.compile("/([\\w-]+)/([\\w-]+)/?", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_3 = Pattern.compile("/([\\w-]+)/([\\w-]+)/?(page/\\d+/?)?", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_1.pattern() + "|" + PATTERN_2 + "|" + PATTERN_3 + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_1.pattern().substring(1) + "|" + PATTERN_2.pattern().substring(1) + "|" + PATTERN_3.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -64,15 +65,17 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Regex pattern1 = new Regex(param.getCryptedUrl(), PATTERN_1);
-        final Regex pattern2 = new Regex(param.getCryptedUrl(), PATTERN_2);
-        final Regex pattern3 = new Regex(param.getCryptedUrl(), PATTERN_3);
+        final String path = br._getURL().getPath();
+        final Regex pattern1 = new Regex(path, PATTERN_1);
+        final Regex pattern2 = new Regex(path, PATTERN_2);
+        final Regex pattern3 = new Regex(path, PATTERN_3);
         final String urltitle;
-        final String[] images;
+        String[] images;
         String postTitle;
         if (pattern1.patternFind()) {
             urltitle = pattern1.getMatch(1);
@@ -81,7 +84,10 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
         } else {
             urltitle = pattern2.getMatch(0);
             postTitle = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
-            images = br.getRegex("data-size='\\d+x\\d+'><a\\s*href='(https?://[^<>\"']+)").getColumn(0);
+            images = br.getRegex("/ImageObject\" data-pswp-src=\"(https[^\"]+)").getColumn(0);
+            if (images == null || images.length == 0) {
+                images = br.getRegex("data-pswp-src=\"(https[^\"]+)").getColumn(0);
+            }
         }
         if (StringUtils.isEmpty(postTitle)) {
             /* Fallback */
@@ -95,7 +101,8 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
             if (previousGeneration != null) {
                 logger.info("Prohibit endless crawling -> Returning nothing");
                 return ret;
-            } else if (pattern3.patternFind()) {
+            }
+            if (pattern3.patternFind()) {
                 /* Generic crawler e.g. for https://ilikecomix.com/author/bla/ */
                 final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
                 for (final String url : urls) {
@@ -114,7 +121,7 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(postTitle);
         for (String imageurl : images) {
-            imageurl = br.getURL(imageurl).toString();
+            imageurl = br.getURL(imageurl).toExternalForm();
             final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
             link.setAvailable(true);
             link.setContainerUrl(param.getCryptedUrl());

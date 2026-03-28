@@ -40,6 +40,7 @@ import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
+import java.lang.reflect.Modifier;
 import java.text.NumberFormat;
 import java.util.EventObject;
 import java.util.List;
@@ -62,6 +63,8 @@ import javax.swing.table.TableColumn;
 
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.exttable.columnmenu.LockColumnWidthAction;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -122,7 +125,7 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override
@@ -354,7 +357,11 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     }
 
     protected String generateID() {
-        return this.getClass().getSuperclass().getSimpleName() + "." + this.getClass().getName();
+        String ret = this.getClass().getSuperclass().getSimpleName() + "." + this.getClass().getName();
+        if (getClass().isAnonymousClass() && Modifier.isAbstract(getClass().getSuperclass().getModifiers())) {
+            ret = Hash.getSHA1(StringUtils.valueOrEmpty(getName())) + "." + getClass().getSuperclass().getSimpleName() + "." + this.getClass().getEnclosingClass().getName();
+        }
+        return ret;
     }
 
     /**
@@ -772,7 +779,7 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
      */
     public void setModel(final ExtTableModel<E> model) {
         this.model = model;
-        this.generateID();
+        id = this.generateID();
         updateNumberFormat();
     }
 

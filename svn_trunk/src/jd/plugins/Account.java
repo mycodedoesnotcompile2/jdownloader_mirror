@@ -723,7 +723,10 @@ public class Account extends Property {
         return Math.min(timeout, Math.max(timeValid, 0));
     }
 
-    /** In which interval (milliseconds) will this account get checked? Min. = 5 minutes, default = 30 minutes. */
+    /**
+     * In which interval (milliseconds) will this account get checked? <br>
+     * Min. = 5 minutes, default = 30 minutes.
+     */
     public void setRefreshTimeout(long refresh_timeout) {
         this.setProperty(PROPERTY_REFRESH_TIMEOUT, refresh_timeout);
     }

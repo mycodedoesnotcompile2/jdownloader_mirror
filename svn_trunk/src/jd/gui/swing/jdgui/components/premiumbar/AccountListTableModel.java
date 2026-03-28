@@ -40,6 +40,7 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.AccountController;
@@ -47,7 +48,6 @@ import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
 import jd.controlling.accountchecker.AccountChecker;
 import jd.controlling.accountchecker.AccountCheckerEventListener;
-import jd.gui.swing.jdgui.GUIUtils;
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
@@ -329,7 +329,10 @@ public class AccountListTableModel extends ExtTableModel<AccountEntry> implement
 
             @Override
             public String getStringValue(AccountEntry value) {
-                return GUIUtils.getAccountName(value.getAccount());
+                if (CFG_GUI.CFG.isPresentationModeEnabled()) {
+                    return CFG_GUI.CFG.getPresentationModeText();
+                }
+                return value.getAccount().getUser();
             }
         });
         this.addColumn(new ExtDateColumn<AccountEntry>(_GUI.T.premiumaccounttablemodel_column_expiredate()) {

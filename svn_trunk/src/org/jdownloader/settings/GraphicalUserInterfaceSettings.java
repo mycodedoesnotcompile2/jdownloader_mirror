@@ -399,8 +399,15 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry("Presentation mode peforms tasks like: account username obstruction throughout GUI")
+    @DescriptionForConfigEntry("Hides sensitive data in GUI, mostly in username columns. This can be helpful for making screenshots for tutorials without worrying about exposing private data.")
     boolean isPresentationModeEnabled();
+
+    @DescriptionForConfigEntry("Text that is displayed in string columns (mostly username columns) when presentation mode is active.")
+    @DefaultStringValue("***HIDDEN_DUE_TO_ENABLED_PRESENTATION_MODE***")
+    @AboutConfig
+    public String getPresentationModeText();
+
+    public void setPresentationModeText(String text);
 
     void setTooltipEnabled(boolean b);
 
@@ -583,7 +590,6 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
                     } else {
                         return formatter.format(speed / (double) KB.getDivider()).concat(" KB");
                     }
-
                 }
             default:
                 if (speed > 0) {

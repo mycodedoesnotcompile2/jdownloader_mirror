@@ -27,23 +27,38 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
 
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.config.MediathekProperties;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
+import jd.http.BearerAuthentication;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.nutils.encoding.HTMLEntities;
 import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -54,20 +69,27 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 52297 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 52579 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
-    private String             dllink                           = null;
-    public static final String PROPERTY_CRAWLER_FORCED_FILENAME = "crawler_forced_filename";
-    public static final String PROPERTY_ITEM_ID                 = "itemId";
-    public static final String PROPERTY_CONVERT_XML_SUBTITLE    = "convert_xml_subtitle";
+    private String              dllink                                                             = null;
+    public static final String  PROPERTY_CRAWLER_FORCED_FILENAME                                   = "crawler_forced_filename";
+    public static final String  PROPERTY_ITEM_ID                                                   = "itemId";
+    public static final String  PROPERTY_CONVERT_XML_SUBTITLE                                      = "convert_xml_subtitle";
+    private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_IDTOKEN                              = "ardmediathek_idtoken";
+    private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_USER_ID                              = "ardmediathek_user_id";
+    private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_TIMESTAMP_SPECIAL_LOGIN_DIALOG_SHOWN = "ardmediathek_timestamp_special_login_dialog_shown";
+    private static final String ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL                        = "https://support.jdownloader.org/knowledgebase/article/ardmediathek-login-instructions";
 
     public ARDMediathek(final PluginWrapper wrapper) {
         super(wrapper);
+        if (this.getHost().equals("ardmediathek.de")) {
+            this.enablePremium("https://accounts.ard.de/registrieren");
+        }
     }
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
     }
 
     @Override
@@ -576,14 +598,151 @@ public class ARDMediathek extends PluginForHost {
     }
 
     @Override
-    public void reset() {
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final Cookies userCookies = account.loadUserCookies();
+        final String msg;
+        if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+            msg = "Beachte die spezielle Loginanleitung: " + ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL;
+        } else {
+            msg = "Follow the special login instructions: " + ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL;
+        }
+        if (userCookies == null || userCookies.isEmpty()) {
+            showCookieLoginInfo();
+            throw new AccountInvalidException(msg);
+        }
+        /* Credits to: https://github.com/yt-dlp/yt-dlp/issues/9035 */
+        br.setCookies(userCookies);
+        final String ams_cookie = br.getCookie("sso.ardmediathek.de", "ams");
+        if (StringUtils.isEmpty(ams_cookie)) {
+            /* If this happens, we know that the user has imported the wrong cookies. */
+            showArdmediathekSpecialLoginInfo(account);
+            throw new AccountInvalidException(msg);
+        }
+        br.getPage("https://sso.ardmediathek.de/sso/token");
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            throw new AccountInvalidException();
+        }
+        final String idtoken = entries.get("idToken").toString();
+        if (StringUtils.isEmpty(idtoken)) {
+            /* Valid json response but empty idtoken -> Should never happen! */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        account.setProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_IDTOKEN, idtoken);
+        /* Extract user info from bearer token */
+        final String[] tokenparts = idtoken.split("\\.");
+        final String idtoken_userinfo_json_base64encoded = tokenparts[1];
+        final String idtoken_userinfo_json = Encoding.Base64Decode(idtoken_userinfo_json_base64encoded);
+        Map<String, Object> idtoken_userinfo_parsed = restoreFromString(idtoken_userinfo_json, TypeRef.MAP);
+        String user_id = idtoken_userinfo_parsed.get("user_id").toString();
+        String user_email = (String) JavaScriptEngineFactory.walkJson(idtoken_userinfo_parsed, "firebase/identities/email/{0}");
+        String displayName = idtoken_userinfo_parsed.get("name").toString();
+        Number ageRating = (Number) idtoken_userinfo_parsed.get("age_rating");
+        final boolean fetch_user_data_from_api = false;
+        if (fetch_user_data_from_api) {
+            setAuthHeader(br, account);
+            br.getPage("https://accounts.ard.de/users");
+            List<Map<String, Object>> userlist = null;
+            try {
+                userlist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            } catch (final JSonMapperException ignore) {
+                /* This should not happen but if it happens it means that the user is not logged in anymore. */
+                throw new AccountInvalidException();
+            }
+            final Map<String, Object> user = userlist.get(0);
+            user_id = user.get("uid").toString();
+            displayName = user.get("displayName").toString();
+            ageRating = (Number) user.get("ageRating");
+        }
+        if (user_id == null || displayName == null || ageRating == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        account.setProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_USER_ID, user_id);
+        if (ageRating.intValue() != 18) {
+            throw new AccountInvalidException("Account ist gültig, jedoch nicht altersverifiziert und bringt somit keine Vorteile in JDownloader");
+        }
+        /* User could enter anything in username field but we want unique usernames -> Set username from api response */
+        if (StringUtils.isEmpty(user_email)) {
+            account.setUser(user_email);
+        } else {
+            account.setUser(displayName);
+        }
+        final AccountInfo ai = new AccountInfo();
+        ai.setUnlimitedTraffic();
+        ai.setStatus("Account mit Altersverifizierung");
+        return ai;
+    }
+
+    public String getStoredUserID(final Account account) {
+        return account.getStringProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_USER_ID);
+    }
+
+    public void setAuthHeader(final Browser br, final Account account) {
+        final String idtoken = account.getStringProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_IDTOKEN);
+        if (StringUtils.isEmpty(idtoken)) {
+            /* Developer mistake */
+            throw new IllegalArgumentException("idtoken must not be null");
+        }
+        br.addAuthentication(new BearerAuthentication(this.getHost(), idtoken, null));
+        br.getHeaders().put("x-authorization", "Bearer " + idtoken);
     }
 
     @Override
-    public void resetDownloadlink(final DownloadLink link) {
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        this.handleFree(link);
     }
 
     @Override
-    public void resetPluginGlobals() {
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
+    }
+
+    protected Thread showArdmediathekSpecialLoginInfo(final Account account) {
+        synchronized (account) {
+            if (account.hasProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_TIMESTAMP_SPECIAL_LOGIN_DIALOG_SHOWN)) {
+                /* Only display this dialog once per account */
+                return null;
+            }
+            final String host = this.getHost();
+            final Thread thread = new Thread() {
+                public void run() {
+                    try {
+                        String message = "";
+                        final String title;
+                        if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                            title = host + " - Login";
+                            message += "Hallo liebe(r) " + host + " NutzerIn\r\n";
+                            message += "Beachte diese spezielle Login Anleitung:\r\n";
+                            message += ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL;
+                        } else {
+                            title = host + " - Login";
+                            message += "Hello dear " + host + " user\r\n";
+                            message += "Please follow this special login instructions:\r\n";
+                            message += ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL;
+                        }
+                        final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                        dialog.setTimeout(3 * 60 * 1000);
+                        if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
+                            CrossSystem.openURL(ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL);
+                        }
+                        final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                        ret.throwCloseExceptions();
+                    } catch (final Throwable e) {
+                        getLogger().log(e);
+                    }
+                };
+            };
+            thread.setDaemon(true);
+            thread.start();
+            account.setProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_TIMESTAMP_SPECIAL_LOGIN_DIALOG_SHOWN, Time.systemIndependentCurrentJVMTimeMillis());
+            return thread;
+        }
     }
 }

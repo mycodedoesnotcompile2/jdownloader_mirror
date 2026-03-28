@@ -18,6 +18,18 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
@@ -38,19 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 52539 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52573 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -120,9 +120,9 @@ public class DdownloadCom extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "ddownload.com", "ddl.to", "api.ddl.to", "esimpurcuesc.ddownload.com",
-        /*
-         * download cdn, dedicated to ddownload?
-         */"ucdn.to" });
+                /*
+                 * download cdn, dedicated to ddownload?
+                 */"ucdn.to" });
         return ret;
     }
 
@@ -279,10 +279,18 @@ public class DdownloadCom extends XFileSharingProBasic {
         /* 2020-05-17 */
         super.scanInfo(html, fileInfo);
         String filename = new Regex(html, "<h1[^>]*class=\"file-info-name\"[^>]*>([^<]+)</h1>").getMatch(0);
+        if (StringUtils.isEmpty(filename)) {
+            /* 2026-03-27 */
+            filename = new Regex(html, "class=\"[^\"]*filename\"[^>]*>([^<]+)</div>").getMatch(0);
+        }
         String filesize = new Regex(html, "class=\"file-size\">([^<>\"]+)<").getMatch(0);
         if (StringUtils.isEmpty(filesize)) {
             /* 2021-03-25 */
             filesize = new Regex(html, "\\[<font[^>]*>(\\d+[^<>\"]+)</font>\\]").getMatch(0);
+            if (StringUtils.isEmpty(filesize)) {
+                /* 2026-03-27 */
+                filesize = new Regex(html, "class=\"[^\"]*filesize\"[^>]*>([^<]+)</div>").getMatch(0);
+            }
         }
         if (!StringUtils.isEmpty(filename)) {
             fileInfo[0] = filename;
