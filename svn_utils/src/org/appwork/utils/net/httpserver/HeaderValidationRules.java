@@ -39,6 +39,7 @@ import java.util.Map;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.HeaderCollection;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
 
 /**
  * Configuration class for header validation rules.
@@ -146,11 +147,12 @@ public class HeaderValidationRules {
      * Checks if all mandatory headers are present (and match their required patterns if specified) and if no forbidden headers are present
      * (or match their forbidden patterns if specified).
      *
-     * @param headers
-     *            The request headers to validate
+     * @param request
+     *            The HTTP request to validate
      * @return true if the request is allowed (all rules are satisfied), false otherwise
      */
-    public boolean isRequestAllowed(final HeaderCollection headers) {
+    public boolean isRequestAllowed(final HttpRequest request) {
+        final HeaderCollection headers = request == null ? null : request.getRequestHeaders();
         if (headers == null) {
             return !this.isEnabled();
         }
@@ -195,11 +197,12 @@ public class HeaderValidationRules {
     /**
      * Gets a detailed error message describing why the request is not allowed. Returns null if the request is allowed.
      *
-     * @param headers
-     *            The request headers to validate
+     * @param request
+     *            The HTTP request to validate
      * @return Error message string if validation fails, null if validation passes
      */
-    public String getValidationError(final HeaderCollection headers) {
+    public String getValidationError(final HttpRequest request) {
+        final HeaderCollection headers = request == null ? null : request.getRequestHeaders();
         if (headers == null) {
             if (this.isEnabled()) {
                 return "Request headers are null but validation is enabled";

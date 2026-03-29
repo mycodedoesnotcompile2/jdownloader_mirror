@@ -48,6 +48,7 @@ import org.appwork.storage.StorableValidateCondition2;
 import org.appwork.storage.StorableValidateCondition3;
 import org.appwork.storage.StorableValidationLogic;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 
 /**
  * @author Thomas
@@ -99,6 +100,23 @@ public class LocaleMap extends LinkedHashMap<String, String> implements Storable
     public LocaleMap(Map<String, String> message) {
         if (message != null) {
             putAll(message);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public LocaleMap(final Translateable txt, final Class<? extends TranslateInterface>... translationInterfaces) {
+        this(txt == null ? null : txt.translate("en"));
+        if (txt == null) {
+            return;
+        }
+        for (final String locale : TranslationFactory.listAvailableTranslations(translationInterfaces)) {
+            if (StringUtils.equals("en", locale)) {
+                continue;
+            }
+            final String translated = txt.translate(locale);
+            if (!StringUtils.equals(this.get("en"), translated)) {
+                this.put(locale, translated);
+            }
         }
     }
 

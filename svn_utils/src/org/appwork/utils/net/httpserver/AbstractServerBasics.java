@@ -240,7 +240,9 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
      * This method should be called before processing any request to ensure security policies are enforced. It throws exceptions if
      * validation fails.
      * </p>
-     * @param response TODO
+     *
+     * @param response
+     *            TODO
      * @param requestMethod
      * @param headerCollection
      *            The request to validate. Must implement CorsRequestInterface and provide getRequestMethod(), getRequestedURL() or
@@ -262,8 +264,8 @@ public abstract class AbstractServerBasics implements HttpServerInterface {
         // Header validation
         final HeaderValidationRules headerRules = this.getHeaderValidationRules();
         if (headerRules != null && headerRules.isEnabled()) {
-            if (!headerRules.isRequestAllowed(requestHeaders)) {
-                final String errorMessage = headerRules.getValidationError(requestHeaders);
+            if (!headerRules.isRequestAllowed(request)) {
+                final String errorMessage = headerRules.getValidationError(request);
                 LogV3.warning("Security: Header validation failed | Error: " + errorMessage);
                 throw new ForbiddenHeaderException(errorMessage);
             }

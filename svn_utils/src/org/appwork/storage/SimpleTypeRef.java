@@ -44,4 +44,8 @@ public class SimpleTypeRef<T> extends TypeRef<T> {
     public SimpleTypeRef(Type type) {
         super(type);
     }
+
+    public SimpleTypeRef(Class<T> type) {
+        super(type);
+    }
 }

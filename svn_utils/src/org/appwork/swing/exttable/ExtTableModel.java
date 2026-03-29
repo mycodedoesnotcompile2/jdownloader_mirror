@@ -1026,7 +1026,6 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     public boolean isColumnVisible(final ExtColumn<E> col) {
         try {
             if (col == null) {
-
                 // may happen if we removed a column from the model
                 return false;
             }

@@ -90,7 +90,6 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
         getLogger().fine("Dialog    [" + okText + "][" + cancelText + "]\r\nflag:  " + Integer.toBinaryString(flag) + "\r\ntitle: " + title + "\r\nmsg:   \r\n" + question + "\r\noptions:   \r\n" + Arrays.toString(options) + "\r\ndef:" + defaultSelection);
         message = question;
         this.renderer = renderer;
-
         defaultAnswer = defaultSelection < 0 ? 0 : defaultSelection;
         this.options = options;
     }
@@ -116,7 +115,6 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
             ret.setRenderer(rend);
         } else {
             final ListCellRenderer org = ret.getRenderer();
-
             ret.setRenderer(new ListCellRenderer<Object>() {
                 /**
                  * @see javax.swing.DefaultListCellRenderer#getListCellRendererComponent(javax.swing.JList, java.lang.Object, int, boolean,
@@ -125,11 +123,12 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
                 @Override
                 public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                     Component comp = org.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-
-                    if (value instanceof LabelInterface && comp instanceof TextComponent) {
-                        ((TextComponent) comp).setText(((LabelInterface) value).getLabel());
-                    } else if (value instanceof LabelInterface && comp instanceof JLabel) {
-                        ((JLabel) comp).setText(((LabelInterface) value).getLabel());
+                    if (comp instanceof TextComponent) {
+                        ((TextComponent) comp).setText(elementToString(value));
+                    }
+                    if (comp instanceof JLabel) {
+                        ((JLabel) comp).setText(elementToString(value));
+                        ((JLabel) comp).setIcon(elementToIcon(value));
                     }
                     return comp;
                 }
@@ -146,11 +145,29 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
     }
 
     /**
+     * @param value
+     * @return
+     */
+    protected Icon elementToIcon(Object value) {
+        return null;
+    }
+
+    /**
+     * @param value
+     * @return
+     */
+    protected String elementToString(Object value) {
+        if (value instanceof LabelInterface) {
+            return ((LabelInterface) value).getLabel();
+        }
+        return String.valueOf(value);
+    }
+
+    /**
      * @param renderer2
      * @return
      */
     protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
-
         return renderer;
     }
 

@@ -39,6 +39,7 @@ import java.net.URL;
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Time;
 
 public class IDEUtils {
     public static File getWorkSpace() {
@@ -50,8 +51,15 @@ public class IDEUtils {
     }
 
     public static File getProjectFolder(Class<?> cls) {
-        URL url = Application.class.getResource("/" + cls.getName().replace(".", "/") + ".class");
-        DebugMode.breakIf(url == null);
+        long started = Time.systemIndependentCurrentJVMTimeMillis();
+        URL url = null;
+        while (url == null && Time.systemIndependentCurrentJVMTimeMillis() - started < 5000) {
+            url = Application.class.getResource("/" + cls.getName().replace(".", "/") + ".class");
+        }
+        if (url == null) {
+            DebugMode.debugger();
+            throw new WTFException("Compile Errors?");
+        }
         try {
             File file = new File(url.toURI()).getParentFile();
             for (int i = 0; i < cls.getName().split("\\.").length; i++) {

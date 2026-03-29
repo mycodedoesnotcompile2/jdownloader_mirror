@@ -40,8 +40,19 @@ package org.appwork.swing.exttable.columns;
  */
 public interface CellHeightProvider {
     /**
-     * @param i
+     * Lets a column drive per-row height (e.g. multi-line cells). {@link org.appwork.swing.exttable.ExtTable} applies all
+     * {@link CellHeightProvider} columns in column order for each row.
+     * <p>
+     * For an &quot;interleaved&quot; layout (a normal row followed by a taller row with extra content), use alternating model
+     * rows and return a larger height only for those detail rows; render the extra UI in an
+     * {@link org.appwork.swing.exttable.columns.ExtComponentColumn}. JTable does not support colspan; the usual pattern is a
+     * dedicated last column that grows ({@code AUTO_RESIZE_LAST_COLUMN}) and hosts the wide component on detail rows only.
+     * </p>
+     *
+     * @param row
+     *            view row index
      * @param height
+     *            height accumulated so far for this row
      * @return
      */
     int adjustRowHeight(int row, int height);

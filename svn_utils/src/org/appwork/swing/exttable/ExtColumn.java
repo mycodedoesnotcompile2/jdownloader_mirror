@@ -688,7 +688,15 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     }
 
     public boolean isResizable() {
-        return getModel().getTable().isResizeableColumns() && (!this.getModel().getTable().getColumnStore("ColumnWidthLocked_", this.getID(), !this.isDefaultResizable()) || !getModel().getTable().isColumnLockingFeatureEnabled());
+        ExtTableModel<E> m = getModel();
+        if (m == null) {
+            return false;
+        }
+        ExtTable<E> t = m.getTable();
+        if (t == null) {
+            return false;
+        }
+        return t.isResizeableColumns() && (!t.getColumnStore("ColumnWidthLocked_", this.getID(), !this.isDefaultResizable()) || !t.isColumnLockingFeatureEnabled());
     }
 
     /**

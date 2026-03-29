@@ -669,6 +669,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
             // }
         } catch (RuntimeException e) {
             this.layoutException = e;
+            DebugMode.debugger();
             throw e;
         } finally {
             if (this.getDialog().getModalityType() != ModalityType.MODELESS) {
@@ -808,6 +809,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
             throw new IllegalStateException("Dialog has not been initialized yet. call displayDialog()");
         }
         // This happens if you dispose a frame - which will dispose all children as well. - without settings a returnmask
+        // This might happen, if there is an exception during the dialog init
         DebugMode.breakIf(getReturnmask() == 0, "YOu should set a returnmask first");
         AbstractDialog.this.stopTimer();
         new EDTRunner() {
