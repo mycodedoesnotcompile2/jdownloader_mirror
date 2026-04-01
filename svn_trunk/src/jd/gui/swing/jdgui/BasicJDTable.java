@@ -197,6 +197,12 @@ public class BasicJDTable<T> extends ExtTable<T> implements GenericConfigEventLi
     protected int calculateAutoRowHeight() {
         // Try to determine the correct auto row height.
         ExtTextColumn<String> col = new ExtTextColumn<String>("Test") {
+
+            @Override
+            protected String generateID() {
+                return "calculateAutoRowHeight";
+            }
+
             @Override
             public String getStringValue(String value) {
                 return "Test";

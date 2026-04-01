@@ -33,8 +33,11 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
+import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URL;
 
+import org.appwork.utils.net.httpconnection.DNSResolver.REQUESTOR;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.socketconnection.Socks5SocketConnection;
 import org.appwork.utils.net.socketconnection.SocksSocketConnection.DESTTYPE;
@@ -55,6 +58,21 @@ public class Socks5HTTPConnectionImpl extends AbstractSocksHTTPConnection {
 
     @Override
     protected Socks5SocketConnection buildSocksSocketConnection() {
-        return new Socks5SocketConnection(this.getProxy(), getDestType());
+        return new Socks5SocketConnection(this.getProxy(), getDestType()) {
+            @Override
+            protected InetAddress[] resolveDomain(REQUESTOR requestor, IPVERSION ipVersion, HTTPProxy proxy) throws IOException {
+                return Socks5HTTPConnectionImpl.this.resolveDomain(requestor, ipVersion, proxy.getHost());
+            }
+
+            @Override
+            public IPVERSION getIPVersion() {
+                return Socks5HTTPConnectionImpl.this.getIPVersion();
+            }
+
+            @Override
+            public DNSResolver getDNSResolver() {
+                return Socks5HTTPConnectionImpl.this.getDNSResolver();
+            }
+        };
     }
 }

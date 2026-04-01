@@ -43,7 +43,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,6 +56,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.net.httpconnection.DNSResolver.REQUESTOR;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.trust.TrustCallback;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
@@ -113,14 +113,6 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
         }
     }
 
-    protected InetAddress[] getRemoteIPs(HTTPProxy proxy, final boolean resolve) throws IOException {
-        if (StringUtils.isEmpty(proxy.getHost())) {
-            throw new ProxyConnectException(new UnknownHostException("Could not resolve: -empty host-"), proxy);
-        } else {
-            return getRemoteIPs(proxy.getHost(), resolve);
-        }
-    }
-
     protected volatile InetAddress customEndPointInetAddress = null;
 
     protected InetAddress getCustomEndPointInetAddress() {
@@ -161,7 +153,7 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                     this.requestProperties.put(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION, basicAuth);
                 }
                 IOException ee = null;
-                List<InetAddress> proxyIPs = new ArrayList<InetAddress>(Arrays.asList(getRemoteIPs(getProxy(), true)));
+                List<InetAddress> proxyIPs = new ArrayList<InetAddress>(Arrays.asList(getRemoteIPs(REQUESTOR.PROXY, getIPVersion(), getProxy().getHost(), true)));
                 long startTime = Time.systemIndependentCurrentJVMTimeMillis();
                 while (proxyIPs.size() > 0) {
                     final InetAddress host = proxyIPs.remove(0);
@@ -381,7 +373,7 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.net.httpconnection.HTTPConnectionImpl#disconnect()
      */
     @Override

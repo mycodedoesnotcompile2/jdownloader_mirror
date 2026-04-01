@@ -33,8 +33,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51893 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52582 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadUs extends PluginForHost {
     public EasyuploadUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -152,5 +153,10 @@ public class EasyuploadUs extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public SiteTemplate siteTemplateType() {
+        return SiteTemplate.UnknownNewFilehosterScript2026;
     }
 }

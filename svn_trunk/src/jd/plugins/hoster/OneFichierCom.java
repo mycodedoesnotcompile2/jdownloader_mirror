@@ -58,6 +58,8 @@ import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.FreeDownloadNoFreeSlotsMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.FreeDownloadWaitBetweenDownloadsLimitMode;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -98,7 +100,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52568 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -231,7 +233,7 @@ public class OneFichierCom extends PluginForHost {
              * Max total connections for premium = 30 (RE: admin, updated 07.03.2019) --> See also their FAQ:
              * https://1fichier.com/hlp.html#dllent
              */
-            int maxChunks = PluginJsonConfig.get(OneFichierConfigInterface.class).getMaxPremiumChunks();
+            int maxChunks = PluginJsonConfig.get(this.getConfigInterface()).getMaxPremiumChunks();
             if (maxChunks == 1) {
                 maxChunks = 1;
             } else if (maxChunks < 1 || maxChunks >= 20) {
@@ -248,7 +250,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     private String getURLWithPreferredProtocol(String url) {
-        final OneFichierConfigInterface cfg = PluginJsonConfig.get(OneFichierConfigInterface.class);
+        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
         final SSLMode sslmode = cfg.getSSLMode();
         if (sslmode == SSLMode.AUTO) {
             /* Do not modify URL */
@@ -630,7 +632,7 @@ public class OneFichierCom extends PluginForHost {
         /* Remove form fields we don't want. */
         form.remove("save");
         form.put("did", "1");
-        if (PluginJsonConfig.get(OneFichierConfigInterface.class).getSSLMode() == SSLMode.FORCE_HTTP) {
+        if (PluginJsonConfig.get(this.getConfigInterface()).getSSLMode() == SSLMode.FORCE_HTTP) {
             form.put("dl_no_ssl", "on");
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -675,6 +677,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     private void errorHandlingWebsite(final DownloadLink link, final Account account, final Browser br) throws Exception {
+        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
         final int responsecode = br.getHttpConnection().getResponseCode();
         if (br.containsHTML(">\\s*File not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -744,15 +747,25 @@ public class OneFichierCom extends PluginForHost {
             // You can wait for a slot to become available,<br/>
             // or <a href="/register.pl">👉<strong>Sign in for free to access more slots immediately</strong></a><br/>
             // You will also be able to save this file to your account and download it later.
-            final String msg = "Free download is temporarily limited due to high demand. Buy premium or try again later.";
-            final long waitMillis = TimeUnit.HOURS.toMillis(1);
+            final long waitMillis = cfg.getNoFreeSlotsWaitMinutes() * 60 * 1000;
             if (account != null) {
                 if (AccountType.FREE != account.getType()) {
                     logger.warning("This error should only happen for free accounts");
                 }
-                throw new AccountUnavailableException(msg, waitMillis);
+                throw new AccountUnavailableException("Free account download is temporarily limited. Buy premium or try again later.", waitMillis);
             } else {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
+                final String msg = "Free download is temporarily limited. Buy premium, try a free account or try again later.";
+                final FreeDownloadNoFreeSlotsMode mode = cfg.getNoFreeSlotsMode();
+                if (mode == FreeDownloadNoFreeSlotsMode.PER_FILE) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
+                } else if (mode == FreeDownloadNoFreeSlotsMode.GLOBAL_RECONNECT) {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msg, waitMillis);
+                } else {
+                    /*
+                     * AUTO and NoFreeSlotsMode.GLOBAL_WAIT * /
+                     */
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
+                }
             }
         }
         /* Check for blocked IP */
@@ -767,41 +780,37 @@ public class OneFichierCom extends PluginForHost {
             waittimeMinutesStr = "60";
         }
         final int defaultWaitMinutes = 5;
-        boolean isBlocked = waittimeMinutesStr != null;
-        isBlocked |= br.containsHTML("/>\\s*Téléchargements en cours");
-        isBlocked |= br.containsHTML("En téléchargement standard, vous ne pouvez télécharger qu\\'un seul fichier");
-        isBlocked |= br.containsHTML(">\\s*veuillez patienter avant de télécharger un autre fichier");
-        isBlocked |= br.containsHTML(">\\s*You already downloading (some|a) file");
-        isBlocked |= br.containsHTML(">\\s*You can download only one file at a time");
-        isBlocked |= br.containsHTML(">\\s*Please wait a few seconds before downloading new ones");
-        isBlocked |= br.containsHTML(">\\s*You must wait for another download");
-        isBlocked |= br.containsHTML("Without premium status, you can download only one file at a time");
-        isBlocked |= br.containsHTML("Without Premium, you can only download one file at a time");
-        isBlocked |= br.containsHTML("Without Premium, you must wait between downloads");
-        isBlocked |= br.containsHTML("Warning ! Without subscription, you can only download one file at|<span style=\"color:red\">Warning\\s*!\\s*</span>\\s*<br/>Without subscription, you can only download one file at a time\\.\\.\\.");
-        isBlocked |= br.containsHTML(">\\s*Votre adresse IP ouvre trop de connexions vers le serveur");
-        if (isBlocked) {
+        boolean is_ip_blocked = waittimeMinutesStr != null;
+        is_ip_blocked |= br.containsHTML("/>\\s*Téléchargements en cours");
+        is_ip_blocked |= br.containsHTML("En téléchargement standard, vous ne pouvez télécharger qu\\'un seul fichier");
+        is_ip_blocked |= br.containsHTML(">\\s*veuillez patienter avant de télécharger un autre fichier");
+        is_ip_blocked |= br.containsHTML(">\\s*You already downloading (some|a) file");
+        is_ip_blocked |= br.containsHTML(">\\s*You can download only one file at a time");
+        is_ip_blocked |= br.containsHTML(">\\s*Please wait a few seconds before downloading new ones");
+        is_ip_blocked |= br.containsHTML(">\\s*You must wait for another download");
+        is_ip_blocked |= br.containsHTML("Without premium status, you can download only one file at a time");
+        is_ip_blocked |= br.containsHTML("Without Premium, you can only download one file at a time");
+        is_ip_blocked |= br.containsHTML("Without Premium, you must wait between downloads");
+        is_ip_blocked |= br.containsHTML("Warning ! Without subscription, you can only download one file at|<span style=\"color:red\">Warning\\s*!\\s*</span>\\s*<br/>Without subscription, you can only download one file at a time\\.\\.\\.");
+        is_ip_blocked |= br.containsHTML(">\\s*Votre adresse IP ouvre trop de connexions vers le serveur");
+        if (is_ip_blocked) {
+            final String msg = "Your must wait between downloads";
+            long waitMillis = defaultWaitMinutes * 60 * 1000l;
+            if (waittimeMinutesStr != null) {
+                waitMillis = Long.parseLong(waittimeMinutesStr) * 60 * 1000l;
+            }
             if (account != null) {
-                final long waitMilliseconds;
-                if (waittimeMinutesStr != null) {
-                    waitMilliseconds = Integer.parseInt(waittimeMinutesStr) * 60 * 1001l;
-                } else {
-                    waitMilliseconds = defaultWaitMinutes * 60 * 1000l;
-                }
-                throw new AccountUnavailableException("Wait between downloads", waitMilliseconds);
+                throw new AccountUnavailableException(msg, waitMillis);
             } else {
-                final boolean preferReconnect = PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferReconnectEnabled();
-                long waitMillis = defaultWaitMinutes * 60 * 1000l;
-                if (waittimeMinutesStr != null) {
-                    waitMillis = Long.parseLong(waittimeMinutesStr) * 60 * 1000l;
-                }
-                if (preferReconnect) {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitMillis);
+                final FreeDownloadWaitBetweenDownloadsLimitMode mode = cfg.getFreeDownloadWaitBetweenDownloadsLimitMode();
+                if (mode == FreeDownloadWaitBetweenDownloadsLimitMode.GLOBAL_RECONNECT) {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msg, waitMillis);
                 } else if (waitMillis >= 10 * 60 * 1000) {
-                    /* High waittime --> Reconnect */
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitMillis);
+                    /* High wait time --> Reconnect required */
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msg, waitMillis);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait between downloads. Reconnect is disabled in plugin settings!", waitMillis);
+                    /* FreeDownloadWaitBetweenDownloadsLimitMode.AUTO or FreeDownloadWaitBetweenDownloadsLimitMode.GLOBAL_WAIT */
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
                 }
             }
         }

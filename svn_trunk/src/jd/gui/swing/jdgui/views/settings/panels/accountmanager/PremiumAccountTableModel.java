@@ -204,8 +204,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         }
 
         @Override
-        protected long getValue(final Object o) {
-            final AccountEntry entry = (AccountEntry) o;
+        protected long getValue(final AccountEntry o) {
+            final AccountEntry entry = o;
             final AccountInfo ai = entry.getAccount().getAccountInfo();
             if (ai == null) {
                 return 0L;

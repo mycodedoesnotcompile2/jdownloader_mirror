@@ -27,7 +27,7 @@ public class FilterTableModel extends ExtTableModel<Filter> {
 
     @Override
     protected void initColumns() {
-        addColumn(new ExtTextColumn<Filter>("Hoster") {
+        addColumn(new ExtTextColumn<Filter>("HosterIcon") {
             /**
              *
              */
@@ -73,7 +73,7 @@ public class FilterTableModel extends ExtTableModel<Filter> {
                 return "";
             }
         });
-        addColumn(new ExtLongColumn<Filter>("Hoster") {
+        addColumn(new ExtLongColumn<Filter>("HosterCounter") {
             private final Color defaultColor;
             private final int   defaultMaxWidth;
 
@@ -134,7 +134,7 @@ public class FilterTableModel extends ExtTableModel<Filter> {
 
         });
         ExtTextColumn<Filter> hosterColumn;
-        addColumn(hosterColumn = new ExtTextColumn<Filter>("Hoster") {
+        addColumn(hosterColumn = new ExtTextColumn<Filter>("HosterName") {
             private final Color defaultColor;
 
             {

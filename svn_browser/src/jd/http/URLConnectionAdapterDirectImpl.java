@@ -3,7 +3,6 @@ package jd.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.URL;
 import java.util.Arrays;
@@ -183,12 +182,6 @@ public class URLConnectionAdapterDirectImpl extends HTTPConnectionImpl implement
     @Override
     public void setRequest(final Request request) {
         this.request = request;
-        if (request != null) {
-            final InetAddress customInetAddress = request.getCustomInetAddress();
-            if (customInetAddress != null) {
-                this.setRemoteIPs(new InetAddress[] { customInetAddress });
-            }
-        }
     }
 
     @Override

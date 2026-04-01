@@ -57,6 +57,7 @@ import jd.nutils.encoding.Encoding;
 import jd.nutils.encoding.HTMLEntities;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
@@ -69,12 +70,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 52579 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String              dllink                                                             = null;
     public static final String  PROPERTY_CRAWLER_FORCED_FILENAME                                   = "crawler_forced_filename";
     public static final String  PROPERTY_ITEM_ID                                                   = "itemId";
     public static final String  PROPERTY_CONVERT_XML_SUBTITLE                                      = "convert_xml_subtitle";
+    /* Account properties */
     private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_IDTOKEN                              = "ardmediathek_idtoken";
     private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_USER_ID                              = "ardmediathek_user_id";
     private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_TIMESTAMP_SPECIAL_LOGIN_DIALOG_SHOWN = "ardmediathek_timestamp_special_login_dialog_shown";
@@ -630,6 +632,9 @@ public class ARDMediathek extends PluginForHost {
             /* Valid json response but empty idtoken -> Should never happen! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        /* There are no paid ardmediathek accounts */
+        account.setType(AccountType.FREE);
+        /* Store valid token for later usage */
         account.setProperty(PROPERTY_ACCOUNT_ARDMEDIATHEK_IDTOKEN, idtoken);
         /* Extract user info from bearer token */
         final String[] tokenparts = idtoken.split("\\.");
@@ -670,7 +675,6 @@ public class ARDMediathek extends PluginForHost {
             account.setUser(displayName);
         }
         final AccountInfo ai = new AccountInfo();
-        ai.setUnlimitedTraffic();
         ai.setStatus("Account mit Altersverifizierung");
         return ai;
     }

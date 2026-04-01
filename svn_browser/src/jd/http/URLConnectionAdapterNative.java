@@ -3,7 +3,6 @@ package jd.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.net.InetAddress;
 import java.net.Proxy;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -97,12 +96,6 @@ public class URLConnectionAdapterNative extends NativeHTTPConnectionImpl impleme
     @Override
     public void setRequest(final Request request) {
         this.request = request;
-        if (request != null) {
-            final InetAddress customInetAddress = request.getCustomInetAddress();
-            if (customInetAddress != null) {
-                this.connectExceptions.add("CustomInetAddress not yet supported:" + customInetAddress);
-            }
-        }
     }
 
     @Override
@@ -195,7 +188,7 @@ public class URLConnectionAdapterNative extends NativeHTTPConnectionImpl impleme
         if (endPointSocketAddress != null) {
             return endPointSocketAddress;
         }
-        Proxy proxy = nativeProxy;
+        Proxy proxy = this.nativeProxy;
         if (proxy == null) {
             Field proxyField = null;
             try {

@@ -20,6 +20,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.Type;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.translate._JDT;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
@@ -44,24 +58,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.Type;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.translate._JDT;
-
-@HostPlugin(revision = "$Revision: 52447 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52594 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("http://enter." + getHost() + "/signup/signup.php");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
     }
 
     @Override
@@ -287,31 +294,59 @@ public class JulesjordanCom extends PluginForHost {
             prepBR(br, account.getHoster());
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
-            if (cookies != null) {
+            final Cookies userCookies = account.loadUserCookies();
+            if (cookies != null || userCookies != null) {
                 /*
                  * Try to avoid login captcha at all cost! Important: ALWAYS check this as their cookies can easily become invalid e.g. when
                  * the user logs in via browser.
                  */
-                br.setCookies(cookies);
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
+                }
                 if (!force) {
                     logger.info("Trust cookies without checking");
                     return;
                 }
                 br.getPage("https://www." + this.getHost() + "/members/index.php");
-                checkErrorsAfterPossibleLoginSuccess(br);
+                checkErrorsAfterPossibleLoginSuccess(account);
                 if (isLoggedin(br)) {
                     logger.info("Cookie login successful");
-                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    if (userCookies == null) {
+                        account.saveCookies(br.getCookies(br.getHost()), "");
+                    }
                     return;
                 } else {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
                     account.clearCookies("");
+                    if (userCookies != null) {
+                        /* Dead end */
+                        logger.info("User Cookie login failed");
+                        if (account.hasEverBeenValid()) {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                        } else {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                        }
+                    }
                 }
             }
             logger.info("Performing full login");
-            br.getPage("https://www." + this.getHost() + "/trial/index.php");
-            br.getPage("/members/");
+            br.getPage("https://www." + this.getHost() + "/trial_pg/");
+            String signin_path = br.getRegex("href=\"(/[^\"]+)\" class=\"nav-login\"").getMatch(0);
+            if (signin_path == null && br.containsHTML("/verifymyage")) {
+                logger.warning("Failed to find login path -> Using static fallback value");
+                // old: /members/
+                signin_path = "/verifymyage/"; // 2026-03-31
+            } else if (signin_path == null) {
+                signin_path = "/members/";
+            }
+            /* 2026-03-31: new */
+            if (signin_path.matches("/verifymyage/?")) {
+                logger.info("Age verification might be required after login");
+            }
+            br.getPage(signin_path);
             final Form loginform = br.getFormbyActionRegex(".*auth\\.form.*");
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -330,7 +365,7 @@ public class JulesjordanCom extends PluginForHost {
                     /* User entered invalid login-captcha */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
-                checkErrorsAfterPossibleLoginSuccess(br);
+                checkErrorsAfterPossibleLoginSuccess(account);
                 /* No other error happened until now -> All we know is that login has failed. */
                 throw new AccountInvalidException();
             }
@@ -339,15 +374,24 @@ public class JulesjordanCom extends PluginForHost {
     }
 
     /** Check for "in between" errors: Errors which happen when the logins are valid but the account still cannot be used. */
-    void checkErrorsAfterPossibleLoginSuccess(final Browser br) throws AccountInvalidException, AccountUnavailableException {
+    void checkErrorsAfterPossibleLoginSuccess(final Account account) throws AccountInvalidException, AccountUnavailableException {
         if (br.getURL().matches("(?i).*/expired/?$")) {
             /* Login is valid but account is not premium anymore. */
             throw new AccountInvalidException("Account is expired");
         } else if (br.getURL().matches("(?i).*/trial_pg/?$")) {
             throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
-        } else if (br.containsHTML(">Please note that you are accessing [^<]* from a location that requires us to to verify your age")) {
+        } else if (br.containsHTML(">\\s*Please note that you are accessing [^<]* from a location that requires us to to verify your age")) {
             /* 2025-10-13: auntjudysxxx.com + USA Ashburn VA VPN, example not blocked: USA Washington */
             throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
+        } else if (br.containsHTML("id=\"avVerifyBtn\"")) {
+            /* 2026-03-31: julesjordan.com + any(?) country */
+            String cookieLoginHint = "";
+            final Cookies userCookies = account.loadUserCookies();
+            if (userCookies == null) {
+                /* User did not use cookie login method -> Tell user to try cookie login */
+                cookieLoginHint = ", try cookie login method";
+            }
+            throw new AccountUnavailableException("Age verification required, try cookie login" + cookieLoginHint, 2 * 60 * 60 * 1000);
         }
     }
 

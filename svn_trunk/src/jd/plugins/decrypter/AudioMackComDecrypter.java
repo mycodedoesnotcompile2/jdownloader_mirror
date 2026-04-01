@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AudioMackComHoster;
 
-@DecrypterPlugin(revision = "$Revision: 49508 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52595 $", interfaceVersion = 2, names = {}, urls = {})
 public class AudioMackComDecrypter extends PluginForDecrypt {
     public AudioMackComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -130,15 +130,14 @@ public class AudioMackComDecrypter extends PluginForDecrypt {
                 uploader_url_slug = uploader.get("url_slug").toString();
             }
             final String url_slug = track.get("url_slug").toString();
-            final DownloadLink dl = createDownloadlink("https://" + this.getHost() + "/" + uploader_url_slug + "/song/" + url_slug);
+            final DownloadLink audio = createDownloadlink("https://" + this.getHost() + "/" + uploader_url_slug + "/song/" + url_slug);
             if (isPlaylist) {
-                dl.setProperty(AudioMackComHoster.PROPERTY_PLAYLIST_POSITION, index + 1);
-                dl.setProperty(AudioMackComHoster.PROPERTY_PLAYLIST_NUMBEROF_ITEMS, tracks.size());
+                audio.setProperty(AudioMackComHoster.PROPERTY_PLAYLIST_POSITION, index + 1);
+                audio.setProperty(AudioMackComHoster.PROPERTY_PLAYLIST_NUMBEROF_ITEMS, tracks.size());
             }
-            AudioMackComHoster.parseSingleSongData(dl, track);
-            dl.setAvailable(true);
-            dl.setContentUrl(ogurl);
-            ret.add(dl);
+            AudioMackComHoster.parseSingleSongData(audio, track);
+            audio.setAvailable(true);
+            ret.add(audio);
             index++;
         }
         String fpName;

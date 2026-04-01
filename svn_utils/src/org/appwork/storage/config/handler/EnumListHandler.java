@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.utils.DebugMode;
 
 /**
@@ -79,8 +80,15 @@ public class EnumListHandler extends ListHandler<Enum<?>[]> {
                 }
             }
             this.setDefaultValue(ret.toArray(new Enum[0]));
-        } else {
-            this.setDefaultValue(null);
+            return;
         }
+        if (getAnnotation(DefaultOnNull.class) != null) {
+            final ParameterizedType type = (ParameterizedType) getRawType();
+            final Class enumClass = (Class) type.getActualTypeArguments()[0];
+            final Enum[] defaultValue = (Enum[]) enumClass.getEnumConstants();
+            this.setDefaultValue(defaultValue);
+            return;
+        }
+        this.setDefaultValue(null);
     }
 }

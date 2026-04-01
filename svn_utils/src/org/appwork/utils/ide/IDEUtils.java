@@ -43,14 +43,44 @@ import org.appwork.utils.Time;
 
 public class IDEUtils {
     public static File getWorkSpace() {
-        return getProjectFolder(Application.class).getParentFile();
+        final Class<?> clazz = IDEUtils.class;
+        // this class
+        final URL url = clazz.getResource("/" + clazz.getName().replace(".", "/") + ".class");
+        File parent = null;
+        try {
+            parent = new File(url.toURI()).getParentFile();
+        } catch (Throwable e) {
+            throw new WTFException(e);
+        }
+        for (int i = 0; i < clazz.getName().split("\\.").length; i++) {
+            parent = parent.getParentFile();
+        }
+        // Intellij
+        if ("production".equals(parent.getName())) {
+            if ("bin".equals(parent.getParentFile().getName())) {
+                parent = parent.getParentFile().getParentFile();
+            }
+        }
+        return parent.getParentFile();
     }
 
-    public static void main(String[] args) {
-        System.out.println(getWorkSpace());
+    public static File getProjectFolderByJavaFile(final Class<?> orgClass) {
+        Class<?> cls = orgClass;
+        while (cls.isAnonymousClass()) {
+            cls = cls.getEnclosingClass();
+        }
+        final File workSpace = getWorkSpace();
+        final String javaFile = "/src/" + cls.getName().replace(".", "/") + ".java";
+        final File[] projects = workSpace.listFiles();
+        for (File project : projects) {
+            if (new File(project, javaFile).isFile()) {
+                return project;
+            }
+        }
+        return getProjectFolder(orgClass);
     }
 
-    public static File getProjectFolder(Class<?> cls) {
+    public static File getProjectFolderByClassFile(final Class<?> cls) {
         long started = Time.systemIndependentCurrentJVMTimeMillis();
         URL url = null;
         while (url == null && Time.systemIndependentCurrentJVMTimeMillis() - started < 5000) {
@@ -77,11 +107,20 @@ public class IDEUtils {
         }
     }
 
+    public static File getProjectFolder(Class<?> cls) {
+        final File inWorkSpace = getProjectFolderByJavaFile(cls);
+        if (inWorkSpace != null) {
+            return inWorkSpace;
+        }
+        return getProjectFolderByJavaFile(cls);
+    }
+
     public static File getProjectFolder() throws ClassNotFoundException {
+        final StackTraceElement[] stackTrace = new Exception().getStackTrace();
         try {
-            return getProjectFolder(Class.forName(new Exception().getStackTrace()[1].getClassName()));
+            return getProjectFolder(Class.forName(stackTrace[1].getClassName()));
         } catch (Throwable e) {
-            return getProjectFolder(Class.forName(new Exception().getStackTrace()[0].getClassName()));
+            return getProjectFolder(Class.forName(stackTrace[0].getClassName()));
         }
     }
 }

@@ -295,7 +295,7 @@ public abstract class AbstractSocksHTTPConnection extends HTTPConnectionImpl {
                 } else if (!socksSocketConnection.isSupported(DESTTYPE.IPV4) || SocksSocketConnection.DESTTYPE.IPV6.equals(socksSocketConnection.getDestType(null))) {
                     version = IPVERSION.IPV6_IPV4;
                 }
-                final InetAddress[] inetAddress = HTTPConnectionUtils.resolvHostIP(getHostname(), version);
+                final InetAddress[] inetAddress = resolveDomain(DNSResolver.REQUESTOR.HOST, version, getHostname());
                 if (inetAddress != null && inetAddress.length > 0) {
                     return new InetSocketAddress(inetAddress[0], getConnectEndpointPort());
                 }

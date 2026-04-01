@@ -54,7 +54,8 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.net.SocketFactory;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.net.httpconnection.DNSResolver;
+import org.appwork.utils.net.httpconnection.DNSResolver.REQUESTOR;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.ProxyAuthException;
@@ -281,25 +282,27 @@ public abstract class SocketConnection extends Socket {
         this.connect(endpoint, connectTimeout, null);
     }
 
-    protected InetAddress[] resolvHostIP(HTTPProxy host) throws IOException {
-        return HTTPConnectionUtils.resolvHostIP(host.getHost(), getIPVersion());
+    protected DNSResolver dnsResolver = null;
+
+    public void setDNSResolver(final DNSResolver resolver) {
+        this.dnsResolver = resolver;
     }
 
-    protected volatile InetAddress remoteIPs[] = null;
-
-    protected InetAddress[] getRemoteIPs(final HTTPProxy proxy, final boolean resolve) throws IOException {
-        if (this.remoteIPs == null && resolve) {
-            this.remoteIPs = this.resolvHostIP(proxy);
+    public DNSResolver getDNSResolver() {
+        final DNSResolver dnsResolver = this.dnsResolver;
+        if (dnsResolver == null) {
+            return DNSResolver.DEFAULT;
         }
-        if (resolve && (remoteIPs == null || remoteIPs.length == 0)) {
-            throw new UnknownHostException("Could not resolve(" + getIPVersion() + "):" + proxy.getHost());
-        } else {
-            return remoteIPs;
-        }
+        return this.dnsResolver;
     }
 
-    protected void setRemoteIPs(InetAddress[] remoteIPs) {
-        this.remoteIPs = remoteIPs;
+    protected InetAddress[] resolveDomain(DNSResolver.REQUESTOR requestor, IPVERSION ipVersion, HTTPProxy proxy) throws IOException {
+        final DNSResolver dnsResolver = getDNSResolver();
+        final InetAddress[] ret = dnsResolver.resolveDomain(requestor, ipVersion, proxy.getHost());
+        if (ret == null || ret.length == 0) {
+            throw new UnknownHostException("DNSResolver returned no address for:" + proxy);
+        }
+        return ret;
     }
 
     protected void connect(SocketStreamInterface socketStreamInterface, SocketAddress connectSocketAddress, int connectTimeout) throws IOException {
@@ -314,7 +317,7 @@ public abstract class SocketConnection extends Socket {
     public void connect(SocketAddress endpoint, final int connectTimeout, final StringBuffer logger) throws IOException {
         try {
             final int port = getProxy().getPort();
-            final InetAddress[] socksIPs = getRemoteIPs(this.getProxy(), true);
+            final InetAddress[] socksIPs = resolveDomain(REQUESTOR.PROXY, getIPVersion(), this.getProxy());
             boolean retryFlag = true;
             while (retryFlag) {
                 IOException ioE = null;

@@ -39,8 +39,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52066 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52582 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwiftuploadsCom extends PluginForHost {
     public SwiftuploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,6 +69,7 @@ public class SwiftuploadsCom extends PluginForHost {
         ret.add(new String[] { "uploadzap.com" });
         ret.add(new String[] { "akirabox.com", "akirabox.to" });
         ret.add(new String[] { "filearn.top" });
+        ret.add(new String[] { "up4share.org" });
         return ret;
     }
 
@@ -270,6 +272,7 @@ public class SwiftuploadsCom extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+        /* 2026-03-31: Captcha is always required for free download */
         return true;
     }
 
@@ -279,10 +282,7 @@ public class SwiftuploadsCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public SiteTemplate siteTemplateType() {
+        return SiteTemplate.UnknownNewFilehosterScript2026;
     }
 }

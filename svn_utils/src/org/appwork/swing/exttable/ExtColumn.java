@@ -44,6 +44,7 @@ import java.lang.reflect.Modifier;
 import java.text.NumberFormat;
 import java.util.EventObject;
 import java.util.List;
+import java.util.WeakHashMap;
 import java.util.regex.Pattern;
 
 import javax.swing.AbstractCellEditor;
@@ -63,6 +64,7 @@ import javax.swing.table.TableColumn;
 
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.exttable.columnmenu.LockColumnWidthAction;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.locale._AWU;
@@ -125,7 +127,7 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override
@@ -356,10 +358,23 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     public void extendControlButtonMenu(final JPopupMenu popup) {
     }
 
+    private final static WeakHashMap<Class, String> DUPE_ID_CHECK = new WeakHashMap<Class, String>();
+
     protected String generateID() {
         String ret = this.getClass().getSuperclass().getSimpleName() + "." + this.getClass().getName();
         if (getClass().isAnonymousClass() && Modifier.isAbstract(getClass().getSuperclass().getModifiers())) {
             ret = Hash.getSHA1(StringUtils.valueOrEmpty(getName())) + "." + getClass().getSuperclass().getSimpleName() + "." + this.getClass().getEnclosingClass().getName();
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                synchronized (DUPE_ID_CHECK) {
+                    final String existingKey = DUPE_ID_CHECK.get(getClass());
+                    if (existingKey == null || ret.equals(existingKey)) {
+                        DUPE_ID_CHECK.put(getClass(), ret);
+                    } else {
+                        DebugMode.debugger();
+                        System.out.println("check me:" + existingKey);
+                    }
+                }
+            }
         }
         return ret;
     }

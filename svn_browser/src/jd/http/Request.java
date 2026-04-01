@@ -20,7 +20,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
-import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
@@ -200,36 +199,27 @@ public abstract class Request {
     /*
      * default timeouts, because 0 is infinite and BAD, if we need 0 then we have to set it manually
      */
-    protected int                    connectTimeout    = 30000;
-    protected int                    readTimeout       = 60000;
-    protected Cookies                cookies           = null;
+    protected int                    connectTimeout  = 30000;
+    protected int                    readTimeout     = 60000;
+    protected Cookies                cookies         = null;
     protected RequestHeader          headers;
     protected String                 htmlCode;
     protected URLConnectionAdapter   httpConnection;
-    protected long                   readTime          = -1;
-    protected boolean                requested         = false;
-    protected int                    readLimit         = 1 * 1024 * 1024;
+    protected long                   readTime        = -1;
+    protected boolean                requested       = false;
+    protected int                    readLimit       = 1 * 1024 * 1024;
     protected HTTPProxy              proxy;
     protected URL                    url;
-    protected String                 customCharset     = null;
-    protected byte[]                 responseBytes     = null;
-    protected boolean                contentDecoded    = true;
-    protected boolean                keepByteArray     = false;
-    protected Boolean                sslTrustALL       = null;
-    protected long                   requestID         = -1;
-    protected long                   browserID         = -1;
-    protected long                   browserParentID   = -1;
-    protected IPVERSION              ipVersion         = null;
-    protected InetAddress            customInetAddress = null;
-    protected WeakReference<Browser> browser           = new WeakReference<Browser>(null);
-
-    public InetAddress getCustomInetAddress() {
-        return this.customInetAddress;
-    }
-
-    public void setCustomInetAddress(InetAddress customInetAddress) {
-        this.customInetAddress = customInetAddress;
-    }
+    protected String                 customCharset   = null;
+    protected byte[]                 responseBytes   = null;
+    protected boolean                contentDecoded  = true;
+    protected boolean                keepByteArray   = false;
+    protected Boolean                sslTrustALL     = null;
+    protected long                   requestID       = -1;
+    protected long                   browserID       = -1;
+    protected long                   browserParentID = -1;
+    protected IPVERSION              ipVersion       = null;
+    protected WeakReference<Browser> browser         = new WeakReference<Browser>(null);
 
     public IPVERSION getIPVersion() {
         return this.ipVersion;

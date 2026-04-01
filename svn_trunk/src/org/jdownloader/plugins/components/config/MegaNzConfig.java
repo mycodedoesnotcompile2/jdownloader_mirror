@@ -48,7 +48,7 @@ public interface MegaNzConfig extends PluginConfigInterface {
         }
 
         public String getLimitMode_label() {
-            return "Set preferred limit mode";
+            return "Behavior for errors like 'Bandwidth Limit Exceeded'";
         }
 
         public String getMaxWaittimeOnLimitReachedMinutes_label() {
@@ -126,26 +126,26 @@ public interface MegaNzConfig extends PluginConfigInterface {
         GLOBAL_RECONNECT {
             @Override
             public String getLabel() {
-                return "Global: Wait or get new IP";
+                return "Put wait status on all mega links and trigger reconnect";
             }
         },
         GLOBAL_WAIT {
             @Override
             public String getLabel() {
-                return "Global: Wait";
+                return "Put wait status on all mega links";
             }
         },
         PER_FILE {
             @Override
             public String getLabel() {
-                return "Per file: Wait";
+                return "Put wait status on each link where this error happens";
             }
         };
     }
 
     @AboutConfig
     @DefaultEnumValue("PER_FILE")
-    @DescriptionForConfigEntry("Set preferred limit mode")
+    @DescriptionForConfigEntry("Behavior for errors like 'Bandwidth Limit Exceeded'")
     @Order(70)
     LimitMode getLimitMode();
 

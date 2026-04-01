@@ -25,7 +25,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49711 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52588 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorncomixinfoNet extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
@@ -42,7 +42,7 @@ public class PorncomixinfoNet extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "gedecomix.com", "porncomixinfo.com", "porncomixinfo.net" });
+        ret.add(new String[] { "gedecomix.com", "porncomixinfo.com", "porncomixinfo.net", "binalbro.com" });
         return ret;
     }
 
@@ -110,10 +110,23 @@ public class PorncomixinfoNet extends PluginForDecrypt {
                 }
             } else {
                 /* New 2023-10-30 */
-                final String[] imageurls = br.getRegex("=\"image-\\d+\"\\s*src=\"\\s*(https?://[^\"]+)\"").getColumn(0);
+                final HashSet<String> dupes = new HashSet<String>();
+                final String[] imageurls = br.getRegex("=\"image-\\d+\"\\s*(?:data-)?src=\"(https?://[^\"]+)\"").getColumn(0);
                 if (imageurls != null && imageurls.length > 0) {
                     for (String imageurl : imageurls) {
                         imageurl = Encoding.htmlOnlyDecode(imageurl);
+                        if (!dupes.add(imageurl)) {
+                            continue;
+                        }
+                        /* Same page link might exist multiple times -> Try to avoid dupes via unique page-number */
+                        /* Example: /page---(6).jpg and /06.jpg */
+                        String pageStr = new Regex(imageurl, "/0*(\\d+).jpe?g$").getMatch(0);
+                        if (pageStr == null) {
+                            pageStr = new Regex(imageurl, "/page[\\-]+\\((\\d+)\\).jpe?g").getMatch(0);
+                        }
+                        if (pageStr != null && !dupes.add(pageStr)) {
+                            continue;
+                        }
                         final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
                         ret.add(link);
                     }
@@ -154,7 +167,7 @@ public class PorncomixinfoNet extends PluginForDecrypt {
             final HashSet<String> dupes = new HashSet<String>();
             for (final String url : urls) {
                 final String thisChapterSlug = new Regex(url, this.getSupportedLinks()).getMatch(2);
-                final boolean isValidChapterSlug = thisChapterSlug != null && thisChapterSlug.contains("-");
+                final boolean isValidChapterSlug = thisChapterSlug != null;
                 if (url.contains(seriesSlug) && isValidChapterSlug && dupes.add(url)) {
                     ret.add(this.createDownloadlink(url));
                 }

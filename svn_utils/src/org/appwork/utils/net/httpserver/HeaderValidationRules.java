@@ -81,7 +81,7 @@ public class HeaderValidationRules {
     /**
      * @param key
      */
-    public void removeForbiddenHeader(String key) {
+    public synchronized void removeForbiddenHeader(String key) {
         HashMap<String, String> newMap = new HashMap<String, String>(forbiddenHeaders);
         newMap.remove(key);
         forbiddenHeaders = newMap;
@@ -90,7 +90,7 @@ public class HeaderValidationRules {
     /**
      * @param key
      */
-    public void removeMandatoryHeader(String key) {
+    public synchronized void removeMandatoryHeader(String key) {
         HashMap<String, String> newMap = new HashMap<String, String>(mandatoryHeaders);
         newMap.remove(key);
         mandatoryHeaders = newMap;
@@ -116,7 +116,7 @@ public class HeaderValidationRules {
      *
      * @return Map where key is header name and value is regex pattern that the header value must match (or null if any value is acceptable)
      */
-    public Map<String, String> getMandatoryHeaders() {
+    public synchronized Map<String, String> getMandatoryHeaders() {
         return new HashMap<String, String>(this.mandatoryHeaders);
     }
 
@@ -126,7 +126,7 @@ public class HeaderValidationRules {
      * @return Map where key is header name and value is regex pattern that the header value must not match (or null if header itself is
      *         forbidden)
      */
-    public Map<String, String> getForbiddenHeaders() {
+    public synchronized Map<String, String> getForbiddenHeaders() {
         return new HashMap<String, String>(this.forbiddenHeaders);
     }
 
@@ -136,8 +136,8 @@ public class HeaderValidationRules {
      * @return true if there are mandatory or forbidden headers defined
      */
     public boolean isEnabled() {
-        Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
-        Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
+        final Map<String, String> mandatoryHeadersValue = getMandatoryHeaders();
+        final Map<String, String> forbiddenHeadersValue = getForbiddenHeaders();
         return !mandatoryHeadersValue.isEmpty() || !forbiddenHeadersValue.isEmpty();
     }
 

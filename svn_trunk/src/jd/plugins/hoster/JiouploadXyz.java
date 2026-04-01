@@ -40,8 +40,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52582 $", interfaceVersion = 3, names = {}, urls = {})
 public class JiouploadXyz extends PluginForHost {
     public JiouploadXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -283,5 +284,10 @@ public class JiouploadXyz extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public SiteTemplate siteTemplateType() {
+        return SiteTemplate.UnknownNewFilehosterScript2026;
     }
 }

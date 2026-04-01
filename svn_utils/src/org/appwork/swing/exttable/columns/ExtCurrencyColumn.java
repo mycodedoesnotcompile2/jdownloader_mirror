@@ -22,7 +22,7 @@ public abstract class ExtCurrencyColumn<E> extends ExtColumn<E> {
         formatter = updateNumberFormat();
         this.setRowSorter(new ExtDefaultRowSorter<E>() {
             @Override
-            public int compare(final Object o1, final Object o2) {
+            public int compare(final E o1, final E o2) {
                 if (ExtCurrencyColumn.this.getValue(o1) == ExtCurrencyColumn.this.getValue(o2)) {
                     return 0;
                 }
@@ -71,7 +71,7 @@ public abstract class ExtCurrencyColumn<E> extends ExtColumn<E> {
         return null;
     }
 
-    abstract protected long getValue(Object o);
+    abstract protected long getValue(E o);
 
     @Override
     public JComponent getEditorComponent(final E value, final boolean isSelected, final int row, final int column) {
@@ -84,17 +84,17 @@ public abstract class ExtCurrencyColumn<E> extends ExtColumn<E> {
     }
 
     @Override
-    public boolean isEditable(final Object obj) {
+    public boolean isEditable(final E obj) {
         return false;
     }
 
     @Override
-    public boolean isEnabled(final Object obj) {
+    public boolean isEnabled(final E obj) {
         return true;
     }
 
     @Override
-    public boolean isSortable(final Object obj) {
+    public boolean isSortable(final E obj) {
         return true;
     }
 
@@ -109,6 +109,6 @@ public abstract class ExtCurrencyColumn<E> extends ExtColumn<E> {
     }
 
     @Override
-    public void setValue(final Object value, final Object object) {
+    public void setValue(final Object value, final E object) {
     }
 }

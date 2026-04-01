@@ -200,7 +200,7 @@ public class SingleAppInstance {
         directory.mkdirs();
         this.lockFile = new File(directory, appID + ".lock");
         this.listener = listenr;
-        logger = LogV3.defaultLogger();
+        setLogger(LogV3.defaultLogger());
     }
 
     public IncommingMessageListener getListener() {
@@ -606,6 +606,7 @@ public class SingleAppInstance {
         if (this.alreadyUsed) {
             this.cannotStart(new IllegalStateException("create new instance!"));
         }
+        final LogInterface logger = this.logger;
         this.alreadyUsed = true;
         try {
             GoAwayException goAwayException = null;
@@ -781,6 +782,7 @@ public class SingleAppInstance {
                                         handleIncommingConnection(client);
                                     } catch (InterruptedException e) {
                                         DebugMode.breakIf(true, "It is actually not possble to reach this code");
+                                        final LogInterface logger = SingleAppInstance.this.logger;
                                         if (logger != null) {
                                             logger.log(e);
                                         }
@@ -857,6 +859,7 @@ public class SingleAppInstance {
     }
 
     protected void onUncaughtExceptionDuringHandlingIncommingConnections(Throwable e) {
+        final LogInterface logger = this.logger;
         if (logger != null) {
             logger.log(e);
         }
@@ -948,6 +951,7 @@ public class SingleAppInstance {
         synchronized (connections) {
             connections.put(socket, null);
         }
+        final LogInterface logger = this.logger;
         try {
             final ClientConnection client = buildConnection(socket);
             synchronized (connections) {
@@ -962,7 +966,7 @@ public class SingleAppInstance {
                     client.sendResponse(new Response(GO_AWAY_INVALID_ID, "Bad clientID"));
                 } catch (IOException e) {
                     if (logger != null) {
-                        logger.finest("SingleAppInstance: client disconnected before GO_AWAY could be sent: " + e.getMessage());
+                        logger.exception("SingleAppInstance: client disconnected before GO_AWAY could be sent: " + e.getMessage(), e);
                     }
                 }
             } else {
@@ -970,7 +974,7 @@ public class SingleAppInstance {
                     client.sendResponse(new Response(CLIENT_ID_OK));
                 } catch (IOException e) {
                     if (logger != null) {
-                        logger.finest("SingleAppInstance: client disconnected before CLIENT_ID_OK could be sent: " + e.getMessage());
+                        logger.exception("SingleAppInstance: client disconnected before CLIENT_ID_OK could be sent: " + e.getMessage(), e);
                     }
                     return;
                 }
@@ -1113,12 +1117,14 @@ public class SingleAppInstance {
     }
 
     protected void onIncommingInvalidMessage(String message) {
+        final LogInterface logger = this.logger;
         if (logger != null) {
             logger.info("invalid SingleAppInstanceClient message:" + message);
         }
     }
 
     protected void onIncommingTrailingMessage(String message) {
+        final LogInterface logger = this.logger;
         if (logger != null) {
             logger.info("trailing Message:" + message);
         }

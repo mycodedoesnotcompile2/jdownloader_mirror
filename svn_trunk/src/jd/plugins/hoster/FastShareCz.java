@@ -45,7 +45,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52059 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52587 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastShareCz extends PluginForHost {
     public FastShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,9 +157,10 @@ public class FastShareCz extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        /*
-         * 2023-09-18: Only registered users can see/download files. For non-logged-in-users it seems like all files are displayed as
-         * offline (website redirects to mainpage).
+        /**
+         * 2023-09-18: Only registered users can see/download files. <br>
+         * For non-logged-in-users (anonymous users) they make it seem like all files are displayed as offline (website redirects to
+         * mainpage).
          */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         return requestFileInformation(link, account);

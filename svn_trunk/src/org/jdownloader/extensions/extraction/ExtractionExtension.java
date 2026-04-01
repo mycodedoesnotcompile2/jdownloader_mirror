@@ -48,7 +48,6 @@ import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
 import org.appwork.shutdown.ShutdownVetoListener;
 import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.ModifyLock;
 import org.appwork.utils.StringUtils;
@@ -310,6 +309,12 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                             return archive;
                         }
                     }
+                } catch (ArchiveException e) {
+                    if (isAlreadyProcessed(factory)) {
+                        return null;
+                    }
+                    throwable = e;
+                    logger.log(e);
                 } catch (final Throwable e) {
                     throwable = e;
                     logger.log(e);
@@ -756,12 +761,33 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
 
     public static final ThreadLocal<Map<Object, Object>> ARCHIVE_FACTORY_OPTIMIZATION = new ThreadLocal<Map<Object, Object>>();
 
+    public static boolean isAlreadyProcessed(ArchiveFactory factory) {
+        final Map<Object, Object> map = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
+        if (map == null) {
+            return false;
+        }
+        final Object archives = map.get("archives");
+        if (archives == null) {
+            return false;
+        }
+        synchronized (archives) {
+            final Set<String> skipArchiveIDSet = (Set<String>) map.get("skipArchiveIDSet");
+            if (skipArchiveIDSet == null) {
+                return false;
+            } else if (skipArchiveIDSet.contains(factory.getArchiveID())) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
     public List<Archive> getArchivesFromPackageChildren(final List<? extends Object> nodes, Set<String> ignoreArchiveIDs, final int maxArchives) {
         final Map<Object, Object> packageChildrenCache = new HashMap<Object, Object>();
         final HashSet<String> skipArchiveIDSet = new HashSet<String>();
-
+        packageChildrenCache.put("skipArchiveIDSet", skipArchiveIDSet);
         final ArrayList<Archive> archives = new ArrayList<Archive>();
-        final ArrayList<Archive> optimizeArchives = new ArrayList<Archive>();
+        packageChildrenCache.put("archives", archives);
         if (ignoreArchiveIDs != null) {
             skipArchiveIDSet.addAll(ignoreArchiveIDs);
         }
@@ -923,9 +949,6 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                                 if (!abortFlag.get() && skipArchiveIDSet.add(archive.getArchiveID())) {
                                     archives.add(archive);
                                     optimizeCachedPackageChildren(archive);
-                                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                        System.out.println("found archives:" + archives.size());
-                                    }
                                     if (maxArchives > 0 && archives.size() >= maxArchives) {
                                         abortFlag.set(true);
                                         return;

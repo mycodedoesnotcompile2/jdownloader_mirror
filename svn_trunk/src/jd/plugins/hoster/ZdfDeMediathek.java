@@ -26,15 +26,19 @@ import java.net.URL;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.config.Order;
@@ -44,9 +48,13 @@ import org.jdownloader.translate._JDT;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -56,20 +64,26 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 52297 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
-    public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
-    public static final String PROPERTY_streamingType    = "streamingType";
-    public static final String PROPERTY_title            = "title";
-    public static final String PROPERTY_tv_show          = "tv_show";
-    public static final String PROPERTY_date_formatted   = "date_formatted";
-    public static final String PROPERTY_tv_station       = "tv_station";
-    public static final String PROPERTY_language         = "language";
-    public static final String PROPERTY_convert_subtitle = "convertsubtitle";
-    private String             dllink                    = null;
+    public static final String  PROPERTY_hlsBandwidth       = "hlsBandwidth";
+    public static final String  PROPERTY_streamingType      = "streamingType";
+    public static final String  PROPERTY_title              = "title";
+    public static final String  PROPERTY_tv_show            = "tv_show";
+    public static final String  PROPERTY_date_formatted     = "date_formatted";
+    public static final String  PROPERTY_tv_station         = "tv_station";
+    public static final String  PROPERTY_language           = "language";
+    public static final String  PROPERTY_convert_subtitle   = "convertsubtitle";
+    /* Account properties */
+    private static final String PROPERTY_ACCOUNT_LOGINTOKEN = "zdfmediathek_logintoken";
+    private static final String API_BASE                    = "https://api.zdf.de";
+    private String              dllink                      = null;
 
     public ZdfDeMediathek(PluginWrapper wrapper) {
         super(wrapper);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.enablePremium("https://www.zdf.de/mein-zdf/registrierung");
+        }
     }
 
     @Override
@@ -419,16 +433,66 @@ public class ZdfDeMediathek extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
 
     @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        synchronized (account) {
+            br.setCookiesExclusive(true);
+            final String storedToken = account.getStringProperty(PROPERTY_ACCOUNT_LOGINTOKEN);
+            final Cookies cookies = account.loadCookies("");
+            // TODO: Check if cookie login implementation makes sense
+            // final Cookies userCookies = account.loadUserCookies();
+            if (storedToken != null) {
+                logger.info("Attempting token login");
+                // TODO: Add functionality
+                br.setCookies(cookies);
+            }
+            logger.info("Performing full login");
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("grant_type", "password");
+            query.appendEncoded("password", account.getPass());
+            query.appendEncoded("username", account.getUser());
+            /*
+             * Hardcoded API token also used in other open source projects e.g. mediathekview:
+             * https://github.com/mediathekview/MServer/issues/1039
+             */
+            br.getHeaders().put("api-auth", "Bearer aa3noh4ohz9eeboo8shiesheec9ciequ9Quah7el");
+            br.postPage(API_BASE + "/identity/login", query);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String token = (String) entries.get("token");
+            if (br.getHttpConnection().getResponseCode() != 200 || StringUtils.isEmpty(token)) {
+                throw new AccountInvalidException(entries.get("message").toString());
+            } else if (StringUtils.isEmpty(token)) {
+                /* This should never happen */
+                throw new AccountInvalidException();
+            }
+            account.setProperty(PROPERTY_ACCOUNT_LOGINTOKEN, token);
+            /* Check if account is age verified */
+            br.getPage(API_BASE + "/identity/fsk/verification");
+            final Map<String, Object> verification = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (!Boolean.TRUE.equals(verification.get("verified"))) {
+                throw new AccountInvalidException("Account ist gültig, jedoch nicht altersverifiziert und bringt somit keine Vorteile in JDownloader");
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
+        }
+        /* There are no paid zdfmediathek accounts */
+        account.setType(AccountType.FREE);
+        final AccountInfo ai = new AccountInfo();
+        ai.setStatus("Account mit Altersverifizierung");
+        return ai;
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        this.handleFree(link);
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 
     @Override

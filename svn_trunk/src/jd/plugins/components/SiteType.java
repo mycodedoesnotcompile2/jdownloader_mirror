@@ -309,6 +309,12 @@ public class SiteType {
          * Use this to tag websites/crawler plugins that are only designed to crawl HTTP directories:
          * https://en.wikipedia.org/wiki/Webserver_directory_index
          */
-        GenericHTTPDirectoryIndex
+        GenericHTTPDirectoryIndex,
+        /**
+         * 2026-03-31: There is no name for it yet but it's used by multiple website owners already. <br>
+         * Examples: SwiftuploadsCom, EasyuploadUs, UploadCityZapuploadTop, OmfoSpace, JiouploadXyz, up4share.org <br>
+         * Tags: /file", /preview"
+         */
+        UnknownNewFilehosterScript2026
     }
 }

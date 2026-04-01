@@ -35,15 +35,22 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52180 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52597 $", interfaceVersion = 3, names = {}, urls = {})
 public class ArdaudiothekDe extends PluginForDecrypt {
     public ArdaudiothekDe(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "ardaudiothek.de" });
+        ret.add(new String[] { "ardaudiothek.de", "ardsounds.de" });
         return ret;
     }
 
@@ -71,14 +78,16 @@ public class ArdaudiothekDe extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String episodeTargetID = null;
-        boolean doSpecialHandlingToFindSingleEpisodePosition = true;
-        br.setFollowRedirects(true);
+
         List<Map<String, Object>> episodes = null;
         int infiniteLoopPreventionCounter = -1;
         FilePackage fp = null;
         String urlToAccess = param.getCryptedUrl();
+        final boolean doSpecialHandlingToFindSingleEpisodePosition;
         if (urlToAccess.matches("(?i).*urn:\\w+:episode.*")) {
             doSpecialHandlingToFindSingleEpisodePosition = false;
+        } else {
+            doSpecialHandlingToFindSingleEpisodePosition = true;
         }
         Map<String, Object> publicationService = null;
         int page = 0;
@@ -155,8 +164,9 @@ public class ArdaudiothekDe extends PluginForDecrypt {
         brc.getHeaders().put("Accept", "*/*");
         /* Starts from 2 as page 1 = website -> html code and gets crawled in beforehand. */
         int page = 1;
-        do {
+        pagination: do {
             page++;
+            /* API docs: https://api.ardaudiothek.de/docs/ */
             brc.getPage("https://api.ardaudiothek.de/graphql?query=query%20ProgramSetEpisodesQuery(%24id%3AID!%2C%24offset%3AInt!%2C%24count%3AInt!)%7Bresult%3AprogramSet(id%3A%24id)%7Bitems(offset%3A%24offset%20first%3A%24count%20orderBy%3APUBLISH_DATE_DESC%20filter%3A%7BisPublished%3A%7BequalTo%3Atrue%7D%7D)%7BpageInfo%7BhasNextPage%20endCursor%7Dnodes%7Bid%20title%20publishDate%20summary%20duration%20path%20image%7Burl%20url1X1%20description%20attribution%7DprogramSet%7Bid%20title%20path%20publicationService%7Btitle%20genre%20path%20organizationName%7D%7Daudios%7Burl%20downloadUrl%20allowDownload%7D%7D%7D%7D%7D&variables=%7B%22id%22%3A%22" + podcastID + "%22%2C%22offset%22%3A" + offset + "%2C%22count%22%3A" + maxItemsPerPage + "%7D");
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> items = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/result/items");
@@ -170,19 +180,18 @@ public class ArdaudiothekDe extends PluginForDecrypt {
             logger.info("Crawled page " + page + " | Found items: " + ret.size() + "/" + totalNumberofItems);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
+                break pagination;
             } else if (Boolean.FALSE.equals(pageInfo.get("hasNextPage"))) {
                 logger.info("Stopping because: Reached last page");
-                break;
+                break pagination;
             } else if (episodes.size() < maxItemsPerPage) {
                 /* Double fail-safe */
                 logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
-                break;
-            } else {
-                /* Access next page */
-                offset += episodes.size();
-                continue;
+                break pagination;
             }
+            /* Continue to next page */
+            offset += episodes.size();
+            continue;
         } while (true);
         return ret;
     }
@@ -235,10 +244,10 @@ public class ArdaudiothekDe extends PluginForDecrypt {
                 /* User wants to have one specific episode only */
                 ret.clear();
                 ret.add(link);
-                break;
-            } else {
-                ret.add(link);
+                return ret;
             }
+            /* Continue to next item */
+            ret.add(link);
             position++;
         }
         return ret;

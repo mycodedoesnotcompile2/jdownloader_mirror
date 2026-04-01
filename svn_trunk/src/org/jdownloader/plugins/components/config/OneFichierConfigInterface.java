@@ -1,7 +1,6 @@
 package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
@@ -10,7 +9,6 @@ import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.TakeValueFromSubconfig;
 import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "1fichier.com", type = Type.HOSTER)
@@ -18,8 +16,16 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     public static final OneFichierConfigInterface.OneFichierConfigInterfaceTranslation TRANSLATION = new OneFichierConfigInterfaceTranslation();
 
     public static class OneFichierConfigInterfaceTranslation {
-        public String getPreferReconnectEnabled_label() {
-            return "Free download and IP related download limits: Prefer reconnect?";
+        public String getFreeDownloadWaitBetweenDownloadsLimitMode_label() {
+            return "Free download: What to do on error 'You must wait between downloads', 'You already downloading a file' or similar?";
+        }
+
+        public String getNoFreeSlotsMode_label() {
+            return "Free download: What to do on error 'download is temporarily limited due to high demand', 'no free slots' or similar?";
+        }
+
+        public String getNoFreeSlotsWaitMinutes_label() {
+            return "Free download: Wait time (minutes) for errors related to 'download is temporarily limited due to high demand' or 'no free slots'?";
         }
 
         public String getSSLMode_label() {
@@ -47,13 +53,77 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
         }
     }
 
-    @AboutConfig
-    @DefaultBooleanValue(false)
-    @TakeValueFromSubconfig("PREFER_RECONNECT")
-    @Order(10)
-    boolean isPreferReconnectEnabled();
+    public static enum FreeDownloadWaitBetweenDownloadsLimitMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto: Put wait status on all 1fichier links";
+            }
+        },
+        GLOBAL_RECONNECT {
+            @Override
+            public String getLabel() {
+                return "Put wait status on all 1fichier links and trigger reconnect";
+            }
+        },
+        GLOBAL_WAIT {
+            @Override
+            public String getLabel() {
+                return "Put wait status on all 1fichier links";
+            }
+        };
+    }
 
-    void setPreferReconnectEnabled(boolean b);
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @DescriptionForConfigEntry("Free download: What to do on error 'You must wait between downloads', 'You already downloading a file' or similar?")
+    @Order(10)
+    FreeDownloadWaitBetweenDownloadsLimitMode getFreeDownloadWaitBetweenDownloadsLimitMode();
+
+    void setFreeDownloadWaitBetweenDownloadsLimitMode(final FreeDownloadWaitBetweenDownloadsLimitMode mode);
+
+    public static enum FreeDownloadNoFreeSlotsMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto: Put wait status on all 1fichier links";
+            }
+        },
+        GLOBAL_RECONNECT {
+            @Override
+            public String getLabel() {
+                return "Put wait status on all 1fichier links and trigger reconnect";
+            }
+        },
+        GLOBAL_WAIT {
+            @Override
+            public String getLabel() {
+                return "Put wait status on all 1fichier links";
+            }
+        },
+        PER_FILE {
+            @Override
+            public String getLabel() {
+                return "Put wait status on each link where this error happens";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @DescriptionForConfigEntry("Free download: What to do on error 'download is temporarily limited due to high demand', 'no free slots' or similar?")
+    @Order(11)
+    FreeDownloadNoFreeSlotsMode getNoFreeSlotsMode();
+
+    void setNoFreeSlotsMode(final FreeDownloadNoFreeSlotsMode mode);
+
+    @AboutConfig
+    @DefaultIntValue(15)
+    @Order(12)
+    @SpinnerValidator(min = 1, max = 600, step = 1)
+    int getNoFreeSlotsWaitMinutes();
+
+    void setNoFreeSlotsWaitMinutes(int num);
 
     public static enum SSLMode implements LabelInterface {
         AUTO {
@@ -127,7 +197,7 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     @SpinnerValidator(min = 0, max = 20, step = 1)
     int getMaxPremiumChunks();
 
-    void setMaxPremiumChunks(int b);
+    void setMaxPremiumChunks(int num);
 
     @AboutConfig
     @SpinnerValidator(min = 2500, max = 30000, step = 500)

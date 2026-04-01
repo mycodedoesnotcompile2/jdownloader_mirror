@@ -122,11 +122,10 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
                  */
                 @Override
                 public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                    Component comp = org.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                    final Component comp = org.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                     if (comp instanceof TextComponent) {
                         ((TextComponent) comp).setText(elementToString(value));
-                    }
-                    if (comp instanceof JLabel) {
+                    } else if (comp instanceof JLabel) {
                         ((JLabel) comp).setText(elementToString(value));
                         ((JLabel) comp).setIcon(elementToIcon(value));
                     }

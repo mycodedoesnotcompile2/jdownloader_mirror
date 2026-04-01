@@ -224,7 +224,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
     private int[]                                allowedResponseCodes = new int[0];
     protected final CopyOnWriteArrayList<String> connectExceptions    = new CopyOnWriteArrayList<String>();
     protected volatile KEEPALIVE                 keepAlive            = KEEPALIVE.DISABLED;
-    protected volatile InetAddress               remoteIPs[]          = null;
     protected TrustProviderInterface             sslTrustProvider     = null;
     protected KeyManager[]                       sslKeyManagers       = null;
     protected TrustResult                        trustResult          = null;
@@ -585,7 +584,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                             continue;
                         }
                     } else {
-                        if ((socketStream.sameHost(host) || (dnsLookup && socketStream.sameRemoteIPs(getRemoteIPs(host, true))))) {
+                        if ((socketStream.sameHost(host) || (dnsLookup && socketStream.sameRemoteIPs(getRemoteIPs(DNSResolver.REQUESTOR.HOST, getIPVersion(), host, true))))) {
                             socketPoolIterator.remove();
                             if (checkSocketChannel(socket)) {
                                 return socketStream;
@@ -842,33 +841,35 @@ public class HTTPConnectionImpl implements HTTPConnection {
 
     @Override
     public DNSResolver getDNSResolver() {
+        final DNSResolver dnsResolver = this.dnsResolver;
+        if (dnsResolver == null) {
+            return DNSResolver.DEFAULT;
+        }
         return this.dnsResolver;
     }
 
-    protected InetAddress[] resolvHostIP(final String host) throws IOException {
-        if (this.dnsResolver != null) {
-            final InetAddress[] resolved = this.dnsResolver.resolveDomain(host);
-            if (resolved == null || resolved.length == 0) {
-                throw new UnknownHostException("DNSResolver returned no address for:" + host);
-            }
-            return resolved;
+    protected InetAddress[] resolveDomain(DNSResolver.REQUESTOR requestor, IPVERSION ipVersion, final String host) throws IOException {
+        final DNSResolver dnsResolver = getDNSResolver();
+        final InetAddress[] ret = dnsResolver.resolveDomain(requestor, ipVersion, host);
+        if (ret == null || ret.length == 0) {
+            throw new UnknownHostException("DNSResolver returned no address for:" + host);
         }
-        return HTTPConnectionUtils.resolvHostIP(host, getIPVersion());
+        return ret;
     }
 
-    protected InetAddress[] getRemoteIPs(final String hostName, final boolean resolve) throws IOException {
+    @Deprecated
+    protected volatile InetAddress remoteIPs[] = null;
+
+    @Deprecated
+    protected InetAddress[] getRemoteIPs(DNSResolver.REQUESTOR requestor, IPVERSION ipVersion, final String hostName, final boolean resolve) throws IOException {
         if (this.remoteIPs == null && resolve) {
-            this.remoteIPs = this.resolvHostIP(hostName);
+            remoteIPs = resolveDomain(requestor, ipVersion, hostName);
         }
         if (resolve && (remoteIPs == null || remoteIPs.length == 0)) {
             throw new UnknownHostException("Could not resolve(" + getIPVersion() + "):" + hostName);
         } else {
             return remoteIPs;
         }
-    }
-
-    protected void setRemoteIPs(InetAddress[] remoteIPs) {
-        this.remoteIPs = remoteIPs;
     }
 
     protected static HashMap<String, SSLSocketStreamOptions>             SSL_SOCKETSTREAM_OPTIONS          = new HashMap<String, SSLSocketStreamOptions>();
@@ -997,7 +998,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
             if (this.connectionSocket == null) {
                 /* try all different ip's until one is valid and connectable */
                 IOException ee = null;
-                List<InetAddress> remoteIPs = new ArrayList<InetAddress>(Arrays.asList(getRemoteIPs(getHostname(), true)));
+                List<InetAddress> remoteIPs = new ArrayList<InetAddress>(Arrays.asList(getRemoteIPs(DNSResolver.REQUESTOR.HOST, getIPVersion(), getHostname(), true)));
                 while (remoteIPs.size() > 0) {
                     final InetAddress host = remoteIPs.remove(0);
                     this.resetConnection();

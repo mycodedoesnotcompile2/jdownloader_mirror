@@ -35,10 +35,12 @@ package org.appwork.utils.net.httpconnection;
 
 import java.io.IOException;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
 
+import org.appwork.utils.net.httpconnection.DNSResolver.REQUESTOR;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.socketconnection.Socks4SocketConnection;
 import org.appwork.utils.net.socketconnection.SocksSocketConnection;
@@ -81,6 +83,21 @@ public class Socks4HTTPConnectionImpl extends AbstractSocksHTTPConnection {
 
     @Override
     protected Socks4SocketConnection buildSocksSocketConnection() {
-        return new Socks4SocketConnection(this.getProxy(), getDestType());
+        return new Socks4SocketConnection(this.getProxy(), getDestType()) {
+            @Override
+            protected InetAddress[] resolveDomain(REQUESTOR requestor, IPVERSION ipVersion, HTTPProxy proxy) throws IOException {
+                return Socks4HTTPConnectionImpl.this.resolveDomain(requestor, ipVersion, proxy.getHost());
+            }
+
+            @Override
+            public IPVERSION getIPVersion() {
+                return Socks4HTTPConnectionImpl.this.getIPVersion();
+            }
+
+            @Override
+            public DNSResolver getDNSResolver() {
+                return Socks4HTTPConnectionImpl.this.getDNSResolver();
+            }
+        };
     }
 }

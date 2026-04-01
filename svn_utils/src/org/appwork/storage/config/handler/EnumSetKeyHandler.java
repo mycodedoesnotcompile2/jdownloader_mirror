@@ -37,10 +37,13 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.utils.DebugMode;
 
 /**
@@ -81,8 +84,15 @@ public class EnumSetKeyHandler extends ObjectKeyHandler {
                 }
             }
             this.setDefaultValue(new CopyOnWriteArraySet<Enum<?>>(ret));
-        } else {
-            this.setDefaultValue(null);
+            return;
         }
+        if (getAnnotation(DefaultOnNull.class) != null) {
+            final ParameterizedType type = (ParameterizedType) getRawType();
+            final Class enumClass = (Class) type.getActualTypeArguments()[0];
+            final Set<Object> defaultValue = new CopyOnWriteArraySet<Object>(Arrays.asList(enumClass.getEnumConstants()));
+            this.setDefaultValue(defaultValue);
+            return;
+        }
+        this.setDefaultValue(null);
     }
 };

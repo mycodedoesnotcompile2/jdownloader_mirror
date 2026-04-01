@@ -21,18 +21,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
@@ -42,7 +30,20 @@ import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
+@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 2, names = {}, urls = {})
 public class AudioMackComHoster extends PluginForHost {
     public AudioMackComHoster(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,6 +104,7 @@ public class AudioMackComHoster extends PluginForHost {
     public static final String  PROPERTY_ALBUM_ID                = "album_id";
     public static final String  PROPERTY_PLAYLIST_POSITION       = "playlist_position";
     public static final String  PROPERTY_PLAYLIST_NUMBEROF_ITEMS = "playlist_numberof_items";
+    public static final String  PROPERTY_PREMIUM_ONLY            = "premium_only";
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -116,11 +118,13 @@ public class AudioMackComHoster extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getLinkID(link) + extDefault;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         results = null;
-        if (!link.isNameSet()) {
-            link.setName(this.getLinkID(link) + extDefault);
-        }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -129,7 +133,7 @@ public class AudioMackComHoster extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String ogurl = br.getRegex("\"og:url\" content=\"([^\"]+)\"").getMatch(0);
-        final String[] match = new Regex(ogurl, "(?i).*/([^/]+)/(song)/([^/]+)").getRow(0);
+        final String[] match = new Regex(ogurl, ".*/([^/]+)/(song)/([^/]+)").getRow(0);
         if (match == null || match.length != 3) {
             /* Unsupported URL and/or plugin failure */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -144,7 +148,7 @@ public class AudioMackComHoster extends PluginForHost {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         results = (Map<String, Object>) entries.get("results");
         final String status = (String) results.get("status");
-        if (status.equalsIgnoreCase("suspended")) {
+        if ("suspended".equalsIgnoreCase(status)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         parseSingleSongData(link, results);
@@ -184,6 +188,12 @@ public class AudioMackComHoster extends PluginForHost {
                 link.setDownloadSize(256 * 1024l / 8 * durationSeconds);
             }
         }
+        final Object premium_user_only = track.get("premium_user_only");
+        if (premium_user_only instanceof String && premium_user_only.toString().equalsIgnoreCase("yes")) {
+            link.setProperty(PROPERTY_PREMIUM_ONLY, true);
+        } else {
+            link.removeProperty(PROPERTY_PREMIUM_ONLY);
+        }
     }
 
     @Override
@@ -194,6 +204,9 @@ public class AudioMackComHoster extends PluginForHost {
             dllink = (String) results.get("streaming_url");
         }
         if (StringUtils.isEmpty(dllink)) {
+            if (link.hasProperty(PROPERTY_PREMIUM_ONLY)) {
+                throw new AccountRequiredException("This song is only available for Audiomack+ subscribers.");
+            }
             /* 2022-10-13 */
             final boolean pluginBroken = false;
             if (pluginBroken) {
@@ -292,21 +305,7 @@ public class AudioMackComHoster extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        /* No not allow multihost plugins to handle items from this plugin. */
-        return link.getHost().equalsIgnoreCase(plugin.getHost());
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

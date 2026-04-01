@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51935 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaupCc extends PluginForHost {
     public MegaupCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -169,7 +169,10 @@ public class MegaupCc extends PluginForHost {
             if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Plugin is still under development");
             }
-            // TODO: Add decryption of download_token value
+            /**
+             * TODO: Add decryption of download_token value though as long as Cloudflare is blocking on first download step, it doesn't make
+             * any sense to put any time into this.
+             */
             br.getPage("https://m3g.megaup.cc/dl/" + download_token + "/check");
             String dllink = "https://m3g.megaup.cc/dl/" + download_token + "/download";
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));

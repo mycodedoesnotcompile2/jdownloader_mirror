@@ -2,7 +2,6 @@ package jd.http;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.URL;
 
@@ -88,12 +87,6 @@ public class URLConnectionAdapterHTTPProxyImpl extends HTTPProxyHTTPConnectionIm
     @Override
     public void setRequest(final Request request) {
         this.request = request;
-        if (request != null) {
-            final InetAddress customInetAddress = request.getCustomInetAddress();
-            if (customInetAddress != null) {
-                this.setCustomEndPointInetAddress(customInetAddress);
-            }
-        }
     }
 
     @Override

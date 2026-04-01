@@ -33,14 +33,29 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+
 /**
- * Resolver for DNS lookups. Used by {@link HTTPConnection} (and {@link org.appwork.utils.net.httpclient.HttpClient}) to resolve host
- * names to IP addresses. Allows custom resolution (e.g. map a host to another host's IP for virtual-host-on-same-server scenarios).
+ * Resolver for DNS lookups. Used by {@link HTTPConnection} (and {@link org.appwork.utils.net.httpclient.HttpClient}) to resolve host names
+ * to IP addresses. Allows custom resolution (e.g. map a host to another host's IP for virtual-host-on-same-server scenarios).
  */
 public interface DNSResolver {
+    public static final DNSResolver DEFAULT = new DNSResolver() {
+                                                @Override
+                                                public InetAddress[] resolveDomain(REQUESTOR requestor, IPVERSION ipVersion, String domain) throws UnknownHostException {
+                                                    return HTTPConnectionUtils.resolvHostIP(domain, ipVersion);
+                                                }
+                                            };
+
+    public static enum REQUESTOR {
+        HOST,
+        PROXY
+    }
+
     /**
      * Resolve a domain/host name to one or more IP addresses.
      *
@@ -50,5 +65,5 @@ public interface DNSResolver {
      * @throws UnknownHostException
      *             if the domain cannot be resolved
      */
-    InetAddress[] resolveDomain(String domain) throws UnknownHostException;
+    InetAddress[] resolveDomain(REQUESTOR requestor, IPVERSION ipVersion, String domain) throws IOException;
 }
