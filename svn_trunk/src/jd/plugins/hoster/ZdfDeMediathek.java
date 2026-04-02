@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
 
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
@@ -47,14 +48,15 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
 import jd.PluginWrapper;
+import jd.http.BearerAuthentication;
 import jd.http.Browser;
-import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -64,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 52603 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String  PROPERTY_hlsBandwidth       = "hlsBandwidth";
     public static final String  PROPERTY_streamingType      = "streamingType";
@@ -82,6 +84,11 @@ public class ZdfDeMediathek extends PluginForHost {
     public ZdfDeMediathek(PluginWrapper wrapper) {
         super(wrapper);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /**
+             * 2026-04-01: This had been implemented to grant access to age restricted content. <br>
+             * However, after implementing it I realized that age restricted content can also be accessed at any time without being logged
+             * in so I'll leave this disabled for stable for now.
+             */
             this.enablePremium("https://www.zdf.de/mein-zdf/registrierung");
         }
     }
@@ -442,26 +449,34 @@ public class ZdfDeMediathek extends PluginForHost {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final String storedToken = account.getStringProperty(PROPERTY_ACCOUNT_LOGINTOKEN);
-            final Cookies cookies = account.loadCookies("");
-            // TODO: Check if cookie login implementation makes sense
-            // final Cookies userCookies = account.loadUserCookies();
+            final AccountInfo ai = new AccountInfo();
+            ai.setStatus("Account mit Altersverifizierung");
+            /* There are no paid zdfmediathek accounts */
+            account.setType(AccountType.FREE);
+            /*
+             * Hardcoded API token also used in other open source projects e.g. mediathekview:
+             * https://github.com/mediathekview/MServer/issues/1039
+             */
+            br.getHeaders().put("api-auth", "Bearer aa3noh4ohz9eeboo8shiesheec9ciequ9Quah7el");
             if (storedToken != null) {
                 logger.info("Attempting token login");
-                // TODO: Add functionality
-                br.setCookies(cookies);
+                // br.setCookies(cookies);
+                br.addAuthentication(new BearerAuthentication(getHost(), storedToken, null));
+                try {
+                    getAgeVerificationInfo(account);
+                    logger.info("Token login successful");
+                    return ai;
+                } catch (final PluginException pe) {
+                    logger.info("Token login failed");
+                }
             }
             logger.info("Performing full login");
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("grant_type", "password");
             query.appendEncoded("password", account.getPass());
             query.appendEncoded("username", account.getUser());
-            /*
-             * Hardcoded API token also used in other open source projects e.g. mediathekview:
-             * https://github.com/mediathekview/MServer/issues/1039
-             */
-            br.getHeaders().put("api-auth", "Bearer aa3noh4ohz9eeboo8shiesheec9ciequ9Quah7el");
             br.postPage(API_BASE + "/identity/login", query);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> entries = this.handleAPIErrors(account, null);
             final String token = (String) entries.get("token");
             if (br.getHttpConnection().getResponseCode() != 200 || StringUtils.isEmpty(token)) {
                 throw new AccountInvalidException(entries.get("message").toString());
@@ -471,23 +486,50 @@ public class ZdfDeMediathek extends PluginForHost {
             }
             account.setProperty(PROPERTY_ACCOUNT_LOGINTOKEN, token);
             /* Check if account is age verified */
-            br.getPage(API_BASE + "/identity/fsk/verification");
-            final Map<String, Object> verification = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            br.addAuthentication(new BearerAuthentication(getHost(), token, null));
+            final Map<String, Object> verification = getAgeVerificationInfo(account);
             if (!Boolean.TRUE.equals(verification.get("verified"))) {
                 throw new AccountInvalidException("Account ist gültig, jedoch nicht altersverifiziert und bringt somit keine Vorteile in JDownloader");
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
+            return ai;
         }
-        /* There are no paid zdfmediathek accounts */
-        account.setType(AccountType.FREE);
-        final AccountInfo ai = new AccountInfo();
-        ai.setStatus("Account mit Altersverifizierung");
-        return ai;
+    }
+
+    private Map<String, Object> getAgeVerificationInfo(final Account account) throws Exception {
+        br.getPage(API_BASE + "/identity/fsk/verification");
+        final Map<String, Object> verification = this.handleAPIErrors(account, null);
+        return verification;
     }
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         this.handleFree(link);
+    }
+
+    private Map<String, Object> handleAPIErrors(final Account account, final DownloadLink link) throws Exception {
+        if (link != null) {
+            logger.info("!!DEVELOPER!! this function was only made to check login related errors -> Implement proper DownloadLink support and remove this logger!");
+        }
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long wait = 1 * 60 * 1000;
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait);
+            } else {
+                throw new AccountUnavailableException(msg, wait);
+            }
+        }
+        if (br.getHttpConnection().getResponseCode() == 200) {
+            /* No error */
+            return entries;
+        }
+        final String msg = (String) entries.get("msg");
+        throw new AccountInvalidException(msg);
     }
 
     @Override

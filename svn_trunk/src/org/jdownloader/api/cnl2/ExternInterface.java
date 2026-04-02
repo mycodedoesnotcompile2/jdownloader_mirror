@@ -3,19 +3,18 @@ package org.jdownloader.api.cnl2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.AllowAllSocketAddressValidator;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
-import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.HttpServer;
+import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
 import org.jdownloader.api.DeprecatedAPIHttpServerController;
@@ -108,5 +107,6 @@ public class ExternInterface {
         // NEW: Set to null via ResponseSecurityHeaders API - not critical for ExternInterface
         securityHeaders.setReferrerPolicy(null);
         server.setResponseSecurityHeaders(securityHeaders);
+        server.setSocketAddressValidator(new AllowAllSocketAddressValidator());
     }
 }

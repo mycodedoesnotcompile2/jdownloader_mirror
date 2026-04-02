@@ -77,7 +77,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52573 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52604 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -425,18 +425,19 @@ public class XHamsterCom extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         dllink = null;
         final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
-        final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
+        final String contenturl = getCorrectedURL(link.getPluginPatternMatcher());
         final String extDefault = ".mp4";
         if (!link.isNameSet()) {
-            link.setName(getFallbackFileTitle(contentURL) + extDefault);
+            link.setName(getFallbackFileTitle(contenturl) + extDefault);
         }
         final String fidBefore = getFID(link);
         if (account != null) {
-            login(account, contentURL, true);
+            login(account, contenturl, true);
         } else {
-            br.getPage(contentURL);
+            br.getPage(contenturl);
         }
-        if (this.canHandle(br.getURL())) {
+        final boolean isPremiumURL = isPremiumURL(contenturl);
+        if (!isPremiumURL && this.canHandle(br.getURL())) {
             /* Check if video_id has changed, eg reuploaded to different version and old video redirects to new one */
             final String fidAfter = getFID(br.getURL());
             if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
@@ -499,7 +500,7 @@ public class XHamsterCom extends PluginForHost {
             datePublished = br.getRegex("data-tooltip\\s*=\\s*\"(\\d{4}-\\d{2}-\\d{2}) \\d{2}:\\d{2}:\\d{2} UTC\"").getMatch(0);
         }
         String filename = null;
-        if (this.isPremiumURL(contentURL)) {
+        if (isPremiumURL) {
             String title = getTitle(link, br);
             if (this.isPremiumAccount(account)) {
                 /* Premium users can download the full videos in different qualities. */
@@ -530,11 +531,11 @@ public class XHamsterCom extends PluginForHost {
         } else {
             /* Free content */
             // embeded correction --> Usually not needed
-            if (contentURL.matches("(?i).+/xembed\\.php.*")) {
+            if (contenturl.matches("(?i).+/xembed\\.php.*")) {
                 logger.info("Trying to change embed URL --> Real URL");
                 String realpage = br.getRegex("main_url=(https?[^\\&]+)").getMatch(0);
-                if (realpage != null && !StringUtils.equals(realpage, contentURL)) {
-                    logger.info("Successfully changed: " + contentURL + " ----> " + realpage);
+                if (realpage != null && !StringUtils.equals(realpage, contenturl)) {
+                    logger.info("Successfully changed: " + contenturl + " ----> " + realpage);
                     link.setUrlDownload(Encoding.htmlDecode(realpage));
                     br.getPage(realpage);
                 } else {
@@ -1467,7 +1468,7 @@ public class XHamsterCom extends PluginForHost {
         final String fidBefore = getFID(link);
         requestFileInformation(link, account);
         final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
-        final boolean isPremiumURL = this.isPremiumURL(contentURL);
+        final boolean isPremiumURL = isPremiumURL(contentURL);
         if (!isPremiumURL && this.canHandle(br.getURL())) {
             /* Check if video_id has changed, eg reuploaded to different version and old video redirects to new one */
             final String fidAfter = getFID(br.getURL());

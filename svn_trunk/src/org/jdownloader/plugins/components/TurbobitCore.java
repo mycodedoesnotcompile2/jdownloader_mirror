@@ -15,29 +15,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.ConfigEntry;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.plugins.download.HashInfo;
-
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -62,7 +39,30 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52536 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.ConfigEntry;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.download.HashInfo;
+
+@HostPlugin(revision = "$Revision: 52604 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -72,7 +72,6 @@ public abstract class TurbobitCore extends PluginForHost {
     private static final boolean           prefer_single_linkcheck_via_mass_linkchecker  = true;
     private static final String            TYPE_premiumRedirectLinks                     = "(?i)(?:https?://[^/]+/)?/?download/redirect/[A-Za-z0-9]+/([a-z0-9]+)";
     private static Map<String, AtomicLong> hostLastPremiumCaptchaProcessedTimestampMap   = new HashMap<String, AtomicLong>();
-
     /* Properties */
 
     /**
@@ -195,9 +194,9 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
-         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
-         * short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br>
+         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
+         * slow down the linkcheck and cause more http requests in a short amount of time!
          */
         try {
             final boolean fastLinkcheck = isFastLinkcheckEnabled();
@@ -277,9 +276,9 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
-         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
-         * short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br>
+         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
+         * slow down the linkcheck and cause more http requests in a short amount of time!
          */
         try {
             final boolean fastLinkcheck = isFastLinkcheckEnabled();
@@ -461,13 +460,26 @@ public abstract class TurbobitCore extends PluginForHost {
         return br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(<div class=\"code-404\">404</div>|Файл не найден\\. Возможно он был удален\\.<br|(?:Document|File|Page)\\s*(was)?\\s*not found|It could possibly be deleted\\.)");
     }
 
-    protected AccountType parseAccountInfo(final Account account, AccountInfo ai, Map<String, Object> entries) throws Exception {
+    protected AccountType parseAccountInfo(final Account account, AccountInfo ai, Map<String, Object> userinfo) throws Exception {
         if (ai == null) {
             ai = new AccountInfo();
+        }
+        final Map<String, Object> entries;
+        if (userinfo != null && userinfo.get("premium") != null) {
+            /* Use result that has already been parsed */
+            entries = userinfo;
+        } else if (userinfo != null && StringUtils.endsWithCaseInsensitive(br.getURL(), "/api/user/info")) {
+            /* Use result that has already been parsed */
+            entries = userinfo;
+        } else {
+            entries = getUserInformationWebsiteV2(br.cloneBrowser(), account);
         }
         synchronized (account) {
             try {
                 final Map<String, Object> entries_premium = (Map<String, Object>) entries.get("premium");
+                if (entries_premium == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 final String status = entries_premium.get("status").toString();
                 if (status.equalsIgnoreCase("banned")) {
                     account.setType(AccountType.PREMIUM);
@@ -519,14 +531,7 @@ public abstract class TurbobitCore extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         ai.setUnlimitedTraffic();
         if (allowWebsiteV2Handling()) {
-            final Map<String, Object> entries;
-            if (userinfo != null && StringUtils.endsWithCaseInsensitive(br.getURL(), "/api/user/info")) {
-                /* Use result that has already been parsed */
-                entries = userinfo;
-            } else {
-                entries = getUserInformationWebsiteV2(br, account);
-            }
-            parseAccountInfo(account, ai, entries);
+            parseAccountInfo(account, ai, userinfo);
         } else {
             // >Turbo access till 27.09.2015</span>
             String expire = br.getRegex(">\\s*Turbo access till\\s*(.*?)\\s*</span>").getMatch(0);
@@ -618,13 +623,13 @@ public abstract class TurbobitCore extends PluginForHost {
         if (StringUtils.containsIgnoreCase(br.getURL(), "login=true")) {
             logger.info("Not logged in because: URL contains 'login=true'");
             return null;
-        }
-        if (!br.getRequest().getHtmlCode().startsWith("{")) {
+        } else if (!br.getRequest().getHtmlCode().startsWith("{")) {
             logger.info("Not logged in because: Got html instead of json");
             return null;
+        } else {
+            final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
+            return entries;
         }
-        final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
-        return entries;
     }
 
     protected static long getBlockingEndTime(final Browser br, final Account account) {
@@ -764,7 +769,8 @@ public abstract class TurbobitCore extends PluginForHost {
     }
 
     /**
-     * Fills in captchaForm. </br> DOES NOT SEND CAPTCHA-FORM!!
+     * Fills in captchaForm. </br>
+     * DOES NOT SEND CAPTCHA-FORM!!
      */
     protected boolean processCaptchaFormWebsiteV1(final DownloadLink link, final Account account, final Form captchaform, final Browser br, final boolean optionalCaptcha) throws PluginException, InterruptedException {
         if (AbstractHCaptcha.containsHCaptcha(br)) {
@@ -878,7 +884,6 @@ public abstract class TurbobitCore extends PluginForHost {
                                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                             } else {
                                 return new CloudflareTurnstileChallenge(plugin, siteKey) {
-
                                     @Override
                                     public String getSiteUrl() {
                                         return siteUrl;
@@ -1378,22 +1383,65 @@ public abstract class TurbobitCore extends PluginForHost {
                 throw new AccountUnavailableException(errortext, waitmillis);
             }
         }
-        final String error_name = (String) entries.get("error_name");
+        final String error_key = (String) entries.get("error_name");
         final String message = (String) entries.get("message");
-        if (error_name == null && message == null) {
+        if (error_key == null && message == null) {
             /* No error */
             return entries;
         }
-        if (error_name != null) {
-            if (error_name.equalsIgnoreCase("file_is_not_available_for_download")) {
+        final Object dataO = entries.get("data");
+        String localized_error_msg = null;
+        if (dataO instanceof Map) {
+            /* Example: {"error_name":"validation_failed","data":{"password":["The password may not be greater than 24 characters."]}} */
+            final Map<String, Object> data = (Map<String, Object>) dataO;
+            if (data.size() > 1) {
+                logger.info("Unexpected: data has multiple keys: " + data.keySet());
+            }
+            for (final Map.Entry<String, Object> entry : data.entrySet()) {
+                if (entry.getValue() instanceof List) {
+                    final List<String> messages = (List<String>) entry.getValue();
+                    if (messages.size() > 1) {
+                        logger.info("Unexpected: key '" + entry.getKey() + "' has multiple messages: " + messages);
+                    }
+                    if (!messages.isEmpty()) {
+                        if (localized_error_msg == null) {
+                            localized_error_msg = messages.get(0);
+                        }
+                    }
+                }
+            }
+        }
+        if (StringUtils.isEmpty(localized_error_msg) && error_key != null) {
+            /* Fallback to static list of localized error messages */
+            /* e.g. {"error_name":"password_incorrect","data":{"needCaptcha":true}} */
+            /* {"error_name":"invalid_captcha","data":[]} */
+            final Map<String, String> error_key_to_msg = new HashMap<String, String>();
+            error_key_to_msg.put("password_incorrect", "Password incorrect");
+            error_key_to_msg.put("invalid_captcha", "Invalid captcha");
+            // error_key_to_msg.put("file_is_not_available_for_download", "File has been deleted");
+            localized_error_msg = error_key_to_msg.get(error_key);
+        }
+        if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
+            if (localized_error_msg != null) {
+                throw new AccountInvalidException(localized_error_msg);
+            } else {
+                throw new AccountInvalidException(error_key);
+            }
+        }
+        if (error_key != null) {
+            /* TODO: Move captcha check up */
+            if (error_key.equalsIgnoreCase("invalid_captcha")) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            }
+            if (error_key.equalsIgnoreCase("file_is_not_available_for_download")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             // TODO: Add translation and support for more errors
             if (link == null) {
                 /* Account related error e.g. password_incorrect, invalid_captcha */
-                throw new AccountInvalidException(error_name);
+                throw new AccountInvalidException(error_key);
             } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, error_name);
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_key);
             }
         } else {
             if (message.equalsIgnoreCase("File size is greater than allowed")) {
@@ -1458,7 +1506,8 @@ public abstract class TurbobitCore extends PluginForHost {
             /* lets set a new User-Agent */
             logger.info("Performing full login");
             prepBrowserWebsiteV1(br);
-            br.getPage("https://" + curr_domain + "/login");
+            final String loginpage = "https://" + curr_domain + "/login";
+            br.getPage(loginpage);
             boolean requiredLoginCaptcha = false;
             Form loginform = findAndPrepareLoginForm(br, account);
             if (loginform != null) {
@@ -1535,11 +1584,10 @@ public abstract class TurbobitCore extends PluginForHost {
                         if (redirect != null) {
                             br.getPage(redirect);
                         }
-                        if (isLoggedIN(br)) {
-                            return null;
-                        } else {
+                        if (!isLoggedIN(br)) {
                             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                         }
+                        return null;
                     }
                     final String message = (String) response.get("message");
                     throw new AccountInvalidException(message);
@@ -1554,14 +1602,62 @@ public abstract class TurbobitCore extends PluginForHost {
                 }
             } else if (allowWebsiteV2Handling()) {
                 /* Assume that we are on website version 2.0 (aka new.turbobit.net/login) */
-                final Map<String, Object> postdata = new HashMap<String, Object>();
-                postdata.put("email", account.getUser());
-                postdata.put("password", account.getPass());// TODO: hitfile only allows 15 chars
-                postdata.put("captcha", true);
-                postdata.put("g-recaptcha-response", "");
-                postdata.put("g-captcha-index", 4);
-                br.addAllowedResponseCodes(422);
-                br.postPageRaw(getWebsiteV2Base() + "/api/auth/login", JSonStorage.serializeToJson(postdata));
+                Number captchaIndex = 0;
+                String captchaResponse = "";
+                boolean requestedCaptcha = false;
+                for (int i = 0; i <= 2; i++) {
+                    final Map<String, Object> postdata = new HashMap<String, Object>();
+                    postdata.put("email", account.getUser());
+                    postdata.put("password", account.getPass());// TODO: hitfile only allows 15 chars
+                    postdata.put("captcha", true);
+                    postdata.put("captchaResponse", captchaResponse);
+                    postdata.put("captchaIndex", captchaIndex);
+                    br.addAllowedResponseCodes(422);
+                    br.postPageRaw(getWebsiteV2Base() + "/api/auth/login", JSonStorage.serializeToJson(postdata));
+                    if (!requestedCaptcha && DebugMode.TRUE_IN_IDE_ELSE_FALSE && br.containsHTML("\"needCaptcha\":true|\"error_name\":\"invalid_captcha\"")) {
+                        br.getPage(getWebsiteV2Base() + "/api/captcha");
+                        final Map<String, Object> captchainfo = this.checkErrorsWebsiteV2(br, null, account);
+                        final String captchatype = captchainfo.get("driver").toString();
+                        if (!captchatype.equalsIgnoreCase("turnstile")) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        final String captchaKey = captchainfo.get("publicKey").toString();
+                        // TODO: Fix this and enable it in Stable
+                        captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, captchaKey) {
+                            protected org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge createChallenge() throws PluginException {
+                                final PluginForHost plugin = getPlugin();
+                                final String siteKey = getSiteKey();
+                                if (plugin == null) {
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                                } else if (siteKey == null) {
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                                } else {
+                                    return new CloudflareTurnstileChallenge(plugin, siteKey) {
+                                        @Override
+                                        public String getSiteUrl() {
+                                            return loginpage;
+                                        }
+
+                                        @Override
+                                        public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
+                                            return null;
+                                        }
+
+                                        @Override
+                                        public String getHTML(HttpRequest request, String id) {
+                                            return null;
+                                        }
+                                    };
+                                }
+                            };
+                        }.getToken();
+                        captchaIndex = (Number) captchainfo.get("index");
+                        requestedCaptcha = true;
+                        continue;
+                    }
+                    /* No captcha required or we already processed it once and still failed. */
+                    break;
+                }
                 final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
                 return entries;
             }

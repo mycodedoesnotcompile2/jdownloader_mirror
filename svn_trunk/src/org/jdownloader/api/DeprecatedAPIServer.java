@@ -42,6 +42,7 @@ import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.AllowAllSocketAddressValidator;
 import org.appwork.utils.net.httpserver.ConnectionTimeouts;
 import org.appwork.utils.net.httpserver.ContentSecurityPolicy;
 import org.appwork.utils.net.httpserver.CorsHandler;
@@ -252,6 +253,7 @@ public class DeprecatedAPIServer extends HttpServer {
         setHeaderValidationRules(header);
         ConnectionTimeouts connectionTimeouts = new ConnectionTimeouts();
         setConnectionTimeouts(connectionTimeouts);
+        setSocketAddressValidator(new AllowAllSocketAddressValidator());
     }
 
     @Override

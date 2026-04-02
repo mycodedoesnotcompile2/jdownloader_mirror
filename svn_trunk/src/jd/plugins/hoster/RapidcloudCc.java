@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47819 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52604 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidcloudCc extends XFileSharingProBasic {
     public RapidcloudCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +104,18 @@ public class RapidcloudCc extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        if (br.containsHTML(">\\s*You're attempting to download a|Please select one of options below in order to purchase an access to this file for just")) {
+            final String price = br.getRegex("this file for just\\s*<strong>(\\d+\\.\\d{2} USD)</strong>").getMatch(0);
+            String msg = "This file is available for direct purchases only.";
+            if (price != null) {
+                msg += "Price: " + price;
+            }
+            return msg;
+        }
+        return super.getPremiumOnlyErrorMessage(br);
     }
 }

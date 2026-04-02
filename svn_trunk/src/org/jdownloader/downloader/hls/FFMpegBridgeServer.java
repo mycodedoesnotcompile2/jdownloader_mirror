@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.AllowAllSocketAddressValidator;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HeaderValidationRules;
 import org.appwork.utils.net.httpserver.HttpServer;
@@ -66,7 +67,7 @@ public class FFMpegBridgeServer extends HttpServer {
         CorsHandler corsHandler = new CorsHandler();
         corsHandler.setAllowMethods();
         corsHandler.setMaxAge(TimeUnit.MINUTES.toSeconds(30)); // 30 minutes
-        setSocketAddressValidator(null);
+        setSocketAddressValidator(new AllowAllSocketAddressValidator());
         setCorsHandler(corsHandler);
     }
 }

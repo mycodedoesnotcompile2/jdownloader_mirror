@@ -442,7 +442,7 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Runnable#run()
      */
     /**
@@ -691,6 +691,10 @@ public class HttpServer extends AbstractServerBasics implements Runnable {
      * @return the socket address validator used for IPC/single-instance trust checks; null means all sockets are allowed
      */
     public SocketAddressValidator getSocketAddressValidator() {
+        final SocketAddressValidator socketAddressValidator = this.socketAddressValidator;
+        if (socketAddressValidator == null) {
+            return new AllowAllSocketAddressValidator();
+        }
         return socketAddressValidator;
     }
 

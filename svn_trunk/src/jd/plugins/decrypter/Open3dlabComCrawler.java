@@ -22,12 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.Open3dlabComConfig;
-import org.jdownloader.plugins.components.config.Open3dlabComConfig.MirrorFallbackMode;
-import org.jdownloader.plugins.components.config.Open3dlabComConfigSmutbaSe;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -46,7 +40,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.Open3dlabCom;
 
-@DecrypterPlugin(revision = "$Revision: 49228 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.Open3dlabComConfig;
+import org.jdownloader.plugins.components.config.Open3dlabComConfig.MirrorFallbackMode;
+import org.jdownloader.plugins.components.config.Open3dlabComConfigSmutbaSe;
+
+@DecrypterPlugin(revision = "$Revision: 52599 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { Open3dlabCom.class })
 public class Open3dlabComCrawler extends PluginForDecrypt {
     public Open3dlabComCrawler(PluginWrapper wrapper) {
@@ -122,7 +121,7 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         } else {
             projectID = projectIDFromSourceurl;
         }
-        final String[] dlHTMLs = br.getRegex("<td class=\"text-wrap-word js-edit-input\"(.*?)</div>\\s*</td>\\s*</tr>").getColumn(0);
+        final String[] dlHTMLs = br.getRegex("<td class=\"text-wrap-word js-edit-input\"(.*?)</td>\\s*</tr>").getColumn(0);
         if (dlHTMLs == null || dlHTMLs.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -135,9 +134,9 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         }
         final Open3dlabComConfig cfg;
         if (this.getHost().equals("open3dlab.com")) {
-            cfg = PluginJsonConfig.get(Open3dlabComConfig.class);
+            cfg = get(Open3dlabComConfig.class);
         } else {
-            cfg = PluginJsonConfig.get(Open3dlabComConfigSmutbaSe.class);
+            cfg = get(Open3dlabComConfigSmutbaSe.class);
         }
         String[] mirrorPrioList = null;
         String userHosterMirrorListStr = cfg.getMirrorPriorityString();
@@ -148,7 +147,7 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         final MirrorFallbackMode fallbackMode = cfg.getMirrorFallbackMode();
         for (final String dlHTML : dlHTMLs) {
             /* Find all mirrors */
-            String filename = new Regex(dlHTML, "span class=\"js-edit-input__wrapper\"><strong>([^<]+)</strong>").getMatch(0);
+            String filename = new Regex(dlHTML, "span class=\"js-edit-input__wrapper\"><strong>\\s*([^<]+)\\s*</strong>").getMatch(0);
             if (filename == null) {
                 filename = new Regex(dlHTML, "(?i)You are about to download \"([^\"]+)").getMatch(0);
             }
@@ -157,7 +156,7 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
             }
             String filesizeStr = new Regex(dlHTML, "<td>(\\d+[^<]+)</td>\\s*</tr>").getMatch(0);
             if (filesizeStr == null) {
-                filesizeStr = new Regex(dlHTML, ">\\s*([0-9\\.]+\\s*(TB|GB|MB|KB))\\s*<").getMatch(0);
+                filesizeStr = new Regex(dlHTML, ">\\s*([0-9\\.]+\\s*(TB|GB|MB|KB))\\s*<?").getMatch(0);
             }
             long filesize = -1;
             if (filesizeStr != null) {

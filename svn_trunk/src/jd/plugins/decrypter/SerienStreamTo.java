@@ -30,21 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.gui.UserIO;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterException;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
@@ -55,7 +40,24 @@ import org.jdownloader.plugins.components.config.SerienStreamToConfig;
 import org.jdownloader.plugins.components.config.SerienStreamToConfig.SeasonCrawlMode;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.gui.UserIO;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterException;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 52603 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -126,7 +128,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
     }
 
-    private DownloadLink crawlSingleRedirect(final Browser br, String url) throws PluginException, InterruptedException, DecrypterException, IOException {
+    private DownloadLink crawlSingleRedirect(final Browser br, String url) throws PluginException, InterruptedException, DecrypterException, IOException, DecrypterRetryException {
         /* Enforce https */
         url = url.replaceFirst("^(?i)http://", "https://");
         br.setFollowRedirects(false);
@@ -166,7 +168,18 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
         if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (finallink == null || this.canHandle(finallink)) {
+        }
+        if (finallink == null) {
+            if (br.containsHTML(" var t = \"")) {
+                /**
+                 * 2026-04-01: Cloudflare Turnstile + Altcaptcha required (we do not support Altcaptcha) <br>
+                 * See: https://board.jdownloader.org/showthread.php?p=556817#post556817 * <br>
+                 * Screenshot: https://snipboard.io/Bk79ul.jpg/
+                 */
+                throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (this.canHandle(finallink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (Browser.getHost(finallink, true).equalsIgnoreCase(initialHost)) {
             /* E.g. redirect to mainpage */
@@ -175,7 +188,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         return createDownloadlink(finallink);
     }
 
-    private ArrayList<DownloadLink> crawlMirrors(final CryptedLink param, final String contenturl) throws PluginException, InterruptedException, DecrypterException, IOException {
+    private ArrayList<DownloadLink> crawlMirrors(final CryptedLink param, final String contenturl) throws PluginException, InterruptedException, DecrypterException, IOException, DecrypterRetryException {
         br.setFollowRedirects(true);
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {

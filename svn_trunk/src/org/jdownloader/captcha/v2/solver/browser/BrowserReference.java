@@ -12,6 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import jd.controlling.captcha.SkipRequest;
+import jd.parser.Regex;
+import jd.plugins.Plugin;
+
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -28,6 +32,7 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpserver.AllowAllSocketAddressValidator;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HttpHandlerInfo;
 import org.appwork.utils.net.httpserver.HttpServer;
@@ -53,10 +58,6 @@ import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-
-import jd.controlling.captcha.SkipRequest;
-import jd.parser.Regex;
-import jd.plugins.Plugin;
 
 public abstract class BrowserReference implements ExtendedHttpRequestHandler, HttpRequestHandler {
     private final AbstractBrowserChallenge challenge;
@@ -112,11 +113,11 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     protected final AtomicReference<HttpHandlerInfo> handlerInfo = new AtomicReference<HttpHandlerInfo>(null);
     protected final SingleReachableState             canClose    = new SingleReachableState("canClose");
     protected final static Queue                     QUEUE       = new Queue("BrowserReference") {
-                                                                     @Override
-                                                                     public void killQueue() {
-                                                                         LogController.CL().log(new Throwable("YOU CANNOT KILL ME!"));
-                                                                     }
-                                                                 };
+        @Override
+        public void killQueue() {
+            LogController.CL().log(new Throwable("YOU CANNOT KILL ME!"));
+        }
+    };
 
     public void open() throws IOException {
         if (!canClose.isReached()) {
@@ -281,7 +282,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.net.httpserver.handler.HttpRequestHandler#onGetRequest(org.appwork.utils.net.httpserver.requests.GetRequest,
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
@@ -563,5 +564,6 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
         // NEW: Set to null via ResponseSecurityHeaders API - not critical for BrowserReference
         securityHeaders.setReferrerPolicy(null);
         server.setResponseSecurityHeaders(securityHeaders);
+        server.setSocketAddressValidator(new AllowAllSocketAddressValidator());
     }
 }
