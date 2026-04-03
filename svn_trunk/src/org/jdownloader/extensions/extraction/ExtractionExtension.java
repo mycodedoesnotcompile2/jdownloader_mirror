@@ -1057,6 +1057,15 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     }
 
     @Override
+    public <T> T invoke(String method, Class<T> returnType, Object... args) throws NoSuchMethodException, Exception {
+        if ("requiresAntiStandby".equals(method) && boolean.class == returnType && args.length == 0) {
+            final boolean requiresAntiStandby = !getJobQueue().isEmpty();
+            return returnType.cast(requiresAntiStandby);
+        }
+        return super.invoke(method, returnType, args);
+    }
+
+    @Override
     public MenuItemData updateMenuModel(ContextMenuManager manager, MenuContainerRoot mr) {
         if (manager instanceof MenuManagerMainToolbar) {
             return updateMainToolbar(mr);

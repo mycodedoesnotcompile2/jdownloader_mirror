@@ -34,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.AvThXyz;
 
-@DecrypterPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52605 $", interfaceVersion = 3, names = {}, urls = {})
 public class AvThNet extends PluginForDecrypt {
     public AvThNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,7 +48,7 @@ public class AvThNet extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "av-th.net" });
+        ret.add(new String[] { "av-th.co", "av-th.net" });
         return ret;
     }
 
@@ -76,11 +76,12 @@ public class AvThNet extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String urlTitleCleaned = Encoding.htmlDecode(new Regex(br.getURL(), this.getSupportedLinks()).getMatch(0).replace("-", " ").trim());
+        final String urlTitleCleaned = Encoding.htmlDecode(new Regex(contenturl, this.getSupportedLinks()).getMatch(0).replace("-", " ").trim());
         final PluginForHost plg = this.getNewPluginForHostInstance(AvThXyz.getPluginDomains().get(0)[0]);
         final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         for (final String url : urls) {

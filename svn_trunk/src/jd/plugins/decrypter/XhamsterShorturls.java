@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49829 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52605 $", interfaceVersion = 3, names = {}, urls = {})
 public class XhamsterShorturls extends PluginForDecrypt {
     public XhamsterShorturls(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class XhamsterShorturls extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[A-Za-z]/[A-Za-z0-9]+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(embed/[a-zA-Z0-9]+|[A-Za-z]/[A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }

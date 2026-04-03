@@ -77,7 +77,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52604 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52606 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -153,17 +153,15 @@ public class XHamsterCom extends PluginForHost {
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
+        final String domainPart = "https?://(?:[a-z0-9\\-]+\\.)?";
         for (final String[] domains : pluginDomains) {
-            /* Videos current pattern */
-            String pattern = "https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains) + "/(?:videos|moments)/[a-z0-9\\-_]+-[A-Za-z0-9]+";
-            /* E.g. xhamster.tv */
-            pattern += "|https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains) + "/video/[a-z0-9\\-]+";
-            /* Embed pattern: 2020-05-08: /embed/123 = current pattern, x?embed.php = old one */
-            pattern += "|https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains) + "/(embed/[A-Za-z0-9]+|x?embed\\.php\\?video=[A-Za-z0-9]+)";
-            /* Movies old pattern --> Redirects to TYPE_VIDEOS_2 (or TYPE_VIDEOS_3) */
-            pattern += "|https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains) + "/movies/[0-9]+/[^/]+\\.html";
-            /* Premium pattern */
-            pattern += "|https?://(?:gold\\.xhamsterpremium\\.com|faphouse\\.com|faphouse2\\.com)/([a-z]{2}/)?videos/([A-Za-z0-9\\-]+)";
+            final String hostsPart = buildHostsPatternPart(domains);
+            String pattern = domainPart + hostsPart + "/(";
+            pattern += TYPE_VIDEOS.pattern().substring(1);
+            pattern += "|" + TYPE_MOMENTS.pattern().substring(1);
+            pattern += "|" + TYPE_MOVIES.pattern().substring(1);
+            pattern += "|" + TYPE_EMBED.pattern().substring(1);
+            pattern += ")";
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);
@@ -188,28 +186,30 @@ public class XHamsterCom extends PluginForHost {
     }
 
     /* The list of qualities/formats displayed to the user */
-    public static final String  domain_premium                                            = "faphouse.com";
-    public static final String  api_base_premium                                          = "https://faphouse.com/api";
-    private static final String TYPE_MOVIES                                               = "(?i)^https?://[^/]+/movies/(\\d+)/([^/]+)\\.html$";
-    private static final String TYPE_VIDEOS                                               = "(?i)^https?://[^/]+/(?:[a-z]{2}/)?videos?/([A-Za-z0-9\\-]+)$";
-    private static final String TYPE_VIDEOS_2                                             = "(?i)^https?://[^/]+/videos/([a-z0-9\\-_]+)-(\\d+)$";
-    private static final String TYPE_VIDEOS_3                                             = "(?i)^https?://[^/]+/videos/([a-z0-9\\-_]+)-([A-Za-z0-9]+)$";
-    private static final String TYPE_MOMENTS                                              = "(?i)^https?://[^/]+/moments/([a-z0-9\\-_]+)-([A-Za-z0-9]+)$";
-    private final String        PROPERTY_USERNAME                                         = "username";
-    private final String        PROPERTY_DATE                                             = "date";
-    private final String        PROPERTY_TAGS                                             = "tags";
-    private final static String PROPERTY_VIDEOID                                          = "videoid";
-    private final static String PROPERTY_DEBUG_IS_SET_AS_FAVORITE                         = "debug_is_set_as_favorite";
-    private final String        PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN                    = "last_used_free_domain";
-    private final String        PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL                        = "premium_login_url";
-    private final String        PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_LEFT  = "premium_monthly_official_downloads_left";
-    private final String        PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_MAX   = "premium_monthly_official_downloads_max";
+    public static final String   domain_premium                                            = "faphouse.com";
+    public static final String   api_base_premium                                          = "https://faphouse.com/api";
+    private static final Pattern TYPE_VIDEOS                                               = Pattern.compile("/(?:[a-z]{2}/)?videos/([a-z0-9\\-_]+)-([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MOMENTS                                              = Pattern.compile("/moments/([a-z0-9\\-_]+)-([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MOVIES                                               = Pattern.compile("/movies/(\\d+)/([^/]+)\\.html", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_EMBED                                                = Pattern.compile("/(?:x?embed\\.php\\?video=|embed/)([A-Za-z0-9\\-]+)", Pattern.CASE_INSENSITIVE);
+    private final String         PROPERTY_USERNAME                                         = "username";
+    private final String         PROPERTY_DATE                                             = "date";
+    private final String         PROPERTY_TAGS                                             = "tags";
+    /* video_id that can be used to build URLs */
+    private final static String  PROPERTY_VIDEOID                                          = "videoid";
+    /* Internal xhamster video_id. Can be used for duplicate matching but cannot necessarily be used in user accessible URLs. */
+    private final static String  PROPERTY_NUMERIC_VIDEO_ID                                 = "numeric_video_id";
+    private final static String  PROPERTY_DEBUG_IS_SET_AS_FAVORITE                         = "debug_is_set_as_favorite";
+    private final String         PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN                    = "last_used_free_domain";
+    private final String         PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL                        = "premium_login_url";
+    private final String         PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_LEFT  = "premium_monthly_official_downloads_left";
+    private final String         PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_MAX   = "premium_monthly_official_downloads_max";
     /*
      * Timestamp of when this account was a premium only account last time which means login via xhamster.com was not possible while login
      * via faphouse.com revealed that this account was a valid premium account.
      */
-    private final String        PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT = "timestamp_last_time_premium_only_account";
-    private static final String COOKIE_KEY_PREMIUM                                        = "premium";
+    private final String         PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT = "timestamp_last_time_premium_only_account";
+    private static final String  COOKIE_KEY_PREMIUM                                        = "premium";
 
     @Override
     public String getAGBLink() {
@@ -217,7 +217,6 @@ public class XHamsterCom extends PluginForHost {
     }
 
     public static final String   TYPE_MOBILE    = "(?i).+m\\.xhamster\\.+";
-    public static final String   TYPE_EMBED     = "(?i)^https?://[^/]+/(?:x?embed\\.php\\?video=|embed/)([A-Za-z0-9\\-]+)";
     /* Important: Keep this up2date! */
     private static final Pattern TYPE_PREMIUM   = Pattern.compile(".+(xhamsterpremium\\.com|faphouse\\.com|faphouse2\\.com).+", Pattern.CASE_INSENSITIVE);
     private static final String  NORESUME       = "NORESUME";
@@ -239,13 +238,12 @@ public class XHamsterCom extends PluginForHost {
                 break;
             }
         }
+        if (new Regex(url, TYPE_EMBED).patternFind() || url.matches(TYPE_MOBILE)) {
+            /* Correct embed url or old mobile urls to normal video url */
+            return "https://" + newDomain + "/videos/" + getFID(url);
+        }
         if (!StringUtils.equals(domainFromURL, newDomain)) {
-            if (url.matches(TYPE_MOBILE) || url.matches(TYPE_EMBED)) {
-                url = "https://" + newDomain + "/videos/" + new Regex(url, TYPE_EMBED).getMatch(0);
-            } else {
-                /* Change domain in URL */
-                url = url.replaceFirst(Pattern.quote(domainFromURL), newDomain);
-            }
+            url = url.replaceFirst(Pattern.quote(domainFromURL), newDomain);
         }
         return url;
     }
@@ -263,9 +261,12 @@ public class XHamsterCom extends PluginForHost {
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String linkid = getFID(link);
-        if (linkid != null) {
-            return this.getHost() + "://" + linkid;
+        String video_id = link.getStringProperty(PROPERTY_NUMERIC_VIDEO_ID);
+        if (video_id == null) {
+            video_id = getFID(link);
+        }
+        if (video_id != null) {
+            return this.getHost() + "://" + video_id;
         } else {
             return super.getLinkID(link);
         }
@@ -283,6 +284,17 @@ public class XHamsterCom extends PluginForHost {
         }
     }
 
+    /** Looks for unique numeric video_id in html code. */
+    private String find_internal_video_id(final Browser br) {
+        String id = br.getRegex("\"video_id\":(\\d+)").getMatch(0);
+        if (id != null) {
+            return id;
+        }
+        /* For xhamster premium/faphouse items */
+        id = br.getRegex("data-el-video-id=\"(\\d+)").getMatch(0);
+        return id;
+    }
+
     private static String getFID(final String url) {
         if (url == null) {
             return null;
@@ -292,7 +304,11 @@ public class XHamsterCom extends PluginForHost {
         if (match != null) {
             return match;
         }
-        match = new Regex(url, "https?://[^/]+/[^/]+/[^/]*?([a-z0-9]+)(/|$|\\?)").getMatch(0);
+        match = new Regex(url, TYPE_MOMENTS).getMatch(1);
+        if (match != null) {
+            return match;
+        }
+        match = new Regex(url, TYPE_VIDEOS).getMatch(1);
         if (match != null) {
             return match;
         }
@@ -300,15 +316,12 @@ public class XHamsterCom extends PluginForHost {
         if (match != null) {
             return match;
         }
-        match = new Regex(url, TYPE_MOMENTS).getMatch(1);
-        if (match != null) {
-            return match;
-        }
-        match = new Regex(url, TYPE_VIDEOS_3).getMatch(1);
-        if (match != null) {
-            return match;
-        }
-        match = new Regex(url, TYPE_VIDEOS_2).getMatch(1);
+        return null;
+    }
+
+    private static String getUrlTitle(final String url) {
+        String match = null;
+        match = new Regex(url, TYPE_MOMENTS).getMatch(0);
         if (match != null) {
             return match;
         }
@@ -316,29 +329,10 @@ public class XHamsterCom extends PluginForHost {
         if (match != null) {
             return match;
         }
-        return null;
-    }
-
-    private static String getUrlTitle(final String url) {
-        // order is important, see getFID
-        String match = null;
-        match = new Regex(url, TYPE_MOMENTS).getMatch(0);
-        if (match != null) {
-            return match;
-        }
-        match = new Regex(url, TYPE_VIDEOS_3).getMatch(0);
-        if (match != null) {
-            return match;
-        }
-        match = new Regex(url, TYPE_VIDEOS_2).getMatch(0);
-        if (match != null) {
-            return match;
-        }
         match = new Regex(url, TYPE_MOVIES).getMatch(1);
         if (match != null) {
             return match;
         }
-        /* All other linktypes do not contain any title hint --> Return null */
         return null;
     }
 
@@ -436,8 +430,10 @@ public class XHamsterCom extends PluginForHost {
         } else {
             br.getPage(contenturl);
         }
-        final boolean isPremiumURL = isPremiumURL(contenturl);
-        if (!isPremiumURL && this.canHandle(br.getURL())) {
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/site/error")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (this.canHandle(br.getURL())) {
             /* Check if video_id has changed, eg reuploaded to different version and old video redirects to new one */
             final String fidAfter = getFID(br.getURL());
             if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
@@ -446,9 +442,6 @@ public class XHamsterCom extends PluginForHost {
                 // this one updates the property only
                 link.setProperty(PROPERTY_VIDEOID, fidAfter);
             }
-        }
-        if (StringUtils.containsIgnoreCase(br.getURL(), "/site/error")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Check for self-embed */
         String selfEmbeddedURL = br.getRegex("<iframe[^>]*src\\s*=\\s*\"(https?://xh\\.video/(?:[A-Za-z])/" + getFID(link) + ")\"[^>]*></iframe>").getMatch(0);
@@ -461,8 +454,15 @@ public class XHamsterCom extends PluginForHost {
             br.getPage(selfEmbeddedURL);
             /* Now this may have sent us to an embed URL --> Fix that */
             this.embedToNormalHandling(br, link);
-        } else if (br.getURL().matches(TYPE_EMBED)) {
+        } else if (new Regex(br.getURL(), TYPE_EMBED).patternFind()) {
             this.embedToNormalHandling(br, link);
+        }
+        String internal_video_id = link.getStringProperty(PROPERTY_NUMERIC_VIDEO_ID);
+        if (internal_video_id == null) {
+            internal_video_id = this.find_internal_video_id(br);
+            if (internal_video_id != null) {
+                link.setProperty(PROPERTY_NUMERIC_VIDEO_ID, internal_video_id);
+            }
         }
         final int responsecode = br.getRequest().getHttpConnection().getResponseCode();
         if (responsecode == 423) {
@@ -493,6 +493,9 @@ public class XHamsterCom extends PluginForHost {
         } else if (responsecode == 452) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (internal_video_id == null) {
+            logger.warning("Failed to find internal_video_id");
+        }
         /* Set some Packagizer properties */
         String username = br.getRegex("class=\"entity-author-container__name\"[^>]*href=\"https?://[^/]+/users/([^<>\"]+)\"").getMatch(0);
         String datePublished = br.getRegex("\"datePublished\":\"(\\d{4}-\\d{2}-\\d{2})\"").getMatch(0);
@@ -500,7 +503,7 @@ public class XHamsterCom extends PluginForHost {
             datePublished = br.getRegex("data-tooltip\\s*=\\s*\"(\\d{4}-\\d{2}-\\d{2}) \\d{2}:\\d{2}:\\d{2} UTC\"").getMatch(0);
         }
         String filename = null;
-        if (isPremiumURL) {
+        if (isPremiumURL(contenturl)) {
             String title = getTitle(link, br);
             if (this.isPremiumAccount(account)) {
                 /* Premium users can download the full videos in different qualities. */
@@ -733,7 +736,8 @@ public class XHamsterCom extends PluginForHost {
         if (nonEmbedURL == null) {
             logger.warning("Failed to find nonEmbedURL -> Content offline?");
             return;
-        } else if (!StringUtils.equalsIgnoreCase(br.getURL(), nonEmbedURL)) {
+        }
+        if (!StringUtils.equalsIgnoreCase(br.getURL(), nonEmbedURL)) {
             logger.info("Found non-embed URL: Old: " + br.getURL() + " | New: " + nonEmbedURL);
             br.getPage(nonEmbedURL);
             final String realVideoID = getFID(nonEmbedURL);
@@ -1470,7 +1474,7 @@ public class XHamsterCom extends PluginForHost {
         final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
         final boolean isPremiumURL = isPremiumURL(contentURL);
         if (!isPremiumURL && this.canHandle(br.getURL())) {
-            /* Check if video_id has changed, eg reuploaded to different version and old video redirects to new one */
+            /* Check if video_id has changed, eg re-uploaded to different version and old video redirects to new one */
             final String fidAfter = getFID(br.getURL());
             if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
                 // video link redirects to another video, eg shorter video, maybe uploaded longer version

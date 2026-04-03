@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.Open3dlabComConfig;
@@ -39,10 +40,17 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49799 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52608 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -59,7 +67,8 @@ public class Open3dlabCom extends PluginForHost {
         return ret;
     }
 
-    public static final String pattern_supported_links_path_relative = "/project/file/download/(\\d+)/(\\w+)/?";
+    public static final Pattern PATTERN_SUPPORTED_LINKS        = Pattern.compile("/project/mirror/download/([a-f0-9\\-]+)/?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SUPPORTED_LINKS_LEGACY = Pattern.compile("/project/file/download/(\\d+)/(\\w+)/?", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
@@ -73,7 +82,7 @@ public class Open3dlabCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pattern_supported_links_path_relative);
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_SUPPORTED_LINKS.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -103,23 +112,28 @@ public class Open3dlabCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-        return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(1);
+        final String mirror_id = new Regex(link.getPluginPatternMatcher(), PATTERN_SUPPORTED_LINKS).getMatch(0);
+        if (mirror_id != null) {
+            return mirror_id;
+        }
+        /* For older links */
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_SUPPORTED_LINKS_LEGACY);
+        return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(0);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
-        }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("(?i)>\\s*You are about to download\\s*\"([^\"]+)\"\\s*</h3>").getMatch(0);
+        String filename = br.getRegex(">\\s*You are about to download\\s*\"([^\"]+)\"\\s*</h3>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -135,7 +149,6 @@ public class Open3dlabCom extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser brc = br.cloneBrowser();
-                brc.setFollowRedirects(true);
                 /* 2023-03-20: HEAD-request impossible */
                 con = brc.openGetConnection(dllink);
                 handleConnectionErrors(brc, con, link.getName());

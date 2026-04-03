@@ -15,6 +15,29 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.ConfigEntry;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -39,30 +62,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.ConfigEntry;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 52604 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52609 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -72,6 +72,7 @@ public abstract class TurbobitCore extends PluginForHost {
     private static final boolean           prefer_single_linkcheck_via_mass_linkchecker  = true;
     private static final String            TYPE_premiumRedirectLinks                     = "(?i)(?:https?://[^/]+/)?/?download/redirect/[A-Za-z0-9]+/([a-z0-9]+)";
     private static Map<String, AtomicLong> hostLastPremiumCaptchaProcessedTimestampMap   = new HashMap<String, AtomicLong>();
+
     /* Properties */
 
     /**
@@ -194,9 +195,9 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br>
-         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
-         * slow down the linkcheck and cause more http requests in a short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
+         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
+         * short amount of time!
          */
         try {
             final boolean fastLinkcheck = isFastLinkcheckEnabled();
@@ -276,9 +277,9 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br>
-         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
-         * slow down the linkcheck and cause more http requests in a short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
+         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
+         * short amount of time!
          */
         try {
             final boolean fastLinkcheck = isFastLinkcheckEnabled();
@@ -769,8 +770,7 @@ public abstract class TurbobitCore extends PluginForHost {
     }
 
     /**
-     * Fills in captchaForm. </br>
-     * DOES NOT SEND CAPTCHA-FORM!!
+     * Fills in captchaForm. </br> DOES NOT SEND CAPTCHA-FORM!!
      */
     protected boolean processCaptchaFormWebsiteV1(final DownloadLink link, final Account account, final Form captchaform, final Browser br, final boolean optionalCaptcha) throws PluginException, InterruptedException {
         if (AbstractHCaptcha.containsHCaptcha(br)) {
@@ -872,36 +872,9 @@ public abstract class TurbobitCore extends PluginForHost {
                         };
                     }.getToken();
                 } else if (StringUtils.startsWithCaseInsensitive(driver, "turnstile")) {
-                    final String siteUrl = buildExternalDownloadURL(link, this);
+                    final String siteURL = buildExternalDownloadURL(link, this);
                     final String captchaKey = captchainfo.get("publicKey").toString();
-                    captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, brc, captchaKey) {
-                        protected org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge createChallenge() throws PluginException {
-                            final PluginForHost plugin = getPlugin();
-                            final String siteKey = getSiteKey();
-                            if (plugin == null) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                            } else if (siteKey == null) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                            } else {
-                                return new CloudflareTurnstileChallenge(plugin, siteKey) {
-                                    @Override
-                                    public String getSiteUrl() {
-                                        return siteUrl;
-                                    }
-
-                                    @Override
-                                    public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
-                                        return null;
-                                    }
-
-                                    @Override
-                                    public String getHTML(HttpRequest request, String id) {
-                                        return null;
-                                    }
-                                };
-                            }
-                        };
-                    }.getToken();
+                    captchaResponse = getTurnstileToken(brc, captchaKey, siteURL);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha:" + driver);
                 }
@@ -1055,6 +1028,37 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         initMirrorDownload(link, account, mirrors);
         dl.startDownload();
+    }
+
+    protected String getTurnstileToken(final Browser brc, final String captchaKey, final String siteURL) throws PluginException, InterruptedException {
+        return new CaptchaHelperHostPluginCloudflareTurnstile(this, brc, captchaKey) {
+            protected org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge createChallenge() throws PluginException {
+                final PluginForHost plugin = getPlugin();
+                final String siteKey = getSiteKey();
+                if (plugin == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (siteKey == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else {
+                    return new CloudflareTurnstileChallenge(plugin, siteKey) {
+                        @Override
+                        public String getSiteUrl() {
+                            return siteURL;
+                        }
+
+                        @Override
+                        public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
+                            return null;
+                        }
+
+                        @Override
+                        public String getHTML(HttpRequest request, String id) {
+                            return null;
+                        }
+                    };
+                }
+            };
+        }.getToken();
     }
 
     /**
@@ -1483,6 +1487,7 @@ public abstract class TurbobitCore extends PluginForHost {
                         logger.info("Cookie login successful");
                         /* Set new cookie timestamp */
                         br.setCookies(curr_domain, cookies);
+                        account.saveCookies(br.getCookies(curr_domain), "");
                         return entries;
                     } catch (final PluginException ignore) {
                         logger.log(ignore);
@@ -1495,6 +1500,7 @@ public abstract class TurbobitCore extends PluginForHost {
                         logger.info("Cookie login successful");
                         /* Set new cookie timestamp */
                         br.setCookies(curr_domain, cookies);
+                        account.saveCookies(br.getCookies(curr_domain), "");
                         return null;
                     }
                     logger.info("Cookie login failed");
@@ -1508,12 +1514,12 @@ public abstract class TurbobitCore extends PluginForHost {
             prepBrowserWebsiteV1(br);
             final String loginpage = "https://" + curr_domain + "/login";
             br.getPage(loginpage);
-            boolean requiredLoginCaptcha = false;
             Form loginform = findAndPrepareLoginForm(br, account);
             if (loginform != null) {
                 br.submitForm(loginform);
                 loginform = findAndPrepareLoginForm(br, account);
                 throwWebInvalidLoginOrPassword(br, account);// a captcha might be required first in order to get the password wrong error
+                boolean requiredLoginCaptcha = false;
                 if (!isLoggedIN(br) && loginform != null) {
                     logger.info("Loginform is present again after login attempt");
                     /* Check for stupid login captcha */
@@ -1600,6 +1606,8 @@ public abstract class TurbobitCore extends PluginForHost {
                     /* Display hint to user on how to disable login captchas. */
                     showLoginCaptchaInformation(account);
                 }
+                account.saveCookies(br.getCookies(curr_domain), "");
+                return null;
             } else if (allowWebsiteV2Handling()) {
                 /* Assume that we are on website version 2.0 (aka new.turbobit.net/login) */
                 Number captchaIndex = 0;
@@ -1608,49 +1616,29 @@ public abstract class TurbobitCore extends PluginForHost {
                 for (int i = 0; i <= 2; i++) {
                     final Map<String, Object> postdata = new HashMap<String, Object>();
                     postdata.put("email", account.getUser());
-                    postdata.put("password", account.getPass());// TODO: hitfile only allows 15 chars
+                    postdata.put("password", getAccountPasswordForLogin(account));
                     postdata.put("captcha", true);
                     postdata.put("captchaResponse", captchaResponse);
                     postdata.put("captchaIndex", captchaIndex);
                     br.addAllowedResponseCodes(422);
                     br.postPageRaw(getWebsiteV2Base() + "/api/auth/login", JSonStorage.serializeToJson(postdata));
-                    if (!requestedCaptcha && DebugMode.TRUE_IN_IDE_ELSE_FALSE && br.containsHTML("\"needCaptcha\":true|\"error_name\":\"invalid_captcha\"")) {
+                    if (requestedCaptcha || br.containsHTML("\"needCaptcha\"\\s*:\\s*true|\"error_name\"\\s*:\\s*\"invalid_captcha\"")) {
                         br.getPage(getWebsiteV2Base() + "/api/captcha");
                         final Map<String, Object> captchainfo = this.checkErrorsWebsiteV2(br, null, account);
-                        final String captchatype = captchainfo.get("driver").toString();
-                        if (!captchatype.equalsIgnoreCase("turnstile")) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        final String driver = captchainfo.get("driver").toString();
+                        if (StringUtils.startsWithCaseInsensitive(driver, "recaptcha")) {
+                            final String captchaKey = captchainfo.get("publicKey").toString();
+                            captchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, br, captchaKey) {
+                                protected String getSiteUrl() {
+                                    return loginpage;
+                                };
+                            }.getToken();
+                        } else if (StringUtils.startsWithCaseInsensitive(driver, "turnstile")) {
+                            final String captchaKey = captchainfo.get("publicKey").toString();
+                            captchaResponse = getTurnstileToken(br, captchaKey, loginpage);
+                        } else {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha:" + driver);
                         }
-                        final String captchaKey = captchainfo.get("publicKey").toString();
-                        // TODO: Fix this and enable it in Stable
-                        captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, captchaKey) {
-                            protected org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge createChallenge() throws PluginException {
-                                final PluginForHost plugin = getPlugin();
-                                final String siteKey = getSiteKey();
-                                if (plugin == null) {
-                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                                } else if (siteKey == null) {
-                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                                } else {
-                                    return new CloudflareTurnstileChallenge(plugin, siteKey) {
-                                        @Override
-                                        public String getSiteUrl() {
-                                            return loginpage;
-                                        }
-
-                                        @Override
-                                        public BrowserViewport getBrowserViewport(BrowserWindow screenResource, java.awt.Rectangle elementBounds) {
-                                            return null;
-                                        }
-
-                                        @Override
-                                        public String getHTML(HttpRequest request, String id) {
-                                            return null;
-                                        }
-                                    };
-                                }
-                            };
-                        }.getToken();
                         captchaIndex = (Number) captchainfo.get("index");
                         requestedCaptcha = true;
                         continue;
@@ -1659,11 +1647,21 @@ public abstract class TurbobitCore extends PluginForHost {
                     break;
                 }
                 final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
+                account.saveCookies(br.getCookies(curr_domain), "");
                 return entries;
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            account.saveCookies(br.getCookies(curr_domain), "");
-            return null;
         }
+    }
+
+    protected String getAccountPasswordForLogin(final Account account) {
+        final String ret = account.getPass();
+        if (ret.length() <= 24) {
+            return ret;
+        }
+        // max 24 characters
+        return ret.substring(0, 24);
     }
 
     private Thread showLoginCaptchaInformation(final Account account) {
@@ -1734,7 +1732,7 @@ public abstract class TurbobitCore extends PluginForHost {
             return null;
         }
         loginForm.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
-        loginForm.put("user%5Bpass%5D", Encoding.urlEncode(account.getPass()));
+        loginForm.put("user%5Bpass%5D", Encoding.urlEncode(getAccountPasswordForLogin(account)));
         return loginForm;
     }
 
@@ -1761,6 +1759,12 @@ public abstract class TurbobitCore extends PluginForHost {
 
     private String getWebsiteV2Base() {
         return "https://app." + getConfiguredDomain();
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getWebsiteV2Base(), true, 500);
     }
 
     protected void setConfigElements() {

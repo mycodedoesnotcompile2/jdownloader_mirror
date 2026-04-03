@@ -16,26 +16,19 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.OdyseeComConfig;
-import org.jdownloader.plugins.components.config.OdyseeComConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -45,7 +38,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51015 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.OdyseeComConfig;
+import org.jdownloader.plugins.components.config.OdyseeComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52607 $", interfaceVersion = 3, names = {}, urls = {})
 public class OdyseeCom extends PluginForHost {
     public OdyseeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +84,7 @@ public class OdyseeCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(@?[^:]+:[a-z0-9]+(?:/([^/:]{2,}:[a-z0-9\\-]+))?|\\$/(?:embed|download)/[^/]+/[a-z0-9\\-]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(@?[^:]+:[a-z0-9]+(?:/([^/:]{2,}:[a-z0-9\\-]+))?.*|\\$/(?:embed|download)/[^/]+/[a-z0-9\\-]+).*");
         }
         return ret.toArray(new String[0]);
     }
@@ -136,18 +140,25 @@ public class OdyseeCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(urlpart);
         }
+        UrlQuery query = UrlQuery.parse(new URL(link.getPluginPatternMatcher()).getQuery());
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.getHeaders().put("Content-Type", "application/json-rpc");
         if (Encoding.isUrlCoded(urlpart)) {
             urlpart = Encoding.htmlDecode(urlpart);
         }
         final String resolveString = "lbry://" + urlpart.replace(":", "#");
-        br.postPageRaw("https://api.na-backend.odysee.com/api/v1/proxy?m=resolve", "{\"jsonrpc\":\"2.0\",\"method\":\"resolve\",\"params\":{\"urls\":[\"" + resolveString + "\"],\"include_purchase_receipt\":true,\"include_is_my_output\":true}}");
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        Browser brc = br.createNewBrowserInstance();
+        brc.setFollowRedirects(true);
+        PostRequest request = brc.createPostRequest("https://api.na-backend.odysee.com/api/v1/proxy?m=resolve", "{\"jsonrpc\":\"2.0\",\"method\":\"resolve\",\"params\":{\"urls\":[\"" + resolveString + "\"],\"include_purchase_receipt\":true,\"include_is_my_output\":true}}");
+        request.getHeaders().put("Origin", "https://" + this.getHost());
+        request.getHeaders().put("Referer", "https://" + this.getHost() + "/");
+        request.getHeaders().put("Content-Type", "application/json-rpc");
+        brc.getPage(request);
+        if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final boolean isUnlisted = request.containsHTML("\"c:unlisted\"");
+        final Map<String, Object> entries = restoreFromString(request.getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> result = (Map<String, Object>) entries.get("result");
         final Map<String, Object> videodata = (Map<String, Object>) result.get(resolveString);
         if (videodata.containsKey("error")) {
@@ -209,29 +220,40 @@ public class OdyseeCom extends PluginForHost {
             logger.info("Failed to find claimID or sdhash");
             return AvailableStatus.TRUE;
         }
-        // Old host: https://cdn.lbryplayer.xyz/
-        final String dllink = "https://player.odycdn.com/api/v4/streams/free/" + slug + "/" + claimID + "/" + sdhash.substring(0, 6);
+        /* E.g. "text/markdown", "video/mp4" */
+        link.setProperty(PROPERTY_EXPECTED_CONTENT_TYPE, downloadInfo.get("media_type").toString());
+        if (isUnlisted && (!query.containsKey("signature") || !query.containsKey("signature_ts"))) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Missing required signature params");
+        }
         final PreferredStreamQuality quality = getPreferredQuality(link);
-        final int userPreferredQualityHeight = this.getPreferredQualityHeight(link, quality);
-        if (userPreferredQualityHeight == -1 || directDownload) {
-            String url = dllink;
-            if (isDownload) {
-                try {
-                    String downloadURL = dllink + "?download=true";
-                    final Browser brc = br.cloneBrowser();
-                    final URLConnectionAdapter con = checkDownloadableRequest(link, brc, brc.createGetRequest(downloadURL), 0, true);
-                    if (con != null) {
-                        url = downloadURL;
-                    } else if (brc.containsHTML("downloads are currently disabled")) {
-                        throw new IOException("downloads are currently disabled: use stream!");
-                    } else {
-                        throw new IOException("unknown error");
-                    }
-                } catch (IOException e) {
-                    logger.log(e);
-                    logger.info("Official download is not possible -> Fallback to stream download");
-                }
-            }
+        final Map<String, Object> get = new HashMap<String, Object>();
+        get.put("id", System.currentTimeMillis());
+        get.put("jsonrpc", "2.0");
+        get.put("method", "get");
+        final Map<String, Object> params = new HashMap<String, Object>();
+        params.put("environment", "live");
+        if (query.containsKey("signature")) {
+            // required for unlisted content
+            params.put("signature", query.get("signature"));
+        }
+        if (query.containsKey("signature_ts")) {
+            // required for unlisted content
+            params.put("signature_ts", query.get("signature_ts"));
+        }
+        params.put("uri", resolveString);
+        get.put("params", params);
+        brc = br.createNewBrowserInstance();
+        request = brc.createJSonPostRequest("https://api.na-backend.odysee.com/api/v1/proxy?m=get", get);
+        request.getHeaders().put("Origin", "https://" + this.getHost());
+        request.getHeaders().put("Referer", "https://" + this.getHost() + "/");
+        request.getHeaders().put("Content-Type", "application/json-rpc");
+        brc.getPage(request);
+        final Map<String, Object> response = restoreFromString(request.getHtmlCode(), TypeRef.MAP);
+        final String streaming_url = (String) JavaScriptEngineFactory.walkJson(response, "result/streaming_url");
+        if (streaming_url == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if ((PreferredStreamQuality.BEST.equals(quality) || isDownload) && StringUtils.containsIgnoreCase(streaming_url, ".mp4")) {
             final long filesize = JavaScriptEngineFactory.toLong(downloadInfo.get("size"), -1);
             if (filesize > 0) {
                 /*
@@ -239,15 +261,18 @@ public class OdyseeCom extends PluginForHost {
                  */
                 link.setDownloadSize(filesize);
             }
-            link.setProperty(PROPERTY_DIRECTURL, url);
+            link.setProperty(PROPERTY_DIRECTURL, streaming_url);
             link.setProperty(PROPERTY_QUALITY, PreferredStreamQuality.BEST.name());
+            return AvailableStatus.TRUE;
         } else {
-            link.setProperty(PROPERTY_DIRECTURL, dllink);
+            String m3u8_url = streaming_url;
+            if (StringUtils.containsIgnoreCase(m3u8_url, ".mp4")) {
+                m3u8_url = m3u8_url.replaceFirst(".mp4($|\\?.+)", "/master.m3u8$1");
+            }
+            link.setProperty(PROPERTY_DIRECTURL, m3u8_url);
             link.setProperty(PROPERTY_QUALITY, quality.name());
+            return AvailableStatus.TRUE;
         }
-        /* E.g. "text/markdown", "video/mp4" */
-        link.setProperty(PROPERTY_EXPECTED_CONTENT_TYPE, downloadInfo.get("media_type").toString());
-        return AvailableStatus.TRUE;
     }
 
     @Override
@@ -271,7 +296,7 @@ public class OdyseeCom extends PluginForHost {
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Stream unavailable");
             }
-            final Browser brc = br.cloneBrowser();
+            final Browser brc = br.createNewBrowserInstance();
             brc.setFollowRedirects(true);
             brc.getHeaders().put("Origin", "https://" + this.getHost());
             brc.getHeaders().put("Referer", "https://" + this.getHost() + "/");
@@ -309,6 +334,8 @@ public class OdyseeCom extends PluginForHost {
                 }
                 link.setVerifiedFileSize(-1);
                 checkFFmpeg(link, "Download a HLS Stream");
+                br = br.createNewBrowserInstance();
+                br.getHeaders().put("Referer", "https://" + this.getHost() + "/");
                 dl = new HLSDownloader(link, br, chosenQuality.getStreamURL());
             } else {
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, con.getRequest(), resumable, maxchunks);
@@ -338,7 +365,8 @@ public class OdyseeCom extends PluginForHost {
             return false;
         }
         try {
-            final Browser brc = br.cloneBrowser();
+            final Browser brc = br.createNewBrowserInstance();
+            brc.getHeaders().put("Referer", "https://" + this.getHost() + "/");
             dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, resumable, maxchunks);
             if (this.looksLikeDownloadableContent(dl.getConnection(), link)) {
                 return true;

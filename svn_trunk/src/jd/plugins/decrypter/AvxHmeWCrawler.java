@@ -51,7 +51,7 @@ import jd.plugins.PluginForHost;
 /**
  * @author typek_pb
  */
-@DecrypterPlugin(revision = "$Revision: 48187 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52605 $", interfaceVersion = 2, names = {}, urls = {})
 public class AvxHmeWCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public AvxHmeWCrawler(PluginWrapper wrapper) {
@@ -61,8 +61,28 @@ public class AvxHmeWCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         /* Always add current domain to first position! */
-        ret.add(new String[] { "avh.world", "avaxhome.ws", "avaxhome.bz", "avaxhome.cc", "avaxhome.in", "avaxhome.pro", "avaxho.me", "avaxhm.com", "avxhm.is", "avxhm.se", "avxhome.se", "avxhome.in", "avxde.org", "xsava.xyz", "zavat.pw", "avxlive.icu", "avxhm.in" });
+        /* List of more/current domains: https://avaxhome-mirrors.pw/index.html */
+        ret.add(new String[] { "avxhome.st", "xsava.xyz", "avxhm.in", "zavat.pw", "avh.world", "avaxhome.ws", "avaxhome.bz", "avaxhome.cc", "avaxhome.in", "avaxhome.pro", "avaxho.me", "avaxhm.com", "avxhm.is", "avxhm.se", "avxhome.se", "avxhome.in", "avxde.org", "avxlive.icu" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("avh.world");
+        deadDomains.add("avaxhome.ws");
+        deadDomains.add("avaxhome.bz");
+        deadDomains.add("avaxhome.cc");
+        deadDomains.add("avaxhome.in");
+        deadDomains.add("avaxhome.pro");
+        deadDomains.add("avaxho.me");
+        deadDomains.add("avaxhm.com");
+        deadDomains.add("avxhm.is");
+        deadDomains.add("avxhm.se");
+        deadDomains.add("avxhome.se");
+        deadDomains.add("avxhome.in");
+        deadDomains.add("avxde.org");
+        deadDomains.add("avxlive.icu");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

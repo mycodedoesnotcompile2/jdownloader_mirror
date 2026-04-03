@@ -1402,6 +1402,9 @@ public class YoutubeHelper {
         if (value == null) {
             return null;
         }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final String input = value;
         String output = input;
         final String playerID = getPlayerID(html5PlayerJs);
@@ -1563,6 +1566,9 @@ public class YoutubeHelper {
     String descrambleSignatureNew(final String sig) throws IOException, PluginException {
         if (sig == null) {
             return null;
+        }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String playerID = getPlayerID(html5PlayerJs);
         final String resultCacheKey = "descrambleSignatureNew/" + playerID + "/";

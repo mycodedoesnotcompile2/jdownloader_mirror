@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = { "badjojo.com" }, urls = { "https?://(?:www\\.)?badjojo\\.com/(\\d+)/[a-z0-9\\-]+/?" })
+@DecrypterPlugin(revision = "$Revision: 52606 $", interfaceVersion = 3, names = { "badjojo.com" }, urls = { "https?://(?:www\\.)?badjojo\\.com/(\\d+)/[a-z0-9\\-]+/?" })
 public class BadJoJoComDecrypter extends PornEmbedParser {
     public BadJoJoComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,16 +40,17 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
+    @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        decryptedLinks.addAll(findEmbedUrls());
-        if (!decryptedLinks.isEmpty()) {
-            return decryptedLinks;
+        ret.addAll(findEmbedUrls());
+        if (!ret.isEmpty()) {
+            return ret;
         }
         if (br.containsHTML("(?i)<h4>Source</h4>")) {
             /* 2017-03-21: Handle special case */
@@ -58,13 +59,13 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
             if (externID != null) {
                 externID = Encoding.urlDecode(externID, true);
                 logger.info("externID: " + externID);
-                decryptedLinks.add(createDownloadlink(externID));
-                return decryptedLinks;
+                ret.add(createDownloadlink(externID));
+                return ret;
             }
         }
         /* Looks like selfhosted content */
-        decryptedLinks.add(createDownloadlink(param.getCryptedUrl()));
-        return decryptedLinks;
+        ret.add(createDownloadlink(param.getCryptedUrl()));
+        return ret;
     }
 
     @Override

@@ -66,12 +66,10 @@ import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.NonDownloa
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFileAdoptFolderStructureMode;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51820 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 52607 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -151,7 +149,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
 
     @Deprecated
     private ArrayList<DownloadLink> crawlOldSearch(final CryptedLink param) throws Exception {
-        final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+        final ArchiveOrgConfig cfg = get(ArchiveOrgConfig.class);
         final int maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
         if (maxResults == 0) {
             logger.info("User disabled search term crawler -> Returning empty array");
@@ -284,7 +282,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final boolean isCollection = StringUtils.equalsIgnoreCase(type, "collection");
         final int maxResults;
         if (allowApplySearchLimit) {
-            final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+            final ArchiveOrgConfig cfg = get(ArchiveOrgConfig.class);
             maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
         } else {
             maxResults = -1;
@@ -573,7 +571,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             return ret;
         } catch (final PluginException e) {
             /* Desired item looks to be offline -> Decide what to return. */
-            final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+            final ArchiveOrgConfig cfg = get(ArchiveOrgConfig.class);
             final SingleFilePathNotFoundMode mode = cfg.getSingleFilePathNotFoundMode();
             if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND && mode == SingleFilePathNotFoundMode.ADD_NOTHING_AND_DISPLAY_ADDED_URL_AS_OFFLINE && fallbackResult != null) {
                 if (fallbackResult instanceof DownloadLink) {
@@ -697,7 +695,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 final Object viewable = bookpage.get("viewable");
                 if (Boolean.FALSE.equals(viewable)) {
                     /* Only downloadable with account as book needs to be borrowed to view the pages. */
-                    if (account == null && PluginJsonConfig.get(ArchiveOrgConfig.class).getNonDownloadableBookPagesMode() == NonDownloadableBookPagesMode.SET_AVAILABLE_STATUS_OFFLINE) {
+                    if (account == null && get(ArchiveOrgConfig.class).getNonDownloadableBookPagesMode() == NonDownloadableBookPagesMode.SET_AVAILABLE_STATUS_OFFLINE) {
                         /* User wants non-downloadable items to be displayed as offline. */
                         link.setAvailable(false);
                     } else {
@@ -788,7 +786,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             /* Crawl item with collection crawler */
             return this.crawlCollection(sourceurl, identifier);
         }
-        final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+        final ArchiveOrgConfig cfg = get(ArchiveOrgConfig.class);
         PlaylistCrawlMode playlistCrawlMode = cfg.getPlaylistCrawlMode202404();
         if (playlistCrawlMode == PlaylistCrawlMode.DEFAULT) {
             playlistCrawlMode = PlaylistCrawlMode.AUTO;
@@ -1454,11 +1452,6 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    @Override
-    public Class<? extends PluginConfigInterface> getConfigInterface() {
-        return ArchiveOrgConfig.class;
     }
 
     public static String generateBookContentURL(final String bookID) {

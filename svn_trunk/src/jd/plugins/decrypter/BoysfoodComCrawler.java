@@ -21,12 +21,16 @@ import java.util.List;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.hoster.BoysfoodCom;
 
-@DecrypterPlugin(revision = "$Revision: 48965 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52606 $", interfaceVersion = 3, names = {}, urls = {})
 public class BoysfoodComCrawler extends PornEmbedParser {
     public BoysfoodComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,6 +66,29 @@ public class BoysfoodComCrawler extends PornEmbedParser {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:free-porn-videos|videos)/\\d+/[a-z0-9\\-]+");
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        br.setFollowRedirects(true);
+        br.getPage(param.getCryptedUrl());
+        if (isOffline(br)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        ret.addAll(findEmbedUrls());
+        if (!ret.isEmpty()) {
+            return ret;
+        }
+        String extern_url = br.getRegex("<iframe width[^>]*src=\"(http[^\"]+)").getMatch(0);
+        if (extern_url != null) {
+            logger.info("externID: " + extern_url);
+            ret.add(createDownloadlink(extern_url));
+            return ret;
+        }
+        /* Looks like selfhosted content */
+        ret.add(createDownloadlink(param.getCryptedUrl()));
+        return ret;
     }
 
     @Override

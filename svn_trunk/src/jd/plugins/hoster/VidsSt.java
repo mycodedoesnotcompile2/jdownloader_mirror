@@ -18,10 +18,13 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -36,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52603 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52605 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidsSt extends PluginForHost {
     public VidsSt(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,8 +116,11 @@ public class VidsSt extends PluginForHost {
         return this.getFID(link) + ".mp4";
     }
 
+    private String hls_stream_url = null;
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        hls_stream_url = null;
         this.setBrowserExclusive();
         final String fid = this.getFID(link);
         /* Always access "/v/" links regardless which type of link a user has added. */
@@ -124,7 +130,19 @@ public class VidsSt extends PluginForHost {
         } else if (br.containsHTML(">\\s*This video does not exist or has been removed")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
+        String filename = null;
+        try {
+            final String json = br.getRegex("const playerConfig = (\\{.*?\\})").getMatch(0);
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            filename = entries.get("videoName").toString();
+            hls_stream_url = entries.get("videoUrl").toString();
+        } catch (final Throwable e) {
+            logger.info("json handling failed");
+            logger.log(e);
+        }
+        if (filename == null) {
+            filename = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
+        }
         String filesize = br.getRegex("\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}\\s*\\|\\s*([\\d.]+\\s*\\w+)\\s*\\|").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
@@ -148,13 +166,24 @@ public class VidsSt extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String dllink = br.getRegex("class=\"btn download-video-btn\"[^<]*href=\"([^\"]+)").getMatch(0);
-        if (StringUtils.isEmpty(dllink)) {
+        final String official_downloadurl = br.getRegex("class=\"btn download-video-btn\"[^<]*href=\"([^\"]+)").getMatch(0);
+        if (StringUtils.isEmpty(official_downloadurl) && StringUtils.isEmpty(hls_stream_url)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-        this.handleConnectionErrors(br, dl.getConnection());
-        dl.startDownload();
+        if (!StringUtils.isEmpty(official_downloadurl)) {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, official_downloadurl, this.isResumeable(link, null), this.getMaxChunks(link, null));
+            this.handleConnectionErrors(br, dl.getConnection());
+            dl.startDownload();
+        } else {
+            /* No official downloadlink available -> Try stream download */
+            logger.info("Attempting stream download");
+            // br.getPage(hls_master);
+            // final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            // final String url_hls = hlsbest.getStreamURL();
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, hls_stream_url);
+            dl.startDownload();
+        }
     }
 
     @Override

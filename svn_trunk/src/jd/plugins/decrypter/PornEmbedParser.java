@@ -21,7 +21,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.DecrypterArrayList;
 
-@DecrypterPlugin(revision = "$Revision: 51509 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52606 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class PornEmbedParser extends PluginForDecrypt {
     public PornEmbedParser(PluginWrapper wrapper) {
         super(wrapper);
@@ -292,7 +292,7 @@ public abstract class PornEmbedParser extends PluginForDecrypt {
         // Now check for all existent URLs if they're supported by any plugin tagged as porn plugin
         /************************************************************************************************************/
         final String[] urls = getEmbedURLs(br);
-        if (urls != null) {
+        if (urls != null && urls.length > 0) {
             for (final String url : urls) {
                 if (!allowResult(url)) {
                     continue;

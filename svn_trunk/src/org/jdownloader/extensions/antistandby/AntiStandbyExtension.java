@@ -122,25 +122,30 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
     }
 
     protected boolean requiresAntiStandby(final Set<Condition> condition) {
-        if (condition == null) {
+        if (condition == null || condition.size() == 0) {
             return false;
-        } else if (condition.contains(Condition.RUNNING)) {
+        }
+        if (condition.contains(Condition.RUNNING)) {
             return true;
-        } else if (condition.contains(Condition.CRAWLING) && (LinkCollector.getInstance().isCollecting() || LinkChecker.isChecking())) {
+        }
+        if (condition.contains(Condition.CRAWLING) && (LinkCollector.getInstance().isCollecting() || LinkChecker.isChecking())) {
             return true;
-        } else if (condition.contains(Condition.DOWNLOADING) && DownloadWatchDog.getInstance().getStateMachine().isState(DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.STOPPING_STATE)) {
+        }
+        if (condition.contains(Condition.DOWNLOADING) && DownloadWatchDog.getInstance().getStateMachine().isState(DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.STOPPING_STATE)) {
             return true;
-        } else if (condition.contains(Condition.EXTRACTING)) {
+        }
+        if (condition.contains(Condition.EXTRACTING)) {
             final ExtractionExtension extension = ArchiveValidator.EXTENSION;
             if (extension != null && !extension.getJobQueue().isEmpty()) {
                 return true;
             }
-        } else if (condition.contains(Condition.EXTENSION)) {
+        }
+        if (condition.contains(Condition.EXTENSION)) {
             for (AbstractExtension<?, ?> extension : ExtensionController.getInstance().getEnabledExtensions()) {
                 try {
                     if (extension instanceof AntiStandbyExtension) {
                         continue;
-                    } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
+                    } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", boolean.class))) {
                         return true;
                     }
                 } catch (Throwable e) {

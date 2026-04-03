@@ -19,9 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -37,7 +34,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51700 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 52612 $", interfaceVersion = 3, names = {}, urls = {})
 public class KikaDeCrawler extends PluginForDecrypt {
     public KikaDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -151,8 +151,17 @@ public class KikaDeCrawler extends PluginForDecrypt {
             }
             final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(asset.get("url").toString()));
             video.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, "kika.de");
-            final String filename = (String) asset.get("fileName");
+            final Number frameHeight = (Number) asset.get("frameHeight");
+            String filename = (String) asset.get("fileName");
             if (filename != null) {
+                final String externalID = new Regex(externalId, "([a-f0-9]{8}-[a-f0-9-]+)").getMatch(0);
+                if (title != null && externalID != null && filename.contains(externalID)) {
+                    filename = title;
+                    if (frameHeight != null) {
+                        filename += "-" + frameHeight + "p";
+                    }
+                    filename += ".mp4";
+                }
                 video.setFinalFileName(filename);
             }
             final Number fileSizeO = (Number) asset.get("fileSize");

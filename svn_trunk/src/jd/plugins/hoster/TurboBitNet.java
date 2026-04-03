@@ -33,7 +33,7 @@ import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet;
 import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet.PreferredDomain;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52611 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurboBitNet extends TurbobitCore {
     public TurboBitNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,12 +106,7 @@ public class TurboBitNet extends TurbobitCore {
         return 60;
     }
 
-    /**
-     * returns the annotation pattern array
-     *
-     */
     public static String[] getAnnotationUrls() {
-        // construct pattern
         final String host = getHostsPattern();
         return new String[] { host + "/([A-Za-z0-9]+(/[^<>\"/]*?)?\\.html|download/free/[a-z0-9]+|/?download/redirect/[A-Za-z0-9]+/[a-z0-9]+)" };
     }
