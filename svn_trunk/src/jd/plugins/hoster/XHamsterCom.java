@@ -31,27 +31,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.config.XhamsterConfig;
-import org.jdownloader.plugins.components.config.XhamsterConfig.PreferredFormat;
-import org.jdownloader.plugins.components.config.XhamsterConfig.PremiumDownloadMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -77,7 +56,28 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52606 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.config.XhamsterConfig;
+import org.jdownloader.plugins.components.config.XhamsterConfig.PreferredFormat;
+import org.jdownloader.plugins.components.config.XhamsterConfig.PremiumDownloadMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52613 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -108,11 +108,9 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br>
-         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
-         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br>
-         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
+         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -188,7 +186,7 @@ public class XHamsterCom extends PluginForHost {
     /* The list of qualities/formats displayed to the user */
     public static final String   domain_premium                                            = "faphouse.com";
     public static final String   api_base_premium                                          = "https://faphouse.com/api";
-    private static final Pattern TYPE_VIDEOS                                               = Pattern.compile("/(?:[a-z]{2}/)?videos/([a-z0-9\\-_]+)-([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_VIDEOS                                               = Pattern.compile("/(?:[a-z]{2}/)?videos/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_MOMENTS                                              = Pattern.compile("/moments/([a-z0-9\\-_]+)-([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_MOVIES                                               = Pattern.compile("/movies/(\\d+)/([^/]+)\\.html", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_EMBED                                                = Pattern.compile("/(?:x?embed\\.php\\?video=|embed/)([A-Za-z0-9\\-]+)", Pattern.CASE_INSENSITIVE);
@@ -249,7 +247,7 @@ public class XHamsterCom extends PluginForHost {
     }
 
     /** Returns true if the full content behind the given URL can only be viewed with a paid account. */
-    private boolean isPremiumURL(final String url) {
+    private static boolean isPremiumURL(final String url) {
         if (url == null) {
             return false;
         } else if (new Regex(url, TYPE_PREMIUM).patternFind()) {
@@ -308,9 +306,10 @@ public class XHamsterCom extends PluginForHost {
         if (match != null) {
             return match;
         }
-        match = new Regex(url, TYPE_VIDEOS).getMatch(1);
+        match = new Regex(url, TYPE_VIDEOS).getMatch(0);
         if (match != null) {
-            return match;
+            final String fid = new Regex(match, ("([A-Za-z0-9]+)$")).getMatch(0);
+            return fid;
         }
         match = new Regex(url, TYPE_MOVIES).getMatch(0);
         if (match != null) {
@@ -327,6 +326,8 @@ public class XHamsterCom extends PluginForHost {
         }
         match = new Regex(url, TYPE_VIDEOS).getMatch(0);
         if (match != null) {
+            final String title = new Regex(match, "(.+)-[A-Za-z0-9]+$").getMatch(0);
+            match = StringUtils.firstNotEmpty(title, match);
             return match;
         }
         match = new Regex(url, TYPE_MOVIES).getMatch(1);
@@ -1980,10 +1981,9 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
-             * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
+             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
+             * user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

@@ -49,7 +49,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52607 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52613 $", interfaceVersion = 3, names = {}, urls = {})
 public class OdyseeCom extends PluginForHost {
     public OdyseeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -304,6 +304,9 @@ public class OdyseeCom extends PluginForHost {
             if (!looksLikeDownloadableContent(con, link)) {
                 brc.followConnection();
                 if (!LinkCrawlerDeepInspector.looksLikeMpegURL(con)) {
+                    if (brc.containsHTML("this content cannot be accessed")) {
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "this content cannot be accessed");
+                    }
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final List<HlsContainer> hls = HlsContainer.getHlsQualities(brc);
@@ -341,7 +344,9 @@ public class OdyseeCom extends PluginForHost {
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, con.getRequest(), resumable, maxchunks);
                 if (!this.looksLikeDownloadableContent(dl.getConnection(), link)) {
                     br.followConnection(true);
-                    if (dl.getConnection().getResponseCode() == 403) {
+                    if (brc.containsHTML("this content cannot be accessed")) {
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "this content cannot be accessed");
+                    } else if (dl.getConnection().getResponseCode() == 403) {
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
                     } else if (dl.getConnection().getResponseCode() == 404) {
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);

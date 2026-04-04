@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,7 +33,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VimmNet;
 
-@DecrypterPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+
+@DecrypterPlugin(revision = "$Revision: 52613 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimmNetCrawler extends PluginForDecrypt {
     public VimmNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +87,7 @@ public class VimmNetCrawler extends PluginForDecrypt {
         if (downloadUnavailableText != null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, downloadUnavailableText);
         }
-        final String jsonarrayStr = br.getRegex("(?:var|const) (?:allMedia|media)\\s*=\\s*(\\[.*?\\]);").getMatch(0);
+        final String jsonarrayStr = br.getRegex("(?:var|const|let)\\s+(?:allMedia|media)\\s*=\\s*(\\[.*?\\]);").getMatch(0);
         if (jsonarrayStr == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -117,8 +117,7 @@ public class VimmNetCrawler extends PluginForDecrypt {
             }
             /**
              * There are file-hashes available but it looks like those are for the files inside the .zip archives so we can't make use of
-             * them. </br>
-             * See fields GoodHash, GoodMd5, GoodSha1
+             * them. </br> See fields GoodHash, GoodMd5, GoodSha1
              */
             if (filesizeAltZippedStr != null && filesizeAltZippedStr.toString().matches("\\d+") && resourcelist.size() == 1 && downloadformatsOptions != null && downloadformatsOptions.length >= 2) {
                 /* Alternative version is available */
