@@ -192,7 +192,7 @@ public class LoginDialog extends AbstractDialog<LoginData> implements ActionList
         if (rememberDisabled) {
             save.setEnabled(false);
         }
-        contentpane.setLayout(new MigLayout("ins 5, wrap 2", "[]10[grow,fill]", "[][]"));
+        contentpane.setLayout(this.createLoginContentPaneLayout());
         addUserNameField(contentpane);
         addPasswordField(contentpane);
         addSave(contentpane);
@@ -200,6 +200,13 @@ public class LoginDialog extends AbstractDialog<LoginData> implements ActionList
         pass.setText(prePass);
         save.setSelected(preSave);
         return contentpane;
+    }
+
+    /**
+     * Layout for {@link #layoutDialogContent()}; override in subclasses that need the login area (e.g. embedded server tiles) to grow with the dialog.
+     */
+    protected MigLayout createLoginContentPaneLayout() {
+        return new MigLayout("ins 5, wrap 2", "[]10[grow,fill]", "[][]");
     }
 
     protected void addPasswordField(final JPanel contentpane) {

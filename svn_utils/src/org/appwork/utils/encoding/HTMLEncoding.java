@@ -307,11 +307,21 @@ public class HTMLEncoding {
     private HTMLEncoding() {
     }
 
+    /**
+     * Escape text for HTML {@code <title>} and similar single-line contexts.
+     * <p>
+     * Each maximal run of carriage return / line feed characters ({@code \r}, {@code \n}) is replaced by a single space (e.g. {@code CRLF} becomes one space, not two). The result is then escaped like
+     * {@link #escapeText(String, boolean)} with {@code convertLineBreaks == false} (no {@code <br>}).
+     * </p>
+     *
+     * @param input
+     *            raw title text; {@code null} yields an empty string
+     */
     public static String escapeTitle(final String input) {
         if (input == null) {
             return "";
         }
-        final String normalized = input.replace('\r', ' ').replace('\n', ' ');
+        final String normalized = input.replaceAll("[\\r\\n]+", " ");
         return escapeText(normalized, false);
     }
 

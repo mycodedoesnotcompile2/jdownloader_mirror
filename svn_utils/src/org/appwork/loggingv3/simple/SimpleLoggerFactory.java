@@ -122,7 +122,7 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     }
 
     protected LoggerToSink createLogger(final Object name) {
-        return new LoggerToSink(this);
+        return new LoggerToSink(this, name);
     }
 
     @Override

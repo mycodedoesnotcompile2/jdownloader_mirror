@@ -10,7 +10,7 @@
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
@@ -19,11 +19,11 @@
  *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: e-mail@appwork.org
+ *     Contact AppWork for further details: <e-mail@appwork.org>
  * === Non-Commercial Usage ===
  *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
@@ -31,54 +31,78 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.loggingv3.simple;
+package org.appwork.exceptions;
 
-import org.appwork.loggingv3.AbstractLogger;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.reflection.Clazz;
 
 /**
+ * For all "What the F$%&" Situations. We all know that the shouldn't exist, but we all know: They do!
+ *
  * @author Thomas
- * @date 19.09.2018
  *
  */
-public class LoggerToSink extends AbstractLogger {
-    protected final SinkProvider sinkProvider;
-    private final Object         context;
+public class ForwardAsRuntimeException extends RuntimeException {
+    /**
+     *
+     */
+    private static final long serialVersionUID = -6107320171996331828L;
 
     /**
-     * @return the context
+     *
      */
-    public Object getContext() {
-        return context;
+    public ForwardAsRuntimeException() {
+        super();
     }
 
-    public LoggerToSink(SinkProvider sinkprovider, Object context) {
-        this.sinkProvider = sinkprovider;
-        this.context = context;
+    /**
+     * @param message
+     */
+    public ForwardAsRuntimeException(final String message) {
+        super(message);
     }
 
-    @Override
-    public void info(String msg) {
-        if (msg == null || msg.trim().length() == 0) {
-            return;
-        } else {
-            sinkProvider.publish(new LogRecord2(this, msg, getThrownAt()));
+    /**
+     * @param message
+     * @param cause
+     */
+    public ForwardAsRuntimeException(final String message, final Throwable cause) {
+        super(message, cause);
+    }
+
+    /**
+     * @param cause
+     */
+    public ForwardAsRuntimeException(final Throwable cause) {
+        super(cause);
+    }
+
+    /**
+     * @param e
+     * @return
+     */
+    public static ForwardAsRuntimeException wrap(Throwable e) {
+        if (e instanceof ForwardAsRuntimeException) {
+            return (ForwardAsRuntimeException) e;
         }
-    }
-
-    @Override
-    public void log(Throwable e) {
-        sinkProvider.publish(new LogRecord2(this, getStackTrace(e), getThrownAt()).level(LogV3Level.EXCEPTION));
-    }
-
-    @Override
-    public void exception(String msg, Throwable e) {
-        sinkProvider.publish(new LogRecord2(this, msg + "\r\n" + getStackTrace(e), getThrownAt()).level(LogV3Level.EXCEPTION));
+        return new ForwardAsRuntimeException(e);
     }
 
     /**
-     * @param newRecord
+     * @param class1
+     * @return
      */
-    public void publish(LogRecord2 newRecord) {
-        sinkProvider.publish(newRecord);
+    public <T extends Throwable> T unpack(Class<T> class1) {
+        return unpack(this, class1);
+    }
+
+    public static <T extends Throwable> T unpack(Throwable e, Class<T> class1) {
+        while (e instanceof ForwardAsRuntimeException) {
+            e = e.getCause();
+        }
+        if (!Clazz.isInstanceof(e.getClass(), class1)) {
+            return Exceptions.getInstanceof(e, class1);
+        }
+        return (T) e;
     }
 }

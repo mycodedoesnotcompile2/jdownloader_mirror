@@ -52,7 +52,4 @@ public interface LogV3Factory {
     public LogInterface getLogger(Object context);
 
     public LogInterface getDefaultLogger();
-    /**
-     * @param simpleLoggerFactory
-     */
 }

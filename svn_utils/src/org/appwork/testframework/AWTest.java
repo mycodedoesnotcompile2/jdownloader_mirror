@@ -120,8 +120,8 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     /**
-     * Default true: test may be skipped when dependencies have not changed. Override to false for tests that scan
-     * source (headers, line endings, etc.) so they always run.
+     * Default true: test may be skipped when dependencies have not changed. Override to false for tests that scan source (headers, line
+     * endings, etc.) so they always run.
      *
      * @see org.appwork.testframework.TestInterface#isSkipOnUnchangedDependencies()
      * @see org.appwork.testframework.PostBuildTestInterface#isSkipOnUnchangedDependencies()
@@ -512,7 +512,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             @Override
             protected LoggerToSink createLogger(final Object name) {
-                return new LoggerToSink(this) {
+                return new LoggerToSink(this, name) {
                     /*
                      * (non-Javadoc)
                      *

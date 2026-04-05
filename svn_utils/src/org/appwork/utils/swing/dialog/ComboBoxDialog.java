@@ -94,6 +94,13 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
         this.options = options;
     }
 
+    /**
+     * @return the options
+     */
+    public Object[] getOptions() {
+        return options;
+    }
+
     /*
      * (non-Javadoc)
      *

@@ -85,7 +85,9 @@ public class HTMLEncodingTest extends AWTest {
         assertEq("br lf cr", "a<br>b<br>c", HTMLEncoding.escapeText("a\nb\rc"));
         assertEq("attr spaces", "a b c", HTMLEncoding.escapeAttribute("a\nb\rc"));
         assertEq("title flatten", "a b c", HTMLEncoding.escapeTitle("a\nb\rc"));
-        assertEq("title trims nl only to space", "x  y", HTMLEncoding.escapeTitle("x\n\ry"));
+        assertEq("title newline run one space", "x y", HTMLEncoding.escapeTitle("x\n\ry"));
+        assertEq("title crlf one space", "a b", HTMLEncoding.escapeTitle("a\r\nb"));
+        assertEq("title double newline one space", "a b", HTMLEncoding.escapeTitle("a\n\nb"));
     }
 
     private static void testEscapeUnicodePassthrough() {

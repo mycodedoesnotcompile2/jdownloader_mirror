@@ -86,5 +86,4 @@ public class BasicDialogHandler implements UserIOHandlerInterface {
     public void showException(String message, Throwable e) {
         D.showExceptionDialog(_AWU.T.DIALOG_ERROR_TITLE(), message, e);
     }
-
 }

@@ -383,4 +383,16 @@ public class LogV3 {
     public static void exception(final Object context, final Throwable e) {
         exception(context, e, null);
     }
+
+    /**
+     * @param ret
+     */
+    public static void pushContext(Object context) {
+    }
+
+    /**
+     * @param api2Context
+     */
+    public static void releaseContext(Object context) {
+    }
 }

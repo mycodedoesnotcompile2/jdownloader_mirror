@@ -49,10 +49,12 @@ import java.nio.channels.FileLock;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -354,6 +356,40 @@ public class LogToFileSink extends AbstractSink {
         return logFolder;
     }
 
+    /**
+     * Rotated log segments ({@code .txt} and {@code .zip}) for this sink, newest {@link File#lastModified()} first. Uses
+     * {@link #getLogFolder()} and the constructor path pattern ({@code subdir/name_\\d.txt} or {@code name_\\d.txt}).
+     */
+    public List<File> listLogDataFilesNewestFirst() {
+        final File root = getLogFolder();
+        if (root == null) {
+            return Collections.emptyList();
+        }
+        final int slash = filepattern.lastIndexOf('/');
+        final String relDir = slash >= 0 ? filepattern.substring(0, slash) : "";
+        final String tail = slash >= 0 ? filepattern.substring(slash + 1) : filepattern;
+        final int dMark = tail.indexOf("_\\d");
+        if (dMark < 0) {
+            return Collections.emptyList();
+        }
+        final String filePrefix = tail.substring(0, dMark + 1);
+        final File dir = relDir.length() == 0 ? root : new File(root, relDir);
+        if (!dir.isDirectory()) {
+            return Collections.emptyList();
+        }
+        final File[] listed = dir.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(final File d, final String name) {
+                return name.startsWith(filePrefix) && (name.endsWith(".txt") || name.endsWith(".zip"));
+            }
+        });
+        if (listed == null || listed.length == 0) {
+            return Collections.emptyList();
+        }
+        Arrays.sort(listed, Comparator.comparingLong(File::lastModified).reversed());
+        return Arrays.asList(listed);
+    }
+
     private boolean releaseLock(final FileLock lock) {
         boolean ret = false;
         try {
@@ -595,6 +631,15 @@ public class LogToFileSink extends AbstractSink {
     private volatile long           lastFlushRequest;
     protected long                  flushInterval = 15000;
     protected volatile long         lastFlushed;
+    private String                  deliminator   = "\r\n";
+
+    /**
+     * @param deliminator
+     *            the deliminator to set
+     */
+    public void setDeliminator(String deliminator) {
+        this.deliminator = deliminator;
+    }
 
     public long getFlushInterval() {
         return flushInterval;
@@ -677,13 +722,20 @@ public class LogToFileSink extends AbstractSink {
             try {
                 final BufferedWriter fos = this.fos;
                 if (fos != null) {
-                    fos.write(format(record) + "\r\n");
+                    fos.write(format(record) + getDeliminator());
                     delayedFlush();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    /**
+     * @return
+     */
+    public String getDeliminator() {
+        return deliminator;
     }
 
     int                          files = 0;
@@ -999,7 +1051,6 @@ public class LogToFileSink extends AbstractSink {
                         }
                     }
                 }
-
                 extendExportPost(zipout);
             } catch (IOException e) {
                 ioException = e;

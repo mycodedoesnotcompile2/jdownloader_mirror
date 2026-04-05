@@ -39,8 +39,10 @@ import java.util.Locale;
 
 import org.appwork.loggingv3.simple.Formatter;
 import org.appwork.loggingv3.simple.LogRecord2;
+import org.appwork.loggingv3.simple.LoggerToSink;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
 
 /**
  * @author Thomas
@@ -87,6 +89,7 @@ public class SimpleFormatter implements Formatter {
     protected IByReference offsetForThreadName;
     protected IByReference offsetForTimestamp;
     protected IByReference offsetForThrownAt;
+    private boolean        addLoggerContext;
 
     /**
      *
@@ -115,7 +118,32 @@ public class SimpleFormatter implements Formatter {
     }
 
     protected String createPre(LogRecord2 record, String sourceString) {
-        return "--" + fillPre(String.valueOf(record.threadID), " ", offsetForthreadID) + fillPost("(" + abbr(record.threadName, maxThreadNameLength) + ")", " ", offsetForThreadName) + " " + fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
+        String category = "";
+        if (isAddLoggerContext()) {
+            LogInterface logger = record.getLogger();
+            if (logger instanceof LoggerToSink) {
+                Object c = ((LoggerToSink) logger).getContext();
+                if (c != null && !"LogV3".equals(c)) {
+                    category = "[" + c + "] ";
+                }
+            }
+        }
+        return category + "--" + fillPre(String.valueOf(record.threadID), " ", offsetForthreadID) + fillPost("(" + abbr(record.threadName, maxThreadNameLength) + ")", " ", offsetForThreadName) + " " + fillPre(longTimestamp.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
+    }
+
+    /**
+     * @return
+     */
+    public boolean isAddLoggerContext() {
+        return addLoggerContext;
+    }
+
+    /**
+     * @param addLoggerContext
+     *            the addLoggerContext to set
+     */
+    public void setAddLoggerContext(boolean addLoggerContext) {
+        this.addLoggerContext = addLoggerContext;
     }
 
     /**

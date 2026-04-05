@@ -93,6 +93,13 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
         this.message = message;
     }
 
+    /**
+     * @return the message
+     */
+    public String getMessage() {
+        return message;
+    }
+
     private ExtCheckBox              cbAuth;
     private boolean                  authRequired = false;
     private ScheduledExecutorService executer;

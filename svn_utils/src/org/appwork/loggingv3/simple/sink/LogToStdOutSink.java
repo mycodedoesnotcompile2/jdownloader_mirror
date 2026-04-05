@@ -38,9 +38,11 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import org.appwork.loggingv3.simple.LogRecord2;
+import org.appwork.loggingv3.simple.LoggerToSink;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter.LocalTimeFormat;
 import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
 
 /**
  * @author Thomas
@@ -69,7 +71,15 @@ public class LogToStdOutSink extends AbstractSink {
                     sourceString = " (" + source.getFileName() + ":" + source.getLineNumber() + ")";
                 }
                 sourceString += "." + source.getMethodName();
-                return fillPre(timeOnly.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
+                String category = "";
+                LogInterface logger = record.getLogger();
+                if (logger instanceof LoggerToSink) {
+                    Object c = ((LoggerToSink) logger).getContext();
+                    if (c != null && !"LogV3".equals(c)) {
+                        category = "[" + c + "] ";
+                    }
+                }
+                return category + fillPre(timeOnly.get().format(new Date(record.timestamp)), " ", offsetForTimestamp) + " ." + fillPost("" + abbr(String.valueOf(sourceString) + "", maxSourceStringLength), " ", offsetForThrownAt) + " > ";
             }
         };
     }
