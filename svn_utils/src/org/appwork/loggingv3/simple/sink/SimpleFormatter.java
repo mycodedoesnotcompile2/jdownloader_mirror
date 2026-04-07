@@ -105,7 +105,7 @@ public class SimpleFormatter implements Formatter {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.loggingv3.simple.Formatter#format(org.appwork.loggingv3.simple.LogRecord2)
      */
     @Override
@@ -120,9 +120,9 @@ public class SimpleFormatter implements Formatter {
     protected String createPre(LogRecord2 record, String sourceString) {
         String category = "";
         if (isAddLoggerContext()) {
-            LogInterface logger = record.getLogger();
+            final LogInterface logger = record.getLogger();
             if (logger instanceof LoggerToSink) {
-                Object c = ((LoggerToSink) logger).getContext();
+                final Object c = ((LoggerToSink) logger).getContext();
                 if (c != null && !"LogV3".equals(c)) {
                     category = "[" + c + "] ";
                 }

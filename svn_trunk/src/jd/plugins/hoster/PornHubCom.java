@@ -86,7 +86,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52353 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -104,15 +104,15 @@ public class PornHubCom extends PluginForHost {
     /* Note: Video bitrates and resolutions are not exact, they can vary. */
     /* Quality, { videoCodec, videoBitrate, videoResolution, audioCodec, audioBitrate } */
     public static LinkedHashMap<String, String[]> formats                                            = new LinkedHashMap<String, String[]>(new LinkedHashMap<String, String[]>() {
-                                                                                                         {
-                                                                                                             put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
-                                                                                                             put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
-                                                                                                             put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
-                                                                                                             put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
-                                                                                                             put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
-                                                                                                             put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
-                                                                                                         }
-                                                                                                     });
+        {
+            put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
+            put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
+            put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
+            put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
+            put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
+            put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
+        }
+    });
     /* Plugin settings */
     public static final String                    BEST_ONLY                                          = "BEST_ONLY";
     public static final boolean                   default_BEST_ONLY                                  = false;
@@ -953,8 +953,22 @@ public class PornHubCom extends PluginForHost {
                                 qualities.put(qualityVideoHeight, formatMap);
                             }
                             formatMap.put(format, videoUrl);
-                        } else {
-                            plugin.getLogger().warning("WTF: Single HLS item with multiple qualities: " + videoUrl);
+                        } else if (hlsQualities.size() > 1) {
+                            /* Master playlist containing multiple quality levels - extract each */
+                            plugin.getLogger().info("HLS master playlist with " + hlsQualities.size() + " qualities: " + videoUrl);
+                            for (final HlsContainer hlsContainer : hlsQualities) {
+                                final int height = hlsContainer.getHeight();
+                                if (height <= 0) {
+                                    continue;
+                                }
+                                final String heightStr = String.valueOf(height);
+                                Map<String, String> formatMap = qualities.get(heightStr);
+                                if (formatMap == null) {
+                                    formatMap = new HashMap<String, String>();
+                                    qualities.put(heightStr, formatMap);
+                                }
+                                formatMap.put(format, hlsContainer.getStreamURL());
+                            }
                         }
                     } else {
                         /* Old handling */

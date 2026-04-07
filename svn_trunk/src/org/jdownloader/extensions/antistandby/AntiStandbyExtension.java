@@ -145,7 +145,7 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
                 try {
                     if (extension instanceof AntiStandbyExtension) {
                         continue;
-                    } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", boolean.class))) {
+                    } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
                         return true;
                     }
                 } catch (Throwable e) {

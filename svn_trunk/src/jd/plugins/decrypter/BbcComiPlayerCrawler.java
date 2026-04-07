@@ -48,7 +48,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcComiPlayerCrawler extends PluginForDecrypt {
     public BbcComiPlayerCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,11 +103,18 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
         /* 2021-01-12: Website uses "/pc/" instead of "/iptv-all/" */
         br.getPage("https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/iptv-all/vpid/" + vpid + "/format/json");
         if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String result = (String) root.get("result");
+            if (StringUtils.equalsIgnoreCase(result, "selectionunavailable")) {
+                br.getPage("https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/" + vpid + "/format/json");
+            }
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
         }
         final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String result = (String) root.get("result");
-        if (StringUtils.equalsIgnoreCase(result, "geolocation")) {
+        if (StringUtils.equalsIgnoreCase(result, "geolocation") || StringUtils.equalsIgnoreCase(result, "notukerror")) {
             // BbcCom.errorGeoBlocked();
             throw new DecrypterRetryException(RetryReason.GEO, vpid, "This content is not available in your country!");
         }

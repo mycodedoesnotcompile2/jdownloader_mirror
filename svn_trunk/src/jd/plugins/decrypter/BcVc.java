@@ -22,11 +22,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,7 +38,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50759 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52614 $", interfaceVersion = 2, names = {}, urls = {})
 public class BcVc extends PluginForDecrypt {
     public BcVc(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class BcVc extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bc.vc", "bcvc.live", "bcvc.ink", "bcvc.xyz", "bcvc2.com" });
+        ret.add(new String[] { "bc.vc", "bcvc.live", "bcvc.ink", "bcvc.xyz", "bcvc2.com", "bcvcgo.xyz", "bvmbcvc.com" });
         return ret;
     }
 
@@ -110,8 +110,7 @@ public class BcVc extends PluginForDecrypt {
             }
         }
         /**
-         * we have to rename them here because we can damage urls within urls.</br>
-         * URLs containing www. will always be offline.
+         * we have to rename them here because we can damage urls within urls.</br> URLs containing www. will always be offline.
          */
         contenturl = contenturl.replaceFirst("://www.", "://").replaceFirst("http://", "https://");
         br.setFollowRedirects(false);
@@ -123,7 +122,10 @@ public class BcVc extends PluginForDecrypt {
             counter++;
             redirect = br.getRedirectLocation();
             if (redirect == null) {
-                redirect = br.getRegex("top\\.location\\.href = \"((?:https?|ftp)[^<>\"]*?)\"").getMatch(0);
+                redirect = br.getRegex("(?:top\\.location|link)\\.href\\s*=\\s*\"((?:https?|ftp)[^<>\"]*?)\"").getMatch(0);
+                if (redirect != null) {
+                    redirect = redirect.replaceAll("\\\\/", "/");
+                }
             }
             if (redirect == null) {
                 break;

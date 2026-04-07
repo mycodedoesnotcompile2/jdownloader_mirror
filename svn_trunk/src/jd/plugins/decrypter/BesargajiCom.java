@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -38,7 +32,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49512 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
+@DecrypterPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
 public class BesargajiCom extends PluginForDecrypt {
     public BesargajiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,7 @@ public class BesargajiCom extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "ponselharian.com", "besargaji.com" });
+        ret.add(new String[] { "ponselharian.com", "besargaji.com", "bahasteknologi.com" });
         return ret;
     }
 
@@ -87,7 +87,7 @@ public class BesargajiCom extends PluginForDecrypt {
         } else {
             logger.warning("Failed to find preRedirect Form");
         }
-        br.getPage("/api/v1/session");
+        br.postPage("/api/v1/session", "");
         final Map<String, Object> session = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Object session_step = session.get("step");
         /* Verify response */
@@ -100,6 +100,7 @@ public class BesargajiCom extends PluginForDecrypt {
             postdata.put("g-recaptcha-response", recaptchaV2Response);
         }
         postdata.put("_a", true);
+        // postdata.put("_a", 0);
         br.postPageRaw("/api/v1/verify", JSonStorage.serializeToJson(postdata));
         final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String resp_message = resp.get("message").toString();
@@ -107,11 +108,12 @@ public class BesargajiCom extends PluginForDecrypt {
         if (!StringUtils.equalsIgnoreCase(resp_message, "ok")) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.getPage("/api/v1/session");
+        br.postPage("/api/v1/session", "");
         final Map<String, Object> session2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final String session2_ads = session2.get("ads").toString();
+        final String session2_ads = (String) session2.get("ads");
         /* Verify response */
-        if (StringUtils.isEmpty(session2_ads)) {
+        if (false && StringUtils.isEmpty(session2_ads)) {
+            // working fine although no ads field exists
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Map<String, Object> postdata2 = new HashMap<String, Object>();
@@ -129,11 +131,19 @@ public class BesargajiCom extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final UrlQuery query = UrlQuery.parse(url);
         final String maybeB64Result = query.get("u");
-        final String finallink;
+        String finallink;
         if (maybeB64Result != null && maybeB64Result.startsWith("aHR")) {
             finallink = Encoding.Base64Decode(maybeB64Result);
         } else {
             finallink = url;
+        }
+        if (finallink.contains("/ready/go?")) {
+            br.getPage(finallink);
+            finallink = br.getRegex("window\\.location\\.href\\s*=\\s*\"(https*:.*?)\"\\s*;").getMatch(0);
+            if (finallink == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            finallink = finallink.replaceAll("\\\\/", "/");
         }
         ret.add(createDownloadlink(finallink));
         return ret;

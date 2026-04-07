@@ -17,17 +17,22 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jdownloader.plugins.components.XFileSharingProBasic;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52094 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileserveCom extends XFileSharingProBasic {
     public FileserveCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -92,6 +97,62 @@ public class FileserveCom extends XFileSharingProBasic {
     }
 
     @Override
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        // > Download limit reached. Please wait 31 seconds before your next download. Skip the wait and unlock unlimited, instant downloads
+        // right now. <
+        final String preciseWaittime = new Regex(html, "Download limit reached.\\s*Please wait\\s*(.*?)\\s*before your next download").getMatch(0);
+        if (preciseWaittime != null) {
+            /* Reconnect waittime with given (exact) waittime usually either up to the minute or up to the second. */
+            final String tmphrs = new Regex(preciseWaittime, "(?i)\\s*(\\d+)\\s*hours?").getMatch(0);
+            final String tmpmin = new Regex(preciseWaittime, "(?i)\\s*(\\d+)\\s*minutes?").getMatch(0);
+            final String tmpsec = new Regex(preciseWaittime, "(?i)\\s*(\\d+)\\s*seconds?").getMatch(0);
+            final String tmpdays = new Regex(preciseWaittime, "(?i)\\s*(\\d+)\\s*days?").getMatch(0);
+            int waittime;
+            if (tmphrs == null && tmpmin == null && tmpsec == null && tmpdays == null) {
+                /* This should not happen! This is an indicator of developer-failure! */
+                logger.info("Waittime RegExes seem to be broken - using default waittime");
+                waittime = 60 * 60 * 1000;
+            } else {
+                int minutes = 0, seconds = 0, hours = 0, days = 0;
+                if (tmphrs != null) {
+                    hours = Integer.parseInt(tmphrs);
+                }
+                if (tmpmin != null) {
+                    minutes = Integer.parseInt(tmpmin);
+                }
+                if (tmpsec != null) {
+                    seconds = Integer.parseInt(tmpsec);
+                }
+                if (tmpdays != null) {
+                    days = Integer.parseInt(tmpdays);
+                }
+                waittime = ((days * 24 * 3600) + (3600 * hours) + (60 * minutes) + seconds + 1) * 1000;
+            }
+            logger.info("Detected reconnect waittime (milliseconds): " + waittime);
+            /* Not enough wait time to reconnect -> Wait short and retry */
+            final String errMsg = "Download limit reached or wait until next download can be started";
+            if (account != null) {
+                /*
+                 * 2020-04-17: Some hosts will have trafficlimit and e.g. only allow one file every X minutes so his errormessage might be
+                 * confusing to some users. Now it should cover both cases at the same time.
+                 */
+                throw new AccountUnavailableException(errMsg, waittime);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errMsg, waittime);
+            }
+        }
+        super.checkErrors(br, html, link, account);
+    }
+
+    @Override
+    protected long getStartInterval(DownloadLink downloadLink, Account account) {
+        if (account == null || !Account.AccountType.PREMIUM.is(account)) {
+            return TimeUnit.SECONDS.toMillis(45);
+        }
+        return super.getStartInterval(downloadLink, account);
+    }
+
+    @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
         return -1;
     }
@@ -109,7 +170,7 @@ public class FileserveCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilesize = new Regex(html, ">\\s*(\\d+[^<]+)</span>\\s*\\| Uploaded on ").getMatch(0);
+        final String betterFilesize = new Regex(html, ">\\s*(\\d+[^<]+)\\s*</span>\\s*\\|\\s*Uploaded on").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }

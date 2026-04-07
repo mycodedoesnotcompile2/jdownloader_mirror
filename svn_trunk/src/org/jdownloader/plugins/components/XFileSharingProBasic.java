@@ -91,7 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52599 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4167,7 +4167,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         /** Wait time reconnect handling */
         final String limitBasedOnNumberofFilesAndTime = new Regex(html, "(?i)>\\s*(You have reached the maximum limit \\d+ files in \\d+ hours)").getMatch(0);
-        final String preciseWaittime = new Regex(html, "(?i)((You have reached the download(\\-| )limit|You have to wait)[^<>]+)").getMatch(0);
+        String preciseWaittime = new Regex(html, "(?i)((You have reached the download(\\-| )limit|You have to wait)[^<>]+)").getMatch(0);
+        if (preciseWaittime == null) {
+            // fileserve.com
+            preciseWaittime = new Regex(html, "Download limit reached.\\s*Please wait\\s*(.*?)\\s*before your next download").getMatch(0);
+        }
         if (preciseWaittime != null) {
             /* Reconnect waittime with given (exact) waittime usually either up to the minute or up to the second. */
             final String tmphrs = new Regex(preciseWaittime, "(?i)\\s*(\\d+)\\s*hours?").getMatch(0);

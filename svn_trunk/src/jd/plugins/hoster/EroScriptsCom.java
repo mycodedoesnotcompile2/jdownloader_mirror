@@ -2,12 +2,7 @@ package jd.plugins.hoster;
 
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
 import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.ConfigEntry;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -24,11 +19,14 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49631 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/uploads/([\\w\\-/]+)" })
+import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
+@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/uploads/([\\w\\-/]+)" })
 public class EroScriptsCom extends antiDDoSForHost {
-    private static final String COOKIE_ID       = "_forum_session";
-    public static final String  FETCH_IMAGES    = "FETCH_IMAGES";
-    public static final String  SMART_FILENAMES = "SMART_FILENAMES";
+
+    /** Cookie name used to persist the Discourse session. */
+    private static final String COOKIE_ID = "_forum_session";
 
     @Override
     public String[] siteSupportedNames() {
@@ -38,13 +36,20 @@ public class EroScriptsCom extends antiDDoSForHost {
     public EroScriptsCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://discuss.eroscripts.com/signup");
-        setConfigElements();
     }
 
-    protected void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), FETCH_IMAGES, "Add images?").setDefaultValue(true));
-    }
-
+    /**
+     * Logs into discuss.eroscripts.com using Discourse's session API. Restores cookies from the account store when available; only hits the
+     * network when no valid cookies exist or {@code validateCookies} is {@code true}. Supports TOTP two-factor authentication via
+     * interactive user prompt.
+     *
+     * @param br
+     *            browser instance to apply cookies/session to
+     * @param account
+     *            account holding credentials and cookie storage
+     * @param validateCookies
+     *            {@code true} to verify existing cookies against the live site
+     */
     public void login(final Browser br, final Account account, boolean validateCookies) throws Exception {
         synchronized (account) {
             try {
@@ -54,12 +59,11 @@ public class EroScriptsCom extends antiDDoSForHost {
                 if (cookies != null && !cookies.isEmpty()) {
                     br.setCookies("https://discuss.eroscripts.com", cookies);
                     if (!validateCookies) {
-                        /* Do not validate cookies */
                         return;
                     }
                     br.getPage("https://discuss.eroscripts.com/login");
                     if (br.getRedirectLocation() != null) {
-                        // Update cookie timestamp
+                        // Refresh cookie timestamp
                         account.saveCookies(br.getCookies("https://discuss.eroscripts.com"), COOKIE_ID);
                         return;
                     }
@@ -116,6 +120,10 @@ public class EroScriptsCom extends antiDDoSForHost {
         return "https://discuss.eroscripts.com/signup";
     }
 
+    /**
+     * Checks availability of an upload link. Requires a valid account since uploads are only accessible to logged-in users. Skips the
+     * network check if file info has already been populated (e.g. when called from the crawler with an active session).
+     */
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         if (link.getBooleanProperty("has_file_info")) {
@@ -134,7 +142,6 @@ public class EroScriptsCom extends antiDDoSForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        // no account required?
         dl = BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher());
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();

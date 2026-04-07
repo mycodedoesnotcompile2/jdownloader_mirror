@@ -19,12 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -36,7 +30,13 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52546 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 52616 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -132,15 +132,17 @@ public class UploadyIo extends XFileSharingProBasic {
 
     @Override
     protected String regexWaittime(final String html) {
-        String waitStr = new Regex(html, "var timeleft = (\\d+);").getMatch(0);
+        String waitStr = new Regex(html, "var\\s*timeleft\\s*=\\s*(\\d+)\\s*;").getMatch(0);
         if (waitStr == null) {
-            waitStr = new Regex(html, "id=\"wait-time\"[^>]*>\\s*(\\d+)").getMatch(0);
+            waitStr = new Regex(html, "id\\s*=\\s*\"wait-time\"[^>]*>\\s*(\\d+)").getMatch(0);
+            if (waitStr == null) {
+                waitStr = new Regex(html, "var\\s*timeleft\\s*=\\s*parseInt\\(\"(\\d+)").getMatch(0);
+            }
         }
         if (waitStr != null) {
             return waitStr;
-        } else {
-            return super.regexWaittime(html);
         }
+        return super.regexWaittime(html);
     }
 
     @Override

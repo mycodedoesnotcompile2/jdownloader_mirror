@@ -144,7 +144,7 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
 
     @Override
     public <T> T invoke(String method, Class<T> returnType, Object... args) throws NoSuchMethodException, Exception {
-        if ("requiresAntiStandby".equals(method) && boolean.class == returnType && args.length == 0) {
+        if ("requiresAntiStandby".equals(method) && Boolean.class == returnType && args.length == 0) {
             final ShutdownConfig settings = getSettings();
             final Mode mode = settings.getShutdownMode();
             boolean requiresAntiStandby = !Mode.STANDBY.equals(mode);// we don't need anti standby when standby is requested mode

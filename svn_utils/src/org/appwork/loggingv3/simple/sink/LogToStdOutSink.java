@@ -65,16 +65,17 @@ public class LogToStdOutSink extends AbstractSink {
             }
 
             protected String createPre(LogRecord2 record, String sourceString) {
-                StackTraceElement source = record.getThrownAt();
-                sourceString = "";
+                final StackTraceElement source = record.getThrownAt();
                 if (StringUtils.isNotEmpty(source.getFileName()) && source.getLineNumber() >= 0) {
                     sourceString = " (" + source.getFileName() + ":" + source.getLineNumber() + ")";
+                } else {
+                    sourceString = "";
                 }
                 sourceString += "." + source.getMethodName();
                 String category = "";
-                LogInterface logger = record.getLogger();
+                final LogInterface logger = record.getLogger();
                 if (logger instanceof LoggerToSink) {
-                    Object c = ((LoggerToSink) logger).getContext();
+                    final Object c = ((LoggerToSink) logger).getContext();
                     if (c != null && !"LogV3".equals(c)) {
                         category = "[" + c + "] ";
                     }

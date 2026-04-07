@@ -124,7 +124,10 @@ public class HlsContainer {
             if (forced != null) {
                 sb.append(",FORCED=").append(Boolean.TRUE.equals(forced) ? "YES" : "NO");
             }
-            sb.append(",URI=\"").append(getUri()).append("\"");
+            final String uri = getUri();
+            if (uri != null) {
+                sb.append(",URI=\"").append(uri).append("\"");
+            }
             return sb.toString();
         }
 
@@ -294,7 +297,7 @@ public class HlsContainer {
                 }
                 final String uri = new Regex(entry, "(?:,|^)\\s*URI\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                 if (uri == null) {
-                    throw new Exception("No URI?:" + entry);
+                    // no uri does mean the media is embedded into main stream
                 }
                 final String language = new Regex(entry, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                 final String name = new Regex(entry, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);

@@ -39,14 +39,12 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -58,13 +56,14 @@ import org.appwork.utils.IO;
  *
  * @author Thomas
  */
+// TODO: this implementation can leak open RandomAccessFile in ReverseByteDelimitedIterator
 public final class LogIterator implements Iterator<String> {
     /**
      * Default entry delimiter: CRLF ({@code \\r\\n}).
      */
-    public static final byte[] DEFAULT_ENTRY_DELIMITER = new byte[] { '\r', '\n' };
-
+    public static final byte[]                DEFAULT_ENTRY_DELIMITER = new byte[] { '\r', '\n' };
     private final LatestFirstLogEntryIterator delegate;
+    private static final Charset              UTF8                    = Charset.forName("UTF-8");
 
     /**
      * Same as {@link #LogIterator(LogToFileSink, byte[])} with {@link #DEFAULT_ENTRY_DELIMITER}.
@@ -80,8 +79,6 @@ public final class LogIterator implements Iterator<String> {
      *            non-empty byte sequence between entries (matched exactly, scanned backwards)
      */
     public LogIterator(final LogToFileSink sink, final byte[] entryDelimiter) {
-        Objects.requireNonNull(sink, "sink");
-        Objects.requireNonNull(entryDelimiter, "entryDelimiter");
         if (entryDelimiter.length == 0) {
             throw new IllegalArgumentException("entryDelimiter must not be empty");
         }
@@ -116,13 +113,21 @@ public final class LogIterator implements Iterator<String> {
     private static File materializeZipLogToTemp(final File zipFile) throws IOException {
         final File tmp = File.createTempFile("logiter-", ".txt");
         tmp.deleteOnExit();
-        try (ZipInputStream zin = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile)))) {
+        final FileInputStream fis = new FileInputStream(zipFile);
+        try {
+            final ZipInputStream zin = new ZipInputStream(new BufferedInputStream(fis));
             final ZipEntry ze = zin.getNextEntry();
-            if (ze != null) {
-                try (FileOutputStream out = new FileOutputStream(tmp)) {
-                    IO.readStreamToOutputStream(-1, zin, out, true);
-                }
+            if (ze == null) {
+                return null;
             }
+            final FileOutputStream fos = new FileOutputStream(tmp);
+            try {
+                IO.readStreamToOutputStream(-1, zin, fos, true);
+            } finally {
+                fos.close();
+            }
+        } finally {
+            fis.close();
         }
         return tmp;
     }
@@ -143,13 +148,16 @@ public final class LogIterator implements Iterator<String> {
         private void openNextNonEmptyFile() {
             this.current = null;
             while (this.fileIndex < this.files.size()) {
-                final File f = this.files.get(this.fileIndex++);
+                final File file = this.files.get(this.fileIndex++);
                 try {
-                    if (f.getName().endsWith(".zip")) {
-                        final File tmp = materializeZipLogToTemp(f);
-                        this.current = new ReverseByteDelimitedIterator(tmp, this.delimiter, true);
+                    if (file.getName().endsWith(".zip")) {
+                        final File zipFirstEntry = materializeZipLogToTemp(file);
+                        if (zipFirstEntry == null) {
+                            continue;
+                        }
+                        this.current = new ReverseByteDelimitedIterator(zipFirstEntry, this.delimiter, true);
                     } else {
-                        this.current = new ReverseByteDelimitedIterator(f, this.delimiter, false);
+                        this.current = new ReverseByteDelimitedIterator(file, this.delimiter, false);
                     }
                     if (this.current.hasNext()) {
                         return;
@@ -157,7 +165,11 @@ public final class LogIterator implements Iterator<String> {
                     this.current.closeQuietly();
                     this.current = null;
                 } catch (final IOException e) {
-                    throw new UncheckedIOException(e);
+                    if (this.current != null) {
+                        this.current.closeQuietly();
+                    }
+                    // UncheckedIOException is java 1.8 only
+                    throw new RuntimeException(e);
                 }
             }
         }
@@ -192,14 +204,13 @@ public final class LogIterator implements Iterator<String> {
     }
 
     private static final class ReverseByteDelimitedIterator implements Iterator<String> {
-        private static final int CHUNK = 64 * 1024;
-
+        private static final int       CHUNK = 64 * 1024;
         private final RandomAccessFile raf;
         private final File             physicalFile;
         private final boolean          deletePhysicalWhenDone;
         private final byte[]           delimiter;
         private long                   readBefore;
-        private byte[]                 carry           = new byte[0];
+        private byte[]                 carry = new byte[0];
         private String                 prefetchedNext;
         private boolean                eofReached;
         private boolean                closed;
@@ -244,7 +255,7 @@ public final class LogIterator implements Iterator<String> {
                         final byte[] entryBytes = Arrays.copyOfRange(this.carry, entryStart, this.carry.length);
                         this.carry = Arrays.copyOfRange(this.carry, 0, idx);
                         if (entryBytes.length > 0) {
-                            this.prefetchedNext = new String(entryBytes, StandardCharsets.UTF_8);
+                            this.prefetchedNext = new String(entryBytes, UTF8);
                             return;
                         }
                         continue;
@@ -254,7 +265,7 @@ public final class LogIterator implements Iterator<String> {
                         continue;
                     }
                     if (this.carry.length > 0) {
-                        this.prefetchedNext = new String(this.carry, StandardCharsets.UTF_8);
+                        this.prefetchedNext = new String(this.carry, UTF8);
                         this.carry = new byte[0];
                     }
                     this.eofReached = true;
@@ -263,7 +274,8 @@ public final class LogIterator implements Iterator<String> {
                 }
             } catch (final IOException e) {
                 closeQuietly();
-                throw new UncheckedIOException(e);
+                // UncheckedIOException is java 1.8 only
+                throw new RuntimeException(e);
             }
         }
 
@@ -290,12 +302,12 @@ public final class LogIterator implements Iterator<String> {
         @Override
         public String next() {
             prefetch();
-            if (this.prefetchedNext == null) {
+            final String next = this.prefetchedNext;
+            if (next == null) {
                 throw new NoSuchElementException();
             }
-            final String s = this.prefetchedNext;
             this.prefetchedNext = null;
-            return s;
+            return next;
         }
     }
 }

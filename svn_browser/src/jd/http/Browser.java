@@ -3624,6 +3624,41 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 return null;
             }
         },
+        FIREWALL_KASPERSKY_INTERNET_SECURITY {
+            @Override
+            public String getLabel() {
+                return "Kaspersky Internet Security";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else if (con.getResponseCode() == 499 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Request has been forbidden by antivirus")) {
+                    return this;
+                } else if (con.getResponseCode() == 499 && request.isLoaded() && request.containsHTML("<title>\\s*Kaspersky Internet Security\\s*</title>")) {
+                    return this;
+                } else {
+                    return null;
+                }
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SOFTWARE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         FIREWALL_BITDEFENDER {
             @Override
             public String getLabel() {

@@ -386,7 +386,23 @@ public class LogToFileSink extends AbstractSink {
         if (listed == null || listed.length == 0) {
             return Collections.emptyList();
         }
-        Arrays.sort(listed, Comparator.comparingLong(File::lastModified).reversed());
+        final Map<File, Long> lastModifiedMap = new HashMap<File, Long>();
+        // as we cannot guarantee unchanged File.lastModified during sorting, we create immutable copy for sorting
+        for (File entry : listed) {
+            lastModifiedMap.put(entry, entry.lastModified());
+        }
+        Arrays.sort(listed, new Comparator<File>() {
+            private final int compare(long x, long y) {
+                return (x < y) ? -1 : ((x == y) ? 0 : 1);
+            }
+
+            @Override
+            public int compare(File f1, File f2) {
+                final Long f1Mod = lastModifiedMap.get(f1);
+                final Long f2Mod = lastModifiedMap.get(f2);
+                return compare(f2Mod.longValue(), f1Mod.longValue());
+            }
+        });
         return Arrays.asList(listed);
     }
 

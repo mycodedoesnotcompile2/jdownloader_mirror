@@ -23,12 +23,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +42,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 51681 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,6 +105,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
 
     public static final String getChannel() {
         return "dubox";
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 750);
     }
 
     public static final void setPasswordCookie(final Browser br, final String host, final String passwordCookie) {
@@ -219,6 +225,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
             logger.info("Finding protocolAndSubdomain");
             final Browser brc = br.cloneBrowser();
             brc.getPage("https://" + getHost());
+            // TODO: can cause redirect to /simple-verify, which leads to {"errmsg":"need verify_v2","errno":400210,"request_id":...}
             protocolAndSubdomain = "https://" + brc.getHost(true);
         }
         if (surlbrowser != null) {
@@ -365,6 +372,11 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 query_shorturlinfo.appendEncoded("scene", "");
                 br.getPage(protocolAndSubdomain + "/api/shorturlinfo?" + query_shorturlinfo.toString());
                 final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                errno = ((Number) entries2.get("errno")).intValue();
+                if (errno != 0) {
+                    // {"errmsg":"need verify_v2","errno":400210,"request_id":....}
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 final int fcount = ((Number) entries2.get("fcount")).intValue();
                 if (fcount == 0) {
                     /* Empty folder */
