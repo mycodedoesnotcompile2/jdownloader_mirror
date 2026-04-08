@@ -24,6 +24,8 @@ import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.http.BearerAuthentication;
@@ -45,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52567 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52618 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
 public class StoragePortalCom extends PluginForHost {
     /* API docs: https://www.storage-portal.com/docs/download-client-api */
     private static final String          API_BASE           = "https://www.storage-portal.com/api/external/v1";
@@ -198,10 +200,18 @@ public class StoragePortalCom extends PluginForHost {
         if (login_check_interval_millis != null) {
             account.setRefreshTimeout(login_check_interval_millis.longValue());
         }
+        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         if ("premium".equalsIgnoreCase((String) data.get("accountType"))) {
             account.setType(AccountType.PREMIUM);
-            ai.setTrafficLeft(((Number) data.get("trafficleft")).longValue());
-            ai.setTrafficMax(((Number) data.get("trafficmax")).longValue());
+            final long account_trafficmax = ((Number) data.get("trafficmax")).longValue();
+            final long account_trafficleft = ((Number) data.get("trafficleft")).longValue();
+            ai.setTrafficLeft(account_trafficleft);
+            ai.setTrafficMax(account_trafficmax);
+            /* Display daily traffic in GUI if user has more traffic left than the max daily allowed traffic */
+            final Number account_trafficmax_daily = (Number) data.get("trafficmax_daily");
+            if (account_trafficmax_daily != null && account_trafficleft > account_trafficmax_daily.longValue()) {
+                ai.setStatus("Premium Account | Traffic usable today: " + SIZEUNIT.formatValue(maxSizeUnit, account_trafficmax_daily.longValue()));
+            }
         } else {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(1);
@@ -224,6 +234,20 @@ public class StoragePortalCom extends PluginForHost {
             mhost.setMaxChunks(((Number) hostinfo.get("maxChunks")).intValue());
             mhost.setMaxDownloads(((Number) hostinfo.get("maxDownloads")).intValue());
             mhost.setResumable((Boolean) hostinfo.get("resumable"));
+            /* Set individual host traffic limits */
+            final Number trafficleft = (Number) hostinfo.get("trafficleft");
+            /* 2026-04-07: API is supposed to use field name "trafficmax_daily" but uses "trafficmax". */
+            Number trafficmax_daily = (Number) hostinfo.get("trafficmax_daily");
+            if (trafficmax_daily == null) {
+                trafficmax_daily = (Number) hostinfo.get("trafficmax");
+            }
+            if (trafficleft != null && trafficmax_daily != null) {
+                mhost.setTrafficLeftAndMax(trafficleft.longValue(), trafficmax_daily.longValue());
+            }
+            final Number traffic24h_used = (Number) hostinfo.get("traffic24h_used");
+            if (traffic24h_used != null) {
+                mhost.setStatusText("Usage last 24h: " + SIZEUNIT.formatValue(maxSizeUnit, traffic24h_used.longValue()));
+            }
             supportedhosts.add(mhost);
         }
         ai.setMultiHostSupportV2(this, supportedhosts);

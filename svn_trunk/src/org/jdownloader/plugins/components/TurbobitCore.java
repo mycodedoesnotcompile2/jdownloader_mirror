@@ -62,7 +62,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52609 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52620 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -1612,8 +1612,8 @@ public abstract class TurbobitCore extends PluginForHost {
                 /* Assume that we are on website version 2.0 (aka new.turbobit.net/login) */
                 Number captchaIndex = 0;
                 String captchaResponse = "";
-                boolean requestedCaptcha = false;
-                for (int i = 0; i <= 2; i++) {
+                final int loginAttemptsMax = 3;
+                captchaLoop: for (int i = 0; i <= loginAttemptsMax; i++) {
                     final Map<String, Object> postdata = new HashMap<String, Object>();
                     postdata.put("email", account.getUser());
                     postdata.put("password", getAccountPasswordForLogin(account));
@@ -1622,29 +1622,30 @@ public abstract class TurbobitCore extends PluginForHost {
                     postdata.put("captchaIndex", captchaIndex);
                     br.addAllowedResponseCodes(422);
                     br.postPageRaw(getWebsiteV2Base() + "/api/auth/login", JSonStorage.serializeToJson(postdata));
-                    if (requestedCaptcha || br.containsHTML("\"needCaptcha\"\\s*:\\s*true|\"error_name\"\\s*:\\s*\"invalid_captcha\"")) {
-                        br.getPage(getWebsiteV2Base() + "/api/captcha");
-                        final Map<String, Object> captchainfo = this.checkErrorsWebsiteV2(br, null, account);
-                        final String driver = captchainfo.get("driver").toString();
-                        if (StringUtils.startsWithCaseInsensitive(driver, "recaptcha")) {
-                            final String captchaKey = captchainfo.get("publicKey").toString();
-                            captchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, br, captchaKey) {
-                                protected String getSiteUrl() {
-                                    return loginpage;
-                                };
-                            }.getToken();
-                        } else if (StringUtils.startsWithCaseInsensitive(driver, "turnstile")) {
-                            final String captchaKey = captchainfo.get("publicKey").toString();
-                            captchaResponse = getTurnstileToken(br, captchaKey, loginpage);
-                        } else {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha:" + driver);
-                        }
-                        captchaIndex = (Number) captchainfo.get("index");
-                        requestedCaptcha = true;
-                        continue;
+                    if (!br.containsHTML("\"needCaptcha\"\\s*:\\s*true|\"error_name\"\\s*:\\s*\"invalid_captcha\"")) {
+                        /* No captcha needed */
+                        break captchaLoop;
+                    } else if (i == loginAttemptsMax) {
+                        /* Last loop -> Do not ask for captcha since captcha answer would never be used anyways. */
+                        break captchaLoop;
                     }
-                    /* No captcha required or we already processed it once and still failed. */
-                    break;
+                    br.getPage(getWebsiteV2Base() + "/api/captcha");
+                    final Map<String, Object> captchainfo = this.checkErrorsWebsiteV2(br, null, account);
+                    final String driver = captchainfo.get("driver").toString();
+                    if (StringUtils.startsWithCaseInsensitive(driver, "recaptcha")) {
+                        final String captchaKey = captchainfo.get("publicKey").toString();
+                        captchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, br, captchaKey) {
+                            protected String getSiteUrl() {
+                                return loginpage;
+                            };
+                        }.getToken();
+                    } else if (StringUtils.startsWithCaseInsensitive(driver, "turnstile")) {
+                        final String captchaKey = captchainfo.get("publicKey").toString();
+                        captchaResponse = getTurnstileToken(br, captchaKey, loginpage);
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha type: " + driver);
+                    }
+                    captchaIndex = (Number) captchainfo.get("index");
                 }
                 final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
                 account.saveCookies(br.getCookies(curr_domain), "");

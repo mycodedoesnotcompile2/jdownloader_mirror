@@ -29,7 +29,7 @@ import org.appwork.utils.processes.command.Command;
  * Uses AdminExecuter.runAsLocalSystem to start a long-running process as SYSTEM and get its PID, then runAsAdmin to
  * call ProcessHandler.terminateForced on that PID (requires SeDebugPrivilege in JNAWindowsProcessHandler).
  */
-@TestDependency({ "org.appwork.testframework.executer.AdminExecuter", "org.appwork.testframework.executer.AdminHelperProcess", "org.appwork.processes.jna.JNAWindowsProcessHandler" })
+@TestDependency({ "org.appwork.testframework.executer.AdminExecuter", "org.appwork.testframework.executer.AdminHelperProcess", "org.appwork.processes.windows.jna.JNAWindowsProcessHandler" })
 public class TestElevatedAdminCanTerminateLocalSystemProcess extends AWTest implements Serializable {
     private static final long serialVersionUID = 1L;
 

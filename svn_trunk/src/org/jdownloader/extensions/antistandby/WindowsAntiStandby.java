@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package org.jdownloader.extensions.antistandby;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.utils.logging2.LogSource;
@@ -24,9 +25,17 @@ import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinBase;
 
 public class WindowsAntiStandby extends Thread implements Runnable {
-    private static final int           sleep    = 5000;
+    private static final int           sleep    = 1000;
     private final AntiStandbyExtension jdAntiStandby;
     private final AtomicInteger        lastFlag = new AtomicInteger(0);
+    private volatile Set<Condition>    conditions;
+
+    public Set<Condition> getConditions() {
+        if (isAlive()) {
+            return conditions;
+        }
+        return null;
+    }
 
     public WindowsAntiStandby(final AntiStandbyExtension jdAntiStandby) {
         super();
@@ -47,7 +56,7 @@ public class WindowsAntiStandby extends Thread implements Runnable {
             logger.log(e);
         } finally {
             try {
-                enableAntiStandby(logger, false);
+                enableAntiStandby(logger, null);
             } catch (final Throwable e) {
             } finally {
                 logger.fine("JDAntiStandby: Terminated");
@@ -56,17 +65,18 @@ public class WindowsAntiStandby extends Thread implements Runnable {
         }
     }
 
-    private void enableAntiStandby(final LogSource logger, final boolean enabled) {
+    private void enableAntiStandby(final LogSource logger, final Set<Condition> conditions) {
+        this.conditions = conditions;
         // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate
         int flags = WinBase.ES_CONTINUOUS;
-        if (enabled) {
+        if (conditions != null && conditions.size() > 0) {
             flags = flags | WinBase.ES_SYSTEM_REQUIRED;
             if (jdAntiStandby.getSettings().isDisplayRequired()) {
                 flags = flags | WinBase.ES_DISPLAY_REQUIRED;
             }
         }
+        Kernel32.INSTANCE.SetThreadExecutionState(flags);
         if (lastFlag.getAndSet(flags) != flags) {
-            Kernel32.INSTANCE.SetThreadExecutionState(flags);
             logger.fine("JDAntiStandby: new flags=" + flags);
         }
     }

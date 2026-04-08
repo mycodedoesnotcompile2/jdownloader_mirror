@@ -3,6 +3,7 @@ package org.jdownloader.extensions.antistandby;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.utils.JVMVersion;
@@ -34,7 +35,7 @@ public class MacAntiStandBy extends Thread {
             logger.log(e);
         } finally {
             try {
-                enableAntiStandby(logger, false);
+                enableAntiStandby(logger, null);
             } catch (final Throwable e) {
             } finally {
                 logger.fine("JDAntiStandby: Terminated");
@@ -43,8 +44,8 @@ public class MacAntiStandBy extends Thread {
         }
     }
 
-    private void enableAntiStandby(final LogSource logger, final boolean enabled) {
-        if (enabled) {
+    private void enableAntiStandby(final LogSource logger, Set<Condition> conditions) {
+        if (conditions != null && conditions.size() > 0) {
             Process process = lastProcess.get();
             if (process != null) {
                 try {

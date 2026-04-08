@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -34,11 +34,15 @@
 package org.appwork.storage.flexijson.mapper.interfacestorage;
 
 /**
- * only used as marker for interfaces that can be used in FlexiMapper
+ * Marker for <strong>interfaces only</strong> that are mapped with FlexiJSON: the mapper builds a proxy
+ * implementation backed by JSON (see {@link InterfaceStorage}).
+ * <p>
+ * Do <strong>not</strong> implement this on concrete classes. For a Java class with getters/setters and a
+ * no-arg constructor, use {@link org.appwork.storage.Storable} instead ({@code public class Foo implements Storable}).
+ * </p>
  *
  * @author thomas
  * @date 28.07.2022
- *
  */
 public interface FlexiStorableInterface {
 

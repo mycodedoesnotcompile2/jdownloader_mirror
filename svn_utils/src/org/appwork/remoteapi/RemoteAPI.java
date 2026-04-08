@@ -42,10 +42,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -76,6 +78,7 @@ import org.appwork.utils.IO;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.ChunkedOutputStream;
 import org.appwork.utils.net.CountingOutputStream;
 import org.appwork.utils.net.HTTPHeader;
@@ -179,10 +182,8 @@ public class RemoteAPI implements HttpRequestHandler {
     public static boolean gzip(final HttpRequestInterface request) {
         final HTTPHeader acceptEncoding = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING);
         if (acceptEncoding != null) {
-            final String value = acceptEncoding.getValue();
-            if (value != null && value.contains("gzip")) {
-                return true;
-            }
+            final List<String> supportedEncodings = Arrays.asList(StringUtils.valueOrEmpty(acceptEncoding.getValue()).toLowerCase(Locale.ENGLISH).split("\\s*,\\s*"));
+            return supportedEncodings != null && supportedEncodings.contains("gzip");
         }
         return false;
     }
@@ -197,10 +198,8 @@ public class RemoteAPI implements HttpRequestHandler {
         }
         final HTTPHeader acceptEncoding = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING);
         if (acceptEncoding != null) {
-            final String value = acceptEncoding.getValue();
-            if (value != null && value.contains("deflate")) {
-                return true;
-            }
+            final List<String> supportedEncodings = Arrays.asList(StringUtils.valueOrEmpty(acceptEncoding.getValue()).toLowerCase(Locale.ENGLISH).split("\\s*,\\s*"));
+            return supportedEncodings != null && supportedEncodings.contains("deflate");
         }
         return false;
     }

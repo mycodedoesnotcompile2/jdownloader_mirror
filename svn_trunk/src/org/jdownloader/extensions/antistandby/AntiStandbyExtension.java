@@ -16,6 +16,7 @@
 package org.jdownloader.extensions.antistandby;
 
 import java.awt.Dialog.ModalityType;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -117,27 +118,36 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
         }
     }
 
-    protected boolean requiresAntiStandby() {
+    public Set<Condition> getCurrentAntiStandbyConditions() {
+        final Thread antiStandbyThread = this.currentThread.get();
+        if (antiStandbyThread instanceof WindowsAntiStandby) {
+            return ((WindowsAntiStandby) antiStandbyThread).getConditions();
+        }
+        return null;
+    }
+
+    protected Set<Condition> requiresAntiStandby() {
         return requiresAntiStandby(getSettings().getCondition());
     }
 
-    protected boolean requiresAntiStandby(final Set<Condition> condition) {
+    protected Set<Condition> requiresAntiStandby(final Set<Condition> condition) {
+        Set<Condition> ret = new HashSet<Condition>();
         if (condition == null || condition.size() == 0) {
-            return false;
+            return ret;
         }
         if (condition.contains(Condition.RUNNING)) {
-            return true;
+            ret.add(Condition.RUNNING);
         }
         if (condition.contains(Condition.CRAWLING) && (LinkCollector.getInstance().isCollecting() || LinkChecker.isChecking())) {
-            return true;
+            ret.add(Condition.CRAWLING);
         }
         if (condition.contains(Condition.DOWNLOADING) && DownloadWatchDog.getInstance().getStateMachine().isState(DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.STOPPING_STATE)) {
-            return true;
+            ret.add(Condition.DOWNLOADING);
         }
         if (condition.contains(Condition.EXTRACTING)) {
             final ExtractionExtension extension = ArchiveValidator.EXTENSION;
             if (extension != null && !extension.getJobQueue().isEmpty()) {
-                return true;
+                ret.add(Condition.EXTRACTING);
             }
         }
         if (condition.contains(Condition.EXTENSION)) {
@@ -146,13 +156,13 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
                     if (extension instanceof AntiStandbyExtension) {
                         continue;
                     } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
-                        return true;
+                        ret.add(Condition.EXTENSION);
                     }
                 } catch (Throwable e) {
                 }
             }
         }
-        return false;
+        return ret;
     }
 
     @Override

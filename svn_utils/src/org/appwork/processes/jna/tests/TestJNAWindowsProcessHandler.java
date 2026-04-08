@@ -80,7 +80,7 @@ public class TestJNAWindowsProcessHandler extends AWTest {
     @AWTestValidateClassReference
     public static final String ORG_APPWORK_APP_GUI_BASIC_GUI                         = "org.appwork.app.gui.BasicGui";
     @AWTestValidateClassReference
-    public static final String ORG_APPWORK_PROCESSES_JNA_JNA_WINDOWS_PROCESS_HANDLER = "org.appwork.processes.jna.JNAWindowsProcessHandler";
+    public static final String ORG_APPWORK_PROCESSES_JNA_JNA_WINDOWS_PROCESS_HANDLER = "org.appwork.processes.windows.jna.JNAWindowsProcessHandler";
 
     /**
      * @see org.appwork.testframework.TestInterface#runTest()

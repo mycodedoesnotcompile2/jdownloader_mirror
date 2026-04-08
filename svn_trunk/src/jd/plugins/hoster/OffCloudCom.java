@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52266 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52625 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends PluginForHost {
     /* API docs: https://offcloud.com/api */
     private static final String API_ENDPOINT = "https://offcloud.com/api";
@@ -177,7 +177,7 @@ public class OffCloudCom extends PluginForHost {
     protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
-        } else if (str.matches("[a-zA-Z0-9]{32}")) {
+        } else if (str.matches("[a-zA-Z0-9]{16,32}")) {
             return true;
         } else {
             return false;

@@ -81,7 +81,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 51941 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 52625 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -430,6 +430,8 @@ public class ArchiveOrg extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 401");
             } else if (con.getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (con.getResponseCode() == 500) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500");
             }
             if (ArchiveOrg.isItemUnavailable(br)) {
                 if (ArchiveOrg.isAccountRequired(br)) {
@@ -446,15 +448,16 @@ public class ArchiveOrg extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403: Item not available");
                 }
             }
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Final downloadurl did not lead to downloadable content");
         }
         if (link.getHashInfo() != null) {
             /**
-             * Check if we can use the current HashInfo. Delete it if we can't be sure that the file we are going to download is the same
-             * file/version which was initially crawled. </br>
+             * Check if we can use the current HashInfo. <br>
+             * Delete it if we can't be sure that the file we are going to download is the same file/version which was initially crawled.
+             * </br>
              * Getting the current/new file-hash would also be too much effort and in most of all cases the files won't have changed until
-             * download is initiated but it is relly important to clear the hash if in doubt otherwise the user may get a "CRC check failed"
-             * error message for no reason.
+             * download is initiated but it is really important to clear the hash if in doubt otherwise the user may get a "CRC check
+             * failed" error message for no reason.
              */
             boolean deleteHashInfo = false;
             final long lastModifiedTimestampFromAPI = link.getLongProperty(PROPERTY_TIMESTAMP_FROM_API_LAST_MODIFIED, -1);

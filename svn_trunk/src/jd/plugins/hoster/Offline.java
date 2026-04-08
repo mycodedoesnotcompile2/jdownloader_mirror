@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 52507 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52618 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -311,6 +311,8 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "lixstream.com", "boxlinkqrr.com", "boxlinksgc.com", "filevideopmk.com", "vidcloudkix.com", "lix0.org", "dood-hd.com", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "videypro.live", "videyio.com", "videyii.co", "videyaio.com", "vdey.org", "vide0.me", "video0.me", "vide-q.com", "videq.io", "videqlink.org", "cdnvideq.net", "openvideoqrr.com", "videb.org", "videk.org", "vidbre.org", "vidcloudmv.org", "vidcloudmv.net", "vidcloudtv.net", "teramv.com", "teratvs.org", "teraboxtv.net", "pidey.io", "aidey.tv", "avdeq.ink", "doey07s.com", "doey07sto.com", "linkvideowvd.com", "linkvideorex.com", "streamkithmc.com", "streamkitjwj.com", "videotwimg.app", "video-twimg.xyz", "video-twimg.video", "video.twimg.org", "video.twlmg.org",
                 "cdn.twimg.org", "cdn.twlmg.org", "twimg.org", "twlmg.org", "tw-img.video", "tw-img.live", "tvidey.tv", "cdn.tvidey.tv", "tvimg.net", "video.tvimg.net", "twimgapp.com" });
         ret.add(new String[] { "imgcubby.com" });
+        ret.add(new String[] { "myrient.erista.me" });
+        ret.add(new String[] { "way4share.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

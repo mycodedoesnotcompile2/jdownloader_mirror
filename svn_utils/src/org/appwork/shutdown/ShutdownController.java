@@ -53,52 +53,13 @@ import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogInterface;
 
 public class ShutdownController extends Thread {
-    class ShutdownEventWrapper extends ShutdownEvent {
-        private final Thread orgThread;
-
-        /**
-         * @param value
-         */
-        public ShutdownEventWrapper(final Thread value) {
-            this.orgThread = value;
-            // call "Nativ" hooks at the end.
-            this.setHookPriority(Integer.MIN_VALUE);
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (obj instanceof ShutdownEventWrapper) {
-                return this.orgThread == ((ShutdownEventWrapper) obj).orgThread;
-            } else {
-                return false;
-            }
-        }
-
-        @Override
-        public boolean supportsIllegalStateException() {
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            return this.orgThread.hashCode();
-        }
-
-        /*
-         * (non-Javadoc)
-         *
-         * @see org.appwork.shutdown.ShutdownEvent#run()
-         */
-        @Override
-        public void onShutdown(final ShutdownRequest shutdownRequest) {
-            this.orgThread.run();
-        }
-
-        @Override
-        public String toString() {
-            return "ShutdownEventWrapper " + this.orgThread + " - " + this.orgThread.getClass().getName() + " Priority: " + this.getHookPriority();
-        }
-    }
+    /**
+     * Force loading and initialization of nested types used during shutdown before {@link #INSTANCE} is constructed.
+     * Anonymous or non-static inner classes would otherwise load only on first use, which can be too late during JVM shutdown.
+     */
+    @SuppressWarnings("unused")
+    private static final Class<?>[] PRELOADED_SHUTDOWN_TYPES = new Class<?>[] { ShutdownEventWrapper.class, HookDelegatingIdentityHashMap.class, InternalRunnable.class,
+            ShutdownVetoListenerPriorityComparator.class, ShutdownExitThread.class };
 
     private static final ShutdownController INSTANCE = new ShutdownController();
     static {
@@ -152,32 +113,7 @@ public class ShutdownController extends Thread {
                 final Map<Thread, Thread> hooks = (Map<Thread, Thread>) field.get(null);
                 if (hooks != null) {
                     // hooks must not be null else we are already in shutdown!
-                    final IdentityHashMap<Thread, Thread> hookDelegater = new IdentityHashMap<Thread, Thread>() {
-                        /**
-                        *
-                        */
-                        private static final long serialVersionUID = 8334628124340671103L;
-                        {
-                            // ShutdownController should be the only hook in Runtime/ApplicationShutdownHooks!!
-                            super.put(ShutdownController.this, ShutdownController.this);
-                        }
-
-                        @Override
-                        public Thread put(final Thread key, final Thread value) {
-                            final ShutdownEventWrapper hook = new ShutdownEventWrapper(value);
-                            ShutdownController.this.addShutdownEvent(hook);
-                            return null;
-                        }
-
-                        @Override
-                        public Thread remove(final Object key) {
-                            if (ShutdownController.this.removeShutdownEvent(new ShutdownEventWrapper((Thread) key))) {
-                                return (Thread) key;
-                            } else {
-                                return null;
-                            }
-                        }
-                    };
+                    final IdentityHashMap<Thread, Thread> hookDelegater = new HookDelegatingIdentityHashMap(this);
                     for (final Thread hook : hooks.keySet()) {
                         if (ShutdownController.this != hook) {
                             this.addShutdownEvent(new ShutdownEventWrapper(hook));
@@ -237,12 +173,7 @@ public class ShutdownController extends Thread {
                 this.vetoListeners.add(listener);
                 log("Add ShutdownVetoListener:" + listener + ":" + true);
                 try {
-                    Collections.sort(this.vetoListeners, new Comparator<ShutdownVetoListener>() {
-                        @Override
-                        public int compare(final ShutdownVetoListener o1, final ShutdownVetoListener o2) {
-                            return CompareUtils.compareLong(o1.getShutdownVetoPriority(), o2.getShutdownVetoPriority());
-                        }
-                    });
+                    Collections.sort(this.vetoListeners, ShutdownVetoListenerPriorityComparator.INSTANCE);
                 } catch (final Throwable e) {
                     LogV3.log(e);
                 }
@@ -441,23 +372,7 @@ public class ShutdownController extends Thread {
                     } catch (final Throwable e) {
                         LogV3.severe(Exceptions.getStackTrace(e));
                     }
-                    this.exitThread = new Thread("ShutdownThread:" + System.currentTimeMillis() + "|" + request) {
-                        @Override
-                        public void run() {
-                            Integer exitCode = request.getExitCode();
-                            try {
-                                if (exitCode == null) {
-                                    exitCode = ShutdownController.this.getExitCode();
-                                    log("Exit Now(Controller): Code: " + exitCode);
-                                } else {
-                                    log("Exit Now(Request): Code: " + exitCode);
-                                }
-                                ShutdownController.this.runHooks();
-                            } finally {
-                                System.exit(exitCode != null ? exitCode.intValue() : -1);
-                            }
-                        }
-                    };
+                    this.exitThread = new ShutdownExitThread(this, request, "ShutdownThread:" + System.currentTimeMillis() + "|" + request);
                     this.exitThread.start();
                 }
                 long waitDuration = 0;
@@ -554,12 +469,7 @@ public class ShutdownController extends Thread {
                         i++;
                         final long started = Time.systemIndependentCurrentJVMTimeMillis();
                         log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: start item->" + e);
-                        final Thread thread = new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                e.onShutdown(shutdownRequest);
-                            }
-                        });
+                        final Thread thread = new Thread(new InternalRunnable(shutdownRequest, e));
                         thread.setName("ShutdownHook [" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]");
                         thread.start();
                         try {
@@ -600,5 +510,128 @@ public class ShutdownController extends Thread {
      */
     public void setExitCode(final int i) {
         this.exitCode = i;
+    }
+
+    /**
+     * Wraps a JVM shutdown hook {@link Thread} as a {@link ShutdownEvent}.
+     */
+    private static final class ShutdownEventWrapper extends ShutdownEvent {
+        private final Thread orgThread;
+
+        public ShutdownEventWrapper(final Thread value) {
+            this.orgThread = value;
+            // call "Nativ" hooks at the end.
+            this.setHookPriority(Integer.MIN_VALUE);
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (obj instanceof ShutdownEventWrapper) {
+                return this.orgThread == ((ShutdownEventWrapper) obj).orgThread;
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public boolean supportsIllegalStateException() {
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return this.orgThread.hashCode();
+        }
+
+        @Override
+        public void onShutdown(final ShutdownRequest shutdownRequest) {
+            this.orgThread.run();
+        }
+
+        @Override
+        public String toString() {
+            return "ShutdownEventWrapper " + this.orgThread + " - " + this.orgThread.getClass().getName() + " Priority: " + this.getHookPriority();
+        }
+    }
+
+    /**
+     * Replaces {@code ApplicationShutdownHooks.hooks} to delegate registration to {@link ShutdownController}.
+     */
+    private static final class HookDelegatingIdentityHashMap extends IdentityHashMap<Thread, Thread> {
+        private static final long serialVersionUID = 8334628124340671103L;
+        private final ShutdownController controller;
+
+        HookDelegatingIdentityHashMap(final ShutdownController controller) {
+            this.controller = controller;
+            // ShutdownController should be the only hook in Runtime/ApplicationShutdownHooks!!
+            super.put(controller, controller);
+        }
+
+        @Override
+        public Thread put(final Thread key, final Thread value) {
+            final ShutdownEventWrapper hook = new ShutdownEventWrapper(value);
+            this.controller.addShutdownEvent(hook);
+            return null;
+        }
+
+        @Override
+        public Thread remove(final Object key) {
+            if (this.controller.removeShutdownEvent(new ShutdownEventWrapper((Thread) key))) {
+                return (Thread) key;
+            } else {
+                return null;
+            }
+        }
+    }
+
+    private static final class InternalRunnable implements Runnable {
+        private final ShutdownRequest shutdownRequest;
+        private final ShutdownEvent   e;
+
+        InternalRunnable(final ShutdownRequest shutdownRequest, final ShutdownEvent e) {
+            this.shutdownRequest = shutdownRequest;
+            this.e = e;
+        }
+
+        @Override
+        public void run() {
+            this.e.onShutdown(this.shutdownRequest);
+        }
+    }
+
+    private static final class ShutdownVetoListenerPriorityComparator implements Comparator<ShutdownVetoListener> {
+        static final ShutdownVetoListenerPriorityComparator INSTANCE = new ShutdownVetoListenerPriorityComparator();
+
+        @Override
+        public int compare(final ShutdownVetoListener o1, final ShutdownVetoListener o2) {
+            return CompareUtils.compareLong(o1.getShutdownVetoPriority(), o2.getShutdownVetoPriority());
+        }
+    }
+
+    private static final class ShutdownExitThread extends Thread {
+        private final ShutdownController controller;
+        private final ShutdownRequest      request;
+
+        ShutdownExitThread(final ShutdownController controller, final ShutdownRequest request, final String name) {
+            super(name);
+            this.controller = controller;
+            this.request = request;
+        }
+
+        @Override
+        public void run() {
+            Integer exitCode = this.request.getExitCode();
+            try {
+                if (exitCode == null) {
+                    exitCode = this.controller.getExitCode();
+                    this.controller.log("Exit Now(Controller): Code: " + exitCode);
+                } else {
+                    this.controller.log("Exit Now(Request): Code: " + exitCode);
+                }
+                this.controller.runHooks();
+            } finally {
+                System.exit(exitCode != null ? exitCode.intValue() : -1);
+            }
+        }
     }
 }

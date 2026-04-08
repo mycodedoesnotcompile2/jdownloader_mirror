@@ -20,18 +20,19 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 51719 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52625 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -237,6 +238,12 @@ public class LulustreamCom extends XFileSharingProBasic {
 
     @Override
     protected boolean containsRecaptchaV2Class(String string) {
+        /* 2025-04-24: Workaround for upper handling returning wrong value here. */
+        return false;
+    }
+
+    @Override
+    protected boolean containsRecaptchaV2Class(Form form) {
         /* 2025-04-24: Workaround for upper handling returning wrong value here. */
         return false;
     }

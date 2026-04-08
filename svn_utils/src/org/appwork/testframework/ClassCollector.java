@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Hash;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -67,17 +68,21 @@ public class ClassCollector {
                     continue;
                 }
                 if (!inspected.containsKey(clazz)) {
-                    reader = new ClassReader(clazz);
-                    inspected.put(clazz, Hash.getBytesHash(reader.b, Hash.HASH_TYPE_SHA256));
-                    if (collectAll) {
-                        collector = new ClassReferenceCollector();
-                        reader.accept(collector, ClassReader.SKIP_DEBUG);
-                        for (String referenced : collector.referenced) {
-                            if (skip(referenced)) {
-                                continue;
+                    try {
+                        reader = new ClassReader(clazz);
+                        inspected.put(clazz, Hash.getBytesHash(reader.b, Hash.HASH_TYPE_SHA256));
+                        if (collectAll) {
+                            collector = new ClassReferenceCollector();
+                            reader.accept(collector, ClassReader.SKIP_DEBUG);
+                            for (String referenced : collector.referenced) {
+                                if (skip(referenced)) {
+                                    continue;
+                                }
+                                classes.add(referenced);
                             }
-                            classes.add(referenced);
                         }
+                    } catch (IOException e) {
+                        throw Exceptions.addSuppressed(e, new Exception("Failed to load " + clazz));
                     }
                     continue loop;
                 }
@@ -96,9 +101,11 @@ public class ClassCollector {
             return true;
         } else if (clazz.startsWith("org.mozilla.")) {
             return true;
+        } else if (clazz.startsWith("com.install4j.")) {
+            return true;
         } else if (clazz.startsWith("sun.")) {
             return true;
-        } else if (clazz.startsWith("java.") || clazz.startsWith("javax.") || clazz.startsWith("[")) {
+        } else if (clazz.startsWith("java.") || clazz.startsWith("javafx.") || clazz.startsWith("javax.") || clazz.startsWith("[")) {
             return true;
         } else {
             return false;

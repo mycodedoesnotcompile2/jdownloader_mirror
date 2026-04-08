@@ -21,7 +21,9 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49481 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.KVSConfig;
+
+@HostPlugin(revision = "$Revision: 52624 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault3(final PluginWrapper wrapper) {
         super(wrapper);
@@ -29,16 +31,14 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "shameless.com" });
         ret.add(new String[] { "bravotube.net" });
         ret.add(new String[] { "hellporno.com" });
         ret.add(new String[] { "alphaporno.com" });
         ret.add(new String[] { "upskirt.tv" });
-        /* 2023-07-18 */
         ret.add(new String[] { "freshporno.net" });
-        /* 2024-07-31 */
         ret.add(new String[] { "xmegadrive.com" });
+        ret.add(new String[] { "wow.xxx" });
         return ret;
     }
 
@@ -53,6 +53,14 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
 
     public static String[] getAnnotationUrls() {
         return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
+    }
+
+    @Override
+    public Class<? extends KVSConfig> getConfigInterface() {
+        if ("wow.xxx".equals(getHost())) {
+            return KVSConfig.class;
+        }
+        return null;
     }
 
     @Override

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany   
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -34,11 +34,15 @@
 package org.appwork.storage;
 
 /**
- * mark classes that may be stored in JSonStorage Please note that ALL classes
- * that implement this interface MUST implement a default empty constructor
- * 
+ * Marker for <strong>concrete classes</strong> that may be stored or mapped as JSON beans (getters/setters and a
+ * no-arg constructor).
+ * <p>
+ * For a <strong>configuration-style interface</strong> mapped via a FlexiJSON proxy, use
+ * {@link org.appwork.storage.flexijson.mapper.interfacestorage.FlexiStorableInterface} on the interface instead
+ * ({@code public interface MyConfig extends FlexiStorableInterface}), not this type on a class.
+ * </p>
+ *
  * @author thomas
- * 
  */
 public interface Storable {
 

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -291,6 +291,9 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      *
      */
     public static void setAsDefault() {
+        if (Deser.get() instanceof FlexiSerializer) {
+            return;
+        }
         System.setProperty("AWU_SERIALIZER_CLASS", FlexiSerializer.class.getName());
         Deser.set(new FlexiSerializer());
     }

@@ -54,7 +54,6 @@ import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.JNAProcessInfo;
-import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.os.WindowsUtilsKernel32;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
@@ -68,8 +67,8 @@ import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 
 /**
- * AWTest for {@link JNANonWMIWindowsProcessHandler}. Uses PID from {@link Command#getPID()} or current process
- * instead of finding by command line (non-WMI handler does not provide CommandLine).
+ * AWTest for {@link JNANonWMIWindowsProcessHandler}. Uses PID from {@link Command#getPID()} or current process instead of finding by
+ * command line (non-WMI handler does not provide CommandLine).
  *
  * @author thomas
  * @date 08.03.2026
@@ -77,11 +76,11 @@ import com.sun.jna.platform.win32.WinDef.DWORD;
 @TestDependency({ TestJNANonWMIWindowsProcessHandler.ORG_APPWORK_PROCESSES_JNA_JNANON_WMI_WINDOWS_PROCESS_HANDLER, TestJNANonWMIWindowsProcessHandler.ORG_APPWORK_PROCESSES_JNA_JNA_WINDOWS_PROCESS_HANDLER, TestJNANonWMIWindowsProcessHandler.ORG_APPWORK_APP_GUI_BASIC_GUI, "org.appwork.utils.os.WindowsUtils" })
 public class TestJNANonWMIWindowsProcessHandler extends AWTest {
     @AWTestValidateClassReference
-    public static final String ORG_APPWORK_APP_GUI_BASIC_GUI                              = "org.appwork.app.gui.BasicGui";
+    public static final String ORG_APPWORK_APP_GUI_BASIC_GUI                                = "org.appwork.app.gui.BasicGui";
     @AWTestValidateClassReference
-    public static final String ORG_APPWORK_PROCESSES_JNA_JNANON_WMI_WINDOWS_PROCESS_HANDLER = "org.appwork.processes.jna.JNANonWMIWindowsProcessHandler";
+    public static final String ORG_APPWORK_PROCESSES_JNA_JNANON_WMI_WINDOWS_PROCESS_HANDLER = "org.appwork.processes.windows.jna.JNANonWMIWindowsProcessHandler";
     @AWTestValidateClassReference
-    public static final String ORG_APPWORK_PROCESSES_JNA_JNA_WINDOWS_PROCESS_HANDLER      = "org.appwork.processes.jna.JNAWindowsProcessHandler";
+    public static final String ORG_APPWORK_PROCESSES_JNA_JNA_WINDOWS_PROCESS_HANDLER        = "org.appwork.processes.windows.jna.JNAWindowsProcessHandler";
 
     @Override
     public void runTest() throws Exception {
@@ -148,8 +147,8 @@ public class TestJNANonWMIWindowsProcessHandler extends AWTest {
     }
 
     /**
-     * Test listByProcessInfo with a normal ProcessInfo identified by PID (from Command.getPID()). Non-WMI does not
-     * provide command line so we cannot find by command line; we start a process and get PID from Command.
+     * Test listByProcessInfo with a normal ProcessInfo identified by PID (from Command.getPID()). Non-WMI does not provide command line so
+     * we cannot find by command line; we start a process and get PID from Command.
      */
     protected void testListByProcessInfoWithNormalOnlyByPid(String unique, ProcessHandler handler) throws Exception {
         Command c = new Command("cmd", "/c", "ping localhost -n 30 -" + unique);
@@ -280,9 +279,9 @@ public class TestJNANonWMIWindowsProcessHandler extends AWTest {
     }
 
     /**
-     * Compares WMI and non-WMI handler for the same process: both must return the same pid, executablePath,
-     * executableName, parentPid, creationTime, and command line (after getCommandLine() on non-WMI). Ensures both
-     * variants provide identical information for the same process.
+     * Compares WMI and non-WMI handler for the same process: both must return the same pid, executablePath, executableName, parentPid,
+     * creationTime, and command line (after getCommandLine() on non-WMI). Ensures both variants provide identical information for the same
+     * process.
      */
     protected void testWmiVsNonWmiSameInfo() throws Exception {
         int currentPid = getCurrentPid();

@@ -1,12 +1,17 @@
 package org.jdownloader.extensions.antistandby;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.swing.Timer;
+
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
 import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
 
 import org.appwork.loggingv3.LogV3;
@@ -24,6 +29,8 @@ import org.jdownloader.extensions.antistandby.translate.T;
 import org.jdownloader.logging.LogController;
 
 public class AntistandbyConfigPanel extends ExtensionConfigPanel<AntiStandbyExtension> {
+
+    private Label statusLabel;
 
     public AntistandbyConfigPanel(AntiStandbyExtension trayExtension) {
         super(trayExtension);
@@ -103,6 +110,7 @@ public class AntistandbyConfigPanel extends ExtensionConfigPanel<AntiStandbyExte
         if (CrossSystem.isWindows()) {
             final BooleanKeyHandler displayRequired = CFG_ANTISTANDBY.DISPLAY_REQUIRED;
             addPair(T.T.prevent_screensaver(), null, new Checkbox(displayRequired));
+            addPair("Standby requested by", null, statusLabel = new Label(""));
         }
     }
 
@@ -113,6 +121,44 @@ public class AntistandbyConfigPanel extends ExtensionConfigPanel<AntiStandbyExte
     @Override
     public void updateContents() {
 
+    }
+
+    private Timer timer;
+
+    @Override
+    protected void onShow() {
+        super.onShow();
+        timer = new Timer(1000, new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (statusLabel != null) {
+                    final Set<Condition> conditions = getExtension().getCurrentAntiStandbyConditions();
+                    final StringBuilder sb = new StringBuilder();
+                    if (conditions != null) {
+                        for (final Condition condition : conditions) {
+                            if (sb.length() > 0) {
+                                sb.append(",");
+                            }
+                            sb.append(condition.getLabel());
+                        }
+                    }
+                    statusLabel.setText(sb.toString());
+
+                }
+            }
+        });
+        timer.start();
+    }
+
+    @Override
+    protected void onHide() {
+        super.onHide();
+        final Timer timer = this.timer;
+        if (timer != null) {
+            timer.stop();
+            this.timer = null;
+        }
     }
 
 }
