@@ -260,6 +260,9 @@ public class BuildDecisions {
             if (logger == null) {
                 return;
             }
+            if (!isEnabled()) {
+                return;
+            }
             RuntimeMXBean bean = ManagementFactory.getRuntimeMXBean();
             if (bean != null) {
                 String cp = bean.getClassPath();

@@ -218,7 +218,17 @@ public class Exceptions {
                 sb.append(str.substring(off, off + len));
             }
         };
-        try {
+        appendToStacktrace: try {
+            checkClassAnnotatin: {
+                Class<?> check = thrown.getClass();
+                while (check != null) {
+                    if (check.getAnnotation(AppendToStacktrace.class) != null) {
+                        break checkClassAnnotatin;
+                    }
+                    check = check.getSuperclass();
+                }
+                break appendToStacktrace;
+            }
             final ClassCache cc = ClassCache.getClassCache(thrown.getClass());
             for (final String key : cc.getKeys()) {
                 // TODO: slow, optimize
@@ -253,7 +263,7 @@ public class Exceptions {
         if (thrown == null) {
             return "";
         } else {
-            StringBuilder sb = new StringBuilder();
+            final StringBuilder sb = new StringBuilder();
             getStackTrace(sb, thrown);
             return sb.toString();
         }

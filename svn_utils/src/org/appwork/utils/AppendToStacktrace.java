@@ -44,7 +44,7 @@ import java.lang.annotation.Target;
  *
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.METHOD, ElementType.FIELD, })
+@Target({ ElementType.METHOD, ElementType.FIELD, ElementType.TYPE })
 /**
  * Mark a getter in a exception, and our logging methods and ethe Exceptions.getStacktrace method will append the value
  *

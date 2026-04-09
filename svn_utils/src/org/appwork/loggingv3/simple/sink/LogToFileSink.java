@@ -694,17 +694,7 @@ public class LogToFileSink extends AbstractSink {
                                     return;
                                 } finally {
                                     if (lastFlushRequest > lastFlushed) {
-                                        synchronized (LogToFileSink.this) {
-                                            final BufferedWriter fos = LogToFileSink.this.fos;
-                                            if (fos != null) {
-                                                try {
-                                                    lastFlushed = Time.now();
-                                                    fos.flush();
-                                                } catch (IOException e) {
-                                                    return;
-                                                }
-                                            }
-                                        }
+                                        flushNow();
                                     }
                                 }
                             }
@@ -1119,5 +1109,22 @@ public class LogToFileSink extends AbstractSink {
      */
     protected void onLogFile(File logFile, ZipOutputStream zipout) {
         // Default implementation does nothing
+    }
+
+    /**
+     *
+     */
+    public void flushNow() {
+        synchronized (LogToFileSink.this) {
+            final BufferedWriter fos = LogToFileSink.this.fos;
+            if (fos != null) {
+                try {
+                    lastFlushed = Time.now();
+                    fos.flush();
+                } catch (IOException e) {
+                    return;
+                }
+            }
+        }
     }
 }

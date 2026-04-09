@@ -16,13 +16,13 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.hls.HlsContainer;
@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 52594 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52633 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -183,12 +183,13 @@ public class JulesjordanCom extends PluginForHost {
                     if (JulesjordanComDecrypter.isOffline(this.br)) {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
-                    final HashMap<String, String> allQualities = JulesjordanComDecrypter.findAllQualities(this.br);
-                    dllink = allQualities.get(quality);
-                    if (StringUtils.isEmpty(dllink)) {
+                    final Map<String, String[]> allQualities = JulesjordanComDecrypter.findAllQualities(this.br);
+                    final String[] dlinfo = allQualities.get(quality);
+                    if (dlinfo == null) {
                         logger.warning("Failed to refresh directurl");
                         throw new PluginException(LinkStatus.ERROR_FATAL, "Failed to refresh directurl");
                     }
+                    dllink = dlinfo[0];
                     if (isHLS) {
                         con = br.openGetConnection(dllink);
                     } else {
@@ -396,7 +397,7 @@ public class JulesjordanCom extends PluginForHost {
     }
 
     private boolean isLoggedin(final Browser br) {
-        if (br.containsHTML("(?i)members/logout")) {
+        if (br.containsHTML("members/logout")) {
             return true;
         } else {
             return false;
@@ -405,15 +406,43 @@ public class JulesjordanCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
-        ai.setUnlimitedTraffic();
         /*
          * 2017-08-02: No way to verify premium status and/or expire date - I guess if an account works, it always has a subscription
          * (premium status) ...
          */
+        /**
+         * 2026-04-08: There is a new (sketchy) way to obtain more account information:
+         * https://julesjordan.com/members/pages.php?id=My-Membership
+         */
+        if (new Regex(account.getUser(), "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$").patternFind()) {
+            /* Username looks like valid email address -> Try to obtain more account information */
+            try {
+                // br.getPage("/members/pages.php?id=My-Membership");
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("email", account.getUser());
+                br.postPage("/members/pages.php?id=My-Membership", query);
+                /**
+                 * Accounts can have an expiration date but we do not know the format, example html of account without expiration date: <br>
+                 * <p>
+                 * <strong>Expiration Date:</strong> Not set
+                 * </p>
+                 */
+                if (br.containsHTML("Active\\s*</span>")) {
+                    logger.info("Account status: Active");
+                } else {
+                    logger.info("Account status: Unknown");
+                }
+            } catch (final Exception e) {
+                logger.log(e);
+            }
+        } else {
+            logger.info("Cannot determine account type for sure since user did not enter an e-mail address into username field");
+        }
         account.setType(AccountType.PREMIUM);
         account.setConcurrentUsePossible(true);
+        final AccountInfo ai = new AccountInfo();
+        ai.setUnlimitedTraffic();
         return ai;
     }
 
@@ -437,7 +466,7 @@ public class JulesjordanCom extends PluginForHost {
     }
 
     public static String getTitle(final Browser br) {
-        final String title = br.getRegex("class=\"title_bar\">([^<>\"]+)<").getMatch(0);
+        final String title = br.getRegex("class=\"title_bar\">([^<]+)<").getMatch(0);
         return title;
     }
 
@@ -500,10 +529,6 @@ public class JulesjordanCom extends PluginForHost {
     @PluginHost(host = "julesjordan.com", type = Type.HOSTER, multi = true)
     public static interface JulesjordanComConfigInterface extends PluginConfigInterface {
         public static class TRANSLATION {
-            public String getFastLinkcheckEnabled_label() {
-                return _JDT.T.lit_enable_fast_linkcheck();
-            }
-
             public String getGrabBESTEnabled_label() {
                 return _JDT.T.lit_add_only_the_best_video_quality();
             }
@@ -534,13 +559,6 @@ public class JulesjordanCom extends PluginForHost {
         }
 
         public static final TRANSLATION TRANSLATION = new TRANSLATION();
-
-        @AboutConfig
-        @DefaultBooleanValue(true)
-        @Order(9)
-        boolean isFastLinkcheckEnabled();
-
-        void setFastLinkcheckEnabled(boolean b);
 
         @AboutConfig
         @DefaultBooleanValue(false)
@@ -590,13 +608,5 @@ public class JulesjordanCom extends PluginForHost {
         boolean isGrabHTTPMp4_MobileSDEnabled();
 
         void setGrabHTTPMp4_MobileSDEnabled(boolean b);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

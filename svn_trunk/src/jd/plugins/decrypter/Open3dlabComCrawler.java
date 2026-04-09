@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.Open3dlabComConfig;
 import org.jdownloader.plugins.components.config.Open3dlabComConfig.MirrorFallbackMode;
@@ -46,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.Open3dlabCom;
 
-@DecrypterPlugin(revision = "$Revision: 52608 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52631 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { Open3dlabCom.class })
 public class Open3dlabComCrawler extends PluginForDecrypt {
     public Open3dlabComCrawler(PluginWrapper wrapper) {
@@ -122,8 +123,8 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         } else {
             projectID = projectIDFromSourceurl;
         }
-        final String[] dlHTMLs = br.getRegex("(<tr>\\s*<td class=\"text-wrap-word js-edit-input\"[^>]*>.*?</tr>\\s*<tr[^>]*>.*?</tr>)").getColumn(0);
-        if (dlHTMLs == null || dlHTMLs.length == 0) {
+        final String[] htmls = br.getRegex("(<tr>\\s*<td class=\"text-wrap-word js-edit-input\"[^>]*>.*?</tr>\\s*<tr[^>]*>.*?</tr>)").getColumn(0);
+        if (htmls == null || htmls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         String title = br.getRegex("\"name\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
@@ -141,30 +142,37 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         }
         String[] mirrorPrioList = null;
         String userHosterMirrorListStr = cfg.getMirrorPriorityString();
-        if (userHosterMirrorListStr != null) {
-            userHosterMirrorListStr = userHosterMirrorListStr.replace(" ", "").toLowerCase(Locale.ENGLISH);
-            mirrorPrioList = userHosterMirrorListStr.split(",");
+        final boolean userHasMirrorPreference;
+        if (!StringUtils.isEmpty(userHosterMirrorListStr)) {
+            final String[] rawList = userHosterMirrorListStr.replace(" ", "").split(",");
+            mirrorPrioList = new String[rawList.length];
+            for (int i = 0; i < rawList.length; i++) {
+                mirrorPrioList[i] = normalizeToCountryCode(rawList[i]);
+            }
+            userHasMirrorPreference = true;
+        } else {
+            userHasMirrorPreference = false;
         }
         final MirrorFallbackMode fallbackMode = cfg.getMirrorFallbackMode();
-        for (final String dlHTML : dlHTMLs) {
+        for (final String html : htmls) {
             /* Find all mirrors */
-            String filename = new Regex(dlHTML, "<span class=\"js-edit-input__wrapper\"><strong>\\s*([^<]+)\\s*</strong>").getMatch(0);
+            String filename = new Regex(html, "<span class=\"js-edit-input__wrapper\"><strong>\\s*([^<]+)\\s*</strong>").getMatch(0);
             if (filename == null) {
-                filename = new Regex(dlHTML, "(?i)You are about to download \"([^\"]+)").getMatch(0);
+                filename = new Regex(html, "(?i)You are about to download \"([^\"]+)").getMatch(0);
             }
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
             }
-            String filesizeStr = new Regex(dlHTML, "<td>(\\d+[^<]+)</td>\\s*</tr>").getMatch(0);
+            String filesizeStr = new Regex(html, "<td>(\\d+[^<]+)</td>\\s*</tr>").getMatch(0);
             if (filesizeStr == null) {
-                filesizeStr = new Regex(dlHTML, ">\\s*([0-9\\.]+\\s*(TB|GB|MB|KB))\\s*<?").getMatch(0);
+                filesizeStr = new Regex(html, ">\\s*([0-9\\.]+\\s*(TB|GB|MB|KB))\\s*<?").getMatch(0);
             }
             long filesize = -1;
             if (filesizeStr != null) {
                 filesize = SizeFormatter.getSize(filesizeStr);
             }
             /* Collect all mirror links. */
-            final String[] urls = HTMLParser.getHttpLinks(dlHTML, br.getURL());
+            final String[] urls = HTMLParser.getHttpLinks(html, br.getURL());
             final HashSet<String> mirrorURLs = new HashSet<String>();
             for (final String url : urls) {
                 if (url.matches("https?://[^/]+" + Open3dlabCom.PATTERN_SUPPORTED_LINKS.pattern())) {
@@ -184,15 +192,23 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
                 if (filesize != -1) {
                     mirror.setDownloadSize(filesize);
                 }
-                final String mirrorStr = new Regex(mirrorURL, "/\\d+/([^/]+)/?$").getMatch(0);
+                final String mirror_id = new Regex(mirrorURL, Open3dlabCom.PATTERN_SUPPORTED_LINKS).getMatch(0);
+                final String mirrorStr = new Regex(html, mirror_id + "/?\"[^>]*><span class=\"download-text\"><span[^>]*>([^<]+) Download").getMatch(0);
                 if (mirrorStr != null) {
-                    mirrorMap.put(mirrorStr, mirror);
+                    mirrorMap.put(normalizeToCountryCode(mirrorStr), mirror);
                 } else {
+                    /* Fallback */
+                    if (userHasMirrorPreference) {
+                        logger.warning("Failed to find mirror name for mirror: " + mirrorURL);
+                    }
                     untagged_mirrors.add(mirror);
                 }
             }
+            if (userHasMirrorPreference && mirrorMap.isEmpty()) {
+                logger.warning("Failed to find mirror names -> Mirror selection might not work according to users' preferences");
+            }
             DownloadLink preferredMirror = null;
-            if (mirrorPrioList != null && mirrorPrioList.length > 0) {
+            if (userHasMirrorPreference) {
                 /* Search user preferred mirror */
                 for (final String mirrorStr : mirrorPrioList) {
                     preferredMirror = mirrorMap.get(mirrorStr);
@@ -205,7 +221,9 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
                 /* User prefers single mirror and that desired mirror has been found. */
                 ret.add(preferredMirror);
             } else if (fallbackMode == MirrorFallbackMode.ONE) {
-                logger.info("Failed to find desired mirror: Returning random mirror as fallback");
+                if (userHasMirrorPreference) {
+                    logger.info("Failed to find desired mirror: Returning random mirror as fallback");
+                }
                 if (mirrorMap.size() > 0) {
                     final List<DownloadLink> mirrors = new ArrayList<DownloadLink>(mirrorMap.values());
                     ret.add(mirrors.get(new Random().nextInt(mirrors.size())));
@@ -213,7 +231,9 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
                     ret.add(untagged_mirrors.get(new Random().nextInt(untagged_mirrors.size())));
                 }
             } else {
-                logger.info("Failed to find desired mirror: Returning all mirrors as fallback");
+                if (userHasMirrorPreference) {
+                    logger.info("Failed to find desired mirror: Returning all mirrors as fallback");
+                }
                 if (mirrorMap.size() > 0) {
                     ret.addAll(mirrorMap.values());
                 } else {
@@ -247,6 +267,24 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
             result._setFilePackage(fp);
         }
         return ret;
+    }
+
+    /** Normalizes country flag emojis to country-string. */
+    private static String normalizeToCountryCode(final String mirrorStr) {
+        final StringBuilder sb = new StringBuilder();
+        final int len = mirrorStr.length();
+        int i = 0;
+        while (i < len) {
+            final int cp = mirrorStr.codePointAt(i);
+            if (cp >= 0x1F1E6 && cp <= 0x1F1FF) {
+                sb.append((char) ('a' + (cp - 0x1F1E6)));
+            }
+            i += Character.charCount(cp);
+        }
+        if (sb.length() > 0) {
+            return sb.toString(); // Country-Flag-Emoji -> "nl", "us", ...
+        }
+        return mirrorStr.trim().toLowerCase(Locale.ROOT); // Already text
     }
 
     public ArrayList<DownloadLink> crawlProfile(final CryptedLink param) throws Exception {

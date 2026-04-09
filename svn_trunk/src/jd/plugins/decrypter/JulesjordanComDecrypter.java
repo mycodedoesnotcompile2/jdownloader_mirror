@@ -24,16 +24,15 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -44,11 +43,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.hoster.JulesjordanCom;
 import jd.plugins.hoster.JulesjordanCom.JulesjordanComConfigInterface;
 
-@DecrypterPlugin(revision = "$Revision: 52594 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52633 $", interfaceVersion = 3, names = {}, urls = {})
 public class JulesjordanComDecrypter extends PluginForDecrypt {
     public JulesjordanComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,17 +91,18 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
+        final JulesjordanCom plg = (JulesjordanCom) this.getNewPluginForHostInstance(this.getHost());
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        final String contenturl = param.getCryptedUrl();
         if (account == null) {
             /* Only MOCH download and/or trailer download --> Add link for hostplugin -> User might be able to download trailer */
-            final DownloadLink dl = this.createDownloadlink(param.getCryptedUrl());
+            final DownloadLink dl = this.createDownloadlink(contenturl);
             ret.add(dl);
             return ret;
         }
         List<String> all_selected_qualities = new ArrayList<String>();
         final JulesjordanComConfigInterface cfg = PluginJsonConfig.get(JulesjordanCom.JulesjordanComConfigInterface.class);
-        final String url_name = JulesjordanCom.getURLName(param.getCryptedUrl());
+        final String url_name = JulesjordanCom.getURLName(contenturl);
         final boolean grabBest = cfg.isGrabBESTEnabled();
         final boolean grabBestWithinUserSelection = cfg.isOnlyBestVideoQualityOfSelectedQualitiesEnabled();
         final boolean grabUnknownQualities = cfg.isAddUnknownQualitiesEnabled();
@@ -111,7 +110,6 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         final boolean grab1080p = cfg.isGrabHTTPMp4_1080pEnabled();
         final boolean grab720p = cfg.isGrabHTTPMp4_720pHDEnabled();
         final boolean grabMobileSD = cfg.isGrabHTTPMp4_MobileSDEnabled();
-        final boolean fastLinkcheck = cfg.isFastLinkcheckEnabled();
         if (grab4k) {
             all_selected_qualities.add("4K");
         }
@@ -125,73 +123,79 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
             all_selected_qualities.add("Mobile");
         }
         if (all_selected_qualities.isEmpty()) {
+            logger.info("User has deselected all qualities -> Force-selecting all qualities");
             all_selected_qualities = all_known_qualities;
         }
         synchronized (account) {
-            ((jd.plugins.hoster.JulesjordanCom) plg).login(account, false);
-            this.br.getPage(JulesjordanCom.getURLPremium(param.getCryptedUrl()));
+            plg.login(account, false);
+            br.getPage(JulesjordanCom.getURLPremium(contenturl));
             /**
              * 2022-02-21: This may happen randomly- or only for specific links. </br>
              * Once confirmed in JD (or browser!) we should be able to proceed. The website seems to do this by-IP which is why we do not
              * have to update the account cookies to prevent further activation-code-prompts.
              */
-            if (isNewDeviceProtectionActive(this.br)) {
+            if (isNewDeviceProtectionActive(br)) {
                 String activationCode = null;
                 do {
                     activationCode = getUserInput("Enter activation code sent by mail", param).trim();
                     if (this.isAbort()) {
                         throw new InterruptedException();
-                    } else if (!activationCode.matches("[a-z0-9]{6,}")) {
+                    } else if (!activationCode.matches("[a-z0-9]{4,}")) {
                         logger.info("User entered invalid activation code format");
                         continue;
                     } else {
                         break;
                     }
                 } while (true);
-                br.getPage(br.getURL() + "?error_code=" + Encoding.urlEncode(activationCode));
-                if (isNewDeviceProtectionActive(this.br)) {
+                br.getPage(br.getURL() + "?auth_code=" + Encoding.urlEncode(activationCode));
+                if (isNewDeviceProtectionActive(br)) {
                     final String infoText = this.getHost() + " claims 'New Device or Location Detected!'.\r\nAn activation code was sent to your via E-Mail.\r\nYou seem to have entered the wrong activation code for this attempt!\r\nTry again later.";
                     throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "NEW_DEVICE_OR_LOCATION_DETECTION_NOT_PASSED_" + br._getURL().getPath(), infoText, null);
-                } else {
-                    // refresh stored cookies
-                    account.saveCookies(br.getCookies(br.getHost()), "");
                 }
+                // refresh stored cookies in hope that we won't need another code next time.
+                account.saveCookies(br.getCookies(br.getHost()), "");
             } else {
                 // login successful -> refresh stored cookies
                 account.saveCookies(br.getCookies(br.getHost()), "");
             }
         }
-        if (isOffline(this.br)) {
+        if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String title = JulesjordanCom.getTitle(this.br);
+        String title = JulesjordanCom.getTitle(br);
         if (StringUtils.isEmpty(title)) {
             /* Fallback */
             title = url_name;
         }
         title = Encoding.htmlDecode(title).trim();
-        final HashMap<String, DownloadLink> all_found_downloadlinks = new HashMap<String, DownloadLink>();
-        final HashMap<String, String> allQualities = findAllQualities(this.br);
-        final Iterator<Entry<String, String>> it = allQualities.entrySet().iterator();
-        while (it.hasNext()) {
-            final Entry<String, String> entry = it.next();
-            final String quality_url = entry.getKey();
-            final String dlurl = entry.getValue();
-            // final DownloadLink dl = this.createDownloadlink(dlurl);
-            final DownloadLink dl = new DownloadLink(plg, null, this.getHost(), dlurl, true);
-            final String decrypter_filename = title + "_" + quality_url + ".mp4";
-            dl.setName(decrypter_filename);
-            if (fastLinkcheck) {
-                dl.setAvailable(true);
-            }
-            dl.setProperty("fid", url_name);
-            dl.setProperty("quality", quality_url);
-            dl.setProperty("decrypter_filename", decrypter_filename);
-            dl.setProperty("mainlink", param.getCryptedUrl());
-            dl.setLinkID(this.getHost() + "://" + url_name + "/" + quality_url);
-            all_found_downloadlinks.put(quality_url, dl);
+        final Map<String, DownloadLink> all_found_downloadlinks = new HashMap<String, DownloadLink>();
+        final Map<String, String[]> allQualities = findAllQualities(br);
+        if (allQualities == null || allQualities.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final HashMap<String, DownloadLink> all_selected_downloadlinks = handleQualitySelection(all_found_downloadlinks, all_selected_qualities, grabBest, grabBestWithinUserSelection, grabUnknownQualities);
+        final Iterator<Entry<String, String[]>> it = allQualities.entrySet().iterator();
+        while (it.hasNext()) {
+            final Entry<String, String[]> entry = it.next();
+            final String quality_url = entry.getKey();
+            final String[] dlinfo = entry.getValue();
+            final String dlurl = dlinfo[0];
+            // final DownloadLink dl = this.createDownloadlink(dlurl);
+            final DownloadLink video = new DownloadLink(plg, null, this.getHost(), dlurl, true);
+            final String crawler_filename = title + "_" + quality_url + ".mp4";
+            video.setName(crawler_filename);
+            video.setProperty("fid", url_name);
+            video.setProperty("quality", quality_url);
+            video.setProperty("decrypter_filename", crawler_filename);
+            video.setProperty("mainlink", contenturl);
+            video.setLinkID(this.getHost() + "://" + url_name + "/" + quality_url);
+            video.setAvailable(true);
+            if (dlinfo.length == 2) {
+                final String filesizeStr = dlinfo[1];
+                video.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            }
+            all_found_downloadlinks.put(quality_url, video);
+        }
+        final Map<String, DownloadLink> all_selected_downloadlinks = handleQualitySelection(all_found_downloadlinks, all_selected_qualities, grabBest, grabBestWithinUserSelection, grabUnknownQualities);
         /* Finally add selected URLs */
         final Iterator<Entry<String, DownloadLink>> it_2 = all_selected_downloadlinks.entrySet().iterator();
         while (it_2.hasNext()) {
@@ -200,7 +204,7 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
             ret.add(keep);
         }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(Encoding.htmlDecode(title.trim()));
+        fp.setName(Encoding.htmlDecode(title).trim());
         fp.addLinks(ret);
         return ret;
     }
@@ -213,33 +217,33 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         }
     }
 
-    public static HashMap<String, String> findAllQualities(final Browser br) throws Exception {
-        final HashMap<String, String> allQualities = new HashMap<String, String>();
-        /* Old handling */
-        final String[] dlinfo = br.getRegex("<option value=\"(https?://dl\\d+\\.[^/]+/dl/[^<>\"]+\\.mp4)\"").getColumn(0);
-        for (final String dlurl : dlinfo) {
-            final String quality_url = new Regex(dlurl, "([A-Za-z0-9]+)\\.mp4$").getMatch(0);
-            if (dlurl == null || quality_url == null) {
-                /* Skip URLs which do not fit our pattern. */
-                continue;
+    public static Map<String, String[]> findAllQualities(final Browser br) throws Exception {
+        final Map<String, String[]> allQualities = new HashMap<String, String[]>();
+        final String[] filesizes = br.getRegex("class=\"meta\">MP4 • (\\d+[^<]+)</div>").getColumn(0);
+        final String[][] urls = br.getRegex("data-video-path=\"(https?[^\"]+)\" class=\"hover-menu-item[^\"]*\"[^>]*>([^<]+)").getMatches();
+        int index = 0;
+        for (final String[] urlinfo : urls) {
+            final String url = urlinfo[0];
+            final String quality = urlinfo[1];
+            if (filesizes != null && filesizes.length == urls.length) {
+                /* downloadurl + filesize */
+                final String[] dlinfo = new String[2];
+                dlinfo[0] = url;
+                dlinfo[1] = filesizes[index];
+                allQualities.put(quality, dlinfo);
+            } else {
+                /* downloadurl only */
+                final String[] dlinfo = new String[1];
+                dlinfo[0] = url;
+                allQualities.put(quality, dlinfo);
             }
-            allQualities.put(quality_url, dlurl);
-        }
-        /* 2021-07-27: New handling */
-        final String[] jsons = br.getRegex("(\\{ path:.*?\\});").getColumn(0);
-        for (final String json : jsons) {
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
-            String url = entries.get("path").toString();
-            /* Ensure we got an absolute URL, not a relative URL. */
-            url = br.getURL(url).toString();
-            final String name = (String) entries.get("name");
-            allQualities.put(name, url);
+            index++;
         }
         return allQualities;
     }
 
-    private HashMap<String, DownloadLink> handleQualitySelection(final HashMap<String, DownloadLink> all_found_downloadlinks, final List<String> all_selected_qualities, final boolean grab_best, final boolean grab_best_out_of_user_selection, final boolean grab_unknown) {
-        HashMap<String, DownloadLink> all_selected_downloadlinks = new HashMap<String, DownloadLink>();
+    private Map<String, DownloadLink> handleQualitySelection(final Map<String, DownloadLink> all_found_downloadlinks, final List<String> all_selected_qualities, final boolean grab_best, final boolean grab_best_out_of_user_selection, final boolean grab_unknown) {
+        Map<String, DownloadLink> all_selected_downloadlinks = new HashMap<String, DownloadLink>();
         if (all_found_downloadlinks.isEmpty()) {
             logger.info("Failed to find any qualities");
             return all_selected_downloadlinks;
@@ -290,8 +294,8 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         return all_selected_downloadlinks;
     }
 
-    private HashMap<String, DownloadLink> findBESTInsideGivenMap(final HashMap<String, DownloadLink> map_with_downloadlinks) {
-        HashMap<String, DownloadLink> newMap = new HashMap<String, DownloadLink>();
+    private Map<String, DownloadLink> findBESTInsideGivenMap(final Map<String, DownloadLink> map_with_downloadlinks) {
+        Map<String, DownloadLink> newMap = new HashMap<String, DownloadLink>();
         DownloadLink keep = null;
         if (map_with_downloadlinks.size() > 0) {
             for (final String quality : all_known_qualities) {

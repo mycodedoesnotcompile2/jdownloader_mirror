@@ -46,25 +46,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
-import org.appwork.utils.CompareUtils;
-import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogInterface;
 
 public class ShutdownController extends Thread {
-    /**
-     * Force loading and initialization of nested types used during shutdown before {@link #INSTANCE} is constructed.
-     * Anonymous or non-static inner classes would otherwise load only on first use, which can be too late during JVM shutdown.
-     */
-    @SuppressWarnings("unused")
-    private static final Class<?>[] PRELOADED_SHUTDOWN_TYPES = new Class<?>[] { ShutdownEventWrapper.class, HookDelegatingIdentityHashMap.class, InternalRunnable.class,
-            ShutdownVetoListenerPriorityComparator.class, ShutdownExitThread.class };
-
     private static final ShutdownController INSTANCE = new ShutdownController();
     static {
         org.appwork.utils.Application.warnInit();
     }
+    public static final String SHUTDOWNCONTROLLER_HOOK = "shutdowncontroller.hook";
 
     /**
      * get the only existing instance of ShutdownController. This is a singleton
@@ -97,36 +88,42 @@ public class ShutdownController extends Thread {
     private ShutdownController() {
         super(ShutdownController.class.getSimpleName());
         boolean hooksDelegatedFlag = false;
-        try {
-            // add ShutdownController as normal ShutdownHook in Runtime/ApplicationShutdownHooks
-            // may throw IllegalStateException('Shutdown in progress')
-            Runtime.getRuntime().addShutdownHook(this);
-            // synchronize on ApplicationShutdownHooks for synchronized replacement of original hook map
-            synchronized (Class.forName("java.lang.ApplicationShutdownHooks")) {
-                // try to replace the original hook map to "disable" the original hook manager
-                // we overwrite the actual hook list with our own one, and redirect all registered hooks to ShutdownController.
-                // WARNING:
-                // all illegal access operations may be denied >=Java9
-                // and will be denied >=Java16(java.lang.reflect.InaccessibleObjectException), https://openjdk.java.net/jeps/396
-                final Field field = ReflectionUtils.getField("java.lang.ApplicationShutdownHooks", "hooks", null, Map.class);
-                field.setAccessible(true);
-                final Map<Thread, Thread> hooks = (Map<Thread, Thread>) field.get(null);
-                if (hooks != null) {
-                    // hooks must not be null else we are already in shutdown!
-                    final IdentityHashMap<Thread, Thread> hookDelegater = new HookDelegatingIdentityHashMap(this);
-                    for (final Thread hook : hooks.keySet()) {
-                        if (ShutdownController.this != hook) {
-                            this.addShutdownEvent(new ShutdownEventWrapper(hook));
+        if (!"false".equals(System.getProperty(SHUTDOWNCONTROLLER_HOOK))) {
+            try {
+                // add ShutdownController as normal ShutdownHook in Runtime/ApplicationShutdownHooks
+                // may throw IllegalStateException('Shutdown in progress')
+                Runtime.getRuntime().addShutdownHook(this);
+                // synchronize on ApplicationShutdownHooks for synchronized replacement of original hook map
+                synchronized (Class.forName("java.lang.ApplicationShutdownHooks")) {
+                    // try to replace the original hook map to "disable" the original hook manager
+                    // we overwrite the actual hook list with our own one, and redirect all registered hooks to ShutdownController.
+                    // WARNING:
+                    // all illegal access operations may be denied >=Java9
+                    // and will be denied >=Java16(java.lang.reflect.InaccessibleObjectException), https://openjdk.java.net/jeps/396
+                    final Field field = ReflectionUtils.getField("java.lang.ApplicationShutdownHooks", "hooks", null, Map.class);
+                    field.setAccessible(true);
+                    final Map<Thread, Thread> hooks = (Map<Thread, Thread>) field.get(null);
+                    if (hooks != null) {
+                        // hooks must not be null else we are already in shutdown!
+                        final IdentityHashMap<Thread, Thread> hookDelegater = new HookDelegatingIdentityHashMap(this);
+                        for (final Thread hook : hooks.keySet()) {
+                            if (ShutdownController.this == hook && hookDelegater.containsKey(ShutdownController.this)) {
+                                // HookDelegatingIdentityHashMap does add ShutdownController Thread in constructor, executed by
+                                // java.lang.Shutdown
+                                continue;
+                            } else {
+                                this.addShutdownEvent(new ShutdownEventWrapper(hook));
+                            }
                         }
+                        // replace original hook map with hookDelegater
+                        field.set(null, hookDelegater);
+                        hooksDelegatedFlag = true;
                     }
-                    // replace original hook map with hookDelegater
-                    field.set(null, hookDelegater);
-                    hooksDelegatedFlag = true;
                 }
+            } catch (final Throwable e) {
+                // do NOT call any logger(LogV4,LoggerFactory...) because we are still in ShutdownController constructor causing
+                // subsequent calls to ShutdownController.getInstance to return null resulting in NullpointerException
             }
-        } catch (final Throwable e) {
-            // do NOT call any logger(LogV4,LoggerFactory...) because we are still in ShutdownController constructor causing
-            // subsequent calls to ShutdownController.getInstance to return null resulting in NullpointerException
         }
         this.hooksDelegatedFlag = hooksDelegatedFlag;
     }
@@ -232,16 +229,6 @@ public class ShutdownController extends Thread {
      * @param thread
      * @return
      */
-    private String getStackTrace(final Thread thread) {
-        try {
-            final StackTraceElement[] st = thread.getStackTrace();
-            return getStackTrace(st);
-        } catch (final Throwable e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
     protected String getStackTrace(final StackTraceElement[] st) {
         if (st == null) {
             return "";
@@ -318,9 +305,6 @@ public class ShutdownController extends Thread {
         return this.requestShutdown(false);
     }
 
-    // /**
-    // *
-    // */
     public boolean requestShutdown(final boolean silent) {
         return this.requestShutdown(new BasicShutdownRequest(silent));
     }
@@ -370,7 +354,7 @@ public class ShutdownController extends Thread {
                     try {
                         request.onShutdown();
                     } catch (final Throwable e) {
-                        LogV3.severe(Exceptions.getStackTrace(e));
+                        LogV3.log(e);
                     }
                     this.exitThread = new ShutdownExitThread(this, request, "ShutdownThread:" + System.currentTimeMillis() + "|" + request);
                     this.exitThread.start();
@@ -436,20 +420,8 @@ public class ShutdownController extends Thread {
         } catch (final Throwable e) {
         }
     }
-    // private boolean enabled = true;
-    //
-    // public boolean isEnabled() {
-    // return enabled;
-    // }
-    //
-    // public void setEnabled(boolean enabled) {
-    // this.enabled = enabled;
-    // }
 
     private void runHooks() {
-        // if (!isEnabled()) {
-        // return;
-        // }
         if (shutDownHookRunning.compareAndSet(false, true)) {
             /*
              * Attention. This runs in shutdownhook. make sure, that we do not have to load previous unloaded classes here.
@@ -558,7 +530,7 @@ public class ShutdownController extends Thread {
      * Replaces {@code ApplicationShutdownHooks.hooks} to delegate registration to {@link ShutdownController}.
      */
     private static final class HookDelegatingIdentityHashMap extends IdentityHashMap<Thread, Thread> {
-        private static final long serialVersionUID = 8334628124340671103L;
+        private static final long        serialVersionUID = 8334628124340671103L;
         private final ShutdownController controller;
 
         HookDelegatingIdentityHashMap(final ShutdownController controller) {
@@ -602,15 +574,19 @@ public class ShutdownController extends Thread {
     private static final class ShutdownVetoListenerPriorityComparator implements Comparator<ShutdownVetoListener> {
         static final ShutdownVetoListenerPriorityComparator INSTANCE = new ShutdownVetoListenerPriorityComparator();
 
+        private int compareLong(final long x, final long y) {
+            return (x < y) ? -1 : ((x == y) ? 0 : 1);
+        }
+
         @Override
         public int compare(final ShutdownVetoListener o1, final ShutdownVetoListener o2) {
-            return CompareUtils.compareLong(o1.getShutdownVetoPriority(), o2.getShutdownVetoPriority());
+            return compareLong(o1.getShutdownVetoPriority(), o2.getShutdownVetoPriority());
         }
     }
 
     private static final class ShutdownExitThread extends Thread {
         private final ShutdownController controller;
-        private final ShutdownRequest      request;
+        private final ShutdownRequest    request;
 
         ShutdownExitThread(final ShutdownController controller, final ShutdownRequest request, final String name) {
             super(name);
@@ -633,5 +609,28 @@ public class ShutdownController extends Thread {
                 System.exit(exitCode != null ? exitCode.intValue() : -1);
             }
         }
+    }
+
+    /**
+     * intern only--- if we run in a maven like plugin scenario... we run the hooks manually and reset the controller afterwards.
+     */
+    private void reset() {
+        this.shutDown.set(false);
+        synchronized (this.hooks) {
+            hooks.clear();
+        }
+        synchronized (this.vetoListeners) {
+            vetoListeners.clear();
+        }
+        requestedShutDowns.set(0);
+        shutDownHookRunning.set(false);
+    }
+
+    /**
+     * intern only--- if we run in a maven like plugin scenario... we run the hooks manually and reset the controller afterwards.
+     */
+    public void runAndReset() {
+        run();
+        reset();
     }
 }

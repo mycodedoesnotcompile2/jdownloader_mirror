@@ -34,6 +34,7 @@
 package org.appwork.loggingv3.simple.sink;
 
 import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -53,11 +54,13 @@ import org.appwork.utils.IO;
 /**
  * Iterates log entries of a {@link LogToFileSink} from newest to oldest. Opens one segment file at a time; each file is read backwards in
  * chunks. Entries are separated by a fixed byte sequence (default CRLF) — no regular expressions.
+ * <p>
+ * The current segment is backed by an open {@link RandomAccessFile}. If iteration stops before {@link #hasNext()} returns false, call
+ * {@link #close()} (for example in a {@code finally} block) so the file handle and any temporary zip materialization are released.
  *
  * @author Thomas
  */
-// TODO: this implementation can leak open RandomAccessFile in ReverseByteDelimitedIterator
-public final class LogIterator implements Iterator<String> {
+public final class LogIterator implements Iterator<String>, Closeable {
     /**
      * Default entry delimiter: CRLF ({@code \\r\\n}).
      */
@@ -93,6 +96,15 @@ public final class LogIterator implements Iterator<String> {
     @Override
     public String next() {
         return this.delegate.next();
+    }
+
+    /**
+     * Closes the open log segment (if any) and marks this iterator as finished. Safe to call multiple times. After {@code close},
+     * {@link #hasNext()} is false and {@link #next()} throws {@link NoSuchElementException}.
+     */
+    @Override
+    public void close() throws IOException {
+        this.delegate.close();
     }
 
     private static int lastIndexOfBytes(final byte[] haystack, final byte[] needle) {
@@ -137,15 +149,32 @@ public final class LogIterator implements Iterator<String> {
         private final byte[]                 delimiter;
         private int                          fileIndex;
         private ReverseByteDelimitedIterator current;
+        private boolean                      closed;
 
         LatestFirstLogEntryIterator(final List<File> files, final byte[] delimiter) {
-            this.files = new ArrayList<>(files);
+            this.files = new ArrayList<File>(files);
             this.delimiter = delimiter;
             this.fileIndex = 0;
             this.current = null;
+            this.closed = false;
+        }
+
+        void close() {
+            if (this.closed) {
+                return;
+            }
+            this.closed = true;
+            if (this.current != null) {
+                this.current.closeQuietly();
+                this.current = null;
+            }
+            this.fileIndex = this.files.size();
         }
 
         private void openNextNonEmptyFile() {
+            if (this.closed) {
+                return;
+            }
             this.current = null;
             while (this.fileIndex < this.files.size()) {
                 final File file = this.files.get(this.fileIndex++);
@@ -176,6 +205,9 @@ public final class LogIterator implements Iterator<String> {
 
         @Override
         public boolean hasNext() {
+            if (this.closed) {
+                return false;
+            }
             while (true) {
                 if (this.current != null) {
                     if (this.current.hasNext()) {
@@ -196,6 +228,9 @@ public final class LogIterator implements Iterator<String> {
 
         @Override
         public String next() {
+            if (this.closed) {
+                throw new NoSuchElementException();
+            }
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }

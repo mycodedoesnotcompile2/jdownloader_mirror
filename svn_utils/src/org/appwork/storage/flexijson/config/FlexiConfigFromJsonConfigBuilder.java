@@ -86,6 +86,42 @@ public class FlexiConfigFromJsonConfigBuilder<T> extends FlexiConfigBuilder<T> {
         return (FlexiConfigFromJsonConfigBuilder<T>) super.setAutoWriteEnabled(autoWriteEnabled);
     }
 
+    /**
+     * static class to avoid shutdown hooks issues
+     *
+     * @author thomas
+     * @date 08.04.2026
+     *
+     */
+    private static final class DeleteByRespourceFileFilter implements FileFilter {
+        /**
+         *
+         */
+        private final File root;
+        /**
+         *
+         */
+        private final File resource;
+
+        /**
+         * @param root
+         * @param resource
+         */
+        private DeleteByRespourceFileFilter(File root, File resource) {
+            this.root = root;
+            this.resource = resource;
+        }
+
+        @Override
+        public boolean accept(final File file) {
+            final String rel = Files.getRelativePath(root, file);
+            if (StringUtils.startsWithCaseInsensitive(rel, resource.getName() + ".")) {
+                return true;
+            }
+            return false;
+        }
+    }
+
     public static class ConfigBridgeInvocationHandler extends InterfaceStorage {
         public ConfigBridgeInvocationHandler(FlexiJSonMapper mapper, CompiledType cType, FlexiJSonObject obj, FlexiConfigBuilder<?> flexiConfigBuilder) throws SecurityException, NoSuchMethodException {
             super(mapper, cType, obj);
@@ -242,16 +278,7 @@ public class FlexiConfigFromJsonConfigBuilder<T> extends FlexiConfigBuilder<T> {
         // clean up old JSONConfig files
         final File resource = new File(targetPath.getAbsolutePath().replaceAll((CrossSystem.isWindows() ? "(?i)" : "") + "\\.json$", ""));
         final File root = resource.getParentFile();
-        final File[] files = root.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(final File file) {
-                final String rel = Files.getRelativePath(root, file);
-                if (StringUtils.startsWithCaseInsensitive(rel, resource.getName() + ".")) {
-                    return true;
-                }
-                return false;
-            }
-        });
+        final File[] files = root.listFiles(new DeleteByRespourceFileFilter(root, resource));
         for (File file : files) {
             if (file.equals(this.targetPath)) {
                 continue;

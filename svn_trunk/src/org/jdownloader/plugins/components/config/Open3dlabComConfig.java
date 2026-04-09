@@ -12,7 +12,7 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "open3dlab.com", type = Type.HOSTER)
 public interface Open3dlabComConfig extends PluginConfigInterface {
-    final String                    text_MirrorPriorityString        = "Define priority of mirrors e.g. 'ams1, us'.";
+    final String                    text_MirrorPriorityString        = "Define priority of mirrors e.g. 'nl, ca'.";
     final String                    text_MirrorFallbackMode          = "What to do if none of the preferred mirrors are found?";
     final String                    text_CrawlThumbnail              = "Crawl thumbnail from right side of '/project/...' page?";
     final String                    text_CrawlPreviewSlashPromoMedia = "Crawl preview/promo media from middle of '/project/...' page?";

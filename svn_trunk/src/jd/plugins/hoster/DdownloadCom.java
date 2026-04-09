@@ -18,26 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -50,7 +30,25 @@ import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52601 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+
+@HostPlugin(revision = "$Revision: 52632 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,18 +80,6 @@ public class DdownloadCom extends XFileSharingProBasic {
         // re by admin
         ret.setIPVersion(IPVERSION.IPV4_IPV6);
         ret.setHeader(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader2");
-        return ret;
-    }
-
-    @Override
-    public ArrayList<DownloadLink> getDownloadLinks(CrawledLink source, final String data, final FilePackage fp) {
-        final ArrayList<DownloadLink> ret = super.getDownloadLinks(source, data, fp);
-        if (ret == null || ret.size() == 0) {
-            return ret;
-        }
-        for (DownloadLink link : ret) {
-            link.setPluginPatternMatcher(getPluginPatternMatcher(link));
-        }
         return ret;
     }
 
@@ -164,25 +150,10 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected String getPluginPatternMatcher(DownloadLink link) {
-        String ret = super.getPluginPatternMatcher(link);
-        if (ret == null) {
-            return null;
-        }
-        if (ret.contains("killcode=")) {
-            ret = ret.replaceFirst("\\?killcode=[^&#]+", "?").replaceFirst("\\&killcode=[^&#]+", "");
-            if (ret.endsWith("?")) {
-                ret = ret.substring(0, ret.length() - 1);
-            }
-        }
-        return ret;
-    }
-
-    @Override
     public String buildExternalDownloadURL(final DownloadLink link, final PluginForHost buildForThisPlugin) {
         final String fid = getFUIDFromURL(link);
         if (fid != null) {
-            if (StringUtils.startsWithCaseInsensitive(getPluginPatternMatcher(link), "https:")) {
+            if (StringUtils.startsWithCaseInsensitive(getContentURL(link), "https:")) {
                 return "https://" + getHost() + "/" + fid;
             } else if (this.useHTTPS()) {
                 return "https://" + getHost() + "/" + fid;

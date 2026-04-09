@@ -10,6 +10,7 @@ import javax.swing.Icon;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 
+import jd.controlling.ClipboardMonitoring;
 import jd.controlling.downloadcontroller.HistoryEntry;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.packagecontroller.AbstractNode;
@@ -31,6 +32,7 @@ import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.extensions.extraction.ExtractionStatus;
 import org.jdownloader.gui.IconKey;
@@ -152,6 +154,11 @@ public class TaskColumn extends ExtTextColumn<AbstractNode> {
     public boolean onDoubleClick(final MouseEvent e, final AbstractNode obj) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
+                final ColumnHelper columnHelper = new ColumnHelper();
+                fillColumnHelper(columnHelper, obj);
+                if (StringUtils.isNotEmpty(columnHelper.getString())) {
+                    ClipboardMonitoring.getINSTANCE().setCurrentContent(columnHelper.getString());
+                }
                 if (obj instanceof DownloadLink) {
                     List<HistoryEntry> his = ((DownloadLink) obj).getHistory();
                     if (his != null) {

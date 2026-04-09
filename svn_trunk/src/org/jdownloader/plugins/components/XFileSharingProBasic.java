@@ -27,37 +27,6 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -91,7 +60,38 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
+@HostPlugin(revision = "$Revision: 52632 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -491,7 +491,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br>
      * CAUTION: Only set this to true if a filehost: <br>
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br>
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br>
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
+     * <br>
      * 3. Allows a lot of simultaneous connections. <br>
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br>
      * 5. Allows using a generated direct-URL at least two times.
@@ -726,12 +727,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /**
      * Returns URL to content. <br>
      * Uses original domain whenever possible. <br>
+     * Replaces domain in original url if that domain is known to be dead.
      */
     protected String getContentURL(final DownloadLink link) {
         if (link == null) {
             return null;
         }
-        final String originalURL = getPluginPatternMatcher(link);
+        final String originalURL = link.getPluginPatternMatcher();
         if (originalURL == null) {
             return null;
         }
@@ -761,7 +763,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 host = urlHost;
             }
             final String hostCorrected = this.appendWWWIfRequired(host);
-            return originalURL.replaceFirst("(?i)^https?://[^/]+", protocol + hostCorrected);
+            String newurl = originalURL.replaceFirst("(?i)^https?://[^/]+", protocol + hostCorrected);
+            if (StringUtils.containsIgnoreCase(newurl, "killcode=")) {
+                newurl = newurl.replaceFirst("(?i)\\?killcode=[^&#]+", "?").replaceFirst("(?i)\\&killcode=[^&#]+", "");
+                if (newurl.endsWith("?")) {
+                    newurl = newurl.substring(0, newurl.length() - 1);
+                }
+            }
+            return newurl;
         } catch (final MalformedURLException e) {
             /* Return unmodified url. */
             logger.log(e);
@@ -772,10 +781,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public String buildExternalDownloadURL(final DownloadLink link, final PluginForHost buildForThisPlugin) {
         return getContentURL(link);
-    }
-
-    protected String getPluginPatternMatcher(final DownloadLink link) {
-        return link.getPluginPatternMatcher();
     }
 
     @Override
@@ -801,7 +806,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected String getMainPage(final DownloadLink link) {
         final URL url;
         try {
-            url = new URL(getPluginPatternMatcher(link));
+            url = new URL(getContentURL(link));
         } catch (final MalformedURLException e) {
             /* This should never happen */
             e.printStackTrace();
@@ -1067,28 +1072,23 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-    try {
-        /* Check if response is plaintext and contains any known error messages. */
-        final byte[] probe = urlConnection.peek(32);
-        if (probe.length == 0) {
-            return true;
-        }
-        final String probeContext = new String(probe, "UTF-8");
-        final Request clone = urlConnection.getRequest().cloneRequest();
-        clone.setHtmlCode(probeContext);
-        final Browser br = createNewBrowserInstance();
-        br.setRequest(clone);
         try {
-            // TODO: extract the html checks into own method to avoid Browser instance
-            checkServerErrors(br, getDownloadLink(), null);
-        } catch (PluginException e) {
+            /* Check if response is plaintext and contains any known error messages. */
+            final byte[] probe = urlConnection.peek(32);
+            if (probe.length == 0) {
+                return true;
+            }
+            final String probeContext = new String(probe, "UTF-8");
+            try {
+                checkServerErrors(null, probeContext, getDownloadLink(), getCurrentAccount());
+            } catch (PluginException e) {
+                logger.log(e);
+                return false;
+            }
+        } catch (IOException e) {
             logger.log(e);
-            return false;
         }
-    } catch (IOException e) {
-        logger.log(e);
-    }
-    return true;
+        return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -1546,7 +1546,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected URL_TYPE getURLType(final DownloadLink link) {
-        return link != null ? getURLType(getPluginPatternMatcher(link)) : null;
+        return link != null ? getURLType(link.getPluginPatternMatcher()) : null;
     }
 
     protected URL_TYPE getURLType(final String url) {
@@ -1619,7 +1619,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected String getFUID(final DownloadLink link, final URL_TYPE type) {
-        return link != null ? getFUID(getPluginPatternMatcher(link), type) : null;
+        return link != null ? getFUID(link.getPluginPatternMatcher(), type) : null;
     }
 
     /**
@@ -2070,7 +2070,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 for (final DownloadLink link : links) {
                     if (massLinkcheckerParseFileInfo(br, link) == AvailableStatus.UNCHECKED) {
-                        logger.warning("Failed to find any information for current DownloadLink --> Possible mass-linkchecker failure for: " + getPluginPatternMatcher(link));
+                        logger.warning("Failed to find any information for current DownloadLink --> Possible mass-linkchecker failure for: " + link.getPluginPatternMatcher());
                     } else {
                         /* At least one item has been properly detected -> Assume that linkcheck is working. */
                         linkcheckerSuccess = true;
@@ -2216,7 +2216,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br>
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br>
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br>
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
+     * it)!<br>
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br>
      *
@@ -2849,7 +2850,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
+     * <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -4067,17 +4069,17 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     public String getFilenameFromURL(final DownloadLink link) {
         try {
             String result = null;
-            final String url_name_RegEx = "/[a-z0-9]{12}/(.*?)(?:\\.html|\\?|$)";
+            final Pattern url_name_pattern = Pattern.compile("/[a-z0-9]{12}/(.*?)(?:\\.html|\\?|$)");
             /**
              * It's important that we check the contentURL too as we do alter pluginPatternMatcher in { @link
              * #correctDownloadLink(DownloadLink) }
              */
             final String contentURL = getPluginContentURL(link);
             if (contentURL != null) {
-                result = new Regex(new URL(contentURL).getPath(), url_name_RegEx).getMatch(0);
+                result = new Regex(new URL(contentURL).getPath(), url_name_pattern).getMatch(0);
             }
             if (result == null) {
-                result = new Regex(new URL(getPluginPatternMatcher(link)).getPath(), url_name_RegEx).getMatch(0);
+                result = new Regex(new URL(link.getPluginPatternMatcher()).getPath(), url_name_pattern).getMatch(0);
             }
             return result;
         } catch (MalformedURLException e) {
@@ -4356,8 +4358,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Handles all kinds of errors which can happen if we get the final downloadlink but we get html code instead of the file we want to
      * download.
      */
-    public void checkServerErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        final String html = getCorrectBR(br);
+    protected final void checkServerErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        checkServerErrors(br, getCorrectBR(br), link, account);
+    }
+
+    protected void checkServerErrors(Browser br, String html, final DownloadLink link, final Account account) throws PluginException {
         if (new Regex(html, "^(No file|error_nofile|Not Found)$").patternFind()) {
             /* Possibly dead file but it is supposed to be online so let's wait and retry! */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'No file'", 30 * 60 * 1000l);
@@ -4731,7 +4736,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
+     * installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account"
@@ -4920,8 +4926,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
-                 * data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available
+                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = SizeFormatter.getSize(trafficDetails[0]);
                 final long max = SizeFormatter.getSize(trafficDetails[1]);
@@ -4932,8 +4938,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
-             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
+             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
@@ -5296,6 +5302,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     protected InputField get2FALoginField(final Browser br, final Form form) {
         if (form.containsHTML("class\\s*=\\s*\"captcha_code\"") && containsPlainTextCaptcha(form.getHtmlCode())) {
+            // for example filestore.me, <input type="text" name="code" class="captcha_code">
             return null;
         }
         final List<InputField> fields = form.getInputFields();
