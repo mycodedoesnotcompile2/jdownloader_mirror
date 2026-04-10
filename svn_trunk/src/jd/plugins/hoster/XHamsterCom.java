@@ -77,7 +77,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52625 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52637 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -210,6 +210,7 @@ public class XHamsterCom extends PluginForHost {
      */
     private final String         PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT = "timestamp_last_time_premium_only_account";
     private static final String  COOKIE_KEY_PREMIUM                                        = "premium";
+    private boolean              free_login_2fa_required                                   = false;
 
     @Override
     public String getAGBLink() {
@@ -1645,7 +1646,7 @@ public class XHamsterCom extends PluginForHost {
             boolean forceLogincheckPremium = force;
             if (checkURL != null && force) {
                 /* Custom check-URL given -> Only check free or premium login depending on the link -> Speeds things up. */
-                if (this.isPremiumURL(checkURL)) {
+                if (isPremiumURL(checkURL)) {
                     forceLogincheckFree = false;
                     // forceLogincheckPremium = true;
                 } else {
@@ -1654,6 +1655,7 @@ public class XHamsterCom extends PluginForHost {
                 }
             }
             boolean freeLoginSuccess = false;
+            AccountInvalidException freeLoginFailedException = null;
             if (this.isPremiumOnlyAccount(account)) {
                 logger.info("Skipping free login because this account is known to be premium only (= " + domain_premium + " only)");
                 freeLoginSuccess = false;
@@ -1664,9 +1666,18 @@ public class XHamsterCom extends PluginForHost {
                 } catch (final AccountInvalidException aie) {
                     logger.log(aie);
                     logger.info("Free login failed -> Continue for now to check if premium login is possible");
+                    freeLoginFailedException = aie;
                 }
             }
-            this.loginPremium(br, account, checkURL, forceLogincheckPremium, freeLoginSuccess);
+            this.loginPremium(br, account, checkURL, forceLogincheckPremium);
+            /* Premium login success but that does not mean that this account is a premium account! */
+            if (account.getType() != AccountType.PREMIUM && !freeLoginSuccess) {
+                if (freeLoginFailedException != null) {
+                    throw freeLoginFailedException;
+                } else {
+                    throw new AccountInvalidException("Account cannot be used for xhamster.com login and at the same time is not a " + domain_premium + " premium account which means there is no point in using it with JDownloader.");
+                }
+            }
             if (!freeLoginSuccess) {
                 account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT, System.currentTimeMillis());
             } else {
@@ -1683,6 +1694,8 @@ public class XHamsterCom extends PluginForHost {
     }
 
     private void loginFree(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies) throws IOException, PluginException, InterruptedException {
+        /* Nullification */
+        free_login_2fa_required = false;
         String freeDomain = account.getStringProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN);
         if (freeDomain == null) {
             logger.info("Determining current free domain");
@@ -1728,11 +1741,24 @@ public class XHamsterCom extends PluginForHost {
         final String siteKey = PluginJSonUtils.getJson(br, "recaptchaKey");
         final String id = createID();
         final String requestdataFormat = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":%s,\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"trusted\":true,\"username\":%s,\"password\":%s,\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"g-recaptcha-response\":%s}}]";
+        final String requestdataFormatTwoFa = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":%s,\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"username\":%s,\"password\":%s,\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"trusted\":true,\"secondFactorToken\":%s}}]";
         final String requestdataFormatCaptcha = "[{\"name\":\"authorizedUserModelSync\",\"requestData\":{\"model\":{\"id\":null,\"$id\":%s,\"modelName\":\"authorizedUserModel\",\"itemState\":\"unchanged\"},\"username\":%s,\"password\":%s,\"remember\":1,\"redirectURL\":null,\"captcha\":\"\",\"trusted\":true,\"g-recaptcha-response\":%s}}]";
         String requestData = String.format(requestdataFormat, encodeToJSON(id), encodeToJSON(account.getUser()), encodeToJSON(account.getPass()), encodeToJSON(""));
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         brc.postPageRaw("/x-api", requestData);
+        if (twoFaLoginRequired(brc)) {
+            free_login_2fa_required = true;
+            logger.info("2FA code required");
+            final String twoFACode = this.getTwoFACode(account, "\\d{6}");
+            logger.info("Submitting 2FA code");
+            requestData = String.format(requestdataFormatTwoFa, encodeToJSON(id), encodeToJSON(account.getUser()), encodeToJSON(account.getPass()), encodeToJSON(twoFACode));
+            brc.postPageRaw("/x-api", requestData);
+            if (brc.containsHTML("\"invalidToken\":\\s*true")) {
+                throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
+            }
+            logger.info("2FA login successful");
+        }
         if (brc.containsHTML("showCaptcha\":true")) {
             logger.info("Captcha required");
             final String recaptchaV2Response;
@@ -1746,6 +1772,10 @@ public class XHamsterCom extends PluginForHost {
             requestData = String.format(requestdataFormatCaptcha, encodeToJSON(id), encodeToJSON(account.getUser()), encodeToJSON(account.getPass()), encodeToJSON(recaptchaV2Response));
             /* TODO: Fix this */
             brc.postPageRaw("/x-api", requestData);
+            if (twoFaLoginRequired(brc)) {
+                logger.info("Looks like user has entered invalid 2FA token");
+                throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
+            }
         }
         /* First login or not a premium account? One more step required! */
         if (this.getMagicPremiumLoginURL(account) == null) {
@@ -1755,6 +1785,10 @@ public class XHamsterCom extends PluginForHost {
             }
         }
         account.saveCookies(brc.getCookies(br.getHost()), "");
+    }
+
+    private boolean twoFaLoginRequired(final Browser br) {
+        return br.containsHTML("\"secondFactorRequired\":\\s*true");
     }
 
     private boolean checkLoginFree(final Browser br, final Account account, final String customCheckURL) throws IOException {
@@ -1816,7 +1850,7 @@ public class XHamsterCom extends PluginForHost {
         return true;
     }
 
-    private void loginPremium(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies, final boolean xhamsterFreeLoginSuccess) throws IOException, PluginException, InterruptedException {
+    private void loginPremium(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies) throws IOException, PluginException, InterruptedException {
         final Cookies premiumCookies = account.loadCookies(COOKIE_KEY_PREMIUM);
         if (premiumCookies != null) {
             br.setCookies(domain_premium, premiumCookies);
@@ -1925,9 +1959,6 @@ public class XHamsterCom extends PluginForHost {
             account.setType(AccountType.PREMIUM);
         } else {
             account.setType(AccountType.FREE);
-            if (!xhamsterFreeLoginSuccess) {
-                throw new AccountInvalidException("Account cannot be used for xhamster.com login and at the same time is not a " + domain_premium + " premium account which means there is no point in using it with JDownloader.");
-            }
         }
     }
 

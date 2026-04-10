@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 52272 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52641 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,6 @@ public class JpgChurch extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "jpg6.su", "jpg7.cr", "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
         ret.add(new String[] { "putmega.com" });
-        ret.add(new String[] { "imagepond.net" });
         return ret;
     }
 

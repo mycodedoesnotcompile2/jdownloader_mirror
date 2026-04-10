@@ -18,8 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
@@ -27,16 +25,17 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49534 $", interfaceVersion = 3, names = {}, urls = {})
-public class ClictuneCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 52640 $", interfaceVersion = 3, names = {}, urls = {})
+public class ClictuneCom extends PluginForDecrypt {
     public ClictuneCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "clictune.com", "mylinks.xyz", "dlink4.com" });
+        ret.add(new String[] { "clictune.com", "mylinks.xyz", "dlink4.com", "dlink8.com" });
         return ret;
     }
 
@@ -59,9 +58,9 @@ public class ClictuneCom extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 403) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 404) {
@@ -71,10 +70,8 @@ public class ClictuneCom extends antiDDoSForDecrypt {
         }
         String finallink = br.getRegex("redirect/\\?url=(http[^\"]+)\"").getMatch(0);
         if (finallink == null) {
-            /* Assume that URL is offline. */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        // finallink = Encoding.htmlDecode(finallink);
         ret.add(createDownloadlink(finallink));
         return ret;
     }

@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 52633 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52641 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -155,17 +155,19 @@ public class JulesjordanCom extends PluginForHost {
                 this.basicLinkCheck(br, br.createHeadRequest(dllink), link, title, extDefault);
             }
         } else {
-            /* Full video (premium) download */
+            /* Full video/zip (premium) download */
             dllink = link.getPluginPatternMatcher();
             URLConnectionAdapter con = null;
             final boolean isHLS = isHLS(link.getPluginPatternMatcher());
+            final boolean isZIP = !isHLS && isZIPUrl(link);
             try {
                 if (isHLS) {
                     con = br.openGetConnection(dllink);
                 } else {
                     con = br.openHeadConnection(dllink);
                 }
-                if (con.getResponseCode() == 410) {
+                if (!isZIP && con.getResponseCode() == 410) {
+                    /* 2026-04-09: Refreshing directurl shall only be needed for video items */
                     logger.info("Directurl expired --> Trying to refresh it");
                     if (account == null) {
                         logger.info("Cannot refresh directurl because: Account missing");
@@ -319,9 +321,6 @@ public class JulesjordanCom extends PluginForHost {
                     }
                     return;
                 } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(null);
-                    account.clearCookies("");
                     if (userCookies != null) {
                         /* Dead end */
                         logger.info("User Cookie login failed");
@@ -331,6 +330,10 @@ public class JulesjordanCom extends PluginForHost {
                             throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                         }
                     }
+                    /* Try full login */
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
+                    account.clearCookies("");
                 }
             }
             logger.info("Performing full login");
@@ -476,6 +479,10 @@ public class JulesjordanCom extends PluginForHost {
         } else {
             return false;
         }
+    }
+
+    private boolean isZIPUrl(final DownloadLink link) {
+        return StringUtils.endsWithCaseInsensitive(link.getPluginPatternMatcher(), ".zip") || StringUtils.startsWithCaseInsensitive(link.getStringProperty("quality"), "photo_");
     }
 
     public static boolean isTrailerURL(final String inputurl) {

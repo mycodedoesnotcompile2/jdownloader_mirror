@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -29,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 52606 $", interfaceVersion = 3, names = { "badjojo.com" }, urls = { "https?://(?:www\\.)?badjojo\\.com/(\\d+)/[a-z0-9\\-]+/?" })
+@DecrypterPlugin(revision = "$Revision: 52641 $", interfaceVersion = 3, names = {}, urls = {})
 public class BadJoJoComDecrypter extends PornEmbedParser {
     public BadJoJoComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,6 +39,34 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "badjojo.com", "realityxxxtube.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(\\d+)/([a-z0-9\\-]+)/?");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -52,16 +81,14 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
         if (!ret.isEmpty()) {
             return ret;
         }
-        if (br.containsHTML("(?i)<h4>Source</h4>")) {
-            /* 2017-03-21: Handle special case */
-            // <a href="/out.php?siteid=89&amp;id=14064863&amp;url=http%3A%2F%2Fnudez.com%2Fvideo%2F...-221490.html"
-            String externID = br.getRegex("(?i)<h4>Source</h4>\\s*<a href=\"[^\"]+?url=([^\"]+)\"").getMatch(0);
-            if (externID != null) {
-                externID = Encoding.urlDecode(externID, true);
-                logger.info("externID: " + externID);
-                ret.add(createDownloadlink(externID));
-                return ret;
-            }
+        /* 2017-03-21: Handle special case */
+        // <a href="/out.php?siteid=89&amp;id=14064863&amp;url=http%3A%2F%2Fnudez.com%2Fvideo%2F...-221490.html"
+        String externID = br.getRegex("(?i)<h4>Source</h4>\\s*<a href=\"[^\"]+?url=([^\"]+)\"").getMatch(0);
+        if (externID != null) {
+            externID = Encoding.urlDecode(externID, true);
+            logger.info("externID: " + externID);
+            ret.add(createDownloadlink(externID));
+            return ret;
         }
         /* Looks like selfhosted content */
         ret.add(createDownloadlink(param.getCryptedUrl()));

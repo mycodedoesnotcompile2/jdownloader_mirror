@@ -46,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JulesjordanCom;
 import jd.plugins.hoster.JulesjordanCom.JulesjordanComConfigInterface;
 
-@DecrypterPlugin(revision = "$Revision: 52633 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52641 $", interfaceVersion = 3, names = {}, urls = {})
 public class JulesjordanComDecrypter extends PluginForDecrypt {
     public JulesjordanComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -161,6 +161,9 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         }
         if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!this.canHandle(br.getURL())) {
+            /* 2026-04-09: e.g. redirect to: https://www.julesjordan.com/trial_pg/ */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = JulesjordanCom.getTitle(br);
         if (StringUtils.isEmpty(title)) {
@@ -168,40 +171,58 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
             title = url_name;
         }
         title = Encoding.htmlDecode(title).trim();
-        final Map<String, DownloadLink> all_found_downloadlinks = new HashMap<String, DownloadLink>();
-        final Map<String, String[]> allQualities = findAllQualities(br);
-        if (allQualities == null || allQualities.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final Iterator<Entry<String, String[]>> it = allQualities.entrySet().iterator();
-        while (it.hasNext()) {
-            final Entry<String, String[]> entry = it.next();
-            final String quality_url = entry.getKey();
-            final String[] dlinfo = entry.getValue();
-            final String dlurl = dlinfo[0];
-            // final DownloadLink dl = this.createDownloadlink(dlurl);
-            final DownloadLink video = new DownloadLink(plg, null, this.getHost(), dlurl, true);
-            final String crawler_filename = title + "_" + quality_url + ".mp4";
-            video.setName(crawler_filename);
-            video.setProperty("fid", url_name);
-            video.setProperty("quality", quality_url);
-            video.setProperty("decrypter_filename", crawler_filename);
-            video.setProperty("mainlink", contenturl);
-            video.setLinkID(this.getHost() + "://" + url_name + "/" + quality_url);
-            video.setAvailable(true);
-            if (dlinfo.length == 2) {
-                final String filesizeStr = dlinfo[1];
-                video.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        final String[] photo_zip_downloadlinks = br.getRegex("\"(/members/[^\"]+\\.zip)\"").getColumn(0);
+        if (photo_zip_downloadlinks != null && photo_zip_downloadlinks.length > 0) {
+            logger.info("Detected image gallery");
+            int photoindex = 0;
+            for (String url : photo_zip_downloadlinks) {
+                url = br.getURL(url).toExternalForm();
+                final DownloadLink zip = new DownloadLink(plg, null, this.getHost(), url, true);
+                zip.setProperty("fid", url_name);
+                zip.setProperty("quality", "photo_" + photoindex);
+                zip.setProperty("mainlink", contenturl);
+                zip.setLinkID(this.getHost() + "://" + url_name + "/photo/" + photoindex);
+                zip.setAvailable(true);
+                ret.add(zip);
+                photoindex++;
             }
-            all_found_downloadlinks.put(quality_url, video);
-        }
-        final Map<String, DownloadLink> all_selected_downloadlinks = handleQualitySelection(all_found_downloadlinks, all_selected_qualities, grabBest, grabBestWithinUserSelection, grabUnknownQualities);
-        /* Finally add selected URLs */
-        final Iterator<Entry<String, DownloadLink>> it_2 = all_selected_downloadlinks.entrySet().iterator();
-        while (it_2.hasNext()) {
-            final Entry<String, DownloadLink> entry = it_2.next();
-            final DownloadLink keep = entry.getValue();
-            ret.add(keep);
+        } else {
+            logger.info("Assuming that we got a video item");
+            final Map<String, DownloadLink> all_found_downloadlinks = new HashMap<String, DownloadLink>();
+            final Map<String, String[]> allQualities = findAllQualities(br);
+            if (allQualities == null || allQualities.isEmpty()) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final Iterator<Entry<String, String[]>> it = allQualities.entrySet().iterator();
+            while (it.hasNext()) {
+                final Entry<String, String[]> entry = it.next();
+                final String quality_url = entry.getKey();
+                final String[] dlinfo = entry.getValue();
+                final String dlurl = dlinfo[0];
+                // final DownloadLink dl = this.createDownloadlink(dlurl);
+                final DownloadLink video = new DownloadLink(plg, null, this.getHost(), dlurl, true);
+                final String crawler_filename = title + "_" + quality_url + ".mp4";
+                video.setName(crawler_filename);
+                video.setProperty("fid", url_name);
+                video.setProperty("quality", quality_url);
+                video.setProperty("decrypter_filename", crawler_filename);
+                video.setProperty("mainlink", contenturl);
+                video.setLinkID(this.getHost() + "://" + url_name + "/" + quality_url);
+                video.setAvailable(true);
+                if (dlinfo.length == 2) {
+                    final String filesizeStr = dlinfo[1];
+                    video.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                }
+                all_found_downloadlinks.put(quality_url, video);
+            }
+            final Map<String, DownloadLink> all_selected_downloadlinks = handleQualitySelection(all_found_downloadlinks, all_selected_qualities, grabBest, grabBestWithinUserSelection, grabUnknownQualities);
+            /* Finally add selected URLs */
+            final Iterator<Entry<String, DownloadLink>> it_2 = all_selected_downloadlinks.entrySet().iterator();
+            while (it_2.hasNext()) {
+                final Entry<String, DownloadLink> entry = it_2.next();
+                final DownloadLink keep = entry.getValue();
+                ret.add(keep);
+            }
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(Encoding.htmlDecode(title).trim());

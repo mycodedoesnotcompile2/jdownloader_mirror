@@ -19,17 +19,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.CamwhoresTv;
 
-@DecrypterPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Regex;
+import org.appwork.utils.os.CrossSystem;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52642 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoresTvCrawler extends PornEmbedParser {
     public CamwhoresTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,6 +50,16 @@ public class CamwhoresTvCrawler extends PornEmbedParser {
         ret.add(new String[] { "camwhores.tv", "camlovers.tv", "cam-recorder.net", "camwhores10.com", "camwhores10.tv", "camwhores1.com", "camwhores1.tv", "camwhores2.com", "camwhores2.tv", "camwhores3.com", "camwhores3.tv", "camwhores4.com", "camwhores4.tv", "camwhores5.com", "camwhores5.tv", "camwhores6.com", "camwhores6.tv", "camwhores7.com", "camwhores7.tv", "camwhores8.com", "camwhores8.tv", "camwhores9.com", "camwhores9.tv", "camwhores.adult", "camwhores.agency", "camwhores.art", "camwhoresbay.adult", "camwhoresbay.net", "camwhoresbay.org", "camwhoresbay.porn", "camwhoresbay.sex", "camwhoresbay.sexy", "camwhoresbay.tv", "camwhoresbay.webcam", "camwhoresbay.wtf", "camwhoresbay.xxx", "camwhores.best", "camwhores.biz", "camwhores.camera", "camwhores.cc", "camwhores.click", "camwhores.cloud", "camwhorescloud.net", "camwhorescloud.org", "camwhorescloud.porn", "camwhorescloud.tv",
                 "camwhorescloud.xxx", "camwhores.com.co", "camwhores.company", "camwhores.cool", "camwhores.dance", "camwhores.digital", "camwhores.eu", "camwhores.exposed", "camwhores.fans", "camwhores.film", "camwhores.global", "camwhores.guru", "camwhores.id", "camwhores.in", "camwhores.io", "camwhores.lol", "camwhores.love", "camwhores.media", "camwhores.movie", "camwhores.one", "camwhores.online", "camwhores.porn", "camwhores.red", "camwhores.rip", "camwhores.ru.com", "camwhores.run", "camwhores.sex", "camwhores.sexy", "camwhores.shop", "camwhores.show", "camwhores.social", "camwhores.store", "camwhores.stream", "camwhores.studio", "camwhores.sucks", "camwhores.tips", "camwhores.today", "camwhores.top", "camwhores.tube", "camwhorestv.co", "camwhorestv.org", "camwhores.us.com", "camwhores.vc", "camwhores.video", "camwhores.vip", "camwhores.watch", "camwhores.webcam",
                 "camwhores.work", "camwhores.works", "camwhores.ws", "camwhores.wtf", "camwhorez.com", "camwhorez.net", "camwhorez.porn", "camwhorez.sex", "camwhorez.tv", "camwhorez.video", "perfectpussy.tv", "purfectpussy.com", "purfectpussy.net", "purfectpussy.org", "purfectpussy.porn", "purfectpussy.sex", "purfectpussy.tv", "vidwhore.com", "camwhores.sc", "camwhores.org" });
+        return ret;
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        if (CrossSystem.isWindows()) {
+            // version 76.0 is blocked for windows os
+            ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("77.0"));
+        }
         return ret;
     }
 

@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52503 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52639 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -627,7 +627,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             link.setName(weakFilename + extDefault);
         }
         if (link.getReferrerUrl() != null) {
-            /* Rarely needed e.g. for embedded videos from camwhores.tv by camseek.com. */
+            /* Rarely needed e.g. for embedded videos from camwhores.tv. */
             br.getHeaders().put("Referer", link.getReferrerUrl());
         }
         /* Login if we got an account. */

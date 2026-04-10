@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.appwork.utils.StringUtils;
 
@@ -26,6 +27,7 @@ import jd.gui.UserIO;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
@@ -39,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46673 $", interfaceVersion = 2, names = { "metalarea.org" }, urls = { "https?://(?:www\\.)?metalarea\\.org/forum/index\\.php\\?showtopic=([0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 52638 $", interfaceVersion = 2, names = { "metalarea.org" }, urls = { "https?://(?:www\\.)?metalarea\\.org/forum/index\\.php\\?showtopic=([0-9]+)" })
 public class MtlAreRg extends PluginForDecrypt {
     /* must be static so all plugins share same lock */
     private static Object LOCK = new Object();
@@ -54,39 +56,62 @@ public class MtlAreRg extends PluginForDecrypt {
         br.setCookiesExclusive(false);
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(400);
-        getUserLoginAndAccessTargetURL(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        final String thread_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        getUserLoginAndAccessTargetURL(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String fpName = br.getRegex("<td width='99%' style='word-wrap:break-word;'>\\s*<div>\\s*<img[^>]*/>\\s*\\&nbsp;\\s*<b>\\s*(.*?)\\s*</div>\\s*</td>").getMatch(0);
-        if (fpName == null) {
-            fpName = br.getRegex("<title>\\s*(.*?)\\s*</title>").getMatch(0);
-            if (fpName != null) {
-                fpName = fpName.replace(" - Metal Area - Extreme Music Portal", "");
-            }
+        String title = br.getRegex("<td width='99%' style='word-wrap:break-word;'>\\s*<div>\\s*<img[^>]*/>\\s*\\&nbsp;\\s*<b>\\s*(.*?)\\s*</div>\\s*</td>").getMatch(0);
+        if (title == null) {
+            title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
         }
-        if (fpName != null) {
-            fpName = fpName.replaceAll("(</b>(\\s*,)?)", "");
+        if (title != null) {
+            /* Correct title */
+            title = title.replaceFirst(" - Metal Area - Extreme Music Portal", "");
+            title = title.replaceAll("(</b>(\\s*,)?)", "");
+            title = Encoding.htmlDecode(title).trim();
+        } else {
+            logger.warning("Failed to find title");
         }
         // Filter links in hide(s)
         final String htmls[] = br.getRegex("<\\!\\-\\-HideBegin\\-\\->(.*?)<\\!\\-\\-HideEnd\\-\\->").getColumn(0);
         if (htmls == null || htmls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final HashSet<String> temp_ignored_mega_links = new HashSet<String>();
+        int number_of_valid_mega_links = 0;
         for (String pagepiece : htmls) {
-            String[] links = HTMLParser.getHttpLinks(pagepiece, "");
-            if (links != null && links.length != 0) {
-                for (String link : links) {
-                    ret.add(createDownloadlink(link));
+            String[] urls = HTMLParser.getHttpLinks(pagepiece, "");
+            if (urls != null && urls.length != 0) {
+                for (String url : urls) {
+                    if (url.contains("mega.nz")) {
+                        if (url.contains("...")) {
+                            temp_ignored_mega_links.add(url);
+                            continue;
+                        }
+                        number_of_valid_mega_links++;
+                    }
+                    ret.add(createDownloadlink(url));
                 }
             }
         }
-        if (fpName != null) {
-            fpName = Encoding.htmlDecode(fpName).trim();
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(fpName);
-            fp.addLinks(ret);
+        if (number_of_valid_mega_links == 0 && temp_ignored_mega_links.size() > 0) {
+            /* Better something than nothing -> Nevertheless this should never happen! */
+            logger.info("Adding " + temp_ignored_mega_links.size() + " previously ignored mega links");
+            for (final String url : temp_ignored_mega_links) {
+                ret.add(createDownloadlink(url));
+            }
         }
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            fp.setName(title);
+        } else {
+            /* Fallback */
+            fp.setName(thread_id);
+        }
+        fp.setPackageKey("metalarea://thread/" + thread_id);
+        fp.addLinks(ret);
         return ret;
     }
 
@@ -167,7 +192,7 @@ public class MtlAreRg extends PluginForDecrypt {
                 }
                 break;
             }
-        } while (counter < 4 || !this.isAbort());
+        } while (counter < 4 && !this.isAbort());
     }
 
     private void checkErrors(final Browser br) throws PluginException, DecrypterRetryException {
@@ -191,6 +216,7 @@ public class MtlAreRg extends PluginForDecrypt {
         return br.containsHTML("id=\"userlinks\"");
     }
 
+    @Override
     public boolean hasCaptcha(final CryptedLink link, final jd.plugins.Account acc) {
         return false;
     }

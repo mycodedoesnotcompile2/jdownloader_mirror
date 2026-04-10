@@ -20,6 +20,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.OkRuConfig;
+import org.jdownloader.plugins.components.config.OkRuConfig.Quality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -39,21 +49,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.OkRuConfig;
-import org.jdownloader.plugins.components.config.OkRuConfig.Quality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51168 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
+@HostPlugin(revision = "$Revision: 52638 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
 public class OkRu extends PluginForHost {
     public OkRu(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://ok.ru/dk?st.cmd=anonymRegistrationEnterPhone");
+        this.enablePremium("https://" + getHost() + "/dk?st.cmd=anonymRegistrationEnterPhone");
     }
 
     @Override
@@ -215,9 +215,10 @@ public class OkRu extends PluginForHost {
             this.dllink = bestHTTPQualityDownloadurl;
             link.setProperty(PROPERTY_QUALITY, bestHTTPQualityName);
         } else {
-            /* Prefer http - only use HLS if http is not available! */
+            /* Use HLS if http is not available! */
             /**
-             * 2021-09-10: Some users also get: "ondemandHls" and "ondemandDash" </br> No idea if "ondemandHls" == "hlsManifestUrl"
+             * 2021-09-10: Some users also get: "ondemandHls" and "ondemandDash" </br>
+             * No idea if "ondemandHls" == "hlsManifestUrl"
              */
             if (userPreferredQuality != null) {
                 logger.info("Trying HLS fallback because user selected quality hasn't been found!");
@@ -256,7 +257,7 @@ public class OkRu extends PluginForHost {
         // }
         // }
         /* Only check filesize during linkcheck to avoid double-http-requests */
-        if (!isDownload && !StringUtils.isEmpty(dllink) && !dllink.contains(".m3u8")) {
+        if (!isDownload && !StringUtils.isEmpty(dllink) && !StringUtils.containsIgnoreCase(dllink, ".m3u8") && !link.isSizeSet()) {
             URLConnectionAdapter con = null;
             try {
                 con = br.openHeadConnection(dllink);

@@ -52,7 +52,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52569 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52636 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -126,15 +126,20 @@ public class EPornerCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        final Regex videoRegex = new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO);
-        if (videoRegex.patternFind()) {
-            return videoRegex.getMatch(0);
+        final String url = link.getPluginPatternMatcher();
+        Regex regex = new Regex(url, PATTERN_VIDEO);
+        if (regex.patternFind()) {
+            return regex.getMatch(0);
         }
-        final Regex videoUrlRegex = new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO_URL);
-        if (videoUrlRegex.patternFind()) {
-            return videoUrlRegex.getMatch(0);
+        regex = new Regex(url, PATTERN_VIDEO_EMBED);
+        if (regex.patternFind()) {
+            return regex.getMatch(0);
         }
-        return new Regex(link.getPluginPatternMatcher(), PATTERN_PHOTO).getMatch(0);
+        regex = new Regex(url, PATTERN_VIDEO_URL);
+        if (regex.patternFind()) {
+            return regex.getMatch(0);
+        }
+        return new Regex(url, PATTERN_PHOTO).getMatch(0);
     }
 
     @Override
@@ -417,11 +422,12 @@ public class EPornerCom extends PluginForHost {
     }
 
     @Override
-    public String getPluginContentURL(DownloadLink link) {
-        if (new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO_URL).patternFind()) {
+    public String getPluginContentURL(final DownloadLink link) {
+        final String url = link.getPluginPatternMatcher();
+        if (new Regex(url, PATTERN_VIDEO_URL).patternFind() || new Regex(url, PATTERN_VIDEO_EMBED).patternFind()) {
             return "https://www.eporner.com/video-" + this.getFID(link) + "/";
         } else {
-            return link.getPluginPatternMatcher();
+            return url;
         }
     }
 

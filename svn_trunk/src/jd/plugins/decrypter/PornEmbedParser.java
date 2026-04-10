@@ -21,7 +21,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.DecrypterArrayList;
 
-@DecrypterPlugin(revision = "$Revision: 52606 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52640 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class PornEmbedParser extends PluginForDecrypt {
     public PornEmbedParser(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,7 @@ public abstract class PornEmbedParser extends PluginForDecrypt {
 
     /**
      * Override this if it is possible to recognize selfhosted content before looking for external URLs. </br>
-     * Example plugin: boobinspector.com
+     * Example plugin: camwhores.tv
      */
     protected boolean isSelfhosted(final Browser br) {
         return false;

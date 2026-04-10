@@ -18,11 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
@@ -30,7 +28,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.decrypter.CamwhoresTvCrawler;
 
-@HostPlugin(revision = "$Revision: 51010 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
+
+@HostPlugin(revision = "$Revision: 52642 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoresTv extends KernelVideoSharingComV2 {
     public CamwhoresTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -44,6 +47,16 @@ public class CamwhoresTv extends KernelVideoSharingComV2 {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        if (CrossSystem.isWindows()) {
+            // version 76.0 is blocked for windows os
+            ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("77.0"));
+        }
+        return ret;
     }
 
     @Override
