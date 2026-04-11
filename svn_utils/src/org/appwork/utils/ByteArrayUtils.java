@@ -44,6 +44,32 @@ public class ByteArrayUtils {
         return contains(input, 0, probe);
     }
 
+    public final static boolean endsWith(final byte[] array, final byte[] suffix) {
+        if (suffix.length > array.length) {
+            return false;
+        }
+        final int offset = array.length - suffix.length;
+        for (int i = 0; i < suffix.length; i++) {
+            if (array[offset + i] != suffix[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //
+    public static boolean startsWith(byte[] array, byte[] prefix) {
+        if (prefix.length > array.length) {
+            return false;
+        }
+        for (int i = 0; i < prefix.length; i++) {
+            if (array[i] != prefix[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public final static boolean contains(final byte[] input, final int offset, final byte... probe) {
         try {
             if (input.length < probe.length + offset) {

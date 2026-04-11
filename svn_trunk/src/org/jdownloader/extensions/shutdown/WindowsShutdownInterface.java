@@ -3,9 +3,13 @@ package org.jdownloader.extensions.shutdown;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.concurrent.TimeUnit;
 
 import jd.utils.JDUtilities;
 
+import org.appwork.shutdown.ShutdownController;
+import org.appwork.shutdown.ShutdownEvent;
+import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
@@ -75,7 +79,7 @@ public class WindowsShutdownInterface extends ShutdownInterface {
                     }
                 }
             }
-            RestartController.getInstance().exitAsynch(new ForcedShutdown());
+            exitAsync(new ForcedShutdown());
             break;
         case HIBERNATE:
             if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_NT)) {
@@ -140,15 +144,48 @@ public class WindowsShutdownInterface extends ShutdownInterface {
                     logger.log(e);
                 }
             }
-            RestartController.getInstance().exitAsynch(new ForcedShutdown());
+            exitAsync(new ForcedShutdown());
             break;
         case CLOSE:
             stopActivity();
-            RestartController.getInstance().exitAsynch(new SmartRlyExitRequest(true));
+            exitAsync(new SmartRlyExitRequest(true));
             break;
         default:
             break;
         }
+    }
+
+    private void exitAsync(ShutdownRequest request) {
+        if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_11)) {
+            /*
+             * One from Microsoft, 'This is by design. ES_CONTINUOUS is implemented as power requests. Prior to Windows 11 power requests
+             * were held an additional 2 minutes after they were dropped by the application. This caused issue as some applications would
+             * periodically take a power request for a short period keep systems out of sleep indefinitely. This behavior was removed in
+             * Windows 11 and now systems are eligible to sleep as soon as the last power request is dropped.'
+             */
+            ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
+                private final long sleep = TimeUnit.SECONDS.toMillis(5);
+
+                @Override
+                public int getHookPriority() {
+                    return Integer.MIN_VALUE + 1;
+                }
+
+                @Override
+                public void onShutdown(ShutdownRequest shutdownRequest) {
+                    try {
+                        Thread.sleep(sleep);
+                    } catch (InterruptedException ign) {
+                    }
+                }
+
+                @Override
+                public long getMaxDuration() {
+                    return sleep + TimeUnit.SECONDS.toMillis(1);
+                }
+            });
+        }
+        RestartController.getInstance().exitAsynch(request);
     }
 
     private Response execute(String[] command) throws IOException, UnsupportedEncodingException, InterruptedException {

@@ -159,13 +159,15 @@ public final class LogIterator implements Iterator<String>, Closeable {
             this.closed = false;
         }
 
+        // WARNING: not thread safe
         void close() {
             if (this.closed) {
                 return;
             }
             this.closed = true;
-            if (this.current != null) {
-                this.current.closeQuietly();
+            final ReverseByteDelimitedIterator current = this.current;
+            if (current != null) {
+                current.closeQuietly();
                 this.current = null;
             }
             this.fileIndex = this.files.size();
@@ -230,11 +232,11 @@ public final class LogIterator implements Iterator<String>, Closeable {
         public String next() {
             if (this.closed) {
                 throw new NoSuchElementException();
-            }
-            if (!hasNext()) {
+            } else if (!hasNext()) {
                 throw new NoSuchElementException();
+            } else {
+                return this.current.next();
             }
-            return this.current.next();
         }
     }
 

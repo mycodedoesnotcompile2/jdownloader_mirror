@@ -752,6 +752,18 @@ public class DownloadLinkDownloadable implements Downloadable {
                 return;
             }
         }
+        {
+            /* we now use current set filename for granted */
+            final String currentFileName = FILENAME_SOURCE.CUSTOM.getFilename(plugin, downloadLink, connection, downloadLink.getName());
+            if (StringUtils.isNotEmpty(currentFileName)) {
+                /* current filename */
+                final String newFinalFilename = currentFileName;
+                if (setFilename(FILENAME_SOURCE.CUSTOM, newFinalFilename)) {
+                    logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from link:" + plugin.getHost() + "|Content-Type:" + connection.getContentType());
+                }
+                return;
+            }
+        }
     }
 
     protected boolean setFilename(FILENAME_SOURCE source, final String fileName) {

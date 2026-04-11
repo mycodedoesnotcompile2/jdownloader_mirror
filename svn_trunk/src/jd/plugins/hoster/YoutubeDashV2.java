@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
@@ -76,12 +75,10 @@ import jd.plugins.download.raf.ChunkRange;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
@@ -89,17 +86,10 @@ import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpserver.HttpServer;
-import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
-import org.appwork.utils.net.httpserver.requests.AbstractGetRequest;
-import org.appwork.utils.net.httpserver.requests.AbstractPostRequest;
-import org.appwork.utils.net.httpserver.responses.HttpResponse;
-import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
@@ -107,7 +97,6 @@ import org.appwork.utils.swing.dialog.ProgressDialog;
 import org.appwork.utils.swing.dialog.ProgressDialog.ProgressGetter;
 import org.jdownloader.controlling.DefaultDownloadLinkViewImpl;
 import org.jdownloader.controlling.DownloadLinkView;
-import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.controlling.ffmpeg.FFMpegException;
 import org.jdownloader.controlling.ffmpeg.FFMpegProgress;
 import org.jdownloader.controlling.ffmpeg.FFmpeg;
@@ -156,7 +145,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 52261 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 52645 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -361,7 +350,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         return AvailableStatus.TRUE;
                     }
                 }
-                break;
+                    break;
                 case IMAGE: {
                     final String newID;
                     if (VariantGroup.IMAGE_PLAYLIST_COVER.equals(variant.getBaseVariant().getGroup()) && downloadLink.hasProperty(YoutubeHelper.YT_PLAYLIST_ID)) {
@@ -374,7 +363,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         return AvailableStatus.TRUE;
                     }
                 }
-                break;
+                    break;
                 case DESCRIPTION:
                     break;
                 default:
@@ -1754,216 +1743,219 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         return null;
     }
 
-    @Override
-    public FFmpeg getFFmpeg(final Browser br, final DownloadLink downloadLink) {
-        final FFmpegMetaData ffMpegMetaData = getFFmpegMetaData(downloadLink);
-        if (ffMpegMetaData != null && !ffMpegMetaData.isEmpty()) {
-            return new FFmpeg(br) {
-                private final UniqueAlltimeID metaDataProcessID = new UniqueAlltimeID();
-                private HttpServer            httpServer        = null;
-                private File                  metaFile          = null;
-
-                private final boolean isWriteFileEnabled() {
-                    return true;
-                }
-
-                @Override
-                public LogInterface getLogger() {
-                    return YoutubeDashV2.this.getLogger();
-                }
-
-                @Override
-                protected void parseLine(boolean isStdout, String line) {
-                    if (line != null && StringUtils.contains(line, "Input/output error") && StringUtils.contains(line, "/meta")) {
-                        PluginJsonConfig.get(YoutubeConfig.class).setMetaDataEnabled(false);
-                        if (logger != null) {
-                            logger.severe("Firewall/AV blocks JDownloader<->ffmpeg meta data communication. Auto disable meta data support!");
-                        }
-                    }
-                }
-
-                private final HttpServer startHttpServer() {
-                    try {
-                        final HttpServer httpServer = new HttpServer(0);
-                        httpServer.setLocalhostOnly(true);
-                        httpServer.registerRequestHandler(new HttpRequestHandler() {
-                            @Override
-                            public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) throws BasicRemoteAPIException {
-                                return false;
-                            }
-
-                            @Override
-                            public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
-                                try {
-                                    final String id = request.getParameterbyKey("id");
-                                    if (id != null && metaDataProcessID.getID() == Long.parseLong(request.getParameterbyKey("id")) && "/meta".equals(request.getRequestedPath())) {
-                                        if (logger != null) {
-                                            logger.info("Providing ffmpeg meta data");
-                                        }
-                                        final String content = ffMpegMetaData.getFFmpegMetaData();
-                                        final byte[] bytes = content.getBytes("UTF-8");
-                                        response.setResponseCode(HTTPConstants.ResponseCode.get(200));
-                                        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=utf-8"));
-                                        response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, String.valueOf(bytes.length)));
-                                        final OutputStream out = response.getOutputStream(true);
-                                        out.write(bytes);
-                                        out.flush();
-                                        return true;
-                                    }
-                                } catch (final IOException e) {
-                                    if (logger != null) {
-                                        logger.log(e);
-                                    }
-                                }
-                                return false;
-                            }
-                        });
-                        httpServer.start();
-                        if (logger != null) {
-                            logger.info("Opened http server to serve meta on port " + httpServer.getPort());
-                        }
-                        return httpServer;
-                    } catch (final IOException e) {
-                        if (logger != null) {
-                            logger.log(e);
-                        }
-                    }
-                    return null;
-                }
-
-                private File writeMetaFile() {
-                    final File ret = Application.getTempResource("ffmpeg_meta_" + UniqueAlltimeID.create());
-                    try {
-                        IO.writeStringToFile(ret, ffMpegMetaData.getFFmpegMetaData());
-                        if (logger != null) {
-                            logger.info("Wrote meta to " + ret);
-                        }
-                        return ret;
-                    } catch (final Throwable e) {
-                        ret.delete();
-                        if (logger != null) {
-                            logger.log(e);
-                        }
-                    }
-                    return null;
-                }
-
-                private void stopMetaFileProvider() {
-                    final File metaFile = this.metaFile;
-                    if (metaFile != null) {
-                        this.metaFile = null;
-                        metaFile.delete();
-                    }
-                    final HttpServer httpServer = this.httpServer;
-                    if (httpServer != null) {
-                        this.httpServer = null;
-                        httpServer.stop();
-                    }
-                }
-
-                @Override
-                protected boolean demux(FFMpegProgress progress, String out, String audioIn, String[] demuxCommands) throws InterruptedException, IOException, FFMpegException {
-                    if (isWriteFileEnabled()) {
-                        metaFile = writeMetaFile();
-                    } else {
-                        httpServer = startHttpServer();
-                    }
-                    try {
-                        if (httpServer != null || metaFile != null) {
-                            final ArrayList<String> newDemuxCommands = new ArrayList<String>();
-                            boolean metaParamsAdded = false;
-                            String lastDemuxCommand = null;
-                            for (final String demuxCommand : demuxCommands) {
-                                if ("%audio".equals(lastDemuxCommand) && !metaParamsAdded) {
-                                    newDemuxCommands.add("-i");
-                                    if (httpServer != null) {
-                                        newDemuxCommands.add("http://" + httpServer.getServerAddress() + "/meta?id=" + metaDataProcessID.getID());
-                                    } else {
-                                        final String path = metaFile.getAbsolutePath();
-                                        if (CrossSystem.isWindows() && path.length() > 259) {
-                                            // https://msdn.microsoft.com/en-us/library/aa365247.aspx
-                                            newDemuxCommands.add("\\\\?\\" + path);
-                                        } else {
-                                            newDemuxCommands.add(path);
-                                        }
-                                    }
-                                    newDemuxCommands.add("-map_metadata");
-                                    newDemuxCommands.add("1");
-                                    metaParamsAdded = true;
-                                }
-                                newDemuxCommands.add(demuxCommand);
-                                lastDemuxCommand = demuxCommand;
-                            }
-                            if ("%audio".equals(lastDemuxCommand) && !metaParamsAdded) {
-                                newDemuxCommands.add("-i");
-                                if (httpServer != null) {
-                                    newDemuxCommands.add("http://" + httpServer.getServerAddress() + "/meta?id=" + metaDataProcessID.getID());
-                                } else {
-                                    final String path = metaFile.getAbsolutePath();
-                                    if (CrossSystem.isWindows() && path.length() > 259) {
-                                        // https://msdn.microsoft.com/en-us/library/aa365247.aspx
-                                        newDemuxCommands.add("\\\\?\\" + path);
-                                    } else {
-                                        newDemuxCommands.add(path);
-                                    }
-                                }
-                                newDemuxCommands.add("-map_metadata");
-                                newDemuxCommands.add("1");
-                                metaParamsAdded = true;
-                            }
-                            return super.demux(progress, out, audioIn, newDemuxCommands.toArray(new String[0]));
-                        } else {
-                            return super.demux(progress, out, audioIn, demuxCommands);
-                        }
-                    } finally {
-                        stopMetaFileProvider();
-                    }
-                }
-
-                @Override
-                protected boolean mux(FFMpegProgress progress, String out, String videoIn, String audioIn, String[] muxCommands) throws InterruptedException, IOException, FFMpegException {
-                    if (isWriteFileEnabled()) {
-                        metaFile = writeMetaFile();
-                    } else {
-                        httpServer = startHttpServer();
-                    }
-                    try {
-                        if (httpServer != null || metaFile != null) {
-                            final ArrayList<String> newMuxCommands = new ArrayList<String>();
-                            boolean metaParamsAdded = false;
-                            for (final String muxCommand : muxCommands) {
-                                if ("-map".equals(muxCommand) && !metaParamsAdded) {
-                                    newMuxCommands.add("-i");
-                                    if (httpServer != null) {
-                                        newMuxCommands.add("http://" + httpServer.getServerAddress() + "/meta?id=" + metaDataProcessID.getID());
-                                    } else {
-                                        final String path = metaFile.getAbsolutePath();
-                                        if (CrossSystem.isWindows() && path.length() > 259) {
-                                            // https://msdn.microsoft.com/en-us/library/aa365247.aspx
-                                            newMuxCommands.add("\\\\?\\" + path);
-                                        } else {
-                                            newMuxCommands.add(path);
-                                        }
-                                    }
-                                    newMuxCommands.add("-map_metadata");
-                                    newMuxCommands.add("2");
-                                    metaParamsAdded = true;
-                                }
-                                newMuxCommands.add(muxCommand);
-                            }
-                            return super.mux(progress, out, videoIn, audioIn, newMuxCommands.toArray(new String[0]));
-                        } else {
-                            return super.mux(progress, out, videoIn, audioIn, muxCommands);
-                        }
-                    } finally {
-                        stopMetaFileProvider();
-                    }
-                }
-            };
-        } else {
-            return super.getFFmpeg(br, downloadLink);
-        }
-    }
+    // @Override
+    // public FFmpeg getFFmpeg(final Browser br, final DownloadLink downloadLink) {
+    // final FFmpegMetaData ffMpegMetaData = getFFmpegMetaData(downloadLink);
+    // if (ffMpegMetaData != null && !ffMpegMetaData.isEmpty()) {
+    // return new FFmpeg(br) {
+    // private final UniqueAlltimeID metaDataProcessID = new UniqueAlltimeID();
+    // private HttpServer httpServer = null;
+    // private File metaFile = null;
+    //
+    // private final boolean isWriteFileEnabled() {
+    // return true;
+    // }
+    //
+    // @Override
+    // public LogInterface getLogger() {
+    // return YoutubeDashV2.this.getLogger();
+    // }
+    //
+    // @Override
+    // protected void parseLine(boolean isStdout, String line) {
+    // if (line != null && StringUtils.contains(line, "Input/output error") && StringUtils.contains(line, "/meta")) {
+    // PluginJsonConfig.get(YoutubeConfig.class).setMetaDataEnabled(false);
+    // if (logger != null) {
+    // logger.severe("Firewall/AV blocks JDownloader<->ffmpeg meta data communication. Auto disable meta data support!");
+    // }
+    // }
+    // }
+    //
+    // private final HttpServer startHttpServer() {
+    // try {
+    // final HttpServer httpServer = new HttpServer(0);
+    // httpServer.setLocalhostOnly(true);
+    // httpServer.registerRequestHandler(new HttpRequestHandler() {
+    // @Override
+    // public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) throws BasicRemoteAPIException {
+    // return false;
+    // }
+    //
+    // @Override
+    // public boolean onGetRequest(AbstractGetRequest request, HttpResponse response) throws BasicRemoteAPIException {
+    // try {
+    // final String id = request.getParameterbyKey("id");
+    // if (id != null && metaDataProcessID.getID() == Long.parseLong(request.getParameterbyKey("id")) &&
+    // "/meta".equals(request.getRequestedPath())) {
+    // if (logger != null) {
+    // logger.info("Providing ffmpeg meta data");
+    // }
+    // final String content = ffMpegMetaData.getFFmpegMetaData();
+    // final byte[] bytes = content.getBytes("UTF-8");
+    // response.setResponseCode(HTTPConstants.ResponseCode.get(200));
+    // response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/plain; charset=utf-8"));
+    // response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, String.valueOf(bytes.length)));
+    // final OutputStream out = response.getOutputStream(true);
+    // out.write(bytes);
+    // out.flush();
+    // return true;
+    // }
+    // } catch (final IOException e) {
+    // if (logger != null) {
+    // logger.log(e);
+    // }
+    // }
+    // return false;
+    // }
+    // });
+    // httpServer.start();
+    // if (logger != null) {
+    // logger.info("Opened http server to serve meta on port " + httpServer.getPort());
+    // }
+    // return httpServer;
+    // } catch (final IOException e) {
+    // if (logger != null) {
+    // logger.log(e);
+    // }
+    // }
+    // return null;
+    // }
+    //
+    // private File writeMetaFile() {
+    // final File ret = Application.getTempResource("ffmpeg_meta_" + UniqueAlltimeID.create());
+    // try {
+    // IO.writeStringToFile(ret, ffMpegMetaData.getFFmpegMetaData());
+    // if (logger != null) {
+    // logger.info("Wrote meta to " + ret);
+    // }
+    // return ret;
+    // } catch (final Throwable e) {
+    // ret.delete();
+    // if (logger != null) {
+    // logger.log(e);
+    // }
+    // }
+    // return null;
+    // }
+    //
+    // private void stopMetaFileProvider() {
+    // final File metaFile = this.metaFile;
+    // if (metaFile != null) {
+    // this.metaFile = null;
+    // metaFile.delete();
+    // }
+    // final HttpServer httpServer = this.httpServer;
+    // if (httpServer != null) {
+    // this.httpServer = null;
+    // httpServer.stop();
+    // }
+    // }
+    //
+    // @Override
+    // protected boolean demux(FFMpegProgress progress, String out, String audioIn, String[] demuxCommands) throws InterruptedException,
+    // IOException, FFMpegException {
+    // if (isWriteFileEnabled()) {
+    // metaFile = writeMetaFile();
+    // } else {
+    // httpServer = startHttpServer();
+    // }
+    // try {
+    // if (httpServer != null || metaFile != null) {
+    // final ArrayList<String> newDemuxCommands = new ArrayList<String>();
+    // boolean metaParamsAdded = false;
+    // String lastDemuxCommand = null;
+    // for (final String demuxCommand : demuxCommands) {
+    // if ("%audio".equals(lastDemuxCommand) && !metaParamsAdded) {
+    // newDemuxCommands.add("-i");
+    // if (httpServer != null) {
+    // newDemuxCommands.add("http://" + httpServer.getServerAddress() + "/meta?id=" + metaDataProcessID.getID());
+    // } else {
+    // final String path = metaFile.getAbsolutePath();
+    // if (CrossSystem.isWindows() && path.length() > 259) {
+    // // https://msdn.microsoft.com/en-us/library/aa365247.aspx
+    // newDemuxCommands.add("\\\\?\\" + path);
+    // } else {
+    // newDemuxCommands.add(path);
+    // }
+    // }
+    // newDemuxCommands.add("-map_metadata");
+    // newDemuxCommands.add("1");
+    // metaParamsAdded = true;
+    // }
+    // newDemuxCommands.add(demuxCommand);
+    // lastDemuxCommand = demuxCommand;
+    // }
+    // if ("%audio".equals(lastDemuxCommand) && !metaParamsAdded) {
+    // newDemuxCommands.add("-i");
+    // if (httpServer != null) {
+    // newDemuxCommands.add("http://" + httpServer.getServerAddress() + "/meta?id=" + metaDataProcessID.getID());
+    // } else {
+    // final String path = metaFile.getAbsolutePath();
+    // if (CrossSystem.isWindows() && path.length() > 259) {
+    // // https://msdn.microsoft.com/en-us/library/aa365247.aspx
+    // newDemuxCommands.add("\\\\?\\" + path);
+    // } else {
+    // newDemuxCommands.add(path);
+    // }
+    // }
+    // newDemuxCommands.add("-map_metadata");
+    // newDemuxCommands.add("1");
+    // metaParamsAdded = true;
+    // }
+    // return super.demux(progress, out, audioIn, newDemuxCommands.toArray(new String[0]));
+    // } else {
+    // return super.demux(progress, out, audioIn, demuxCommands);
+    // }
+    // } finally {
+    // stopMetaFileProvider();
+    // }
+    // }
+    //
+    // @Override
+    // protected boolean mux(FFMpegProgress progress, String out, String videoIn, String audioIn, String[] muxCommands) throws
+    // InterruptedException, IOException, FFMpegException {
+    // if (isWriteFileEnabled()) {
+    // metaFile = writeMetaFile();
+    // } else {
+    // httpServer = startHttpServer();
+    // }
+    // try {
+    // if (httpServer != null || metaFile != null) {
+    // final ArrayList<String> newMuxCommands = new ArrayList<String>();
+    // boolean metaParamsAdded = false;
+    // for (final String muxCommand : muxCommands) {
+    // if ("-map".equals(muxCommand) && !metaParamsAdded) {
+    // newMuxCommands.add("-i");
+    // if (httpServer != null) {
+    // newMuxCommands.add("http://" + httpServer.getServerAddress() + "/meta?id=" + metaDataProcessID.getID());
+    // } else {
+    // final String path = metaFile.getAbsolutePath();
+    // if (CrossSystem.isWindows() && path.length() > 259) {
+    // // https://msdn.microsoft.com/en-us/library/aa365247.aspx
+    // newMuxCommands.add("\\\\?\\" + path);
+    // } else {
+    // newMuxCommands.add(path);
+    // }
+    // }
+    // newMuxCommands.add("-map_metadata");
+    // newMuxCommands.add("2");
+    // metaParamsAdded = true;
+    // }
+    // newMuxCommands.add(muxCommand);
+    // }
+    // return super.mux(progress, out, videoIn, audioIn, newMuxCommands.toArray(new String[0]));
+    // } else {
+    // return super.mux(progress, out, videoIn, audioIn, muxCommands);
+    // }
+    // } finally {
+    // stopMetaFileProvider();
+    // }
+    // }
+    // };
+    // } else {
+    // return super.getFFmpeg(br, downloadLink);
+    // }
+    // }
 
     public void handleDash(final DownloadLink downloadLink, final YoutubeProperties data, Account account) throws Exception {
         DownloadLinkView oldView = null;
@@ -1998,7 +1990,6 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             requestFileInformation(downloadLink, true);
             final SingleDownloadController dlc = downloadLink.getDownloadLinkController();
             final List<File> locks = new ArrayList<File>();
-            HttpServer httpServer = null;
             try {
                 new DownloadLinkDownloadable(downloadLink).checkIfWeCanWrite(new ExceptionRunnable() {
                     @Override
@@ -2249,9 +2240,6 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 logger.log(e);
                 throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS, null, e);
             } finally {
-                if (httpServer != null) {
-                    httpServer.stop();
-                }
                 for (final File lock : locks) {
                     dlc.unlockFile(lock);
                 }

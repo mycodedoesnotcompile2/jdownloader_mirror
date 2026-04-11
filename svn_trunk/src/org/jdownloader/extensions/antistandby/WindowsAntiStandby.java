@@ -75,6 +75,12 @@ public class WindowsAntiStandby extends Thread implements Runnable {
                 flags = flags | WinBase.ES_DISPLAY_REQUIRED;
             }
         }
+        /**
+         * One from Microsoft, 'This is by design. ES_CONTINUOUS is implemented as power requests. Prior to Windows 11 power requests were
+         * held an additional 2 minutes after they were dropped by the application. This caused issue as some applications would
+         * periodically take a power request for a short period keep systems out of sleep indefinitely. This behavior was removed in Windows
+         * 11 and now systems are eligible to sleep as soon as the last power request is dropped.'
+         */
         Kernel32.INSTANCE.SetThreadExecutionState(flags);
         if (lastFlag.getAndSet(flags) != flags) {
             logger.fine("JDAntiStandby: new flags=" + flags);
