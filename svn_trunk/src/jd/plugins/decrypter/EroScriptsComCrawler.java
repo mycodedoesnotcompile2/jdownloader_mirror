@@ -29,7 +29,7 @@ import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/t/([\\w\\-/]+)" })
+@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/t/([\\w\\-/]+)" })
 public class EroScriptsComCrawler extends antiDDoSForDecrypt {
 
     private static final Set<String> VIDEO_EXTENSIONS = new HashSet<String>(Arrays.asList("mp4", "mkv", "wmv", "mov", "avi", "m4v", "webm"));
@@ -243,8 +243,8 @@ public class EroScriptsComCrawler extends antiDDoSForDecrypt {
      */
     private String extFromLink(final DownloadLink dl) {
         final String urlPath = dl.getPluginPatternMatcher().contains("?") ? dl.getPluginPatternMatcher().substring(0, dl.getPluginPatternMatcher().indexOf('?')) : dl.getPluginPatternMatcher();
-        final String ext = Files.getExtension(urlPath, true);
-        return ext != null ? ext : "bin";
+                final String ext = Files.getExtension(urlPath, true);
+                return ext != null ? ext : "bin";
     }
 
     /**

@@ -11,9 +11,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasicSpecialFilejoker;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -28,7 +25,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52629 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasicSpecialFilejoker;
+
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -224,7 +224,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
          * first check for special case, then execute upper handling as in theory, upper code detection of "Wrong IP" could be changed, then
          * special handling here wouldn't work anymore.
          */
-        if (new Regex(br.getRequest().getHtmlCode().trim(), ">\\s*Wrong IP").patternFind()) {
+        if (new Regex(html, ">\\s*Wrong IP").patternFind()) {
             /*
              * 2020-05-19: May happen when user uses a VPN - this can then especially happen in premium mode for all downloads (via API?!).
              */

@@ -57,7 +57,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52603 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52647 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -67,7 +67,8 @@ public class SerienStreamTo extends PluginForDecrypt {
     /**
      * Path patterns down below <br>
      * Marked as old: aniworld urls, formerly also used for serienstream <br>
-     * Marked as new: serienstream urls new 2026-01-29
+     * Marked as new: serienstream urls new 2026-01-29 <br>
+     * This plugin is preferably used by german users so a lot of possible error messages are hardcoded in German.
      */
     private static final Pattern SERIES_REGEX                                 = Pattern.compile("([\\w-]+)(/staffel-(\\d+)(/episode-(\\d+))?)?", Pattern.CASE_INSENSITIVE);
     /*
@@ -170,13 +171,13 @@ public class SerienStreamTo extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (finallink == null) {
-            if (br.containsHTML(" var t = \"")) {
+            if (br.containsHTML("var t = \"")) {
                 /**
                  * 2026-04-01: Cloudflare Turnstile + Altcaptcha required (we do not support Altcaptcha) <br>
                  * See: https://board.jdownloader.org/showthread.php?p=556817#post556817 * <br>
                  * Screenshot: https://snipboard.io/Bk79ul.jpg/
                  */
-                throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
+                throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT, "BLOCKIERT_DURCH_NICHT_UNTERSTÜTZTEN_CAPTCHA_TYP_ALTCAPTCHA", "Bitte lesen: https://board.jdownloader.org/showthread.php?p=556817#post556817");
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (this.canHandle(finallink)) {

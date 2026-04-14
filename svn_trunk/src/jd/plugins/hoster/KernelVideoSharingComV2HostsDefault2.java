@@ -21,20 +21,17 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52639 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault2(final PluginWrapper wrapper) {
         super(wrapper);
-        if ("cambro.tv".equals(getHost())) {
-            enablePremium();
-        }
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "alotporn.com" });
         ret.add(new String[] { "camvideos.tv" });
+        ret.add(new String[] { "alotporn.com" });
         return ret;
     }
 
@@ -48,7 +45,12 @@ public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(getPluginDomains());
+        // modified buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:/video)?/(\\d+/[^/\\?#]+/?|embed/\\d+/?)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override

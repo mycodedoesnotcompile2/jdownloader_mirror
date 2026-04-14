@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52461 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52647 $", interfaceVersion = 3, names = {}, urls = {})
 public class DroploadIo extends XFileSharingProBasic {
     public DroploadIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class DroploadIo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "dropload.io", "dropload.tv", "dropload.pro", "dr0pstream.com" });
+        ret.add(new String[] { "dropload.io", "dropload.tv", "dropload.pro", "dropload.co", "dr0pstream.com" });
         return ret;
     }
 

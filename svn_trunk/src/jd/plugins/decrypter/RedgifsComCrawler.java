@@ -22,12 +22,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.BearerAuthentication;
@@ -45,7 +39,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 52274 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class RedgifsComCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_USERS                 = Pattern.compile("/users/([\\w\\-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USERS                 = Pattern.compile("/users/([\\w\\-\\.]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_NICHES                = Pattern.compile("/niches/([\\w\\-]+)(\\?.+)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_GALLERY_OR_SINGLE_GIF = Pattern.compile("/(?!gifs/)(?:(?:watch|ifr)/)?([A-Za-z0-9]+)$", Pattern.CASE_INSENSITIVE);
 

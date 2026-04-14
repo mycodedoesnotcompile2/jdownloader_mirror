@@ -37,7 +37,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 52389 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesterMe extends PluginForHost {
     public FilesterMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,10 +55,10 @@ public class FilesterMe extends PluginForHost {
         return "https://" + getHost();
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filester.me" });
+        ret.add(new String[] { "filester.me", "filester.si", "filester.sh", "filester.gg" });
         return ret;
     }
 

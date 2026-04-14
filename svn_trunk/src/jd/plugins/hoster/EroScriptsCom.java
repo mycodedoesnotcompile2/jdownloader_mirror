@@ -22,7 +22,7 @@ import jd.plugins.PluginException;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 
-@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/uploads/([\\w\\-/]+)" })
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/uploads/([\\w\\-/]+)" })
 public class EroScriptsCom extends antiDDoSForHost {
 
     /** Cookie name used to persist the Discourse session. */

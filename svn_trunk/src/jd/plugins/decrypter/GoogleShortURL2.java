@@ -18,33 +18,25 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52650 $", interfaceVersion = 3, names = {}, urls = {})
-public class BadJoJoComDecrypter extends PornEmbedParser {
-    public BadJoJoComDecrypter(PluginWrapper wrapper) {
+@DecrypterPlugin(revision = "$Revision: 52647 $", interfaceVersion = 3, names = {}, urls = {})
+public class GoogleShortURL2 extends PluginForDecrypt {
+    public GoogleShortURL2(PluginWrapper wrapper) {
         super(wrapper);
-    }
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "badjojo.com", "realityxxxtube.com" });
+        ret.add(new String[] { "share.google" });
         return ret;
     }
 
@@ -64,50 +56,25 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(\\d+)/([a-z0-9\\-]+)/?");
+            ret.add("https?://[\\w\\.]*" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)|https?://(?:www\\.)?google\\.com/share\\.google\\?q=([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
-    @Override
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
-        if (isOffline(br)) {
+        final String parameter = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        br.setFollowRedirects(false);
+        br.getPage(parameter);
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        ret.addAll(findEmbedUrls());
-        if (!ret.isEmpty()) {
-            return ret;
-        }
-        /* 2017-03-21: Handle special case */
-        // <a href="/out.php?siteid=89&amp;id=14064863&amp;url=http%3A%2F%2Fnudez.com%2Fvideo%2F...-221490.html"
-        String externID = br.getRegex("<h4>Source</h4>\\s*<a href=\"[^\"]+?url=([^\"]+)\"").getMatch(0);
-        if (externID != null) {
-            externID = Encoding.urlDecode(externID, true);
-            logger.info("externID: " + externID);
-            ret.add(createDownloadlink(externID));
-            return ret;
-        }
-        /* Looks like selfhosted content */
-        ret.add(createDownloadlink(param.getCryptedUrl()));
-        return ret;
-    }
-
-    @Override
-    protected boolean isOffline(final Browser br) {
-        if (br.getRequest().getHttpConnection().getResponseCode() == 404) {
-            return true;
-        } else if (!this.canHandle(br.getURL())) {
-            return true;
+        final String finallink = br.getRedirectLocation();
+        if (finallink == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
-            return false;
+            ret.add(createDownloadlink(finallink));
         }
-    }
-
-    @Override
-    protected String getFileTitle(final CryptedLink param, final Browser br) {
-        return br.getRegex("<title>(.*?)</title>").getMatch(0);
+        return ret;
     }
 }

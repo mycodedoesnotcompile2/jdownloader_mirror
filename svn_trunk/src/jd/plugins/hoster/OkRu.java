@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52638 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
+@HostPlugin(revision = "$Revision: 52650 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
 public class OkRu extends PluginForHost {
     public OkRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,10 +75,11 @@ public class OkRu extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), "/(\\d+(-\\d+)?)$").getMatch(0);
     }
 
-    private String              dllink               = null;
-    private boolean             paidContent          = false;
-    private static final String PROPERTY_QUALITY     = "quality";
-    private static final String PROPERTY_QUALITY_HLS = "quality_hls";
+    private String              dllink                                         = null;
+    private boolean             paidContent                                    = false;
+    private static final String PROPERTY_QUALITY                               = "quality";
+    private static final String PROPERTY_QUALITY_HLS                           = "quality_hls";
+    private boolean             download_fallback_error_no_video_sources_found = false;
 
     public static void prepBR(final Browser br) {
         /* Use mobile website to get http urls. */
@@ -122,6 +123,7 @@ public class OkRu extends PluginForHost {
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         dllink = null;
+        download_fallback_error_no_video_sources_found = false;
         this.setBrowserExclusive();
         if (account != null) {
             this.login(account, false);
@@ -161,46 +163,50 @@ public class OkRu extends PluginForHost {
         String bestUserPreferredQualityDownloadurl = null;
         String bestUserPreferredQualityName = null;
         final Map<String, String> collectedHTTPQualities = new HashMap<String, String>();
-        Map<String, Object> httpQualityInfo = null;
         final Object httpQualitiesO = entries.get("videos");
         if (httpQualitiesO != null) {
             final int preferredUserQuality = getUserPreferredqualityHeightInt(link);
             int maxQuality = 0;
-            final List<Object> httpQualities = (List<Object>) httpQualitiesO;
-            for (final Object httpQ : httpQualities) {
-                httpQualityInfo = (Map<String, Object>) httpQ;
-                final String qualityIdentifier = (String) httpQualityInfo.get("name");
-                final String url = (String) httpQualityInfo.get("url");
-                if (StringUtils.isEmpty(qualityIdentifier) || StringUtils.isEmpty(url)) {
-                    continue;
-                }
-                collectedHTTPQualities.put(qualityIdentifier, url);
-                final int currentQualityHeigthInt;
-                if (qualityIdentifier.equalsIgnoreCase("full")) {
-                    currentQualityHeigthInt = 1080;
-                } else if (qualityIdentifier.equalsIgnoreCase("hd")) {
-                    currentQualityHeigthInt = 720;
-                } else if (qualityIdentifier.equalsIgnoreCase("sd")) {
-                    currentQualityHeigthInt = 480;
-                } else if (qualityIdentifier.equalsIgnoreCase("low")) {
-                    currentQualityHeigthInt = 360;
-                } else if (qualityIdentifier.equalsIgnoreCase("lowest")) {
-                    currentQualityHeigthInt = 240;
-                } else if (qualityIdentifier.equalsIgnoreCase("mobile")) {
-                    currentQualityHeigthInt = 144;
-                } else {
-                    /* Mobile or other > 0 */
-                    currentQualityHeigthInt = 1;
-                    logger.info("Unknown qualityIdentifier: " + qualityIdentifier);
-                }
-                if (currentQualityHeigthInt > maxQuality) {
-                    bestHTTPQualityDownloadurl = url;
-                    bestHTTPQualityName = qualityIdentifier;
-                    maxQuality = currentQualityHeigthInt;
-                }
-                if (currentQualityHeigthInt > 1 && currentQualityHeigthInt <= preferredUserQuality) {
-                    bestUserPreferredQualityDownloadurl = url;
-                    bestUserPreferredQualityName = qualityIdentifier;
+            final List<Map<String, Object>> httpQualities = (List<Map<String, Object>>) httpQualitiesO;
+            if (httpQualities.isEmpty()) {
+                /* 2026-04-13: Can be triggered by using portuguese VPN */
+                download_fallback_error_no_video_sources_found = true;
+            } else {
+                for (final Map<String, Object> httpQualityInfo : httpQualities) {
+                    final String qualityIdentifier = (String) httpQualityInfo.get("name");
+                    final String url = (String) httpQualityInfo.get("url");
+                    if (StringUtils.isEmpty(qualityIdentifier) || StringUtils.isEmpty(url)) {
+                        /* Skip invalid items */
+                        continue;
+                    }
+                    collectedHTTPQualities.put(qualityIdentifier, url);
+                    final int currentQualityHeigthInt;
+                    if (qualityIdentifier.equalsIgnoreCase("full")) {
+                        currentQualityHeigthInt = 1080;
+                    } else if (qualityIdentifier.equalsIgnoreCase("hd")) {
+                        currentQualityHeigthInt = 720;
+                    } else if (qualityIdentifier.equalsIgnoreCase("sd")) {
+                        currentQualityHeigthInt = 480;
+                    } else if (qualityIdentifier.equalsIgnoreCase("low")) {
+                        currentQualityHeigthInt = 360;
+                    } else if (qualityIdentifier.equalsIgnoreCase("lowest")) {
+                        currentQualityHeigthInt = 240;
+                    } else if (qualityIdentifier.equalsIgnoreCase("mobile")) {
+                        currentQualityHeigthInt = 144;
+                    } else {
+                        /* Mobile or other > 0 */
+                        currentQualityHeigthInt = 1;
+                        logger.info("Unknown qualityIdentifier: " + qualityIdentifier);
+                    }
+                    if (currentQualityHeigthInt > maxQuality) {
+                        bestHTTPQualityDownloadurl = url;
+                        bestHTTPQualityName = qualityIdentifier;
+                        maxQuality = currentQualityHeigthInt;
+                    }
+                    if (currentQualityHeigthInt > 1 && currentQualityHeigthInt <= preferredUserQuality) {
+                        bestUserPreferredQualityDownloadurl = url;
+                        bestUserPreferredQualityName = qualityIdentifier;
+                    }
                 }
             }
         }
@@ -340,6 +346,8 @@ public class OkRu extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked");
         } else if (paidContent) {
             throw new AccountRequiredException();
+        } else if (download_fallback_error_no_video_sources_found) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Failed to find any video sources | GEO-blocked or login required");
         } else if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find final downloadurl");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

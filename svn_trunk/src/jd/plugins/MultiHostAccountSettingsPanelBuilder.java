@@ -211,7 +211,7 @@ public class MultiHostAccountSettingsPanelBuilder {
                 if (shouldShowTrafficCalculationColumn_final) {
                     addColumn(createTrafficCalculationFactorColumn());
                 }
-                addColumn(createCreatedColumn());
+                addColumn(createLastUpdatedColumn());
             }
         };
     }
@@ -749,8 +749,8 @@ public class MultiHostAccountSettingsPanelBuilder {
         };
     }
 
-    private ExtTextColumn<MultiHostHost> createCreatedColumn() {
-        return new ExtTextColumn<MultiHostHost>("Last updated timestamp") {
+    private ExtTextColumn<MultiHostHost> createLastUpdatedColumn() {
+        return new ExtTextColumn<MultiHostHost>("Last updated") {
             @Override
             public String getStringValue(final MultiHostHost mhost) {
                 return new ElapsedTimeFormatter().setUseNaturalLanguage(true).formatTimestamp(mhost.getUpdateTimestamp());

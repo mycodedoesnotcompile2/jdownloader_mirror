@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -26,27 +27,54 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 44102 $", interfaceVersion = 3, names = { "goo.gl" }, urls = { "https?://[\\w\\.]*goo\\.gl/(?:photos/)?[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52647 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleShortURL extends PluginForDecrypt {
     public GoogleShortURL(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "goo.gl" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://[\\w\\.]*" + buildHostsPatternPart(domains) + "/(?:photos/)?([A-Za-z0-9]+)");
+        }
+        return ret.toArray(new String[0]);
+    }
+
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString().replaceFirst("(?i)http://", "https://");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String parameter = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         br.setFollowRedirects(false);
         br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else {
-            final String finallink = br.getRedirectLocation();
-            if (finallink == null) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                decryptedLinks.add(createDownloadlink(finallink));
-            }
         }
-        return decryptedLinks;
+        final String finallink = br.getRedirectLocation();
+        if (finallink == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            ret.add(createDownloadlink(finallink));
+        }
+        return ret;
     }
 }

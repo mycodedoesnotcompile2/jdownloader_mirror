@@ -63,7 +63,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52383 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +84,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     @Override
     public void init() {
         for (String host : siteSupportedNames()) {
-            Browser.setRequestIntervalLimitGlobal(host, false, 250);
+            Browser.setRequestIntervalLimitGlobal(host, false, 1250);
         }
         super.init();
     }
@@ -721,6 +721,16 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     String text = "Time until rate-limit reset: Unknown | Attempt " + (i + 1) + "/" + maxTries;
                     text += "\nTry again later or change your IP | Auto retry in " + retrySeconds + " seconds";
                     this.displayBubbleNotification(title, text);
+                    this.sleep(retrySeconds * 1000, this.cl);
+                    continue;
+                } else if (con.getResponseCode() == 502) {
+                    // rate limit also can result in 502
+                    br.followConnection(true);
+                    logger.info("Error 502 " + con.getResponseMessage());
+                    if (lastTry) {
+                        throw new DecrypterRetryException(RetryReason.HOST);
+                    }
+                    final int retrySeconds = 3 + rnd.nextInt(10);
                     this.sleep(retrySeconds * 1000, this.cl);
                     continue;
                 } else if (con.getResponseCode() == 503) {

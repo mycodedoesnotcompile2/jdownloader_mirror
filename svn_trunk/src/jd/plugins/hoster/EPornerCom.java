@@ -21,15 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.EpornerComConfig;
-import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -52,7 +43,16 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52636 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.EpornerComConfig;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -191,12 +191,12 @@ public class EPornerCom extends PluginForHost {
         } else if (!this.br.getURL().contains(this.getFID(link))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        boolean isAgeVerificationBlocked = this.isAgeVerificationBlocked(br);
+        boolean isAgeVerificationBlocked = isAgeVerificationBlocked(br);
         if (isAgeVerificationBlocked && new Regex(br._getURL().getPath(), PATTERN_VIDEO).patternFind()) {
             logger.info("Trying to avoid age verification");
             /* 2025-07-28: Use video embed page to avoid the need of age verification. */
             br.getPage(br.getURL().replaceFirst("/video-", "/embed/"));
-            isAgeVerificationBlocked = this.isAgeVerificationBlocked(br);
+            isAgeVerificationBlocked = isAgeVerificationBlocked(br);
         }
         if (isAgeVerificationBlocked) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Age verification required! Change your IP or add a verified eporner account.");
@@ -389,8 +389,8 @@ public class EPornerCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private boolean isAgeVerificationBlocked(final Browser br) {
-        if (br.containsHTML("<title>Eporner Age Verification</title>|ageVerif/blurred-background")) {
+    public static boolean isAgeVerificationBlocked(final Browser br) {
+        if (br.containsHTML("<title>\\s*Eporner Age Verification\\s*</title>|ageVerif/blurred-background")) {
             /* 2025-07-28: French users need to verify. Checking links or downloading is not possible in this state. */
             return true;
         } else {
@@ -526,7 +526,7 @@ public class EPornerCom extends PluginForHost {
         }
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");

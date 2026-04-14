@@ -32,7 +32,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 52305 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,14 +49,15 @@ public class KatfileCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
+        ret.add(new String[] { "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
         return ret;
     }
 
     @Override
     public String rewriteHost(final String host) {
-        /* 2025-09-09: Main domain changed from katfile.com to katfile.cloud */
-        /* 2025-12-08: Main domain changed from katfile.cloud to katfile.online */
+        /* 2025-09-09: Main domain changed to katfile.cloud */
+        /* 2025-12-08: Main domain changed to katfile.online */
+        /* 2026ma-04-13: Main domain changed to katfile.ws */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

@@ -1,7 +1,6 @@
 package jd.plugins.hoster;
 
 import java.net.MalformedURLException;
-import java.net.URL;
 //jDownloader - Downloadmanager
 //Copyright (C) 2013  JD-Team support@jdownloader.org
 //
@@ -29,6 +28,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.os.CrossSystem;
@@ -38,7 +38,6 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
-import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.requests.FormData;
@@ -62,8 +61,9 @@ import jd.plugins.components.MultiHosterManagement;
 //IMPORTANT: this class must stay in jd.plugins.hoster because it extends another plugin (UseNet) which is only available through PluginClassLoader
 abstract public class ZeveraCore extends UseNet {
     /* Connection limits */
-    private final String        API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
-    private static final String PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
+    private final String                 API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
+    private static final String          PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
+    private static final HashSet<String> cache_hosts                            = new HashSet<String>();
 
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -131,10 +131,7 @@ abstract public class ZeveraCore extends UseNet {
      * Override this function to set chunks settings!
      */
     public int getDownloadModeMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
-            /* Free Account */
-            return 0;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return 0;
         } else {
@@ -225,9 +222,6 @@ abstract public class ZeveraCore extends UseNet {
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
         if (account == null) {
             return false;
-        } else if (account.getType() != AccountType.PREMIUM && !this.supportsFreeAccountDownloadMode(account)) {
-            /* Free account but downloading via free account is not possible. */
-            return false;
         } else {
             return super.canHandle(link, account);
         }
@@ -272,45 +266,46 @@ abstract public class ZeveraCore extends UseNet {
                 logger.info("Trying to re-use stored directurl: " + storedDirecturl);
                 dllink = storedDirecturl;
             } else {
+                final String external_url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
                 final String hash_md5 = link.getMD5Hash();
                 final String hash_sha1 = link.getSha1Hash();
                 final String hash_sha256 = link.getSha256Hash();
                 /* https://app.swaggerhub.com/apis-docs/premiumize.me/api/1.6.7#/transfer/transferDirectdl */
-                String url = "https://www." + account.getHoster() + "/api/transfer/directdl";
                 final boolean useWorkaround = true;
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && cache_hosts.contains(link.getHost())) {
+                    String url = "https://www." + account.getHoster() + "/api/cache/check";
+                    final UrlQuery query = new UrlQuery();
+                    if (!useWorkaround && !usePairingLogin(account)) {
+                        query.appendEncoded("apikey", getAPIKey(account));
+                    }
+                    query.appendEncoded("items[]", external_url);
+                    url += "?" + query.toString();
+                    br.getPage(url);
+                    final Map<String, Object> entries = this.handleAPIErrors(this, br, link, account);
+                    final List<Object> response = (List<Object>) entries.get("response");
+                    if (!Boolean.TRUE.equals(response.get(0))) {
+                        // TODO: Add proper error handling
+                        throw new PluginException(LinkStatus.ERROR_FATAL, "Item not in cache");
+                    }
+                }
+                String url = "https://www." + account.getHoster() + "/api/transfer/directdl";
                 if (!useWorkaround && !usePairingLogin(account)) {
                     url += "?apikey=" + getAPIKey(account);
                 }
                 PostFormDataRequest req = null;
-                UrlQuery query = null;
-                if (false) {
-                    query = new UrlQuery();
-                    query.add("src", URLEncode.encodeURIComponent(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
-                    if (hash_md5 != null) {
-                        query.add("hash_md5", hash_md5);
-                    }
-                    if (hash_sha1 != null) {
-                        query.add("hash_sha1", hash_sha1);
-                    }
-                    if (hash_sha256 != null) {
-                        query.add("hash_sha256", hash_sha256);
-                    }
-                    br.postPage(url, query);
-                } else {
-                    req = br.createPostFormDataRequest(url);
-                    req.addFormData(new FormData("src", link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
-                    req.addFormData(new FormData("folder_id", "null"));
-                    if (hash_md5 != null) {
-                        req.addFormData(new FormData("hash_md5", hash_md5));
-                    }
-                    if (hash_sha1 != null) {
-                        req.addFormData(new FormData("hash_sha1", hash_md5));
-                    }
-                    if (hash_sha256 != null) {
-                        req.addFormData(new FormData("hash_sha256", hash_sha256));
-                    }
-                    br.getPage(req);
+                req = br.createPostFormDataRequest(url);
+                req.addFormData(new FormData("src", external_url));
+                req.addFormData(new FormData("folder_id", "null"));
+                if (hash_md5 != null) {
+                    req.addFormData(new FormData("hash_md5", hash_md5));
                 }
+                if (hash_sha1 != null) {
+                    req.addFormData(new FormData("hash_sha1", hash_md5));
+                }
+                if (hash_sha256 != null) {
+                    req.addFormData(new FormData("hash_sha256", hash_sha256));
+                }
+                br.getPage(req);
                 final boolean useSlotBlockingQueueHandling = true;
                 Map<String, Object> entries;
                 if (useSlotBlockingQueueHandling) {
@@ -335,11 +330,7 @@ abstract public class ZeveraCore extends UseNet {
                         do {
                             this.sleep(waitSecondsPerLoop * 1000l, link, "deferred queue handling: Waiting sec " + passedSeconds + "/" + maxWaitHumanReadable);
                             passedSeconds += waitSecondsPerLoop;
-                            if (query != null) {
-                                br.postPage(url, query);
-                            } else {
-                                br.getPage(req.cloneRequest());
-                            }
+                            br.getPage(req.cloneRequest());
                             entries = this.handleAPIErrors(this, br, link, account, API_STATUS_FOR_QUEUE_DEFERRED_HANDLING);
                             status = (String) entries.get("status");
                             logger.info("Waited seconds: " + passedSeconds + "/" + maxWaitHumanReadable + " | Serverside 'delay' value: " + delay);
@@ -369,9 +360,9 @@ abstract public class ZeveraCore extends UseNet {
                 }
                 /*
                  * 2019-11-29: TODO: This is a workaround! They're caching data. This means that it may also happen that a slightly
-                 * different file will get delivered (= new hash). This is a bad workaround to "disable" the hash check of our original file
-                 * thus prevent JD to display CRC errors when there are none. Premiumize is advised to at least return the correct MD5 hash
-                 * so that we can set it accordingly but for now, we only have this workaround. See also:
+                 * different file will get delivered (= different file hash). This is a bad workaround to "disable" the hash check of our
+                 * original file thus prevent JD to display CRC errors when there are none. Premiumize is advised to at least return the
+                 * correct MD5 hash so that we can set it accordingly but for now, we only have this workaround. See also:
                  * https://svn.jdownloader.org/issues/87604
                  */
                 final boolean forceDisableCRCCheck = true;
@@ -449,12 +440,12 @@ abstract public class ZeveraCore extends UseNet {
         }
         final Number fair_use_usedO = (Number) userinfo.get("limit_used");
         final Number space_usedO = (Number) userinfo.get("space_used");
-        final Number premium_untilO = (Number) userinfo.get("premium_until");
+        final Object premium_untilO = userinfo.get("premium_until");
         if (space_usedO != null) {
             ai.setUsedSpace(space_usedO.longValue());
         }
         /* E.g. free account: "premium_until":false or "premium_until":null */
-        if (premium_untilO != null) {
+        if (premium_untilO instanceof Number) {
             /* Premium account */
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
@@ -470,210 +461,67 @@ abstract public class ZeveraCore extends UseNet {
                 statustext += " | Unlimited Traffic Booster workaround enabled";
             }
             ai.setStatus(statustext);
-            ai.setValidUntil(premium_untilO.longValue() * 1000, br);
+            ai.setValidUntil(((Number) premium_untilO).longValue() * 1000, br);
             ai.setUnlimitedTraffic();
         } else {
-            /* Expired == FREE */
+            /* Free account -> Either expired premium account or account has always been a free account. */
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(getMaxSimultaneousFreeAccountDownloads());
-            if (this.supportsFreeAccountDownloadMode(account)) {
-                /** 2019-07-27: TODO: Remove this hardcoded trafficlimit and obtain this value via API (not yet given at the moment)! */
-                ai.setTrafficLeft(5000000000l);
-            } else {
-                /** Default = Free accounts do not have any traffic. */
-                ai.setTrafficLeft(0);
-                ai.setExpired(true);
-            }
+            /** Default = Free accounts do not have any traffic. */
+            ai.setTrafficLeft(0);
+            ai.setExpired(true);
         }
         callAPI(br, account, "/api/services/list");
-        final Map<String, Object> hosterinfo = this.handleAPIErrors(this, br, null, account);
-        final HashSet<String> supportedHostsMainDomains = new HashSet<String>();
-        final String[] hosterListTypesToAdd = new String[] { "directdl", "queue" };
-        for (final String hosterListTypeToAdd : hosterListTypesToAdd) {
-            final List<String> hosts = (List<String>) hosterinfo.get(hosterListTypeToAdd);
-            if (hosts != null) {
+        synchronized (cache_hosts) {
+            cache_hosts.clear();
+            final Map<String, Object> hosterinfo = this.handleAPIErrors(this, br, null, account);
+            final HashSet<String> supportedHostsMainDomains = new HashSet<String>();
+            final HashSet<String> supportedHostsMainDomainsWithoutCache = new HashSet<String>();
+            final String[] hosterListTypesToAdd = new String[] { "directdl", "queue" };
+            for (final String hosterListTypeToAdd : hosterListTypesToAdd) {
+                final List<String> hosts = (List<String>) hosterinfo.get(hosterListTypeToAdd);
+                if (hosts == null || hosts.isEmpty()) {
+                    continue;
+                }
                 supportedHostsMainDomains.addAll(hosts);
+                supportedHostsMainDomainsWithoutCache.addAll(hosts);
             }
-        }
-        /*
-         * Function for logging hosts which users might report missing in our list -> With this logger those can be easily identified.
-         */
-        final List<String> cachehosts = (List<String>) hosterinfo.get("cache");
-        final Map<String, Number> fairusefactor = (Map<String, Number>) hosterinfo.get("fairusefactor");
-        if (supportsUsenet(account)) {
-            supportedHostsMainDomains.add("usenet");
-        }
-        final HashSet<String> supportedHostsMainDomainsFinal = new HashSet<String>();
-        supportedHostsMainDomainsFinal.addAll(supportedHostsMainDomains);
-        if (cachehosts != null) {
-            supportedHostsMainDomainsFinal.addAll(cachehosts);
-        }
-        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-        final Map<String, Object> aliasesmap = (Map<String, Object>) hosterinfo.get("aliases");
-        for (final String mainDomain : supportedHostsMainDomainsFinal) {
-            final MultiHostHost mhost = new MultiHostHost(mainDomain);
-            final List<String> allDomains = (List<String>) aliasesmap.get(mainDomain);
-            if (allDomains != null) {
-                mhost.addDomains(allDomains);
+            final List<String> cachehosts = (List<String>) hosterinfo.get("cache");
+            final Map<String, Number> fairusefactor = (Map<String, Number>) hosterinfo.get("fairusefactor");
+            if (cachehosts != null) {
+                supportedHostsMainDomains.addAll(cachehosts);
             }
-            final Number fairusefactorThisHost = fairusefactor.get(mainDomain);
-            if (fairusefactorThisHost != null) {
-                /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
-                mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
+            if (supportsUsenet(account)) {
+                supportedHostsMainDomainsWithoutCache.add("usenet");
             }
-            if (cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomains.contains(mainDomain)) {
-                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
-                mhost.setStatusText("Cache only");
+            final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+            final Map<String, Object> aliasesmap = (Map<String, Object>) hosterinfo.get("aliases");
+            for (final String mainDomain : supportedHostsMainDomains) {
+                final boolean isCacheHost = cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomainsWithoutCache.contains(mainDomain);
+                final MultiHostHost mhost = new MultiHostHost(mainDomain);
+                final List<String> allDomains = (List<String>) aliasesmap.get(mainDomain);
+                if (allDomains != null) {
+                    mhost.addDomains(allDomains);
+                }
+                final Number fairusefactorThisHost = fairusefactor.get(mainDomain);
+                if (fairusefactorThisHost != null && fairusefactorThisHost.intValue() != 1) {
+                    /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
+                    mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
+                }
+                // if (cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomains.contains(mainDomain)) {
+                // mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                // mhost.setStatusText("Cache only (only for usage in KODI and other 3rd party addons)");
+                // }
+                if (isCacheHost) {
+                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+                    mhost.setStatusText("Cache only");
+                    cache_hosts.addAll(allDomains);
+                }
+                supportedhosts.add(mhost);
             }
-            supportedhosts.add(mhost);
-        }
-        ai.setMultiHostSupportV2(this, supportedhosts);
-        if (account.getType() == AccountType.FREE && supportsFreeAccountDownloadMode(account)) {
-            /* Display info-dialog regarding free account usage */
-            handleFreeModeLoginDialog(account, "https://www." + account.getHoster() + "/free");
+            ai.setMultiHostSupportV2(this, supportedhosts);
         }
         return ai;
-    }
-
-    @SuppressWarnings("deprecation")
-    private void handleFreeModeLoginDialog(final Account account, final String url) {
-        final boolean showAlways = true;
-        SubConfiguration config = null;
-        try {
-            config = getPluginConfig();
-            if (showAlways || config.getBooleanProperty("featuredialog_login_Shown_2019_07_01", Boolean.FALSE) == false) {
-                if (showAlways || config.getProperty("featuredialog_login_Shown_2019_07_02") == null) {
-                    showFreeModeLoginInformation(account, url);
-                } else {
-                    config = null;
-                }
-            } else {
-                config = null;
-            }
-        } catch (final Throwable e) {
-        } finally {
-            if (config != null) {
-                config.setProperty("featuredialog_login_Shown_2019_07_01", Boolean.TRUE);
-                config.setProperty("featuredialog_login_Shown_2019_07_02", "shown");
-                config.save();
-            }
-        }
-    }
-
-    private Thread showFreeModeLoginInformation(final Account account, final String url) throws Exception {
-        if (!displayFreeAccountDownloadDialogs(account)) {
-            return null;
-        }
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = br.getHost() + " ermöglicht ab sofort auch kostenlose Downloads";
-                        message += "Hallo liebe(r) " + br.getHost() + " NutzerIn\r\n";
-                        message += "Ab sofort kannst du diesen Anbieter auch mit einem kostenlosen Account verwenden!\r\n";
-                        message += "Mehr infos dazu findest du unter:\r\n" + new URL(url) + "\r\n";
-                        message += "Beim ersten Downloadversuch wird ein Info-Dialog mit weiteren Informationen erscheinen.\r\n";
-                        message += "Du kannst diese Info-Dialoge in den Plugin-Einstellungen deaktivieren\r\n";
-                    } else {
-                        title = br.getHost() + " allows free downloads from now on";
-                        message += "Hello dear " + br.getHost() + " user\r\n";
-                        message += "From now on this service allows downloads via free account.\r\n";
-                        message += "More information:\r\n" + new URL(url) + "\r\n";
-                        message += "On the first download attempt, a window with more detailed information will be displayed.\r\n";
-                        message += "You can turn off these dialogs via Plugin Settings\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(1 * 60 * 1000);
-                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                        CrossSystem.openURL(url);
-                    }
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
-    }
-
-    @SuppressWarnings("deprecation")
-    private void handleFreeModeDownloadDialog(final Account account, final String url) {
-        if (displayFreeAccountDownloadDialogs(account)) {
-            final boolean showAlways = false;
-            SubConfiguration config = null;
-            try {
-                config = getPluginConfig();
-                if (showAlways || config.getBooleanProperty("featuredialog_download_Shown_2019_07_1", Boolean.FALSE) == false) {
-                    if (showAlways || config.getProperty("featuredialog_download_Shown_2019_07_2") == null) {
-                        showFreeModeDownloadInformation(url);
-                    } else {
-                        config = null;
-                    }
-                } else {
-                    config = null;
-                }
-            } catch (final Throwable e) {
-            } finally {
-                if (config != null) {
-                    config.setProperty("featuredialog_download_Shown_2019_07_1", Boolean.TRUE);
-                    config.setProperty("featuredialog_download_Shown_2019_07_2", "shown");
-                    config.save();
-                }
-            }
-        }
-    }
-
-    private Thread showFreeModeDownloadInformation(final String url) throws Exception {
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    final boolean xSystem = CrossSystem.isOpenBrowserSupported();
-                    String message = "";
-                    final String title;
-                    final String host = Browser.getHost(url);
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = br.getHost() + " möchte einen kostenlosen Download starten";
-                        message += "Hallo liebe(r) " + host + " NutzerIn\r\n";
-                        if (xSystem) {
-                            message += "Um mit deinem kostenlosen Account von " + host + " herunterladen zu können musst du den 'free mode' im Fenster das sich gleich öffnet aktivieren.\r\n";
-                        } else {
-                            message += "Um kostenlos von diesem Anbieter herunterladen zu können musst du den 'free mode' unter dieser Adresse aktivieren:\r\n" + new URL(url) + "\r\n";
-                        }
-                        message += "Starte die Downloads danach erneut um zu sehen, ob deine Downloadlinks die Bedingungen eines kostenlosen Downloads erfüllen.\r\n";
-                        message += "Sobald du das Limit erreicht hast, musst du den Free Mode wieder über die oben gezeigte URL aktivieren.\r\n";
-                        message += "Du kannst diese Info-Dialoge in den Plugin-Einstellungen deaktivieren\r\n";
-                    } else {
-                        title = br.getHost() + " wants to start a free download";
-                        message += "Hello dear " + host + " user\r\n";
-                        if (xSystem) {
-                            message += "To be able to use the free mode of this service, you will have to enable it in the browser-window which will open soon.\r\n";
-                        } else {
-                            message += "To be able to use the free mode of this service, you will have to enable it here:\r\n" + new URL(url) + "\r\n";
-                        }
-                        message += "Restart your downloads afterwards to see whether your downloadlinks meet the requirements to be downloadable via free account.\r\n";
-                        message += "Once you've reached the free account downloadlimit, you will have to re-activate free mode via the previously mentioned URL.\r\n";
-                        message += "You can turn off these dialogs via Plugin Settings\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(2 * 60 * 1000);
-                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                        CrossSystem.openURL(url);
-                    }
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
     }
 
     public void login(final Browser br, final Account account, final boolean force) throws Exception {
@@ -888,26 +736,6 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     /**
-     * Indicates whether downloads via free accounts are possible or not. </br>
-     * 2023-11-08: That feature has been removed serverside.
-     */
-    @Deprecated
-    private final boolean supportsFreeAccountDownloadMode(final Account account) {
-        return false;
-    }
-
-    /**
-     * Indicates whether or not to display free account download dialogs which tell the user to activate free mode via website. </br>
-     * Some users find this annoying and will deactivate it. </br>
-     * default = true </br>
-     * 2023-11-08: That feature has been removed serverside.
-     */
-    @Deprecated
-    private final boolean displayFreeAccountDownloadDialogs(final Account account) {
-        return false;
-    }
-
-    /**
      * Indicates whether or not the new 'pairing' login is supported & enabled: https://alexbilbie.com/2016/04/oauth-2-device-flow-grant/
      */
     public boolean usePairingLogin(final Account account) {
@@ -976,31 +804,15 @@ abstract public class ZeveraCore extends UseNet {
             final String errortype = (String) entries.get("error");
             if ("topup_required".equalsIgnoreCase(errortype)) {
                 /**
-                 * 2019-07-27: TODO: Premiumize should add an API call which returns whether free account downloads are currently activated
-                 * or not (see premiumize.me/free). Currently if a user tries to download files via free account and gets this errormessage,
-                 * it is unclear whether: 1. Premium is required to download, 2. User needs to activate free mode first to download this
-                 * file. 3. User has activated free mode but this file is not allowed to be downloaded via free account.
+                 * 2019-07-27: Currently if a user tries to download files via free account and gets this error message, it is unclear
+                 * whether: <br>
+                 * 1. Premium is required to download <br>
+                 * 2. User needs to activate free mode first to download this file. <br>
+                 * 3. User has activated free mode but this file is not allowed to be downloaded via free account. <br>
+                 * 2026-04-13: Free mode does not exist anymore, it once existed here: premiumize.me/free
                  */
-                /* {"status":"error","error":"topup_required","message":"Please purchase premium membership or activate free mode."} */
-                if (account.getType() == AccountType.FREE) {
-                    /* Free */
-                    /* 2019-07-27: Original errormessage may cause confusion so we'll slightly modify that. */
-                    String userMsg = "Premium required or activate free mode via " + this.getHost() + "/free";
-                    if (this.supportsFreeAccountDownloadMode(account)) {
-                        /* Ask user to unlock free account downloads via website */
-                        handleFreeModeDownloadDialog(account, "https://www." + this.br.getHost() + "/free");
-                    } else {
-                        /*
-                         * User has not enabled free account downloads in plugin settings (this is a rare case which may happen in the
-                         * moment when a premium account expires and becomes a free account!)
-                         */
-                        userMsg += " AND via Settings->Plugins->" + this.getHost();
-                    }
-                    getMultiHosterManagement().putError(account, link, 5 * 60 * 1000l, userMsg);
-                } else {
-                    /* Premium account - probably no traffic left */
-                    throw new AccountUnavailableException("Traffic empty or fair use limit reached?", retryInMilliseconds);
-                }
+                /* Premium account - probably no traffic left */
+                throw new AccountUnavailableException("Traffic empty or fair use limit reached?", retryInMilliseconds);
             } else if (message.matches("(?i).*customer_id and pin parameter missing or not logged in.*")) {
                 throw new AccountInvalidException();
             } else if (message.matches("(?i).*Not logged in.*")) {
@@ -1010,12 +822,7 @@ abstract public class ZeveraCore extends UseNet {
             } else if (message.matches("(?i).*content not in cache.*")) {
                 /* 2019-02-19: Not all errors have an errortype given */
                 /* E.g. {"status":"error","message":"content not in cache"} */
-                if (account.getType() == AccountType.FREE && this.supportsFreeAccountDownloadMode(account)) {
-                    /* Case: User tries to download non-cached-file via free account. */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not downloadable via free account because: " + message, retryInMilliseconds);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message, retryInMilliseconds);
-                }
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message, retryInMilliseconds);
             } else if (message.matches("(?i).*file not found.*")) {
                 /*
                  * { "status": "error", "message": "Error: file not found"}
@@ -1027,6 +834,11 @@ abstract public class ZeveraCore extends UseNet {
                  * --> Trust offline status
                  */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
+            } else if (message.matches("(?i).*Daily linklimit for this service reached.*")) {
+                /*
+                 * {"status":"error","message":"Daily linklimit for this service reached."}
+                 */
+                this.getMultiHosterManagement().putError(account, link, 30 * 60 * 1000l, message);
             } else {
                 /* Unknown error */
                 if (plugin instanceof PluginForDecrypt) {

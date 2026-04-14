@@ -21,11 +21,16 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -38,7 +43,7 @@ import jd.plugins.hoster.EPornerCom;
 
 import org.appwork.utils.StringUtils;
 
-@DecrypterPlugin(revision = "$Revision: 49040 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EPornerCom.class })
 public class EPornerComGallery extends PluginForDecrypt {
     public EPornerComGallery(PluginWrapper wrapper) {
@@ -51,6 +56,16 @@ public class EPornerComGallery extends PluginForDecrypt {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(410);
+        br.setCookie(this.getHost(), "ageverif_accepted", "T");
+        br.setCookie(this.getHost(), "epcolor", "black");
+        return br;
     }
 
     @Override
@@ -77,6 +92,19 @@ public class EPornerComGallery extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        boolean isAgeVerificationBlocked = EPornerCom.isAgeVerificationBlocked(br);
+        if (isAgeVerificationBlocked) {
+            final Account account = AccountController.getInstance().getValidAccount(getHost());
+            final EPornerCom hosterPlugin = (EPornerCom) this.getNewPluginForHostInstance(this.getHost());
+            if (account != null) {
+                hosterPlugin.login(account, false);
+            }
+            br.getPage(param.getCryptedUrl());
+            isAgeVerificationBlocked = EPornerCom.isAgeVerificationBlocked(br);
+        }
+        if (isAgeVerificationBlocked) {
+            throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED, "Age verification required! Change your IP or add a verified eporner account.");
         }
         final String numberofPhotosStr = br.getRegex("Photos:\\s*(\\d+)").getMatch(0);
         final int numberofPhotos = Integer.parseInt(numberofPhotosStr);

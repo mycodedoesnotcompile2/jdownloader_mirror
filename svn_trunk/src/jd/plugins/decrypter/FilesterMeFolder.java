@@ -31,10 +31,13 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.FilesterMe;
 
-@DecrypterPlugin(revision = "$Revision: 52424 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,27 +50,20 @@ public class FilesterMeFolder extends PluginForDecrypt {
         return br;
     }
 
-    private static List<String[]> getPluginDomains() {
-        final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filester.me" });
-        return ret;
-    }
-
     public static String[] getAnnotationNames() {
-        return buildAnnotationNames(getPluginDomains());
+        return buildAnnotationNames(FilesterMe.getPluginDomains());
     }
 
     @Override
     public String[] siteSupportedNames() {
-        return buildSupportedNames(getPluginDomains());
+        return buildSupportedNames(FilesterMe.getPluginDomains());
     }
 
     private static final Pattern PATTERN_NORMAL = Pattern.compile("/f/([a-f0-9]{16})");
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
+        for (final String[] domains : FilesterMe.getPluginDomains()) {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern());
         }
         return ret.toArray(new String[0]);

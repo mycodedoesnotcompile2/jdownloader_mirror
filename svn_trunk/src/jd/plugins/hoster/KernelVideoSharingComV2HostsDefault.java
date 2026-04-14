@@ -20,17 +20,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.Exceptions;
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Exceptions;
-import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
-
-@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52648 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -155,6 +155,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "w4nkr.com" });
         ret.add(new String[] { "fullpornxxx.net" });
         ret.add(new String[] { "fullhd.xxx" });
+        ret.add(new String[] { "fapbox.com" });
         return ret;
     }
 

@@ -17,7 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,21 +24,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -49,8 +33,6 @@ import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -65,7 +47,22 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52239 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -100,7 +97,7 @@ public class FileFactory extends PluginForHost {
 
     /** Returns true if this link shall be used with the older filefactory.com website accessible via classic.filefactory.com. */
     private boolean isClassicFile(final DownloadLink link) throws PluginException {
-        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */ && link.getPluginPatternMatcher().contains("classic.filefactory.com"));
+        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */&& link.getPluginPatternMatcher().contains("classic.filefactory.com"));
     }
 
     private String getContentURL(final DownloadLink link) throws PluginException {
@@ -769,8 +766,7 @@ public class FileFactory extends PluginForHost {
                     accountType = AccountType.PREMIUM;
                 }
                 /**
-                 * Other possible values: </br>
-                 * "expired" -> Free Account
+                 * Other possible values: </br> "expired" -> Free Account
                  */
             }
             if (accountType == null) {
@@ -881,79 +877,31 @@ public class FileFactory extends PluginForHost {
                     }
                 }
             }
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             logger.info("Performing full login");
             br.getPage("https://www." + getHost() + "/signin?from=%2Fdashboard");
-            final Form loginform_old_website = br.getFormbyProperty("id", "sign_in");
-            old_website: if (loginform_old_website != null) {
-                logger.info("Full login via old website");
-                if (loginform_old_website.containsHTML("id=\"google-recaptcha\"")) {
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                    loginform_old_website.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                }
-                loginform_old_website.put("loginEmail", Encoding.urlEncode(account.getUser()));
-                loginform_old_website.put("loginPassword", Encoding.urlEncode(account.getPass()));
-                // br.getHeaders().put("Referer", br.getURL("/account/").toExternalForm());
-                br.submitForm(loginform_old_website);
-                if (!this.isLoggedin_old(br)) {
-                    throw new AccountInvalidException();
-                }
-                account.setProperty(PROPERTY_CLASSIC, true);
-            } else {
-                logger.info("Full login via new website");
-                if (false) {
-                    // not required at the moment
-                    br.setCookie(br.getHost(), "cookieConsent", "accepted");
-                    br.setCookie(br.getHost(), "cookieConsentTimestamp", "2025-09-09T14:12:12.097Z");
-                }
-                if (false) {
-                    // not required at the moment?! only sets the recaptcha-verified cookie, LOL
-                    final CaptchaHelperHostPluginRecaptchaV2 rc = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Le6wT0rAAAAAEOzVh77jsWDtqGkwbXcvuPdmaeW") {
-                        @Override
-                        protected boolean isEnterprise() {
-                            return true;
-                        }
-
-                        @Override
-                        protected String getSiteUrl() {
-                            return "https://www.filefactory.com/signin";
-                        }
-
-                        @Override
-                        protected Map<String, Object> getV3Action(String source) {
-                            final Map<String, Object> ret = new HashMap<String, Object>();
-                            ret.put("action", "SIGNIN");
-                            return ret;
-                        }
-                    };
-                    final String recaptchaV2Response = rc.getToken();
-                    final Map<String, Object> postdata1 = new HashMap<String, Object>();
-                    postdata1.put("action", "SIGNIN");
-                    postdata1.put("captchaToken", recaptchaV2Response);
-                    final Browser brc = br.cloneBrowser();
-                    brc.postPageRaw(this.getWebapiBase() + "/auth/pre-auth-check", JSonStorage.serializeToJson(postdata1));
-                    final Map<String, Object> entries1 = checkErrorsWebapi(brc, account);
-                    if (!Boolean.TRUE.equals(entries1.get("success"))) {
-                        // throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
-                }
-                br.setCookie(getHost(), "recaptcha-verified", "true");
-                br.setCookie(br.getHost(), "__Secure-authjs.callback-url", "https%3A%2F%2Fwww." + getHost());
-                Browser brc = br.cloneBrowser();
-                brc.getPage(this.getWebapiBase() + "/auth/csrf");
-                final Map<String, Object> entries2 = checkErrorsWebapi(brc, account);
-                final String csrfToken = entries2.get("csrfToken").toString();
-                final Form loginForm = new Form();
-                loginForm.setMethod(MethodType.POST);
-                loginForm.setAction(this.getWebapiBase() + "/auth/callback/credentials");
-                loginForm.put("email", URLEncoder.encode(account.getUser(), "UTF-8"));
-                loginForm.put("password", URLEncoder.encode(account.getPass(), "UTF-8"));
-                loginForm.put("csrfToken", csrfToken);
-                loginForm.put("callbackUrl", "%2Fdashboard");
-                br.submitForm(loginForm);
-                checkErrorsWebapi(br, account, null, null);
-                checkLoginStatus(br, account);
-                account.removeProperty(PROPERTY_CLASSIC);
+            logger.info("Full login via new website");
+            br.setCookie(getHost(), "recaptcha-verified", "true");
+            {
+                final Map<String, Object> loginJson = new HashMap<String, Object>();
+                loginJson.put("action", "auth:signIn");
+                final Map<String, Object> args = new HashMap<String, Object>();
+                loginJson.put("args", args);
+                args.put("provider", "password");
+                final Map<String, Object> params = new HashMap<String, Object>();
+                args.put("params", params);
+                params.put("email", account.getUser());
+                params.put("flow", "signIn");
+                params.put("password", account.getPass());
+                final Request request = br.createJSonPostRequest(getWebapiBase() + "/auth", loginJson);
+                br.getPage(request);
+                // response contains token json
             }
+            checkErrorsWebapi(br, account, null, null);
+            checkLoginStatus(br, account);
+            account.removeProperty(PROPERTY_CLASSIC);
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
@@ -1112,18 +1060,6 @@ public class FileFactory extends PluginForHost {
      * Throws AccountInvalidException on invalid login.
      */
     private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
-        final class OldWebsite {
-            private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
-                br.getPage("https://www." + FileFactory.this.getHost() + "/account/");
-                if (!checkLoginStatus_old(br, account)) {
-                    account.removeProperty(PROPERTY_CLASSIC);
-                    throw new AccountInvalidException("Session expired");
-                }
-                logger.info("Successfully logged in via classic website");
-                account.setProperty(PROPERTY_CLASSIC, true);
-                return null;
-            }
-        }
         final class NewWebsite {
             private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
                 br.getPage(FileFactory.this.getWebapiBase() + "/auth/session");
@@ -1141,28 +1077,8 @@ public class FileFactory extends PluginForHost {
                 return null;
             }
         }
-        if (account.hasProperty(PROPERTY_CLASSIC)) {
-            return new OldWebsite().checkLoginStatus(br, account);
-        }
         final Map<String, Object> ret = new NewWebsite().checkLoginStatus(br, account);
-        if (ret != null) {
-            return ret;
-        }
-        return new OldWebsite().checkLoginStatus(br, account);
-    }
-
-    private boolean checkLoginStatus_old(final Browser br, final Account account) throws IOException {
-        br.getPage("https://www." + getHost() + "/account/");
-        if (isLoggedin_old(br)) {
-            // logger.info("Successfully logged in via classic website");
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean isLoggedin_old(final Browser br) {
-        return br.containsHTML("/member/signout\"");
+        return ret;
     }
 
     private Map<String, Object> checkErrorsWebapi(final Browser br, final Account account) throws PluginException, InterruptedException {
@@ -1187,6 +1103,7 @@ public class FileFactory extends PluginForHost {
     }
 
     private void checkErrorsWebapi(final Browser br, final Account account, final DownloadLink link, final Map<String, Object> entries) throws PluginException, InterruptedException {
+        // TODO
         if (StringUtils.containsIgnoreCase(br.getURL(), "/api/auth/session")) {
             if (entries == null || entries.size() == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
