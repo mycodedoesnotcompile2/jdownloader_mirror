@@ -47,6 +47,7 @@ import javax.swing.SwingUtilities;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.AWUTheme;
+import org.appwork.uio.UIOConstants;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.DebugMode;
@@ -106,13 +107,17 @@ public class Dialog {
     /**
      * if the user pressed cancel, the return mask will contain this mask
      */
-    public static final int     RETURN_CANCEL                       = 1 << 2;
+    @Deprecated
+    public static final int     RETURN_CANCEL                       = UIOConstants.RETURN.RETURN_CANCEL;
     /**
      * if user closed the window
      */
-    public static final int     RETURN_CLOSED                       = 1 << 6;
-    public static final int     RETURN_INTERRUPT                    = 1 << 8;
-    public static final int     RETURN_EXCEPTION                    = 1 << 9;
+    @Deprecated
+    public static final int     RETURN_CLOSED                       = UIOConstants.RETURN.RETURN_CLOSED;
+    @Deprecated
+    public static final int     RETURN_INTERRUPT                    = UIOConstants.RETURN.RETURN_INTERRUPT;
+    @Deprecated
+    public static final int     RETURN_EXCEPTION                    = UIOConstants.RETURN.RETURN_EXCEPTION;
     /**
      * this return flag can be set in two situations:<br>
      * a) The user selected the {@link #STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option<br>
@@ -120,25 +125,30 @@ public class Dialog {
      * <br>
      * Check {@link #RETURN_SKIPPED_BY_DONT_SHOW} to know if the dialog has been visible or autoskipped
      */
-    public static final int     RETURN_DONT_SHOW_AGAIN              = 1 << 3;
+    @Deprecated
+    public static final int     RETURN_DONT_SHOW_AGAIN              = UIOConstants.RETURN.RETURN_DONT_SHOW_AGAIN;
     /**
      * If the user pressed OK, the return mask will contain this flag
      */
-    public static final int     RETURN_OK                           = 1 << 1;
+    @Deprecated
+    public static final int     RETURN_OK                           = UIOConstants.RETURN.RETURN_OK;
     /**
      * If the dialog has been skipped due to previously selected {@link #STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option, this return flag is set.
      *
      * @see #RETURN_DONT_SHOW_AGAIN
      */
-    public static final int     RETURN_SKIPPED_BY_DONT_SHOW         = 1 << 4;
+    @Deprecated
+    public static final int     RETURN_SKIPPED_BY_DONT_SHOW         = UIOConstants.RETURN.RETURN_SKIPPED_BY_DONT_SHOW;
     /**
      * If the Timeout ({@link UIOManager#LOGIC_COUNTDOWN}) has run out, the return mask contains this flag
      */
-    public static final int     RETURN_TIMEOUT                      = 1 << 5;
+    @Deprecated
+    public static final int     RETURN_TIMEOUT                      = UIOConstants.RETURN.RETURN_TIMEOUT;
     /**
      * If the dialog has been skiped/closed by ESC key
      */
-    public static final int     RETURN_ESC                          = 1 << 7;
+    @Deprecated
+    public static final int     RETURN_ESC                          = UIOConstants.RETURN.RETURN_ESC;
 
     /**
      * @return
@@ -166,24 +176,29 @@ public class Dialog {
     /**
      * Do Not use an Icon. By default dialogs have an Icon
      */
-    public static final int       STYLE_HIDE_ICON                 = 1 << 8;
+    @Deprecated
+    public static final int       STYLE_HIDE_ICON                 = UIOConstants.STYLE.STYLE_HIDE_ICON;
     /**
      * Some dialogs are able to render HTML. Use this switch to enable html
      */
-    public static final int       STYLE_HTML                      = 1 << 7;
+    @Deprecated
+    public static final int       STYLE_HTML                      = UIOConstants.STYLE.STYLE_HTML;
     /**
      * Some dialogs are able to layout themselves in a large mode. E:g. to display a huge text.
      */
-    public static final int       STYLE_LARGE                     = 1 << 6;
+    @Deprecated
+    public static final int       STYLE_LARGE                     = UIOConstants.STYLE.STYLE_LARGE;
     /**
      * Displays a Checkbox with "do not show this again" text. If the user selects this box, the UserInteraktion class will remember the
      * answer and will not disturb the user with the same question (same title)
      */
-    public static final int       STYLE_SHOW_DO_NOT_DISPLAY_AGAIN = 1 << 5;
+    @Deprecated
+    public static final int       STYLE_SHOW_DO_NOT_DISPLAY_AGAIN = UIOConstants.STYLE.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN;
     /**
      * Inputdialogs will use passwordfields instead of textfields
      */
-    public static final int       STYLE_PASSWORD                  = 1 << 9;
+    @Deprecated
+    public static final int       STYLE_PASSWORD                  = UIOConstants.STYLE.STYLE_PASSWORD;
 
     /**
      * tries to find some special markers in the text and selects an appropriate icon
@@ -647,7 +662,7 @@ public class Dialog {
 
     public int showErrorDialog(final String s) {
         try {
-            return this.showConfirmDialog(UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _AWU.T.DIALOG_ERROR_TITLE(), s, AWUTheme.I().getIcon(Dialog.ICON_ERROR, 32), null, null);
+            return this.showConfirmDialog(UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _AWU.T.DIALOG_ERROR_TITLE(), s, AWUTheme.I().getIcon(Dialog.ICON_ERROR, 32), null, null);
         } catch (final DialogClosedException e) {
             return Dialog.RETURN_CLOSED;
         } catch (final DialogCanceledException e) {
@@ -662,7 +677,7 @@ public class Dialog {
      */
     public int showExceptionDialog(final String title, final String message, final Throwable e) {
         try {
-            final ExceptionDialog dialog = new ExceptionDialog(UIOManager.LOGIC_DONT_SHOW_AGAIN_DELETE_ON_EXIT | UIOManager.BUTTONS_HIDE_CANCEL, title, message, e, null, null);
+            final ExceptionDialog dialog = new ExceptionDialog(UIOConstants.LOGIC.LOGIC_DONT_SHOW_AGAIN_DELETE_ON_EXIT | UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL, title, message, e, null, null);
             this.showDialog(dialog);
         } catch (final DialogClosedException e1) {
             return Dialog.RETURN_CLOSED;
@@ -751,7 +766,7 @@ public class Dialog {
      */
     public void showMessageDialog(final int flag, final String title, final String message) {
         try {
-            this.showConfirmDialog(UIOManager.BUTTONS_HIDE_CANCEL | flag, title, message, Dialog.getIconByText(title + message), null, null);
+            this.showConfirmDialog(UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL | flag, title, message, Dialog.getIconByText(title + message), null, null);
         } catch (final DialogClosedException e) {
         } catch (final DialogCanceledException e) {
         }
@@ -909,7 +924,7 @@ public class Dialog {
      * @param bufferedImage
      */
     public void showImage(Image image) {
-        final ConfirmDialog d = new ConfirmDialog(UIOManager.BUTTONS_HIDE_CANCEL, "Image", "" + image.getWidth(null) + "x" + image.getHeight(null), new ImageIcon(image), null, null) {
+        final ConfirmDialog d = new ConfirmDialog(UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL, "Image", "" + image.getWidth(null) + "x" + image.getHeight(null), new ImageIcon(image), null, null) {
             /*
              * (non-Javadoc)
              *

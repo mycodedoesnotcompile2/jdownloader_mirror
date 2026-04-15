@@ -31,16 +31,24 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52055 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52654 $", interfaceVersion = 3, names = {}, urls = {})
 public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
     public XFileSharingProBasicSpecialFilejoker(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
 
+    private static String PROPERTY_INTERNAL_FILE_ID = "internal_file_id";
+
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
-        return requestFileInformationWebsiteXFSOld(link, account);
+    public String getLinkID(final DownloadLink link) {
+        final String internal_file_id = link.getStringProperty(PROPERTY_INTERNAL_FILE_ID);
+        if (internal_file_id != null) {
+            /* Preferably build link_id with internal file_id. */
+            return getHost() + "://" + internal_file_id;
+        } else {
+            return super.getLinkID(link);
+        }
     }
 
     @Override
@@ -51,6 +59,29 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
         } else {
             return super.buildURLPath(link, fuid, type);
         }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
+        return requestFileInformationWebsiteXFSOld(link, account);
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        /* Small dirty hack to find and store internal file_id for better dupe detection. */
+        final DownloadLink link = this.getDownloadLink();
+        if (!link.hasProperty(PROPERTY_INTERNAL_FILE_ID)) {
+            /**
+             * Search for internal file_id. Some files are spread via multiple different "external/public file ids" so duplicated link
+             * detection would fail. If we find this internal file_id we can mitigate this problem as this id is always the same. <br>
+             * Same id = Same file.
+             */
+            final String internal_file_id = new Regex(html, "'aff_file',\\s*'(\\d+)").getMatch(0);
+            if (internal_file_id != null) {
+                link.setProperty(PROPERTY_INTERNAL_FILE_ID, internal_file_id);
+            }
+        }
+        return super.scanInfo(html, fileInfo);
     }
 
     /**
@@ -439,52 +470,51 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
         final String directurl = link.getStringProperty(property, null);
         if (StringUtils.isEmpty(directurl) || !directurl.startsWith("http")) {
             return null;
-        } else {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                con = openAntiDDoSRequestConnection(br2, br2.createHeadRequest(directurl));
-                /* For video streams we often don't get a Content-Disposition header. */
-                // final boolean isFile = con.isContentDisposition() || StringUtils.containsIgnoreCase(con.getContentType(), "video") ||
-                // StringUtils.containsIgnoreCase(con.getContentType(), "audio") || StringUtils.containsIgnoreCase(con.getContentType(),
-                // "application");
+        }
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            br2.setFollowRedirects(true);
+            con = openAntiDDoSRequestConnection(br2, br2.createHeadRequest(directurl));
+            /* For video streams we often don't get a Content-Disposition header. */
+            // final boolean isFile = con.isContentDisposition() || StringUtils.containsIgnoreCase(con.getContentType(), "video") ||
+            // StringUtils.containsIgnoreCase(con.getContentType(), "audio") || StringUtils.containsIgnoreCase(con.getContentType(),
+            // "application");
+            /*
+             * 2019-08-28: contentDisposition is always there plus invalid URLs might have: Content-Type: application/octet-stream -->
+             * 'application' as Content-Type is no longer an indication that we can expect a file!
+             */
+            final boolean isDownload = con.isContentDisposition() || StringUtils.containsIgnoreCase(con.getContentType(), "video") || StringUtils.containsIgnoreCase(con.getContentType(), "audio");
+            if (con.getResponseCode() == 503) {
+                /* Ok */
                 /*
-                 * 2019-08-28: contentDisposition is always there plus invalid URLs might have: Content-Type: application/octet-stream -->
-                 * 'application' as Content-Type is no longer an indication that we can expect a file!
+                 * Too many connections but that does not mean that our directlink is invalid. Accept it and if it still returns 503 on
+                 * download-attempt this error will get displayed to the user - such directlinks should work again once there are less
+                 * active connections to the host!
                  */
-                final boolean isDownload = con.isContentDisposition() || StringUtils.containsIgnoreCase(con.getContentType(), "video") || StringUtils.containsIgnoreCase(con.getContentType(), "audio");
-                if (con.getResponseCode() == 503) {
-                    /* Ok */
-                    /*
-                     * Too many connections but that does not mean that our directlink is invalid. Accept it and if it still returns 503 on
-                     * download-attempt this error will get displayed to the user - such directlinks should work again once there are less
-                     * active connections to the host!
-                     */
-                    logger.info("directurl lead to 503 | too many connections");
-                    return directurl;
-                } else if (!con.getContentType().contains("text") && con.getLongContentLength() >= 0 && con.isOK() && isDownload) {
-                    if (/* StringUtils.equalsIgnoreCase(con.getContentType(), "application/octet-stream") && */con.getLongContentLength() < 100) {
-                        throw new Exception("very likely no file but an error message!length=" + con.getLongContentLength());
-                    } else {
-                        return directurl;
-                    }
+                logger.info("directurl lead to 503 | too many connections");
+                return directurl;
+            } else if (!con.getContentType().contains("text") && con.getLongContentLength() >= 0 && con.isOK() && isDownload) {
+                if (/* StringUtils.equalsIgnoreCase(con.getContentType(), "application/octet-stream") && */con.getLongContentLength() < 100) {
+                    throw new Exception("very likely no file but an error message!length=" + con.getLongContentLength());
                 } else {
-                    /* Failure */
+                    return directurl;
                 }
-            } catch (final Exception e) {
+            } else {
                 /* Failure */
-                logger.log(e);
-            } finally {
-                if (con != null) {
-                    try {
-                        con.disconnect();
-                    } catch (final Throwable e) {
-                    }
+            }
+        } catch (final Exception e) {
+            /* Failure */
+            logger.log(e);
+        } finally {
+            if (con != null) {
+                try {
+                    con.disconnect();
+                } catch (final Throwable e) {
                 }
             }
-            return null;
         }
+        return null;
     }
 
     @Override
@@ -824,13 +854,5 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
             /* Delete API session */
             account.removeProperty(PROPERTY_SESSIONID);
         }
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-        /* 2019-08-23: Debugtest */
-        // link.removeProperty("freelink2");
-        // link.removeProperty("premlink");
-        // link.removeProperty("freelink");
     }
 }

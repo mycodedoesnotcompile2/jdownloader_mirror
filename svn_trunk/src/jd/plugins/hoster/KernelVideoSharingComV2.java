@@ -39,6 +39,27 @@ import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.IO;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.kvs.Script;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
@@ -67,28 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.IO;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.kvs.Script;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52651 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,47 +116,54 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     // other: URL to a live demo: http://www.kvs-demo.com/
     /***
      * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPattern(List)} AND
-     * {@link #buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(List)} (excluding "embed" URLs). </br> Examples:
-     * example.com/videos/1234/title/ </br> example.com/videos/1234-title.html </br> example.com/videos/
+     * {@link #buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(List)} (excluding "embed" URLs). </br>
+     * Examples: example.com/videos/1234/title/ </br>
+     * example.com/videos/1234-title.html </br>
+     * example.com/videos/
      */
-    private static final String   type_normal               = "(?i)^https?://[^/]+/(?:[a-z]{2}/)?(?:videos?/)?(\\d+)(?:/|-)([^/\\?#]+)(?:/?|\\.html)$";
+    private static final Pattern   type_normal               = Pattern.compile("^https?://[^/]+/(?:[a-z]{2}/)?(?:videos?/)?(\\d+)(?:/|-)([^/\\?#]+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE);
     /**
      * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(List)} (excluding
-     * "embed" URLs). </br> You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return true when using such a pattern! </br>
+     * "embed" URLs). </br>
+     * You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return true when using such a pattern! </br>
      * TODO: Consider removing support for this from this main class.
      */
-    private static final String   type_normal_fuid_at_end   = "^(?i)https?://[^/]+/videos?/([^/\\?#]+)-(\\d+)(?:/?|\\.html)$";
+    private static final Pattern   type_normal_fuid_at_end   = Pattern.compile("^https?://[^/]+/videos?/([^/\\?#]+)-(\\d+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE);
     /***
      * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPatternWithoutFileID(List)} and
-     * {@link #buildAnnotationUrlsDefaultVideosPatternWithoutFileIDWithHTMLEnding(List)} (excluding "embed" URLs). </br> You need to
-     * override {@link #hasFUIDInsideURLAtTheEnd(String)} to return false when using such a pattern!
+     * {@link #buildAnnotationUrlsDefaultVideosPatternWithoutFileIDWithHTMLEnding(List)} (excluding "embed" URLs). </br>
+     * You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return false when using such a pattern!
      */
-    private static final String   type_normal_without_fuid  = "(?i)^https?://[^/]+/(?:videos?/)?([^/\\?#]*?)(?:/?|\\.html)$";
+    private static final Pattern   type_normal_without_fuid  = Pattern.compile("^https?://[^/]+/(?:videos?/)?([^/\\?#]*?)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE);
     // private static final String type_mobile = "(?i)^https?://m\\.([^/]+/(videos?/)?\\d+/[^/\\?#]+/$)";
     /**
      * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(List)} (excluding
      * "embed" URLs).
      */
-    protected static final String pattern_only_numbers      = "(?i)^https?://[^/]+/(\\d+)/?$";
-    protected static final String pattern_embedded          = "(?i)^https?://[^/]+/embed/(\\d+)/?$";
-    protected static final String PROPERTY_FUID             = "fuid";
-    protected static final String PROPERTY_USERNAME         = "user";
-    protected static final String PROPERTY_USERID           = "userid";
-    protected static final String PROPERTY_CHANNELNAME      = "channel";
-    protected static final String PROPERTY_CHANNELID        = "channelid";
-    protected static final String PROPERTY_TITLE            = "title";
-    protected static final String PROPERTY_DATE             = "date";
-    protected static final String PROPERTY_IS_PRIVATE_VIDEO = "privatevideo";
-    protected static final String PROPERTY_CHOSEN_QUALITY   = "chosen_quality";
-    protected static final String PROPERTY_DIRECTURL        = "directurl";
-    private static final String   extDefault                = ".mp4";
-    private String                dllink                    = null;
-    public static final String    FIXNAME                   = "fixName";
+    protected static final Pattern pattern_only_numbers      = Pattern.compile("/(\\d+)/?$", Pattern.CASE_INSENSITIVE);
+    protected static final Pattern pattern_embedded          = Pattern.compile("/embed/(\\d+)/?", Pattern.CASE_INSENSITIVE);
+    protected static final String  PROPERTY_FUID             = "fuid";
+    protected static final String  PROPERTY_USERNAME         = "user";
+    protected static final String  PROPERTY_USERID           = "userid";
+    protected static final String  PROPERTY_CHANNELNAME      = "channel";
+    protected static final String  PROPERTY_CHANNELID        = "channelid";
+    protected static final String  PROPERTY_TITLE            = "title";
+    protected static final String  PROPERTY_DATE             = "date";
+    protected static final String  PROPERTY_IS_PRIVATE_VIDEO = "privatevideo";
+    protected static final String  PROPERTY_CHOSEN_QUALITY   = "chosen_quality";
+    protected static final String  PROPERTY_DIRECTURL        = "directurl";
+    private static final String    extDefault                = ".mp4";
+    private String                 dllink                    = null;
+    public static final String     FIXNAME                   = "fixName";
 
     /**
-     * Use this e.g. for: </br> example.com/(de/)?videos/1234/title-inside-url OR: </br> example.com/embed/1234 OR </br> OR(rare/older
-     * case):</br> m.example.com/videos/1234/title-inside-url | m.example.com/embed/1234 </br> Example: <a
-     * href="https://kvs-demo.com/">kvs-demo.com</a> More example hosts in generic class: {@link #KernelVideoSharingComV2HostsDefault}
+     * Use this e.g. for: </br>
+     * example.com/(de/)?videos/1234/title-inside-url OR: </br>
+     * example.com/embed/1234 OR </br>
+     * OR(rare/older case):</br>
+     * m.example.com/videos/1234/title-inside-url | m.example.com/embed/1234 </br>
+     * Example: <a href="https://kvs-demo.com/">kvs-demo.com</a> More example hosts in generic class:
+     * {@link #KernelVideoSharingComV2HostsDefault}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPattern(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -264,16 +271,23 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Use this e.g. for: </br> example.com/1234/title-inside-url</br> OR: </br> example.com/embed/1234 </br> OR </br> Example: <a
-     * href="https://alotporn.com/">alotporn.com</a> </br> More example hosts in generic class:
-     * {@link #KernelVideoSharingComV2HostsDefault2}
+     * Use this e.g. for: </br>
+     * example.com/1234/title-inside-url</br>
+     * OR: </br>
+     * example.com/embed/1234 </br>
+     * OR </br>
+     * Example: <a href="https://alotporn.com/">alotporn.com</a> </br>
+     * More example hosts in generic class: {@link #KernelVideoSharingComV2HostsDefault2}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            // TODO: check ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:/video)?/(\\d+/[^/\\?#]+/?|embed/\\d+/?)");
-            // alotporn.com
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(\\d+/[^/\\?#]+/?|embed/\\d+/?)");
+            /**
+             * 2026-04-14: So far this regex isn't used by many websites <br>
+             * With "/video": alotporn.com Without "/video": camvideos.tv <br>
+             * Both alotporn.com and camvideos.tv allow both url-formats (with- and without "/video").
+             */
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:/video)?/(\\d+/[^/\\?#]+/?|embed/\\d+/?)");
         }
         return ret.toArray(new String[0]);
     }
@@ -286,9 +300,13 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Use this e.g. for:</br> example.com/title-inside-url</br> OR:</br> example.com/embed/1234 </br> Example: <a
-     * href="https://alphaporno.com/">alphaporno.com</a> </br> Special: You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to
-     * return false when using this pattern! </br> More example hosts in generic class: {@link #KernelVideoSharingComV2HostsDefault3}
+     * Use this e.g. for:</br>
+     * example.com/title-inside-url</br>
+     * OR:</br>
+     * example.com/embed/1234 </br>
+     * Example: <a href="https://alphaporno.com/">alphaporno.com</a> </br>
+     * Special: You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return false when using this pattern! </br>
+     * More example hosts in generic class: {@link #KernelVideoSharingComV2HostsDefault3}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternWithoutFileID(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -313,8 +331,11 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Use this e.g. for:</br> example.com/videos/title-inside-url-1234 OR:</br> example.com/embed/1234 </br> Example: <a
-     * href="https://uiporn.com/">uiporn.com</a> </br> Example classses: {@link #UipornCom}, {@link #PorngemCom}
+     * Use this e.g. for:</br>
+     * example.com/videos/title-inside-url-1234 OR:</br>
+     * example.com/embed/1234 </br>
+     * Example: <a href="https://uiporn.com/">uiporn.com</a> </br>
+     * Example classses: {@link #UipornCom}, {@link #PorngemCom}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -332,8 +353,12 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Use this e.g. for:</br> example.com/title-inside-url OR:</br> example.com/embed/1234 </br> Example: <a
-     * href="https://yogaporn.net/">yogaporn.net</a> </br> Example classses: {@link #YogapornNet} </br> Very rarely used pattern!
+     * Use this e.g. for:</br>
+     * example.com/title-inside-url OR:</br>
+     * example.com/embed/1234 </br>
+     * Example: <a href="https://yogaporn.net/">yogaporn.net</a> </br>
+     * Example classses: {@link #YogapornNet} </br>
+     * Very rarely used pattern!
      */
     public static String[] buildAnnotationUrlsDefaultNoVideosNoFUID(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -374,8 +399,12 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Use this e.g. for:</br> example.com/1234</br> OR:</br> example.com/embed/1234 </br> Example: <a
-     * href="https://anyporn.com/">anyporn.com</a> </br> Example class: {@link #AnypornCom}
+     * Use this e.g. for:</br>
+     * example.com/1234</br>
+     * OR:</br>
+     * example.com/embed/1234 </br>
+     * Example: <a href="https://anyporn.com/">anyporn.com</a> </br>
+     * Example class: {@link #AnypornCom}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -393,18 +422,19 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Override this if URLs can end with digits but these are not your FUID! </br> E.g. override this when adding host plugins with
-     * patterns that match {@link #type_normal_fuid_at_end} . </br> Example: example.com/url-title.html</br> Override
-     * {@link #type_normal_without_fuid} if the expected URLs do not contain any FUID at all (well, other than e.g. embed URLs - in this
-     * case, FUID will always get detected).
+     * Override this if URLs can end with digits but these are not your FUID! </br>
+     * E.g. override this when adding host plugins with patterns that match {@link #type_normal_fuid_at_end} . </br>
+     * Example: example.com/url-title.html</br>
+     * Override {@link #type_normal_without_fuid} if the expected URLs do not contain any FUID at all (well, other than e.g. embed URLs - in
+     * this case, FUID will always get detected).
      */
     protected boolean hasFUIDInsideURLAtTheEnd(final String url) {
         return false;
     }
 
     /**
-     * Set this to false if URLs do not contain a FUID at all! </br> Especially important for e.g.: example.com/1random-title/ or
-     * example.com/random-title-version10/ ('1' != FUID!)
+     * Set this to false if URLs do not contain a FUID at all! </br>
+     * Especially important for e.g.: example.com/1random-title/ or example.com/random-title-version10/ ('1' != FUID!)
      */
     protected boolean hasFUIDInsideURL(final String url) {
         return true;
@@ -474,8 +504,9 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * By default, title inside URL will be used whenever found. </br> Let this return true to prefer title returned by
-     * {@link #regexNormalTitleWebsite(Browser) } [if not null] even if title from inside URL is given.
+     * By default, title inside URL will be used whenever found. </br>
+     * Let this return true to prefer title returned by {@link #regexNormalTitleWebsite(Browser) } [if not null] even if title from inside
+     * URL is given.
      */
     protected boolean preferTitleHTML() {
         return false;
@@ -483,15 +514,16 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
 
     /**
      * Enable this for websites which have embed URLs but they're broken e.g. motherporno.com, hclips.com, privatehomeclips.com . </br>
-     * EWmbed URLs will be changed to "fake" normal content URLs which should then redirect to the correct contentURL. </br> <b>Warning:</b>
-     * Enabling this without testing can break embed support!!
+     * EWmbed URLs will be changed to "fake" normal content URLs which should then redirect to the correct contentURL. </br>
+     * <b>Warning:</b> Enabling this without testing can break embed support!!
      */
     protected boolean useEmbedWorkaround() {
         return false;
     }
 
     /**
-     * Returns domain which is considered to work. </br> Prefers to return domain of added URL.
+     * Returns domain which is considered to work. </br>
+     * Prefers to return domain of added URL.
      */
     protected String getWorkingDomain(final DownloadLink link) {
         return getWorkingDomain(link.getPluginPatternMatcher());
@@ -573,8 +605,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (youAreNotAllowedToWatchThisVideo(br, link, account)) {
             /**
              * Some websites have embedding videos disabled but nevertheless it is possible to generate- and add such URLs. It may also
-             * happen that a website owner disabled embedding after first allowing it. </br> The content should be online but we'll never be
-             * able to download it --> Treat as offline
+             * happen that a website owner disabled embedding after first allowing it. </br>
+             * The content should be online but we'll never be able to download it --> Treat as offline
              */
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 /*
@@ -589,8 +621,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Alternative way to linkcheck (works only for some hosts and only if FUID is given): privat-zapisi.biz/feed/12345.xml </br> Also
-     * working for: webcamsbabe.com
+     * Alternative way to linkcheck (works only for some hosts and only if FUID is given): privat-zapisi.biz/feed/12345.xml </br>
+     * Also working for: webcamsbabe.com
      */
     protected AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         dllink = null;
@@ -844,7 +876,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     protected boolean isEmbedURL(final String url) {
         if (url == null) {
             return false;
-        } else if (url.matches(pattern_embedded)) {
+        } else if (new Regex(url, pattern_embedded).patternFind()) {
             return true;
         } else {
             return false;
@@ -900,8 +932,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (video == null) {
             if ("video_not_found".equals(entries.get("code"))) {
                 /**
-                 * 2023-04-28 e.g.: https://txxx.com/embed/882346568220/ </br> Typically also comes with this json:
-                 * "error":1,"code":"video_not_found"
+                 * 2023-04-28 e.g.: https://txxx.com/embed/882346568220/ </br>
+                 * Typically also comes with this json: "error":1,"code":"video_not_found"
                  */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
@@ -1099,15 +1131,17 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Contains logic to determine best file title. </br> Override the following functions if you want to modify filenames:
-     * {@link #regexNormalTitleWebsite()}, {@link #regexEmbedTitleWebsite()}, {@link #preferTitleHTML()}
+     * Contains logic to determine best file title. </br>
+     * Override the following functions if you want to modify filenames: {@link #regexNormalTitleWebsite()},
+     * {@link #regexEmbedTitleWebsite()}, {@link #preferTitleHTML()}
      */
     private String getFileTitle(final DownloadLink link) {
         final String fuid = this.getFUID(link);
         final String titleUrl = getTitleURL(br, link);
         String titleFromHtml = null;
+        final String url = link.getPluginPatternMatcher();
         /* For embed URLs the title might be in a different part of the html -> Check for this first */
-        if (link.getPluginPatternMatcher().matches(pattern_embedded)) {
+        if (new Regex(url, pattern_embedded).patternFind()) {
             titleFromHtml = regexEmbedTitleWebsite(br);
         }
         if (StringUtils.isEmpty(titleFromHtml)) {
@@ -1141,6 +1175,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return ret;
     }
 
+    /** This can be used as a veto for titles that are unsuited. */
     protected String filterPossibleTitle(final Browser br, final String possibleTitle) {
         if ("Related Videos".equalsIgnoreCase(possibleTitle)) {
             return null;
@@ -1355,8 +1390,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, true);
         /**
-         * Registered users can watch private videos when they follow/subscribe to the uploaders. </br> Apart from this there aren't much
-         * advantages. Sometimes registered users can watch higher quality streams.
+         * Registered users can watch private videos when they follow/subscribe to the uploaders. </br>
+         * Apart from this there aren't much advantages. Sometimes registered users can watch higher quality streams.
          */
         final AccountInfo ai = new AccountInfo();
         ai.setUnlimitedTraffic();
@@ -2201,15 +2236,12 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (url == null) {
             return null;
         }
-        String ret = null;
-        if (url.matches(type_normal)) {
-            ret = new Regex(url, type_normal).getMatch(1);
-        } else if (url.matches(type_normal_fuid_at_end) && hasFUIDInsideURLAtTheEnd(url)) {
+        String ret = new Regex(url, type_normal).getMatch(1);
+        if (ret == null && hasFUIDInsideURLAtTheEnd(url)) {
             ret = new Regex(url, type_normal_fuid_at_end).getMatch(0);
-        } else if (url.matches(type_normal_without_fuid)) {
+        }
+        if (ret == null) {
             ret = new Regex(url, type_normal_without_fuid).getMatch(0);
-        } else {
-            return null;
         }
         if (ret != null && ret.contains("%")) {
             ret = URLEncode.decodeURIComponent(ret);
@@ -2218,8 +2250,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * This is supposed to return a numeric ID. Rather return null than anything else here! </br> Override {@link #hasFUIDInsideURL(String)}
-     * to return false if you know that your URLs do not contain a FUID for sure.
+     * This is supposed to return a numeric ID. Rather return null than anything else here! </br>
+     * Override {@link #hasFUIDInsideURL(String)} to return false if you know that your URLs do not contain a FUID for sure.
      */
     protected String getFUID(final DownloadLink link) {
         /* Prefer stored unique ID over ID inside URL because sometimes none is given inside URL. */
@@ -2238,17 +2270,27 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (url == null) {
             return null;
         }
-        if (url.matches(pattern_only_numbers)) {
-            return new Regex(url, pattern_only_numbers).getMatch(0);
-        } else if (url.matches(pattern_embedded)) {
-            return new Regex(url, pattern_embedded).getMatch(0);
-        } else if (url.matches(type_normal_fuid_at_end) && hasFUIDInsideURL(url) && hasFUIDInsideURLAtTheEnd(url)) {
-            return new Regex(url, type_normal_fuid_at_end).getMatch(1);
-        } else if (url.matches(type_normal) && hasFUIDInsideURL(url)) {
-            return new Regex(url, type_normal).getMatch(0);
-        } else {
-            return null;
+        String fuid = new Regex(url, pattern_only_numbers).getMatch(0);
+        if (fuid != null) {
+            return fuid;
         }
+        fuid = new Regex(url, pattern_embedded).getMatch(0);
+        if (fuid != null) {
+            return fuid;
+        }
+        if (hasFUIDInsideURL(url) && hasFUIDInsideURLAtTheEnd(url)) {
+            fuid = new Regex(url, type_normal_fuid_at_end).getMatch(1);
+            if (fuid != null) {
+                return fuid;
+            }
+        }
+        if (hasFUIDInsideURL(url)) {
+            fuid = new Regex(url, type_normal).getMatch(0);
+            if (fuid != null) {
+                return fuid;
+            }
+        }
+        return null;
     }
 
     public <T extends PluginConfigInterface> T get(Class<T> configInterface) {

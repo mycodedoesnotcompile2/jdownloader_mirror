@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52641 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52657 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagepondNet extends PluginForHost {
     public ImagepondNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class ImagepondNet extends PluginForHost {
         return "https://" + getHost();
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "imagepond.net" });
@@ -70,11 +70,12 @@ public class ImagepondNet extends PluginForHost {
 
     private static final Pattern PATTERN_IMAGE_OR_VIDEO = Pattern.compile("/i/([\\w\\-\\.]+)");
     private static final Pattern PATTERN_IMAGE          = Pattern.compile("/image/([\\w\\-\\.]+)");
+    private static final Pattern PATTERN_VIDEO          = Pattern.compile("/videos/([\\w\\-\\.]+)");
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_IMAGE_OR_VIDEO.pattern().substring(1) + "|" + PATTERN_IMAGE.pattern().substring(1) + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_IMAGE_OR_VIDEO.pattern().substring(1) + "|" + PATTERN_IMAGE.pattern().substring(1) + "|" + PATTERN_VIDEO.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -95,6 +96,10 @@ public class ImagepondNet extends PluginForHost {
             return fid;
         }
         fid = new Regex(link.getPluginPatternMatcher(), PATTERN_IMAGE).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO).getMatch(0);
         return fid;
     }
 
@@ -110,18 +115,32 @@ public class ImagepondNet extends PluginForHost {
     @Override
     protected String getDefaultFileName(DownloadLink link) {
         if (new Regex(link.getPluginPatternMatcher(), PATTERN_IMAGE).patternFind()) {
-            /* We know that the file will be an image -> Return name with assumed image extension */
+            /* We know that the file will be an image -> Return name with assumed file extension */
             return this.getFID(link) + ".jpeg";
+        } else if (new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO).patternFind()) {
+            /* We know that the file will be a video -> Return name with assumed file extension */
+            return this.getFID(link) + ".mp4";
         } else {
             /* Can be image or video -> Return string without file extension */
             return this.getFID(link);
         }
     }
 
+    /** Return url to overview page of media item. */
+    private String getContentURL(final DownloadLink link) {
+        final String original_url = link.getPluginPatternMatcher();
+        final Regex regex_video = new Regex(original_url, PATTERN_VIDEO);
+        if (regex_video.patternFind()) {
+            /* Special case: Overview page differs from format of added url. */
+            return "https://www." + getHost() + "/i/" + regex_video.getMatch(0);
+        }
+        return original_url;
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(getContentURL(link));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

@@ -35,6 +35,7 @@ package org.appwork.utils.swing.dialog;
 
 import java.util.logging.Level;
 
+import org.appwork.uio.UIOConstants;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.logging.ExceptionDefaultLogLevel;
 
@@ -68,12 +69,12 @@ public class DialogNoAnswerException extends Exception implements ExceptionDefau
      */
     public DialogNoAnswerException(int mask, Throwable cause) {
         super(cause);
-        this.causedByDontShowAgain = BinaryLogic.containsSome(mask, Dialog.RETURN_SKIPPED_BY_DONT_SHOW);
-        this.causedByTimeout = BinaryLogic.containsSome(mask, Dialog.RETURN_TIMEOUT);
-        this.causedByESC = BinaryLogic.containsSome(mask, Dialog.RETURN_ESC);
-        this.causedByClosed = BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED);
-        this.causedByInterrupt = BinaryLogic.containsSome(mask, Dialog.RETURN_INTERRUPT);
-        this.causedByInitException = BinaryLogic.containsSome(mask, Dialog.RETURN_EXCEPTION);
+        this.causedByDontShowAgain = BinaryLogic.containsSome(mask, UIOConstants.RETURN.RETURN_SKIPPED_BY_DONT_SHOW);
+        this.causedByTimeout = BinaryLogic.containsSome(mask, UIOConstants.RETURN.RETURN_TIMEOUT);
+        this.causedByESC = BinaryLogic.containsSome(mask, UIOConstants.RETURN.RETURN_ESC);
+        this.causedByClosed = BinaryLogic.containsSome(mask, UIOConstants.RETURN.RETURN_CLOSED);
+        this.causedByInterrupt = BinaryLogic.containsSome(mask, UIOConstants.RETURN.RETURN_INTERRUPT);
+        this.causedByInitException = BinaryLogic.containsSome(mask, UIOConstants.RETURN.RETURN_EXCEPTION);
         if (cause == null) {
             this.setStackTrace(new StackTraceElement[] {});
         }

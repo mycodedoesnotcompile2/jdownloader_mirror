@@ -35,7 +35,7 @@ import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52242 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 52652 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
 public class PremiumizeMe extends ZeveraCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("premiumize.me");
 
@@ -80,7 +80,6 @@ public class PremiumizeMe extends ZeveraCore {
     }
 
     public static interface PremiumizeMeConfigInterface extends UsenetAccountConfigInterface {
-        /** 2024-04-26: Removed pairing login setting */
         public class Translation {
             // public String getEnablePairingLogin_label() {
             // return "Enable pairing login?\r\nOnce enabled, you won't be able to use Usenet with Premiumize in JD anymore!!";
@@ -91,11 +90,6 @@ public class PremiumizeMe extends ZeveraCore {
         }
 
         public static final PremiumizeMeConfigInterface.Translation TRANSLATION = new Translation();
-        // @DefaultBooleanValue(false)
-        // @Order(20)
-        // boolean isEnablePairingLogin();
-        //
-        // void setEnablePairingLogin(boolean b);
 
         @AboutConfig
         @DefaultBooleanValue(false)
@@ -109,17 +103,6 @@ public class PremiumizeMe extends ZeveraCore {
     protected PluginConfigPanelNG createConfigPanel() {
         return new UsenetConfigPanel() {
             private static final long serialVersionUID = 1L;
-            // @Override
-            // protected boolean showKeyHandler(KeyHandler<?> keyHandler) {
-            // return "enablepairinglogin".equals(keyHandler.getKey()) ||
-            // "enableboosterpointsunlimitedtrafficworkaround".equals(keyHandler.getKey());
-            // }
-            //
-            // @Override
-            // protected boolean useCustomUI(KeyHandler<?> keyHandler) {
-            // return !"enablepairinglogin".equals(keyHandler.getKey()) &&
-            // !"enableboosterpointsunlimitedtrafficworkaround".equals(keyHandler.getKey());
-            // }
 
             @Override
             protected boolean showKeyHandler(KeyHandler<?> keyHandler) {
@@ -159,17 +142,6 @@ public class PremiumizeMe extends ZeveraCore {
 
     @Override
     public boolean usePairingLogin(final Account account) {
-        /**
-         * 2021-01-29: Hardcoded-disabled this because API changes would be required to make Usenet work when logged in via this method.
-         * Also some users enabled this by mistake and then failed to login (WTF)
-         */
-        // if (account == null) {
-        // return false;
-        // } else if (false && this.getAccountJsonConfig(account).isEnablePairingLogin()) {
-        // return true;
-        // } else {
-        // return false;
-        // }
         return false;
     }
 

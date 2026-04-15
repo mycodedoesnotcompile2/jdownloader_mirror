@@ -20,10 +20,9 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.parser.Regex;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47660 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52651 $", interfaceVersion = 3, names = {}, urls = {})
 public class CartoontubeXxx extends KernelVideoSharingComV2 {
     public CartoontubeXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -59,23 +58,11 @@ public class CartoontubeXxx extends KernelVideoSharingComV2 {
         if (url == null) {
             return null;
         }
-        if (url.matches(pattern_embedded)) {
-            return null;
-        } else {
-            return new Regex(url, this.getSupportedLinks()).getMatch(2);
+        String title = new Regex(url, this.getSupportedLinks()).getMatch(2);
+        if (title != null) {
+            return title;
         }
-    }
-
-    @Override
-    protected String getFUID(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() == null) {
-            return null;
-        }
-        if (link.getPluginPatternMatcher().matches(pattern_embedded)) {
-            return new Regex(link.getPluginPatternMatcher(), pattern_embedded).getMatch(0);
-        } else {
-            return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
-        }
+        return super.getURLTitle(url);
     }
 
     @Override

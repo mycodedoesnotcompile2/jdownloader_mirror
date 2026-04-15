@@ -36,7 +36,6 @@ package org.appwork.uio;
 import org.appwork.utils.swing.dialog.Dialog;
 
 public class UIOManager {
-
     private static volatile UserIOHandlerInterface USERIO = org.appwork.utils.Application.isHeadless() ? new HeadlessDialogHandler() : new BasicDialogHandler();
 
     public static void setUserIO(final UserIOHandlerInterface io) {
@@ -50,40 +49,41 @@ public class UIOManager {
     /**
      * Use this flag to show display of the Timer
      */
-
-    public static final int LOGIC_COUNTDOWN                      = 1 << 2;
+    @Deprecated
+    public static final int LOGIC_COUNTDOWN                      = UIOConstants.LOGIC.LOGIC_COUNTDOWN;
     /**
      * Don't show again is only valid for this session, but is not saved for further sessions
      */
-
-    public static final int LOGIC_DONT_SHOW_AGAIN_DELETE_ON_EXIT = 1 << 11;
+    @Deprecated
+    public static final int LOGIC_DONT_SHOW_AGAIN_DELETE_ON_EXIT = UIOConstants.LOGIC.LOGIC_DONT_SHOW_AGAIN_DELETE_ON_EXIT;
     /**
      * Hide the cancel Button
      */
-
-    public static final int BUTTONS_HIDE_CANCEL                  = 1 << 4;
+    @Deprecated
+    public static final int BUTTONS_HIDE_CANCEL                  = UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL;
     /**
      * Hide the OK button
      */
-
-    public static final int BUTTONS_HIDE_OK                      = 1 << 3;
+    @Deprecated
+    public static final int BUTTONS_HIDE_OK                      = UIOConstants.BUTTONS.BUTTONS_HIDE_OK;
     /**
      * Often, the {@link Dialog#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} option does not make sense for the cancel option. Use this flag if the
      * option should be ignored if the user selects Cancel
      */
-
-    public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL = 1 << 9;
+    @Deprecated
+    public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL = UIOConstants.LOGIC.LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL;
     /**
      * Often, the {@link Dialog#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} option does not make sense for the ok option. Use this flag if the option
      * should be ignored if the user selects OK
      */
-
-    public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_OK     = 1 << 10;
-    public static final int STYLE_SHOW_DO_NOT_DISPLAY_AGAIN      = Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN;
+    @Deprecated
+    public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_OK     = UIOConstants.LOGIC.LOGIC_DONT_SHOW_AGAIN_IGNORES_OK;
+    @Deprecated
+    public static final int STYLE_SHOW_DO_NOT_DISPLAY_AGAIN      = UIOConstants.STYLE.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN;
     /**
      * If set, the dialog does not handle do not show again - just shows the ui and sets the flag if the user clicked it. this can be used
      * to handle the result externaly
      */
-    public static final int LOGIC_DONT_SHOW_AGAIN_GUI_ONLY       = 1 << 11;
-
+    @Deprecated
+    public static final int LOGIC_DONT_SHOW_AGAIN_GUI_ONLY       = UIOConstants.LOGIC.LOGIC_DONT_SHOW_AGAIN_GUI_ONLY;
 }

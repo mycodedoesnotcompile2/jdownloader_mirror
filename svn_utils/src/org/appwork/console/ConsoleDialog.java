@@ -35,10 +35,9 @@ package org.appwork.console;
 
 import java.io.IOException;
 
-import org.appwork.uio.UIOManager;
+import org.appwork.uio.UIOConstants;
 import org.appwork.utils.Application;
 import org.appwork.utils.Exceptions;
-import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 
@@ -95,13 +94,13 @@ public class ConsoleDialog implements ConsoleDialogInterface {
     }
 
     public void waitYesOrNo(int flags, String yes, String no) throws DialogCanceledException, DialogClosedException {
-        if ((flags & UIOManager.BUTTONS_HIDE_OK) != 0 || (flags & UIOManager.BUTTONS_HIDE_CANCEL) != 0) {
-            this.waitToContinue((flags & UIOManager.BUTTONS_HIDE_OK) != 0 ? yes : no);
-            if ((flags & UIOManager.BUTTONS_HIDE_OK) != 0) {
-            } else if ((flags & UIOManager.BUTTONS_HIDE_CANCEL) != 0) {
-                throw new DialogCanceledException(Dialog.RETURN_CANCEL);
+        if ((flags & UIOConstants.BUTTONS.BUTTONS_HIDE_OK) != 0 || (flags & UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL) != 0) {
+            this.waitToContinue((flags & UIOConstants.BUTTONS.BUTTONS_HIDE_OK) != 0 ? yes : no);
+            if ((flags & UIOConstants.BUTTONS.BUTTONS_HIDE_OK) != 0) {
+            } else if ((flags & UIOConstants.BUTTONS.BUTTONS_HIDE_CANCEL) != 0) {
+                throw new DialogCanceledException(UIOConstants.RETURN.RETURN_CANCEL);
             } else {
-                throw new DialogClosedException(Dialog.RETURN_CLOSED);
+                throw new DialogClosedException(UIOConstants.RETURN.RETURN_CLOSED);
             }
         } else {
             while (true) {
@@ -112,7 +111,7 @@ public class ConsoleDialog implements ConsoleDialogInterface {
                 if (c.trim().equalsIgnoreCase("y")) {
                     return;
                 } else if (c.trim().equalsIgnoreCase("n")) {
-                    throw new DialogCanceledException(Dialog.RETURN_CANCEL);
+                    throw new DialogCanceledException(UIOConstants.RETURN.RETURN_CANCEL);
                 }
             }
         }

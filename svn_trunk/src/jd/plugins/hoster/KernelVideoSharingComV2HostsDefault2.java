@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52651 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault2(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,12 +45,7 @@ public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV
     }
 
     public static String[] getAnnotationUrls() {
-        // modified buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:/video)?/(\\d+/[^/\\?#]+/?|embed/\\d+/?)");
-        }
-        return ret.toArray(new String[0]);
+        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(getPluginDomains());
     }
 
     @Override

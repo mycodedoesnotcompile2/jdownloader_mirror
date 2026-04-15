@@ -18,6 +18,10 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.html.Form;
@@ -28,11 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52651 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,7 +57,7 @@ public class KatfileCom extends XFileSharingProBasic {
     public String rewriteHost(final String host) {
         /* 2025-09-09: Main domain changed to katfile.cloud */
         /* 2025-12-08: Main domain changed to katfile.online */
-        /* 2026ma-04-13: Main domain changed to katfile.ws */
+        /* 2026-04-13: Main domain changed to katfile.ws */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
@@ -178,7 +178,6 @@ public class KatfileCom extends XFileSharingProBasic {
             return super.isOffline(link, br);
         }
     }
-
     // @Override
     // protected boolean isPremiumOnlyURL(final Browser br) {
     // final String url = br != null ? br.getURL() : null;

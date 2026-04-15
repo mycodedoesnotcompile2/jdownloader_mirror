@@ -21,6 +21,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -28,8 +31,8 @@ import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
@@ -42,6 +45,7 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.requests.FormData;
 import jd.http.requests.PostFormDataRequest;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -61,15 +65,16 @@ import jd.plugins.components.MultiHosterManagement;
 //IMPORTANT: this class must stay in jd.plugins.hoster because it extends another plugin (UseNet) which is only available through PluginClassLoader
 abstract public class ZeveraCore extends UseNet {
     /* Connection limits */
-    private final String                 API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
-    private static final String          PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
-    private static final HashSet<String> cache_hosts                            = new HashSet<String>();
+    private final String                         API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
+    private static final String                  PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
+    private static final HashSet<String>         global_cache_hosts                     = new HashSet<String>();
+    /* Map of timestamps of cache only items that are not in cache and thus shouldn't be retried. */
+    private static final Map<DownloadLink, Long> cache_unavailable_timestamps           = new WeakHashMap<DownloadLink, Long>();
 
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
     public ZeveraCore(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("https://www." + this.getHost() + "/premium");
     }
 
     @Override
@@ -222,15 +227,30 @@ abstract public class ZeveraCore extends UseNet {
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
         if (account == null) {
             return false;
+        }
+        final Long cache_failed_timestamp;
+        synchronized (cache_unavailable_timestamps) {
+            cache_failed_timestamp = cache_unavailable_timestamps.get(link);
+        }
+        if (cache_failed_timestamp != null && Time.systemIndependentCurrentJVMTimeMillis() - cache_failed_timestamp.longValue() < TimeUnit.DAYS.toMillis(10)) {
+            /* Item has already been tried recently and was not in cache thus we know that we cannot handle it (at this moment). */
+            return false;
         } else {
             return super.canHandle(link, account);
         }
     }
 
+    private final Pattern PATTERN_SELFHOSTED = Pattern.compile("https?://[^/]+/file\\?id=.+", Pattern.CASE_INSENSITIVE);
+
     private boolean isSelfhostedContent(final DownloadLink link) {
         if (link == null) {
             return false;
-        } else if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches("(?i)https?://[^/]+/file\\?id=.+")) {
+        }
+        final String url = link.getPluginPatternMatcher();
+        if (url == null) {
+            return false;
+        }
+        if (new Regex(url, PATTERN_SELFHOSTED).patternFind()) {
             return true;
         } else {
             return false;
@@ -244,12 +264,7 @@ abstract public class ZeveraCore extends UseNet {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        if (this.isSelfhostedContent(link)) {
-            handleDLSelfhosted(link, account);
-        } else {
-            /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        handleDLSelfhosted(link, account);
     }
 
     @Override
@@ -271,11 +286,21 @@ abstract public class ZeveraCore extends UseNet {
                 final String hash_sha1 = link.getSha1Hash();
                 final String hash_sha256 = link.getSha256Hash();
                 /* https://app.swaggerhub.com/apis-docs/premiumize.me/api/1.6.7#/transfer/transferDirectdl */
-                final boolean useWorkaround = true;
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && cache_hosts.contains(link.getHost())) {
+                /**
+                 * If enabled, API key will be included in URL even though we're already sending it via Authorization header to work around
+                 * a server side bug. <br>
+                 * 2026-04-14: It's unknown whether or not this workaround is still needed.
+                 */
+                final boolean useAPIKeyWorkaround = true;
+                final boolean isCacheHost;
+                synchronized (global_cache_hosts) {
+                    isCacheHost = global_cache_hosts.contains(link.getHost());
+                }
+                if (isCacheHost) {
+                    /* Host is "cache only host" which means that we can only download it if it's in the cache of this multihoster. */
                     String url = "https://www." + account.getHoster() + "/api/cache/check";
                     final UrlQuery query = new UrlQuery();
-                    if (!useWorkaround && !usePairingLogin(account)) {
+                    if (!useAPIKeyWorkaround && !usePairingLogin(account)) {
                         query.appendEncoded("apikey", getAPIKey(account));
                     }
                     query.appendEncoded("items[]", external_url);
@@ -284,16 +309,17 @@ abstract public class ZeveraCore extends UseNet {
                     final Map<String, Object> entries = this.handleAPIErrors(this, br, link, account);
                     final List<Object> response = (List<Object>) entries.get("response");
                     if (!Boolean.TRUE.equals(response.get(0))) {
-                        // TODO: Add proper error handling
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Item not in cache");
+                        synchronized (cache_unavailable_timestamps) {
+                            cache_unavailable_timestamps.put(link, Time.systemIndependentCurrentJVMTimeMillis());
+                        }
+                        throw new PluginException(LinkStatus.ERROR_RETRY, "Item not in cache");
                     }
                 }
                 String url = "https://www." + account.getHoster() + "/api/transfer/directdl";
-                if (!useWorkaround && !usePairingLogin(account)) {
+                if (!useAPIKeyWorkaround && !usePairingLogin(account)) {
                     url += "?apikey=" + getAPIKey(account);
                 }
-                PostFormDataRequest req = null;
-                req = br.createPostFormDataRequest(url);
+                final PostFormDataRequest req = br.createPostFormDataRequest(url);
                 req.addFormData(new FormData("src", external_url));
                 req.addFormData(new FormData("folder_id", "null"));
                 if (hash_md5 != null) {
@@ -310,10 +336,10 @@ abstract public class ZeveraCore extends UseNet {
                 Map<String, Object> entries;
                 if (useSlotBlockingQueueHandling) {
                     /* 2023-07-17 */
-                    logger.info("Executing slot-blocking queue handling");
                     entries = this.handleAPIErrors(this, br, link, account, API_STATUS_FOR_QUEUE_DEFERRED_HANDLING);
                     String status = (String) entries.get("status");
                     if (API_STATUS_FOR_QUEUE_DEFERRED_HANDLING.equalsIgnoreCase(status)) {
+                        logger.info("Executing slot-blocking queue handling");
                         final Number delay = (Number) entries.get("delay");
                         final boolean allowUnlimitedRetries = false; // 2023-08-03
                         // final int maxWaitSeconds = delay != null ? Math.min(delay.intValue() * 480, 2400) : 120;
@@ -420,6 +446,10 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     private void handleDLSelfhosted(final DownloadLink link, final Account account) throws Exception {
+        if (!this.isSelfhostedContent(link)) {
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final Map<String, Object> details = requestFileInformationSelfhosted(link, account);
         final String dllink = details.get("link").toString();
         if (StringUtils.isEmpty(dllink)) {
@@ -472,8 +502,8 @@ abstract public class ZeveraCore extends UseNet {
             ai.setExpired(true);
         }
         callAPI(br, account, "/api/services/list");
-        synchronized (cache_hosts) {
-            cache_hosts.clear();
+        synchronized (global_cache_hosts) {
+            global_cache_hosts.clear();
             final Map<String, Object> hosterinfo = this.handleAPIErrors(this, br, null, account);
             final HashSet<String> supportedHostsMainDomains = new HashSet<String>();
             final HashSet<String> supportedHostsMainDomainsWithoutCache = new HashSet<String>();
@@ -515,7 +545,7 @@ abstract public class ZeveraCore extends UseNet {
                 if (isCacheHost) {
                     mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
                     mhost.setStatusText("Cache only");
-                    cache_hosts.addAll(allDomains);
+                    global_cache_hosts.addAll(allDomains);
                 }
                 supportedhosts.add(mhost);
             }
@@ -738,6 +768,7 @@ abstract public class ZeveraCore extends UseNet {
     /**
      * Indicates whether or not the new 'pairing' login is supported & enabled: https://alexbilbie.com/2016/04/oauth-2-device-flow-grant/
      */
+    @Deprecated
     public boolean usePairingLogin(final Account account) {
         return false;
     }
