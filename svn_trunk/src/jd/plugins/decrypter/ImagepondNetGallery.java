@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
@@ -37,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ImagepondNet;
 
-@DecrypterPlugin(revision = "$Revision: 52658 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52663 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ImagepondNet.class })
 public class ImagepondNetGallery extends PluginForDecrypt {
     public ImagepondNetGallery(PluginWrapper wrapper) {
@@ -68,10 +69,12 @@ public class ImagepondNetGallery extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_SUPPORTED = Pattern.compile("/(?:album|a)/([\\w\\-\\.]+)");
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:album|a)/([\\w\\-\\.]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_SUPPORTED.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -79,10 +82,15 @@ public class ImagepondNetGallery extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
-        final String album_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        String album_id = new Regex(contenturl, PATTERN_SUPPORTED).getMatch(0);
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String album_id_from_browser_url = new Regex(br.getURL(), PATTERN_SUPPORTED).getMatch(0);
+        if (album_id_from_browser_url != null) {
+            /* Prefer this id, especially useful when redirect from legacy "/album/..." links to new "/a/..." links happens. */
+            album_id = album_id_from_browser_url;
         }
         final Regex galleryinfo = br.getRegex("<span>(\\d+) items\\s*</span>\\s*<span>(\\d+[^<]+)</span>");
         int numberofItems = -1;
@@ -154,17 +162,25 @@ public class ImagepondNetGallery extends PluginForDecrypt {
                 i++;
             }
             logger.info("Crawled page " + page + " | Items so far: " + ret.size() + "/" + numberofItems);
-            if (ret.size() == numberofItems) {
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            } else if (ret.size() == numberofItems) {
                 logger.info("Stopping because: Found all items");
                 break pagination;
             } else if (newItemsThisPage == 0) {
+                /* Fail safe */
                 logger.info("Stopping because: Reached last page?");
                 break pagination;
             }
+            /* Continue to next page */
             page++;
-            // TODO: Implement pagination
-            logger.info("Stopping because: Pagination hasn't been implemented yet");
-            break pagination;
+            final String nextPageURL = br.getRegex("/a/" + Pattern.quote(album_id) + "\\?page=" + page).getMatch(-1);
+            if (nextPageURL == null) {
+                logger.info("Stopping because: Failed to find next page -> Reached end?");
+                break pagination;
+            }
+            br.getPage(nextPageURL);
         } while (!this.isAbort());
         return ret;
     }

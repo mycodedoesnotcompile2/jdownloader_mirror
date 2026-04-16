@@ -1,6 +1,7 @@
 package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
@@ -26,6 +27,10 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
 
         public String getNoFreeSlotsWaitMinutes_label() {
             return "Free download: Wait time (minutes) for errors related to 'download is temporarily limited due to high demand' or 'no free slots'?";
+        }
+
+        public String getNoFreeSlotsInstantRetryEnabled_label() {
+            return "Free download: Allow some instant retries on error 'download is temporarily limited due to high demand', 'no free slots' or similar?";
         }
 
         public String getSSLMode_label() {
@@ -125,6 +130,13 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
 
     void setNoFreeSlotsWaitMinutes(int num);
 
+    @AboutConfig
+    @DefaultBooleanValue(false)
+    @Order(13)
+    boolean isNoFreeSlotsInstantRetryEnabled();
+
+    void setNoFreeSlotsInstantRetryEnabled(boolean b);
+
     public static enum SSLMode implements LabelInterface {
         AUTO {
             @Override
@@ -206,7 +218,7 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     @Order(60)
     int getGlobalRequestIntervalLimit1fichierComMilliseconds();
 
-    void setGlobalRequestIntervalLimit1fichierComMilliseconds(int milliseconds);
+    void setGlobalRequestIntervalLimit1fichierComMilliseconds(int millis);
 
     @AboutConfig
     @SpinnerValidator(min = 2500, max = 30000, step = 500)
@@ -215,5 +227,5 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     @Order(70)
     int getGlobalRequestIntervalLimitAPI1fichierComMilliseconds();
 
-    void setGlobalRequestIntervalLimitAPI1fichierComMilliseconds(int milliseconds);
+    void setGlobalRequestIntervalLimitAPI1fichierComMilliseconds(int millis);
 }

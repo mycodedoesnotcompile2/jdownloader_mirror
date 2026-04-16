@@ -60,10 +60,9 @@ import org.jdownloader.plugins.components.config.XFSConfigVideo;
 import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
 import org.jdownloader.plugins.components.config.XFSConfigVideo.PreferredDownloadQuality;
 import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52336 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52662 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -82,17 +81,14 @@ public class VoeSx extends XFileSharingProBasic {
      * captchatype-info: 2020-08-19: null<br />
      * other:<br />
      */
-    public static List<String[]> getPluginDomains() {
-        return VoeSxCrawler.getPluginDomains();
-    }
 
     public static String[] getAnnotationNames() {
-        return buildAnnotationNames(getPluginDomains());
+        return buildAnnotationNames(VoeSxCrawler.getPluginDomains());
     }
 
     @Override
     public String[] siteSupportedNames() {
-        return buildSupportedNames(getPluginDomains());
+        return buildSupportedNames(VoeSxCrawler.getPluginDomains());
     }
 
     public static String[] getAnnotationUrls() {
@@ -518,7 +514,7 @@ public class VoeSx extends XFileSharingProBasic {
         if (cfgO == null) {
             return null;
         }
-        final XFSConfigVideo cfg = PluginJsonConfig.get(cfgO);
+        final XFSConfigVideo cfg = get(cfgO);
         final PreferredDownloadQuality quality = cfg.getPreferredDownloadQuality();
         switch (quality) {
         case HIGH:

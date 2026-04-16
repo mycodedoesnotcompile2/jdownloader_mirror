@@ -173,7 +173,7 @@ public interface AWUTranslation extends TranslateInterface {
     String literally_byte_string(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
-    @Default(lngs = { "en", "de" }, values = { "%s1 GB", "%s1 GB" })
+    @Default(lngs = { "en", "de" }, values = { "%s1 GiB", "%s1 GiB" }, invalid = { "%s1 GB" })
     String literally_gibibyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
@@ -181,7 +181,7 @@ public interface AWUTranslation extends TranslateInterface {
     String literally_gigabyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
-    @Default(lngs = { "en", "de" }, values = { "%s1 KB", "%s1 KB" })
+    @Default(lngs = { "en", "de" }, values = { "%s1 KiB", "%s1 KiB" }, invalid = { "%s1 KB" })
     String literally_kibibyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
@@ -189,7 +189,7 @@ public interface AWUTranslation extends TranslateInterface {
     String literally_kilobyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
-    @Default(lngs = { "en", "de" }, values = { "%s1 MB", "%s1 MB" })
+    @Default(lngs = { "en", "de" }, values = { "%s1 MiB", "%s1 MiB" }, invalid = { "%s1 MB" })
     String literally_mebibyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
@@ -197,7 +197,7 @@ public interface AWUTranslation extends TranslateInterface {
     String literally_megabyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
-    @Default(lngs = { "en", "de" }, values = { "%s1 TB", "%s1 TB" })
+    @Default(lngs = { "en", "de" }, values = { "%s1 TiB", "%s1 TiB" }, invalid = { "%s1 TB" })
     String literally_tebibyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")

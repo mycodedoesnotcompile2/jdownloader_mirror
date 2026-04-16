@@ -48,12 +48,11 @@ import org.appwork.utils.DebugMode;
  *
  */
 public class TranslatedEntry {
-
     // private static final boolean CHAR_ARRAY_IMPLEMENTATION = false;
-
-    private final String raw;
-    private Object[]     parts;
-    private volatile int expectedSize;
+    protected final String raw;
+    private Object[]       parts;
+    private volatile int   expectedSize;
+    protected Boolean      validFlag = null;
 
     /**
      * @param string
@@ -83,7 +82,6 @@ public class TranslatedEntry {
                             arg = ((LocaleMap) arg).resolve();
                         }
                         sb.append(arg);
-
                     } else if (p instanceof int[]) {
                         sb.append(raw, ((int[]) p)[0], ((int[]) p)[1]);
                     } else if (p instanceof String) {
@@ -169,5 +167,4 @@ public class TranslatedEntry {
             // }
         }
     }
-
 }

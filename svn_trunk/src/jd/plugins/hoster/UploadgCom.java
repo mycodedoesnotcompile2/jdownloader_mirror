@@ -33,6 +33,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -40,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52635 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52664 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadgCom extends PluginForHost {
     public UploadgCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +59,7 @@ public class UploadgCom extends PluginForHost {
         return "https://" + getHost() + "/pages/terms-of-service";
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "uploadg.com" });
@@ -74,7 +75,10 @@ public class UploadgCom extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL = Pattern.compile("/drive/s/([a-zA-Z0-9]{30})");
+    private static final Pattern PATTERN_NORMAL              = Pattern.compile("/drive/s/([a-zA-Z0-9]{30})");
+    public static final String   PROPERTY_FILENAME           = "uploadg_filename";
+    public static final String   PROPERTY_INTERNAL_FILE_ID   = "uploadg_internal_file_id";
+    public static final String   PROPERTY_INTERNAL_FILE_HASH = "uploadg_internal_file_hash";
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
@@ -95,6 +99,11 @@ public class UploadgCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
+        final String stored_internal_file_id = link.getStringProperty(PROPERTY_INTERNAL_FILE_ID);
+        if (stored_internal_file_id != null) {
+            return stored_internal_file_id;
+        }
+        /* Legacy support */
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
@@ -112,18 +121,20 @@ public class UploadgCom extends PluginForHost {
         return this.getFID(link);
     }
 
-    private String turnstile_site_key         = null;
-    private String internal_file_id           = null;
-    private String internal_file_hash         = null;
-    private Number download_countdown_seconds = null;
+    private String  turnstile_site_key         = null;
+    private String  download_container_id      = null;
+    private String  internal_file_hash         = null;
+    private Number  download_countdown_seconds = null;
+    private Boolean is_paid                    = null;
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         /* Nullification */
         turnstile_site_key = null;
-        internal_file_id = null;
+        download_container_id = null;
         internal_file_hash = null;
         download_countdown_seconds = null;
+        is_paid = null;
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -133,15 +144,32 @@ public class UploadgCom extends PluginForHost {
         final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
         final Map<String, Object> linkinfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "loaders/shareableLinkPage/link");
         final Map<String, Object> entry = (Map<String, Object>) linkinfo.get("entry");
-        link.setFinalFileName(entry.get("name").toString());
-        link.setVerifiedFileSize(((Number) entry.get("file_size")).longValue());
+        String filename = link.getStringProperty(PROPERTY_FILENAME);
+        boolean is_single_file_or_legacy_item = false;
+        if (filename == null) {
+            filename = entry.get("name").toString();
+            is_single_file_or_legacy_item = true;
+        }
+        link.setFinalFileName(filename);
+        if (is_single_file_or_legacy_item) {
+            link.setVerifiedFileSize(((Number) entry.get("file_size")).longValue());
+        }
         if (entry.get("deleted_at") != null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* Collect data we need for downloading */
+        if (StringUtils.isEmpty(link.getComment())) {
+            final String description = (String) entry.get("description");
+            if (!StringUtils.isEmpty(description)) {
+                link.setComment(description);
+            }
+        }
+        internal_file_hash = link.getStringProperty(PROPERTY_INTERNAL_FILE_HASH);
         try {
-            internal_file_id = linkinfo.get("id").toString();
-            internal_file_hash = entry.get("hash").toString();
+            download_container_id = linkinfo.get("id").toString();
+            if (is_single_file_or_legacy_item) {
+                /* Handling for single files that are not part of a folder */
+                internal_file_hash = entry.get("hash").toString();
+            }
             final Map<String, Object> ads = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "settings/ads");
             turnstile_site_key = ads.get("turnstile_site_key").toString();
             download_countdown_seconds = (Number) ads.get("download_countdown_seconds");
@@ -161,6 +189,9 @@ public class UploadgCom extends PluginForHost {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
+            if (Boolean.TRUE.equals(is_paid)) {
+                throw new AccountRequiredException();
+            }
             if (StringUtils.isEmpty(turnstile_site_key)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -197,11 +228,12 @@ public class UploadgCom extends PluginForHost {
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             if (!Boolean.TRUE.equals(entries.get("success"))) {
                 /* This should be a rare case */
+                /* e.g. {"success":false,"message":"CAPTCHA verification failed. Please try again."} */
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             /* We get this token but it's never needed anywhere. */
             // final String download_token = entries.get("download_token").toString();
-            final String dllink = "/api/v1/file-entries/download/" + internal_file_hash + "?shareable_link=" + internal_file_id + "&password=null";
+            final String dllink = "/api/v1/file-entries/download/" + internal_file_hash + "?shareable_link=" + download_container_id + "&password=null";
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());

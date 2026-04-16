@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51244 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
+@HostPlugin(revision = "$Revision: 52664 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
 public class UploadgigCom extends antiDDoSForHost {
     @Override
     protected long getStartInterval(DownloadLink downloadLink, Account account) {
@@ -593,13 +593,5 @@ public class UploadgigCom extends antiDDoSForHost {
             // throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "429", 5 * 60 * 1000l);
         }
         super.runPostRequestTask(ibr);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

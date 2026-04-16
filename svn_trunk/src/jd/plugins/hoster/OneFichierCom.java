@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import javax.swing.JComboBox;
@@ -49,6 +50,7 @@ import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -100,7 +102,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52598 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52659 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -119,6 +121,7 @@ public class OneFichierCom extends PluginForHost {
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
     public static final String  API_BASE                                                          = "https://api.1fichier.com/v1";
     private final boolean       allowFreeAccountDownloadsViaAPI                                   = false;
+    private static AtomicLong   timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed    = new AtomicLong(0);
 
     @Override
     public String[] siteSupportedNames() {
@@ -569,7 +572,7 @@ public class OneFichierCom extends PluginForHost {
         return false;
     }
 
-    public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception, PluginException {
+    private void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (account != null) {
             this.loginWebsite(account, false);
         }
@@ -591,78 +594,121 @@ public class OneFichierCom extends PluginForHost {
             link.removeProperty(directurlproperty);
         }
         prepareBrowserWebsite(br);
+        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
         final String contentURL = this.getURLWithPreferredProtocol(getContentURLWebsite(link));
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(link, account));
-        if (this.looksLikeDownloadableContent(dl.getConnection())) {
-            link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
-            if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
-                /* Link is direct-downloadable without premium account -> Hotlink which means another user is paying for the traffic. */
-                logger.info("Link is hotlink");
-                link.setProperty(PROPERTY_HOTLINK, true);
+        boolean instantRetryOnNoFreeSlots = cfg.isNoFreeSlotsInstantRetryEnabled();
+        final int noFreeSlotsInstantRetryHandlingAutoThresholdMinutes = 10;
+        if (instantRetryOnNoFreeSlots && account == null && Time.systemIndependentCurrentJVMTimeMillis() - timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.get() < TimeUnit.MINUTES.toMillis(noFreeSlotsInstantRetryHandlingAutoThresholdMinutes)) {
+            logger.info("Instant no free slots retry handling has failed within the last " + noFreeSlotsInstantRetryHandlingAutoThresholdMinutes + " minutes -> Auto disabled it");
+            instantRetryOnNoFreeSlots = false;
+        }
+        String dllink = null;
+        freeSlotRetry: for (int freeSlotRetryIndex = 0; freeSlotRetryIndex <= (instantRetryOnNoFreeSlots && account == null ? 10 : 0); freeSlotRetryIndex++) {
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
+                if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
+                    /* Link is direct-downloadable without premium account -> Hotlink which means another user is paying for the traffic. */
+                    logger.info("Link is hotlink");
+                    link.setProperty(PROPERTY_HOTLINK, true);
+                }
+                dl.startDownload();
+                return;
             }
-            dl.startDownload();
-            return;
-        }
-        logger.info("Link is not a hotlink or premium user has direct downloads disabled via Website -> /console/params.pl -> Force download Menu -> Enabled [enabled = disables direct downloads]");
-        link.removeProperty(PROPERTY_HOTLINK);
-        br.followConnection();
-        /* 404 error here means the file is offline */
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        errorHandlingWebsite(link, account, br);
-        final Form form = br.getForm(0);
-        if (form == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        String passCode = link.getDownloadPassword();
-        if (isPasswordProtectedFileWebsite(br)) {
-            logger.info("Handling password protected link...");
-            /*
-             * Set pw protected flag so in case this downloadlink is ever tried to be downloaded via API, we already know that it is
-             * password protected!
-             */
-            link.setPasswordProtected(true);
-            /** Try passwords in this order: 1. DownloadLink stored password, 2. Last used password, 3. Ask user */
-            if (passCode == null) {
-                passCode = getUserInput("Password?", link);
+            logger.info("Link is not a hotlink or premium user has direct downloads disabled via Website -> /console/params.pl -> Force download Menu -> Enabled [enabled = disables direct downloads]");
+            link.removeProperty(PROPERTY_HOTLINK);
+            br.followConnection();
+            /* 404 error here means the file is offline */
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            form.put("pass", Encoding.urlEncode(passCode));
-        }
-        /* Remove form fields we don't want. */
-        form.remove("save");
-        form.put("did", "1");
-        if (PluginJsonConfig.get(this.getConfigInterface()).getSSLMode() == SSLMode.FORCE_HTTP) {
-            form.put("dl_no_ssl", "on");
-        }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
-        if (this.looksLikeDownloadableContent(dl.getConnection())) {
+            errorHandlingWebsite(link, account, br);
+            final Form form = br.getForm(0);
+            if (form == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            String passCode = link.getDownloadPassword();
+            if (isPasswordProtectedFileWebsite(br)) {
+                logger.info("Handling password protected link...");
+                /*
+                 * Set pw protected flag so in case this downloadlink is ever tried to be downloaded via API, we already know that it is
+                 * password protected!
+                 */
+                link.setPasswordProtected(true);
+                /** Try passwords in this order: 1. DownloadLink stored password, 2. Last used password, 3. Ask user */
+                if (passCode == null) {
+                    passCode = getUserInput("Password?", link);
+                }
+                form.put("pass", Encoding.urlEncode(passCode));
+            }
+            /* Remove form fields we don't want. */
+            form.remove("save");
+            form.put("did", "1");
+            if (cfg.getSSLMode() == SSLMode.FORCE_HTTP) {
+                form.put("dl_no_ssl", "on");
+            }
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                if (link.isPasswordProtected()) {
+                    logger.info("User entered valid download password: " + passCode);
+                    /* Save download-password */
+                    link.setDownloadPassword(passCode);
+                }
+                dl.startDownload();
+                return;
+            }
+            br.followConnection();
+            if (isPasswordProtectedFileWebsite(br)) {
+                if (passCode == null) {
+                    /* This should never happen! */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Website states 'Wrong download password' but password hasn't been sent before");
+                }
+                this.errorWrongPassword(link);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             if (link.isPasswordProtected()) {
                 logger.info("User entered valid download password: " + passCode);
                 /* Save download-password */
                 link.setDownloadPassword(passCode);
             }
-            dl.startDownload();
-            return;
-        }
-        br.followConnection();
-        if (isPasswordProtectedFileWebsite(br)) {
-            this.errorWrongPassword(link);
-            /* This code should never be reached */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        errorHandlingWebsite(link, account, br);
-        if (link.isPasswordProtected()) {
-            logger.info("User entered valid download password: " + passCode);
-            /* Save download-password */
-            link.setDownloadPassword(passCode);
-        }
-        String dllink = br.getRegex("align:middle\">\\s+<a href=(\"|')(https?://[a-zA-Z0-9_\\-]+\\.(1fichier|desfichiers)\\.com/[a-zA-Z0-9]+.*?)\\1").getMatch(1);
-        if (dllink == null) {
-            dllink = br.getRegex("<a href=\"([^\"]+)\"[^>]*>\\s*Click here to download").getMatch(0);
-            if (StringUtils.isEmpty(dllink)) {
+            /* Important: Execute free slots check before looking for directlink */
+            if (this.isErrorNoFreeSlots(br)) {
+                if (account == null && instantRetryOnNoFreeSlots) {
+                    final int maxRetries = 15;
+                    if (freeSlotRetryIndex < maxRetries) {
+                        final long waitMS = (long) (Math.random() * 3000);
+                        logger.info("No free slots, retry " + (freeSlotRetryIndex + 1) + "/" + maxRetries + " in " + waitMS + "ms");
+                        this.sleep(waitMS, link);
+                        continue freeSlotRetry;
+                    } else {
+                        logger.info("No free slots, giving up after " + maxRetries + " retries");
+                        timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.set(Time.systemIndependentCurrentJVMTimeMillis());
+                    }
+                }
+                this.errorNoFreeSlots(account);
+                /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else {
+                /* Nullification */
+                if (account == null) {
+                    /* Reset no free slots instant retry handling cooldown timer before error handling gets called. */
+                    timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.set(0);
+                }
             }
+            dllink = br.getRegex("<a href=\"([^\"]+)\"[^>]*>\\s*Click here to download").getMatch(0);
+            if (dllink == null) {
+                dllink = br.getRegex("align:middle\">\\s+<a href=(\"|')(https?://[a-zA-Z0-9_\\-]+\\.(1fichier|desfichiers)\\.com/[a-zA-Z0-9]+.*?)\\1").getMatch(1);
+            }
+            if (dllink != null) {
+                /* Directurl found -> Success :) */
+                break freeSlotRetry;
+            }
+            errorHandlingWebsite(link, account, br);
+            break freeSlotRetry;
+        }
+        if (dllink == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dllink = this.getURLWithPreferredProtocol(dllink);
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -742,31 +788,10 @@ public class OneFichierCom extends PluginForHost {
             } else {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msg, waitMillis);
             }
-        } else if (br.containsHTML(">\\s*Free download is temporarily limited due to high demand")) {
-            // Free download is temporarily limited due to high demand<br/>
-            // You can wait for a slot to become available,<br/>
-            // or <a href="/register.pl">👉<strong>Sign in for free to access more slots immediately</strong></a><br/>
-            // You will also be able to save this file to your account and download it later.
-            final long waitMillis = cfg.getNoFreeSlotsWaitMinutes() * 60 * 1000;
-            if (account != null) {
-                if (AccountType.FREE != account.getType()) {
-                    logger.warning("This error should only happen for free accounts");
-                }
-                throw new AccountUnavailableException("Free account download is temporarily limited. Buy premium or try again later.", waitMillis);
-            } else {
-                final String msg = "Free download is temporarily limited. Buy premium, try a free account or try again later.";
-                final FreeDownloadNoFreeSlotsMode mode = cfg.getNoFreeSlotsMode();
-                if (mode == FreeDownloadNoFreeSlotsMode.PER_FILE) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
-                } else if (mode == FreeDownloadNoFreeSlotsMode.GLOBAL_RECONNECT) {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msg, waitMillis);
-                } else {
-                    /*
-                     * AUTO and NoFreeSlotsMode.GLOBAL_WAIT * /
-                     */
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
-                }
-            }
+        } else if (isErrorNoFreeSlots(br)) {
+            this.errorNoFreeSlots(account);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* Check for blocked IP */
         String waittimeMinutesStr = br.getRegex("you must wait (at least|up to)\\s*(\\d+)\\s*minutes between each downloads").getMatch(1);
@@ -817,6 +842,42 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
+     * Returns true if website states that currently there are no free slots available aka "Free download is temporarily limited due to high
+     * demand".
+     */
+    private boolean isErrorNoFreeSlots(final Browser br) {
+        return br.containsHTML(">\\s*Free download is temporarily limited due to high demand");
+    }
+
+    private void errorNoFreeSlots(final Account account) throws PluginException {
+        // Free download is temporarily limited due to high demand<br/>
+        // You can wait for a slot to become available,<br/>
+        // or <a href="/register.pl">👉<strong>Sign in for free to access more slots immediately</strong></a><br/>
+        // You will also be able to save this file to your account and download it later.
+        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final long waitMillis = cfg.getNoFreeSlotsWaitMinutes() * 60 * 1000;
+        if (account != null) {
+            if (AccountType.FREE != account.getType()) {
+                logger.warning("This error should only happen for free accounts");
+            }
+            throw new AccountUnavailableException("Free account download is temporarily limited. Buy premium or try again later.", waitMillis);
+        } else {
+            final String msg = "Free download is temporarily limited. Buy premium, try a free account or try again later.";
+            final FreeDownloadNoFreeSlotsMode mode = cfg.getNoFreeSlotsMode();
+            if (mode == FreeDownloadNoFreeSlotsMode.PER_FILE) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
+            } else if (mode == FreeDownloadNoFreeSlotsMode.GLOBAL_RECONNECT) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msg, waitMillis);
+            } else {
+                /*
+                 * AUTO and NoFreeSlotsMode.GLOBAL_WAIT *
+                 */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
+            }
+        }
+    }
+
+    /**
      * Access restricted by IP / only registered users / only premium users / only owner. </br>
      * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
      *
@@ -845,6 +906,7 @@ public class OneFichierCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
+        logger.info("Performing login auto handling");
         Exception apiException = null;
         if (this.looksLikeValidAPIKey(account.getPass())) {
             /**

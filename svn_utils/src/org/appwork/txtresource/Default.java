@@ -48,4 +48,6 @@ public @interface Default {
     String[] lngs();
 
     String[] values();
+
+    String[] invalid() default {};
 }

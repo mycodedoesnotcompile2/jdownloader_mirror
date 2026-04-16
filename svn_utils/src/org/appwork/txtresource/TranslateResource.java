@@ -40,6 +40,7 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URL;
+import java.util.Arrays;
 
 import org.appwork.utils.URLStream;
 
@@ -59,7 +60,7 @@ public class TranslateResource {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override
@@ -124,21 +125,28 @@ public class TranslateResource {
     }
 
     protected TranslatedEntry getEntryFromFile(final Method method) {
-        TranslatedEntry ret = null;
-        ret = this.getData().get(method.getName());
-        if (ret == null) {
-            if (fallbackURL != null && !fallbackRead) {
-                fallbackRead = true;
-                try {
-                    final String txt = this.read(fallbackURL);
-                    data.merge(TranslationUtils.restoreFromString(txt, TranslateData.class));
-                } catch (final Throwable e) {
-                    org.appwork.loggingv3.LogV3.severe("Error in Translation File: " + fallbackURL);
-                    org.appwork.loggingv3.LogV3.log(e);
-                }
+        TranslatedEntry ret = this.getData().get(method.getName());
+        if (ret == null && fallbackURL != null && !fallbackRead) {
+            fallbackRead = true;
+            try {
+                final String txt = this.read(fallbackURL);
+                data.merge(TranslationUtils.restoreFromString(txt, TranslateData.class));
+                ret = this.getData().get(method.getName());
+            } catch (final Throwable e) {
+                org.appwork.loggingv3.LogV3.severe("Error in Translation File: " + fallbackURL);
+                org.appwork.loggingv3.LogV3.log(e);
             }
         }
-        return ret;
+        if (ret == null || Boolean.FALSE.equals(ret.validFlag)) {
+            return null;
+        } else if (ret.validFlag == null) {
+            final Default lngAn = method.getAnnotation(Default.class);
+            ret.validFlag = lngAn == null || !Arrays.asList(lngAn.invalid()).contains(ret.raw);
+        }
+        if (Boolean.TRUE.equals(ret.validFlag)) {
+            return ret;
+        }
+        return null;
     }
 
     /**

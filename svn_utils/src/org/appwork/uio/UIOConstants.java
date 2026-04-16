@@ -34,8 +34,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.uio;
 
-import org.appwork.utils.swing.dialog.Dialog;
-
 /**
  * @author daniel
  * @date Apr 14, 2026
@@ -76,13 +74,13 @@ public final class UIOConstants {
          */
         public static final int LOGIC_DONT_SHOW_AGAIN_DELETE_ON_EXIT = 1 << 11;
         /**
-         * Often, the {@link Dialog#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} option does not make sense for the cancel option. Use this flag if the
-         * option should be ignored if the user selects Cancel
+         * Often, the {@link UIOConstants.STYLE#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} option does not make sense for the cancel option. Use this
+         * flag if the option should be ignored if the user selects Cancel
          */
         public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL = 1 << 9;
         /**
-         * Often, the {@link Dialog#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} option does not make sense for the ok option. Use this flag if the
-         * option should be ignored if the user selects OK
+         * Often, the {@link UIOConstants.STYLE#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} option does not make sense for the ok option. Use this flag
+         * if the option should be ignored if the user selects OK
          */
         public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_OK     = 1 << 10;
         /**
@@ -105,7 +103,7 @@ public final class UIOConstants {
         public static final int RETURN_EXCEPTION            = 1 << 9;
         /**
          * this return flag can be set in two situations:<br>
-         * a) The user selected the {@link #STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option<br>
+         * a) The user selected the {@link UIOConstants.STYLE#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option<br>
          * b) The dialog has been skipped because the DO NOT SHOW AGAIN flag has been set previously<br>
          * <br>
          * Check {@link #RETURN_SKIPPED_BY_DONT_SHOW} to know if the dialog has been visible or autoskipped
@@ -116,14 +114,14 @@ public final class UIOConstants {
          */
         public static final int RETURN_OK                   = 1 << 1;
         /**
-         * If the dialog has been skipped due to previously selected {@link #STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option, this return flag is
-         * set.
+         * If the dialog has been skipped due to previously selected {@link UIOConstants.STYLE#STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option, this
+         * return flag is set.
          *
          * @see #RETURN_DONT_SHOW_AGAIN
          */
         public static final int RETURN_SKIPPED_BY_DONT_SHOW = 1 << 4;
         /**
-         * If the Timeout ({@link UIOManager#LOGIC_COUNTDOWN}) has run out, the return mask contains this flag
+         * If the Timeout ({@link UIOConstants.LOGIC#LOGIC_COUNTDOWN}) has run out, the return mask contains this flag
          */
         public static final int RETURN_TIMEOUT              = 1 << 5;
         /**

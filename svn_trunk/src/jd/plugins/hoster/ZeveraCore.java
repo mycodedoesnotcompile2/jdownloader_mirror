@@ -65,11 +65,11 @@ import jd.plugins.components.MultiHosterManagement;
 //IMPORTANT: this class must stay in jd.plugins.hoster because it extends another plugin (UseNet) which is only available through PluginClassLoader
 abstract public class ZeveraCore extends UseNet {
     /* Connection limits */
-    private final String                         API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
-    private static final String                  PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
-    private static final HashSet<String>         global_cache_hosts                     = new HashSet<String>();
+    private final String                   API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
+    private static final String            PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
+    private static HashSet<String>         global_cache_hosts                     = new HashSet<String>();
     /* Map of timestamps of cache only items that are not in cache and thus shouldn't be retried. */
-    private static final Map<DownloadLink, Long> cache_unavailable_timestamps           = new WeakHashMap<DownloadLink, Long>();
+    private static Map<DownloadLink, Long> cache_unavailable_timestamps           = new WeakHashMap<DownloadLink, Long>();
 
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -538,10 +538,6 @@ abstract public class ZeveraCore extends UseNet {
                     /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
                     mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
                 }
-                // if (cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomains.contains(mainDomain)) {
-                // mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                // mhost.setStatusText("Cache only (only for usage in KODI and other 3rd party addons)");
-                // }
                 if (isCacheHost) {
                     mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
                     mhost.setStatusText("Cache only");

@@ -499,7 +499,7 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
             this(divider, false);
         }
 
-        public long to(SIZEUNIT dest, long value) {
+        public long to(SPEEDUNIT dest, long value) {
             final long ret = (value * getDivider()) / dest.getDivider();
             return ret;
         }
