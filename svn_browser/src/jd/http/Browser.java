@@ -3845,12 +3845,15 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
                 }
-                if (con.getResponseCode() == 202 && request.getResponseHeader("x-amzn-waf-action") != null && StringUtils.containsIgnoreCase(request.getResponseHeader("server"), "awselb")) {
+                if (con.getResponseCode() == 202 && request.getResponseHeader("x-amzn-waf-action") != null && request.getResponseHeader("x-amz-rid") != null) {
                     /**
-                     * Typical reaponse-headers: <br>
+                     * Typical response-headers: <br>
                      * Server: awselb/2.0 <br>
                      * x-amzn-waf-action: challenge <br>
-                     * Access-Control-Allow-Headers: x-amzn-waf-action
+                     * Access-Control-Allow-Headers: x-amzn-waf-action <br>
+                     * 
+                     * 2026-04-16: Server could be anything e.g. also: "Server: Server" <br>
+                     * Example: https://www.imdb.com/title/tt0452046
                      */
                     return this;
                 }

@@ -92,7 +92,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52642 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52666 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1247,7 +1247,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1])) {
-            link.setDownloadSize(SizeFormatter.getSize(fileInfo[1]));
+            link.setDownloadSize(parseSize(Size.FILE, fileInfo[1]));
         } else if (!link.isSizeSet() && this.internal_isVideohosterEmbed(this.br) && supports_availablecheck_filesize_via_embedded_video() && !PluginEnvironment.DOWNLOAD.equals(getPluginEnvironment()) && urltype != URL_TYPE.EMBED_VIDEO) {
             /*
              * Special case for some videohosts to determine the filesize: Last chance to find filesize - do NOT execute this when used has
@@ -1320,7 +1320,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1]) && !isFilesizeSet) {
-            link.setDownloadSize(SizeFormatter.getSize(fileInfo[1]));
+            link.setDownloadSize(parseSize(Size.FILE, fileInfo[1]));
         }
     }
 
@@ -1417,7 +1417,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         /* Set filesize */
         if (!StringUtils.isEmpty(fileInfo[1])) {
-            link.setDownloadSize(SizeFormatter.getSize(fileInfo[1]));
+            link.setDownloadSize(parseSize(Size.TRAFFIC, fileInfo[1]));
         }
         return AvailableStatus.TRUE;
     }
@@ -2131,7 +2131,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                  * Filesize should definitely be given - but at this stage we are quite sure that the file is online so let's not throw an
                  * exception if the filesize cannot be found.
                  */
-                link.setDownloadSize(SizeFormatter.getSize(size));
+                link.setDownloadSize(parseSize(Size.TRAFFIC, size));
             }
         } catch (final Throwable ignore) {
             logger.log(ignore);
@@ -4394,10 +4394,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String space[] = new Regex(getCorrectBR(br), ">\\s*Used space:\\s*</td>.*?<td.*?b>([0-9\\.]+) ?(KB|MB|GB|TB)?</b>").getRow(0);
         if ((space != null && space.length != 0) && (space[0] != null && space[1] != null)) {
             /* free users it's provided by default */
-            ai.setUsedSpace(SizeFormatter.getSize(space[0] + " " + space[1]));
+            ai.setUsedSpace(parseSize(Size.STORAGE, space[0] + " " + space[1]));
         } else if ((space != null && space.length != 0) && space[0] != null) {
             /* premium users the Mb value isn't provided for some reason... */
-            ai.setUsedSpace(SizeFormatter.getSize(space[0] + "Mb"));
+            ai.setUsedSpace(parseSize(Size.STORAGE, space[0] + "Mb"));
         }
     }
 
@@ -4419,15 +4419,35 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         long trafficLeft = 0;
         if (!trafficLeftStr.startsWith("-")) {
             /* Positive traffic value */
-            trafficLeft = SizeFormatter.getSize(trafficLeftStr);
+            trafficLeft = parseSize(Size.TRAFFIC, trafficLeftStr);
         }
         // If trafficLeftStr starts with "-", trafficLeft remains 0 (negative traffic = no traffic left)
         /* 2019-02-19: Users can buy additional traffic packages: Example(s): subyshare.com */
         final String usableBandwidth = br.getRegex("Usable Bandwidth\\s*<span[^>]*>\\s*([0-9\\.]+\\s*[TGMKB]+)\\s*/\\s*[0-9\\.]+\\s*[TGMKB]+\\s*<").getMatch(0);
         if (usableBandwidth != null) {
-            trafficLeft = Math.max(trafficLeft, SizeFormatter.getSize(usableBandwidth));
+            trafficLeft = Math.max(trafficLeft, parseSize(Size.TRAFFIC, usableBandwidth));
         }
         ai.setTrafficLeft(trafficLeft);
+    }
+
+    public enum Size {
+        TRAFFIC,
+        STORAGE,
+        FILE
+    }
+
+    protected long parseSize(Size type, String string) {
+        switch (type) {
+        case TRAFFIC: {
+            final long ret = SizeFormatter.getSize(string, false, true);
+            if (ret == -1) {
+                return 0;
+            }
+            return ret;
+        }
+        default:
+            return SizeFormatter.getSize(string, false, false);
+        }
     }
 
     protected AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
@@ -4923,8 +4943,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                  * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
                  * data-toggle="tooltip">49329 Mb</a></span>
                  */
-                final long used = SizeFormatter.getSize(trafficDetails[0]);
-                final long max = SizeFormatter.getSize(trafficDetails[1]);
+                final long used = parseSize(Size.TRAFFIC, trafficDetails[0]);
+                final long max = parseSize(Size.TRAFFIC, trafficDetails[1]);
                 if (used > 0 && max > 0) {
                     return (max - used) + "b";
                 }
@@ -5869,9 +5889,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String premium_bandwidthBytesStr = (String) result.get("premium_bandwidth"); // Double as string
         final String traffic_leftBytesStr = (String) result.get("traffic_left");
         if (premium_bandwidthBytesStr != null) {
-            ai.setTrafficLeft(SizeFormatter.getSize(premium_bandwidthBytesStr));
+            ai.setTrafficLeft(parseSize(Size.TRAFFIC, premium_bandwidthBytesStr));
         } else if (traffic_leftBytesStr != null) {
-            ai.setTrafficLeft(SizeFormatter.getSize(traffic_leftBytesStr));
+            ai.setTrafficLeft(parseSize(Size.TRAFFIC, traffic_leftBytesStr));
         }
         {
             /* Now set less relevant account information */
@@ -5886,7 +5906,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             // final long storage_left = JavaScriptEngineFactory.toLong(entries.get("storage_left"), 0);
             final Object storage_usedO = result.get("storage_used");
             if (storage_usedO != null) {
-                ai.setUsedSpace(SizeFormatter.getSize(storage_usedO.toString()));
+                ai.setUsedSpace(parseSize(Size.STORAGE, storage_usedO.toString()));
             }
         }
         final Object files_totalO = result.get("files_total");

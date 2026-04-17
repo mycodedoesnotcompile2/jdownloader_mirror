@@ -23,7 +23,7 @@ import jd.plugins.HostPlugin;
 
 import org.jdownloader.plugins.components.config.KVSConfig;
 
-@HostPlugin(revision = "$Revision: 52624 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52666 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault3(final PluginWrapper wrapper) {
         super(wrapper);
@@ -59,8 +59,9 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
     public Class<? extends KVSConfig> getConfigInterface() {
         if ("wow.xxx".equals(getHost())) {
             return KVSConfig.class;
+        } else {
+            return null;
         }
-        return null;
     }
 
     @Override

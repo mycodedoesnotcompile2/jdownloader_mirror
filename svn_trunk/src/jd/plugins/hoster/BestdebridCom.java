@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52002 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52670 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -237,16 +237,27 @@ public class BestdebridCom extends PluginForHost {
             /* 2019-07-15: In case they ever correct their Map to an Array, we will need the following line. */
             hosters = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
         }
-        final ArrayList<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostinfo : hosters) {
-            String domain = hostinfo.get("name").toString();
-            if (domain.equalsIgnoreCase("filestore")) {
-                /* 2025-12-16: Workaround since plugin finder will find "filestore.me" and "filestore.to" and then nothing will match. */
-                domain = "filestore.me";
+            /* 2026-04-16: "domains" field is new */
+            List<String> domains = (List<String>) hostinfo.get("domains");
+            if (domains == null || domains.isEmpty()) {
+                /* Legacy handling */
+                domains = new ArrayList<String>();
+                String name = hostinfo.get("name").toString();
+                if (name.equalsIgnoreCase("filestore")) {
+                    /*
+                     * 2025-12-16: Workaround since plugin finder will find "filestore.me" and "filestore.to" and then nothing will match.
+                     */
+                    name = "filestore.me";
+                }
+                domains.add(name);
             }
             final String status = (String) hostinfo.get("status");
+            /* downsincedate is an empty string by default (not null but empty string!!) */
             final String downsincedate = (String) hostinfo.get("downsincedate");
-            final MultiHostHost mhost = new MultiHostHost(domain);
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.addDomains(domains);
             if (!"up".equalsIgnoreCase(status)) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 if (!StringUtils.isEmpty(downsincedate)) {

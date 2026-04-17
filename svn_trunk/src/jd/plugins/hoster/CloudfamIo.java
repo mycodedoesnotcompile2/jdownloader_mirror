@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52049 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52669 $", interfaceVersion = 3, names = {}, urls = {})
 public class CloudfamIo extends PluginForHost {
     public CloudfamIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +113,7 @@ public class CloudfamIo extends PluginForHost {
         } else if (br.containsHTML(">\\s*The file you are looking for does not exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* No filename/size information available at this stage. */
+        scanFileInfo(link, false);
         return AvailableStatus.TRUE;
     }
 
@@ -127,37 +127,55 @@ public class CloudfamIo extends PluginForHost {
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
             final String fid = this.getFID(link);
-            /* 2025-12-23: In browser there is somne delay between these steps but it can be skipped */
-            String redirect1 = br.getRegex("\"(/redirection2\\.php\\?slug=[^\"]+)").getMatch(0);
-            if (StringUtils.isEmpty(redirect1)) {
+            /* 2025-12-23: In browser there is some delay between these steps but it can be skipped. */
+            final String redirectPattern = "(?:\"|')(/redirection\\d*\\.php\\?slug=[^\"']+)";
+            String nextURL = br.getRegex(redirectPattern).getMatch(0);
+            if (StringUtils.isEmpty(nextURL)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.getPage(redirect1);
-            String redirect2 = br.getRegex("\"(/" + fid + "\\?step=2[^\"]*)").getMatch(0);
-            if (StringUtils.isEmpty(redirect2)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            br.getPage(nextURL);
+            for (int step = 1; step <= 5; step++) {
+                final String redirectURL = br.getRegex(redirectPattern).getMatch(0);
+                if (redirectURL == null) {
+                    logger.info("Exit step loop in round: " + step);
+                    break;
+                }
+                logger.info("Step loop success: Step: " + step + " | URL: " + redirectURL);
+                br.getPage(redirectURL);
             }
-            br.getPage(redirect2);
-            /* Set file information -> We cannot get this earlier */
-            String filename = br.getRegex("title=\"([^\"]+)").getMatch(0);
-            String filesize = br.getRegex("File size\\s*</p>\\s*<p[^>]*>([^<]+)</p>").getMatch(0);
-            if (filename != null) {
-                filename = Encoding.htmlDecode(filename).trim();
-                link.setName(filename);
+            String redirect3 = br.getRegex("\"(/" + fid + "\\?step=2[^\"]*)").getMatch(0);
+            if (redirect3 != null) {
+                br.getPage(redirect3);
             } else {
-                logger.warning("Failed to find filename");
+                logger.warning("Failed to find redirect3");
             }
-            if (filesize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesize));
-            } else {
-                logger.warning("Failed to find filesize");
-            }
+            scanFileInfo(link, true);
             final String dllink = "/download_handler.php?slug=" + fid;
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
+    }
+
+    private void scanFileInfo(final DownloadLink link, final boolean logIfMissing) {
+        String filename = br.getRegex("title=\"([^\"]+)").getMatch(0);
+        String filesize = br.getRegex("File size\\s*</p>\\s*<p[^>]*>([^<]+)</p>").getMatch(0);
+        if (filesize == null) {
+            /* 2026-04-16 */
+            filesize = br.getRegex("data-lucide=\"hard-drive\"[^>]*></i>([^<]+)</span>").getMatch(0);
+        }
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename);
+        } else if (logIfMissing) {
+            logger.warning("Failed to find filename");
+        }
+        if (filesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else if (logIfMissing) {
+            logger.warning("Failed to find filesize");
+        }
     }
 
     @Override

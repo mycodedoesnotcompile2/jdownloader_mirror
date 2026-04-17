@@ -20,14 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -35,7 +33,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52663 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 52665 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagepondNet extends PluginForHost {
     public ImagepondNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -183,14 +184,17 @@ public class ImagepondNet extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleDownload(link);
+        handleDownload(link, null);
     }
 
-    private void handleDownload(final DownloadLink link) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link);
         /* The id in this URL can be a different one than the id in the URL added by the user. */
         String dllink = br.getRegex("/i/\\w+/download").getMatch(-1);
         if (dllink == null) {
+            if (br.containsHTML(">\\s*Private Content\\s*<") || br.containsHTML(">\\s*This content is private and can only be viewed by its owner.?\\s*<")) {
+                throw new AccountRequiredException("This content is private and can only be viewed by its owner");
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dllink += "/file";

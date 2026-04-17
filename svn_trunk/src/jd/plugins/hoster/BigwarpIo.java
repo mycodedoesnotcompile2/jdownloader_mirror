@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52667 $", interfaceVersion = 3, names = {}, urls = {})
 public class BigwarpIo extends XFileSharingProBasic {
     public BigwarpIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,8 +45,14 @@ public class BigwarpIo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bigwarp.io", "bigwarp.art", "bigwarp.cc", "bigwarp.pro" });
+        ret.add(new String[] { "bigwarp.pro", "bigwarp.io", "bigwarp.art", "bigwarp.cc" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-04-16: Main domain changed from bigwarp.io to bigwarp.pro */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

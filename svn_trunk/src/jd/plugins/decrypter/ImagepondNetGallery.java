@@ -30,6 +30,8 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -38,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ImagepondNet;
 
-@DecrypterPlugin(revision = "$Revision: 52663 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52667 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ImagepondNet.class })
 public class ImagepondNetGallery extends PluginForDecrypt {
     public ImagepondNetGallery(PluginWrapper wrapper) {
@@ -110,12 +112,14 @@ public class ImagepondNetGallery extends PluginForDecrypt {
             description = Encoding.htmlDecode(description).trim();
         }
         final FilePackage fp = FilePackage.getInstance();
+        final String title_to_use;
         if (title != null) {
-            fp.setName(title);
+            title_to_use = title;
         } else {
             logger.warning("Failed to find gallery title");
-            fp.setName(album_id);
+            title_to_use = album_id;
         }
+        fp.setName(title_to_use);
         /* Description is optional */
         if (description != null) {
             fp.setComment(description);
@@ -129,6 +133,9 @@ public class ImagepondNetGallery extends PluginForDecrypt {
             final String[] filenames = br.getRegex("<p class=\"mt-1.5 text-xs text-gray-400 truncate\"[^>]*>([^<]+)</p>").getColumn(0);
             final String[] file_ids = br.getRegex("/i/([\\w\\-\\.]+)").getColumn(0);
             if (file_ids == null || file_ids.length == 0) {
+                if (br.containsHTML(">\\s*This album is empty.?\\s*</")) {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, title_to_use);
+                }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             for (final String file_id : file_ids) {

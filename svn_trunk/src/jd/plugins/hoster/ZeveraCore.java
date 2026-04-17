@@ -823,7 +823,7 @@ abstract public class ZeveraCore extends UseNet {
         final Number delaySecondsO = (Number) entries.get("delay");
         final long retryInMilliseconds = delaySecondsO != null ? delaySecondsO.longValue() * 1000 : 1 * 60 * 1000;
         if (errorStrIgnore != null && (StringUtils.equalsIgnoreCase(status, errorStrIgnore) || StringUtils.equalsIgnoreCase(message, errorStrIgnore))) {
-            /* Ignore this particular errormessage for now. */
+            /* Ignore this particular error message for now. */
             return;
         }
         if ("error".equalsIgnoreCase(status) && !StringUtils.isEmpty(message)) {

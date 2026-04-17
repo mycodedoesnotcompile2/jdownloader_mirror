@@ -15,6 +15,9 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -25,7 +28,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.DefineBabeCom;
 
-@DecrypterPlugin(revision = "$Revision: 48603 $", interfaceVersion = 3, names = { "definebabe.com" }, urls = { "https?://(?:www\\.)?definebabes?\\.com/video/([a-z0-9]+)/([a-z0-9\\-]+)/" })
+@DecrypterPlugin(revision = "$Revision: 52670 $", interfaceVersion = 3, names = {}, urls = {})
 public class DefinebabeComDecrypter extends PornEmbedParser {
     public DefinebabeComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -34,6 +37,34 @@ public class DefinebabeComDecrypter extends PornEmbedParser {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(DefineBabeCom.definebabe_domains);
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/([a-z0-9]+)/([a-z0-9\\-]+)/");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -46,9 +77,8 @@ public class DefinebabeComDecrypter extends PornEmbedParser {
         if (urlTitle != null) {
             urlTitle = urlTitle.replace("-", " ").trim();
             return urlTitle;
-        } else {
-            return null;
         }
+        return null;
     }
 
     @Override
@@ -80,7 +110,10 @@ public class DefinebabeComDecrypter extends PornEmbedParser {
             /* Fallback */
             title = getURLTitleCleaned(br.getURL());
         }
-        title = Encoding.htmlDecode(title).trim();
-        return title;
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            return title;
+        }
+        return null;
     }
 }

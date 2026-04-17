@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52324 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52670 $", interfaceVersion = 3, names = {}, urls = {})
 public class UqloadCom extends XFileSharingProBasic {
     public UqloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class UqloadCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uqload.is", "uqload.bz", "uqload.cx", "uqload.net", "uqload.ws", "uqload.to", "uqload.io", "uqload.co", "uqload.com" });
+        ret.add(new String[] { "uqload.is", "uqload.bz", "uqload.cx", "uqload.net", "uqload.ws", "uqload.to", "uqload.io", "uqload.co", "uqload.com", "uqload.cc" });
         return ret;
     }
 
@@ -57,6 +57,7 @@ public class UqloadCom extends XFileSharingProBasic {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("uqload.bz"); // 2026-02-17
+        deadDomains.add("uqload.c"); // 2026-04-16
         return deadDomains;
     }
 

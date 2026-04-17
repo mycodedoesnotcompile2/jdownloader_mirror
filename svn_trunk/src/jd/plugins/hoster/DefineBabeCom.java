@@ -27,6 +27,13 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -39,14 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.DefinebabeComDecrypter;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49498 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52670 $", interfaceVersion = 2, names = {}, urls = {})
 public class DefineBabeCom extends PluginForHost {
     public DefineBabeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,10 +59,12 @@ public class DefineBabeCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
+    public static String[] definebabe_domains = new String[] { "definebabe.com", "definebabes.com" };
+
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "definebabe.com", "definebabes.com" });
+        ret.add(definebabe_domains);
         ret.add(new String[] { "definefetish.com" });
         return ret;
     }
@@ -91,15 +93,13 @@ public class DefineBabeCom extends PluginForHost {
     /* Tags: TubeContext@Player */
     /* Sites using the same player: definebabes.com, definebabe.com, definefetish.com */
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
-    private boolean              server_issues     = false;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
-        return "https://www.definebabe.com/about/privacy/";
+        return "https://www." + getHost() + "/about/privacy/";
     }
 
     @Override
@@ -126,10 +126,10 @@ public class DefineBabeCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    @SuppressWarnings({ "unchecked" })
+    private final String extDefault = ".mp4";
+
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        /* Set fallback-filename */
+    protected String getDefaultFileName(DownloadLink link) {
         final Regex urlfinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
         final String weakTitle;
         final String urlSlug = urlfinfo.getMatch(1);
@@ -139,10 +139,13 @@ public class DefineBabeCom extends PluginForHost {
             /* Fallback to File-ID */
             weakTitle = urlfinfo.getMatch(0);
         }
-        final String extDefault = ".mp4";
-        if (!link.isNameSet()) {
-            link.setName(weakTitle + extDefault);
-        }
+        return weakTitle + extDefault;
+    }
+
+    @SuppressWarnings({ "unchecked" })
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        /* Set fallback-filename */
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -154,36 +157,44 @@ public class DefineBabeCom extends PluginForHost {
         String title = DefinebabeComDecrypter.getFileTitle(br);
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
-            link.setFinalFileName(title + extDefault);
+            link.setFinalFileName(title + ".mp4");
         }
         final String videoID = getVideoID(br);
         if (videoID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final boolean useNewAPI = true;
-        if (useNewAPI) {
-            br.getPage("/player/config.php?id=" + videoID);
-            try {
-                final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-                this.dllink = (String) entries.get("video_alt_url");
-                if (StringUtils.isEmpty(this.dllink)) {
-                    this.dllink = (String) entries.get("video_url");
+        final String[] qualities_dlurls = br.getRegex("/player/get_video\\.php\\?q=\\d+p").getColumn(-1); // 2026-04-16
+        if (qualities_dlurls != null && qualities_dlurls.length > 0) {
+            /* First item = highest quality */
+            this.dllink = qualities_dlurls[0];
+        }
+        if (this.dllink == null) {
+            // Old handling
+            final boolean useNewAPI = true;
+            if (useNewAPI) {
+                br.getPage("/player/config.php?id=" + videoID);
+                try {
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    this.dllink = (String) entries.get("video_alt_url");
+                    if (StringUtils.isEmpty(this.dllink)) {
+                        this.dllink = (String) entries.get("video_url");
+                    }
+                } catch (final Throwable e) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Broken video?", e);
                 }
-            } catch (final Throwable e) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Broken video?", e);
-            }
-        } else {
-            br.getPage("http://www." + link.getHost() + "/playlist/playlist.php?type=regular&video_id=" + videoID);
-            final String decrypted = decryptRC4HexString("TubeContext@Player", br.getRequest().getHtmlCode().trim());
-            final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(decrypted);
-            final Map<String, Object> videos = (Map<String, Object>) entries.get("videos");
-            /* Usually only 360 is available */
-            final String[] qualities = { "1080p", "720p", "480p", "360p", "320p", "240p", "180p" };
-            for (final String currentqual : qualities) {
-                final Map<String, Object> quality_info = (Map<String, Object>) videos.get("_" + currentqual);
-                if (quality_info != null) {
-                    dllink = (String) quality_info.get("fileUrl");
-                    break;
+            } else {
+                br.getPage("http://www." + link.getHost() + "/playlist/playlist.php?type=regular&video_id=" + videoID);
+                final String decrypted = decryptRC4HexString("TubeContext@Player", br.getRequest().getHtmlCode().trim());
+                final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(decrypted);
+                final Map<String, Object> videos = (Map<String, Object>) entries.get("videos");
+                /* Usually only 360 is available */
+                final String[] qualities = { "1080p", "720p", "480p", "360p", "320p", "240p", "180p" };
+                for (final String currentqual : qualities) {
+                    final Map<String, Object> quality_info = (Map<String, Object>) videos.get("_" + currentqual);
+                    if (quality_info != null) {
+                        dllink = (String) quality_info.get("fileUrl");
+                        break;
+                    }
                 }
             }
         }
@@ -212,9 +223,7 @@ public class DefineBabeCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
-        } else if (StringUtils.isEmpty(dllink)) {
+        if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
@@ -224,7 +233,7 @@ public class DefineBabeCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     /**

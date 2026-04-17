@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52664 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52667 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadgCom extends PluginForHost {
     public UploadgCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,7 +103,7 @@ public class UploadgCom extends PluginForHost {
         if (stored_internal_file_id != null) {
             return stored_internal_file_id;
         }
-        /* Legacy support */
+        /* Legacy and single file folders/links */
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 

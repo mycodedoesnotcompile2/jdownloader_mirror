@@ -44,13 +44,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50275 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52672 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImDbCom extends PluginForHost {
     private String              dllink         = null;
     private boolean             mature_content = false;
     private static final String IDREGEX        = "(vi\\d+)$";
-    public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/(?:([\\w\\-]+)/)?vi(\\d+)";
-    public static final Pattern TYPE_PHOTO     = Pattern.compile("/[A-Za-z]+/[a-z]{2}(\\d+)/mediaviewer/rm(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern TYPE_VIDEO     = Pattern.compile("/(video|videoplayer)/(?:([\\w\\-]+)/)?vi(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern TYPE_PHOTO     = Pattern.compile("/(?:[a-z]{2}/)?(?:name|title)/[a-z]{2}(\\d+)/mediaviewer/rm(\\d+)", Pattern.CASE_INSENSITIVE);
 
     public ImDbCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -90,8 +90,8 @@ public class ImDbCom extends PluginForHost {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(";
-            regex += TYPE_VIDEO + "|";
-            regex += TYPE_PHOTO.pattern() + "";
+            regex += TYPE_VIDEO.pattern() + "|";
+            regex += TYPE_PHOTO.pattern();
             regex += ")";
             ret.add(regex);
         }

@@ -17,6 +17,8 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -33,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ImDbCom;
 
-@DecrypterPlugin(revision = "$Revision: 50275 $", interfaceVersion = 2, names = { "imdb.com" }, urls = { "https?://(?:www\\.)?imdb\\.com/((?:name|title)/(?:nm|tt)\\d+((?:/mediaindex|videogallery)|/media/index/rg\\d+)?)" })
+@DecrypterPlugin(revision = "$Revision: 52672 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImdbComCrawler extends PluginForDecrypt {
     public ImdbComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,15 +48,43 @@ public class ImdbComCrawler extends PluginForDecrypt {
         return br;
     }
 
-    private static final String TYPE_ARTIST        = "(?i)https?://(www\\.)?imdb\\.com/media/index/rg\\d+";
-    private static final String TYPE_TITLE         = "(?i)https?://(www\\.)?imdb\\.com/name|title/tt\\d+/mediaindex";
-    private static final String TYPE_NAME          = "(?i)https?://(www\\.)?imdb\\.com/name/nm\\d+/mediaindex";
-    private static final String TYPE_VIDEO_GALLERY = "(?i).+/videogallery";
+    private static final Pattern PATTERN_ARTIST        = Pattern.compile("/(?:[a-z]{2}/)?media/index/rg\\d+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_TITLE         = Pattern.compile("/(?:[a-z]{2}/)?title/tt\\d+(/mediaindex)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NAME          = Pattern.compile("/(?:[a-z]{2}/)?name/nm\\d+(/mediaindex)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_VIDEO_GALLERY = Pattern.compile("/(?:[a-z]{2}/)?(?:name|title)/(?:nm|tt)\\d+/videogallery", Pattern.CASE_INSENSITIVE);
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "imdb.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:" + PATTERN_ARTIST.pattern().substring(1) + "|" + PATTERN_TITLE.pattern().substring(1) + "|" + PATTERN_NAME.pattern().substring(1) + "|" + PATTERN_VIDEO_GALLERY.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
-        if (contenturl.matches(".+(?:name|title)/(?:nm|tt)\\d+")) {
+        if (new Regex(contenturl, "(?i)/(?:[a-z]{2}/)?(?:name|title)/(?:nm|tt)\\d+$").patternFind()) {
             contenturl = contenturl + "/videogallery";
         }
         br.setFollowRedirects(true);
@@ -100,7 +130,7 @@ public class ImdbComCrawler extends PluginForDecrypt {
             br.getRequest().setHtmlCode(br.getRequest().getHtmlCode().replace("pro.imdb.com", "www.imdb.com"));
             final int dupesSizeOld = dupes.size();
             final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
-            if (contenturl.matches(TYPE_VIDEO_GALLERY)) {
+            if (new Regex(contenturl, PATTERN_VIDEO_GALLERY).patternFind()) {
                 for (final String url : urls) {
                     if (!new Regex(url, ImDbCom.TYPE_VIDEO).patternFind()) {
                         continue;
