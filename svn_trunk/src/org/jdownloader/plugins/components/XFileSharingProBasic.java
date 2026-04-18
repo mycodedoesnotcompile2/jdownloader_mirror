@@ -92,7 +92,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52666 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52675 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1064,12 +1064,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         /* Check if response is plaintext and contains any known error messages. */
         final byte[] peekBytes;
         try {
+            if (!urlConnection.isConnected()) {
+                return null;
+            }
             peekBytes = urlConnection.peek(32);
             if (peekBytes.length == 0) {
                 return peekBytes;
             }
         } catch (IOException e) {
             logger.log(e);
+            return null;
+        } catch (IllegalStateException ignore) {
+            // java.lang.IllegalStateException: not connected!
             return null;
         }
         final String probeContext = new String(peekBytes, Charset.forName("UTF-8"));
@@ -5273,7 +5279,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public String getUserInput(String title, String message, DownloadLink link) throws PluginException {
         if (StringUtils.equals(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login(), message) && twoFactorMessage != null) {
-            return super.getUserInput(title, twoFactorMessage, link);
+            try {
+                return super.getUserInput(title, twoFactorMessage, link);
+            } catch (PluginException e) {
+                if (e.getLinkStatus() != LinkStatus.ERROR_FATAL) {
+                    throw e;
+                }
+                throw new AccountInvalidException(e, "Missing required 2fa!");
+            }
         }
         return super.getUserInput(title, message, link);
     }

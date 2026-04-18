@@ -788,39 +788,46 @@ public class HlsContainer {
     }
 
     public void setPropertiesOnDownloadLink(final DownloadLink link) {
-        setPropertiesOnDownloadLink(link, new HlsContainer.MEDIA[0]);
+        final List<HlsContainer.MEDIA> media = getMedia();
+        final HlsContainer.MEDIA mediaList[];
+        if (media != null) {
+            mediaList = media.toArray(new HlsContainer.MEDIA[0]);
+        } else {
+            mediaList = new HlsContainer.MEDIA[0];
+        }
+        setPropertiesOnDownloadLink(link, mediaList);
     }
 
-    public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... medias) {
+    public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... mediaList) {
         oldVariant: {// old variant to store information
-        if (this.getWidth() > 0) {
-            link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
-        }
-        if (this.getHeight() > 0) {
-            link.setProperty(GenericM3u8.PROPERTY_HEIGHT, this.getHeight());
-        }
-        if (this.getFramerate() > 0) {
-            link.setProperty(GenericM3u8.PROPERTY_FRAME_RATE, this.getFramerate());
-        }
-        if (this.getBandwidth() > 0) {
-            link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH, this.getBandwidth());
-        }
-        if (this.getAverageBandwidth() > 0) {
-            link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH_AVERAGE, this.getAverageBandwidth());
-        }
-        link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
-        link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
-    }
-    newVariant: {
-        // new variant to store the information
-        final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
-        for (HlsContainer.MEDIA media : medias) {
-            if (media == null) {
-                continue;
+            if (this.getWidth() > 0) {
+                link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
             }
-            containerStorable.getMedia().add(new HlsContainerMediaStorable(media));
+            if (this.getHeight() > 0) {
+                link.setProperty(GenericM3u8.PROPERTY_HEIGHT, this.getHeight());
+            }
+            if (this.getFramerate() > 0) {
+                link.setProperty(GenericM3u8.PROPERTY_FRAME_RATE, this.getFramerate());
+            }
+            if (this.getBandwidth() > 0) {
+                link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH, this.getBandwidth());
+            }
+            if (this.getAverageBandwidth() > 0) {
+                link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH_AVERAGE, this.getAverageBandwidth());
+            }
+            link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
+            link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
         }
-        link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, containerStorable);
-    }
+        newVariant: {
+            // new variant to store the information
+            final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
+            for (HlsContainer.MEDIA mediaEntry : mediaList) {
+                if (mediaEntry == null) {
+                    continue;
+                }
+                containerStorable.getMedia().add(new HlsContainerMediaStorable(mediaEntry));
+            }
+            link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, containerStorable);
+        }
     }
 }

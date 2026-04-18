@@ -47,14 +47,16 @@ import jd.plugins.decrypter.DailyMotionComDecrypter;
 import jd.utils.locale.JDL;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 52678 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -243,8 +245,14 @@ public class DailyMotionCom extends PluginForHost {
         if (isHLS(link)) {
             /* Make sure to follow redirects! */
             this.br.setFollowRedirects(true);
-            String hlsurl = getDirectlink(link);
             final Browser brc = br.cloneBrowser();
+            final String hlsMaster = link.getStringProperty(PROPERTY_HLS_MASTER);
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && hlsMaster != null) {
+                List<HlsContainer> hlsContainers = HlsContainer.getHlsQualities(brc, hlsMaster);
+                HlsContainer hlsContainer = HlsContainer.find(brc, hlsContainers, link);
+                System.out.println("found " + hlsContainer != null);
+            }
+            String hlsurl = getDirectlink(link);
             brc.getPage(hlsurl);
             if (!brc.getHttpConnection().isOK()) {
                 /* Typically response 403 when directurl is expired. */

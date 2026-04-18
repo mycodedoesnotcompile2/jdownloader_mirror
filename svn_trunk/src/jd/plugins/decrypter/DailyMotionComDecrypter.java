@@ -60,7 +60,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52535 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52678 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -611,6 +611,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                 dl.setProperty(DailyMotionCom.PROPERTY_TITLE, title);
                 dl.setProperty("plain_ext", ".mp4");
                 dl.setProperty(DailyMotionCom.PROPERTY_VIDEO_ID, videoID);
+                hlsquality.setPropertiesOnDownloadLink(dl);
                 final String formattedFilename = DailyMotionCom.getFormattedFilename(dl);
                 dl.setName(formattedFilename);
                 dl.setAvailable(true);
