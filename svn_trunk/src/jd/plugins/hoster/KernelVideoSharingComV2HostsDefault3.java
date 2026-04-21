@@ -18,12 +18,12 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.config.KVSConfig;
+
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.config.KVSConfig;
-
-@HostPlugin(revision = "$Revision: 52666 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52680 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault3(final PluginWrapper wrapper) {
         super(wrapper);
@@ -36,7 +36,6 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
         ret.add(new String[] { "hellporno.com" });
         ret.add(new String[] { "alphaporno.com" });
         ret.add(new String[] { "upskirt.tv" });
-        ret.add(new String[] { "freshporno.net" });
         ret.add(new String[] { "xmegadrive.com" });
         ret.add(new String[] { "wow.xxx" });
         return ret;

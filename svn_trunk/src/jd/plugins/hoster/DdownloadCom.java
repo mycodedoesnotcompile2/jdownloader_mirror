@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52632 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52684 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -434,6 +434,31 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
+    protected String findAPIKey(final Browser br) {
+        String apikey = regexAPIKey(br);
+        if (StringUtils.isNotEmpty(apikey)) {
+            /* API key already present in current browser html code so no need to do an http request to find it. */
+            return apikey;
+        }
+        /* 2026-04-20: Special */
+        logger.info("Looking for API key in affiliate settings");
+        try {
+            final Browser brc = br.cloneBrowser();
+            getPage(brc, "/affiliate?tab=settings");
+            apikey = regexAPIKey(brc);
+            if (apikey != null) {
+                return apikey;
+            }
+            /* Call upper handling */
+            logger.info("Special handling: Failed to find API key, maybe it needs to be generated first");
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.warning("Exception occured in findapikey handling");
+        }
+        return super.findAPIKey(br);
+    }
+
+    @Override
     public void resetDownloadlink(DownloadLink link) {
         super.resetDownloadlink(link);
         if (link == null) {
@@ -491,6 +516,16 @@ public class DdownloadCom extends XFileSharingProBasic {
             }
             throw e;
         }
+    }
+
+    @Override
+    public boolean isPasswordProtectedHTML(final Browser br, final Form form) {
+        if (br.containsHTML("class=\"dk-dl-password\"|class=\"dk-pw-header\"")) {
+            return true;
+        } else if (br.containsHTML(">\\s*Password Protected")) {
+            return true;
+        }
+        return super.isPasswordProtectedHTML(br, form);
     }
 
     @Override

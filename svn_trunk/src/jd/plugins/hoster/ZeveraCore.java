@@ -521,12 +521,17 @@ abstract public class ZeveraCore extends UseNet {
             if (cachehosts != null) {
                 supportedHostsMainDomains.addAll(cachehosts);
             }
-            if (supportsUsenet(account)) {
-                supportedHostsMainDomainsWithoutCache.add("usenet");
-            }
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             final Map<String, Object> aliasesmap = (Map<String, Object>) hosterinfo.get("aliases");
             for (final String mainDomain : supportedHostsMainDomains) {
+                if (mainDomain.equalsIgnoreCase("usenet")) {
+                    /**
+                     * This should not be in the list but just in case let's skip it here. <br>
+                     * It's handled separately down below.
+                     */
+                    logger.info("Usenet is in list of supported hosts, that's new");
+                    continue;
+                }
                 final boolean isCacheHost = cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomainsWithoutCache.contains(mainDomain);
                 final MultiHostHost mhost = new MultiHostHost(mainDomain);
                 final List<String> allDomains = (List<String>) aliasesmap.get(mainDomain);
@@ -544,6 +549,9 @@ abstract public class ZeveraCore extends UseNet {
                     global_cache_hosts.addAll(allDomains);
                 }
                 supportedhosts.add(mhost);
+            }
+            if (supportsUsenet(account)) {
+                supportedhosts.add(new MultiHostHost("usenet"));
             }
             ai.setMultiHostSupportV2(this, supportedhosts);
         }

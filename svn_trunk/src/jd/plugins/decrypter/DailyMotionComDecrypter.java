@@ -60,7 +60,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52678 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52689 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,15 +123,16 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             }
             checkErrors(br);
             /* video == 'video_item', user == 'user_home' */
+
+            final Regex profileregex1 = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/(user/([A-Za-z0-9_\\-]+)(?:/\\d+|([^/]+)/videos|/playlists)?)");
             String username = null;
-            final Regex profileregex1 = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/(user/([A-Za-z0-9_\\-]+)(?:/\\d+|([^/]+)/videos|/playlists))");
             if (profileregex1.patternFind()) {
                 username = profileregex1.getMatch(2);
                 if (username == null) {
                     username = profileregex1.getMatch(1);
                 }
             } else {
-                username = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/([^/\\?]+)").getMatch(0);
+                username = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/user/([^/\\?]+)").getMatch(0);
             }
             if (contenturl.matches(TYPE_PLAYLIST)) {
                 return crawlPlaylist(contenturl);
@@ -147,6 +148,12 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal("api.dailymotion.com", true, 500);
     }
 
     private void checkErrors(final Browser br) throws PluginException, DecrypterRetryException {
@@ -186,7 +193,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         }
         boolean has_more = false;
         int page = 0;
-        int numberofVideos = -1;
+        Number numberofVideos = null;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
             page++;
@@ -200,15 +207,13 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             }
             final String json = brc.getRequest().getHtmlCode();
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            if (page == 1) {
-                /* Init some variables. */
-                numberofVideos = ((Number) entries.get("total")).intValue();
-                if (numberofVideos == 0) {
+            if (numberofVideos == null) {
+                numberofVideos = ((Number) entries.get("total"));
+                if (numberofVideos != null && numberofVideos.intValue() == 0) {
                     logger.info("Profile contains 0 items");
                     throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
                 }
             }
-            has_more = ((Boolean) entries.get("has_more")).booleanValue();
             final List<Map<String, Object>> list = (List<Map<String, Object>>) entries.get("list");
             for (final Map<String, Object> videomap : list) {
                 final String videoid = videomap.get("id").toString();
@@ -217,6 +222,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                 ret.add(dl);
                 distribute(dl);
             }
+            has_more = ((Boolean) entries.get("has_more")).booleanValue();
             logger.info("Crawled page " + page + " | Items on this page: " + list.size() + " | Found total so far: " + ret.size() + "/" + numberofVideos);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
@@ -224,7 +230,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             } else if (!has_more) {
                 logger.info("Stopping because: Reached last page: " + page);
                 break;
-            } else if (page <= api_limit_pages) {
+            } else if (page > api_limit_pages) {
                 logger.info("Stopping because: Reached internal API max page limit: " + api_limit_pages);
                 break;
             }
@@ -943,6 +949,11 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         } else {
             return null;
         }
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        return 1;
     }
 
     /* NO OVERRIDE!! */

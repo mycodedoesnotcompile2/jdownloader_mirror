@@ -19,7 +19,7 @@ import jd.plugins.PluginException;
 /**
  * category not designed to do spanning page support!
  */
-@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 2, names = { "dancehallarena.com" }, urls = { "https?://(?:\\w*\\.)?dancehallarena\\.com/(?:[a-zA-Z0-9\\-/]+|category/(?:(?:dancehall|reggae)/(?:singles/|dancehall-albums/|instrumental-dancehall/)?|soca/|mixtapes/(?:dancehall-mixtapes/|reggae-mixtapes/|hiphoprb/)?|videos/(?:music-videos/|viral-videos/)?|efx/)(?:page/\\d+)?)" })
+@DecrypterPlugin(revision = "$Revision: 52680 $", interfaceVersion = 2, names = { "dancehallarena.com" }, urls = { "https?://(?:\\w*\\.)?dancehallarena\\.com/(?:[a-zA-Z0-9\\-/]+|category/(?:(?:dancehall|reggae)/(?:singles/|dancehall-albums/|instrumental-dancehall/)?|soca/|mixtapes/(?:dancehall-mixtapes/|reggae-mixtapes/|hiphoprb/)?|videos/(?:music-videos/|viral-videos/)?|efx/)(?:page/\\d+)?)" })
 public class DncHllArCom extends antiDDoSForDecrypt {
     public DncHllArCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,9 +60,10 @@ public class DncHllArCom extends antiDDoSForDecrypt {
             if (links != null) {
                 for (String link : links) {
                     link = validate(link);
-                    if (link != null) {
-                        ret.add(createDownloadlink(link));
+                    if (link == null) {
+                        continue;
                     }
+                    ret.add(createDownloadlink(link));
                 }
             }
             /* 2023-02-03 */
@@ -73,6 +74,17 @@ public class DncHllArCom extends antiDDoSForDecrypt {
                     if (link != null) {
                         ret.add(createDownloadlink(link));
                     }
+                }
+            }
+            /* 2026-04-20 */
+            links = br.getRegex("href=\"(https?://[^\"]+)\" target=\"_blank\"").getColumn(0);
+            if (links != null) {
+                for (String link : links) {
+                    link = validate(link);
+                    if (link == null) {
+                        continue;
+                    }
+                    ret.add(createDownloadlink(link));
                 }
             }
             if (ret.isEmpty()) {
@@ -101,7 +113,13 @@ public class DncHllArCom extends antiDDoSForDecrypt {
         } else if (link.startsWith("//")) {
             link = protocol + ":" + link;
         }
-        if (new Regex(link, "facebook.com(/|%2F)plugins(/|%2F)|(x|twitter).com(/|%2F)").matches()) {
+        if (new Regex(link, "^https?://(www\\.)?facebook\\.com.*").patternFind()) {
+            return null;
+        }
+        if (new Regex(link, "^https?://(www\\.)?(twitter|x)\\.com.*").patternFind()) {
+            return null;
+        }
+        if (new Regex(link, "^https?://(www\\.)?youtube\\.com.*").patternFind()) {
             return null;
         }
         return link;

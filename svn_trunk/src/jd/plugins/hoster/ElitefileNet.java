@@ -35,7 +35,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51515 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52684 $", interfaceVersion = 3, names = {}, urls = {})
 public class ElitefileNet extends XFileSharingProBasic {
     public ElitefileNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -131,12 +131,11 @@ public class ElitefileNet extends XFileSharingProBasic {
             /*
              * 2019-07-11: apikey handling - prefer account info via API instead of website if allowed.
              */
-
             /*
              * 2019-08-13: Do not hand over corrected_br as source as correctBR() might remove important parts of the html and because XFS
              * owners will usually not add html traps into the html of accounts (especially ) we can use the original unmodified html here.
              */
-            final String apikey = this.findAPIKey(this.br);
+            final String apikey = this.findAPIKey(br);
             if (apikey != null) {
                 /*
                  * 2019-07-11: Use API even if 'supports_api()' is disabled because if it works it is a much quicker and more reliable way
@@ -144,8 +143,8 @@ public class ElitefileNet extends XFileSharingProBasic {
                  */
                 logger.info("Found apikey --> Trying to get accountinfo via API");
                 /* Save apikey for possible future usage */
+                this.setAPIKey(account, br, apikey);
                 synchronized (account) {
-                    account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
                     try {
                         ai = this.fetchAccountInfoAPI(this.br.cloneBrowser(), account);
                         api_success = ai != null;

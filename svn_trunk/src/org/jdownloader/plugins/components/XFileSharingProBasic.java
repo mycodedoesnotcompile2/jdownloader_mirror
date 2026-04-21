@@ -28,37 +28,6 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -92,7 +61,38 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52675 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
+@HostPlugin(revision = "$Revision: 52684 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -492,7 +492,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br>
      * CAUTION: Only set this to true if a filehost: <br>
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br>
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br>
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
+     * <br>
      * 3. Allows a lot of simultaneous connections. <br>
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br>
      * 5. Allows using a generated direct-URL at least two times.
@@ -2219,7 +2220,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br>
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br>
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br>
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
+     * it)!<br>
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br>
      *
@@ -2852,7 +2854,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
+     * <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -4468,15 +4471,16 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         AccountInfo ai = new AccountInfo();
         AccountType apiAccountType = null;
         obtainAccountInfoFromAPI: {
-            final String apikey = this.findAPIKey(this.br.cloneBrowser());
+            final Browser br2 = this.br.cloneBrowser();
+            final String apikey = this.findAPIKey(br2);
             if (apikey == null) {
                 logger.info("No apikey found");
                 break obtainAccountInfoFromAPI;
             }
-            logger.info("Found apikey --> Trying to get AccountInfo via account API: " + apikey);
+            this.setAPIKey(account, br2, apikey);
+            logger.info("Trying to get AccountInfo via account API: " + apikey);
             /* Save apikey for later usage */
             synchronized (account) {
-                account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
                 if (Boolean.FALSE.equals(trustAccountInfoAPI(account))) {
                     /* This avoids one http request if we already know that we cannot trust account-information from the API. */
                     logger.info("--> Not trying to get AccountInfo via untrusted account API");
@@ -4757,10 +4761,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
+     * installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
-     * apikey will usually be located here: "/?op=my_account"
+     * apikey will usually be located here: "/?op=my_account" <br>
+     * Important: Call findAPIHost if an API key is found!
      */
     protected String findAPIKey(final Browser brc) {
         String apikey = regexAPIKey(brc);
@@ -4769,6 +4775,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /* We are not allowed to even try to generate an API key. */
                 break generateAPIKey;
             }
+            logger.info("Failed to find api key in html code -> Trying to generate it");
             String generateApikeyUrl = this.regexGenerateAPIKeyURL(brc);
             if (generateApikeyUrl == null) {
                 /* We cannot generate an API Key without this URL. */
@@ -4785,54 +4792,66 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                      * minutes while the key is being generated and refresh the page afterwards.'. This should not be an issue for us as the
                      * APIKey will be detected upon next account-check.
                      */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find generated apikey - possible plugin failure");
-                } else {
-                    logger.info("Successfully found newly generated apikey: " + apikey);
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find generated apikey - Plugin failure or broken website");
                 }
-            } catch (final Throwable e) {
-                logger.exception("Exception occured during accessing generateApikeyUrl", e);
+                logger.info("Successfully found newly generated apikey: " + apikey);
+            } catch (final Exception e) {
+                logger.exception("Failed to generate apikey due to exception", e);
             }
-        }
-        if (apikey != null) {
-            findAPIHost(brc, apikey);
+        } else {
+            logger.info("Found API key in html code");
         }
         return apikey;
     }
 
     /**
-     * Finds API host and sets it as a plugin property. <br>
-     * Call this before attempting to use a previously found apikey in website mode! <br>
-     * This is needed because some websites are using a different domain or a subdomain for API requests.
+     * Sets API key and finds and sets API domain if it's contained in given browser instance. <br>
+     * Arguments must not be null!!!
      */
-    protected void findAPIHost(final Browser brc, final String apikey) {
+    protected void setAPIKey(final Account account, final Browser brc, final String apikey) {
+        if (account == null) {
+            throw new IllegalArgumentException("account cannot be null");
+        }
+        if (brc == null) {
+            throw new IllegalArgumentException("browser cannot be null");
+        }
         if (apikey == null) {
-            return;
+            throw new IllegalArgumentException("apikey cannot be null");
         }
-        logger.info("Found apikey! Trying to find api domain with protocol");
-        String url_with_apikey = brc.getRegex("(https?://[^/]+/api/account/info[^<>\"\\']*key=" + apikey + "[^<>\"\\']*)").getMatch(0);
-        boolean api_uses_special_domain = false;
-        if (url_with_apikey == null) {
-            logger.info("Unable to find API domain - assuming it is the same as this plugins' domain");
-        } else {
-            try {
-                url_with_apikey = Encoding.htmlOnlyDecode(url_with_apikey);
-                final URL apiurl = new URL(url_with_apikey);
-                final String apihost = Browser.getHost(apiurl, true);
-                if (!apihost.equalsIgnoreCase(this.getHost())) {
-                    logger.info(String.format("API domain is %s while main domain of plugin is %s", apihost, this.getHost()));
-                    api_uses_special_domain = true;
-                    final String test = apiurl.getProtocol() + "://" + apiurl.getHost() + "/api";
-                    this.getPluginConfig().setProperty(PROPERTY_PLUGIN_api_domain_with_protocol, test);
-                } else {
-                    logger.info("API domain and main domain are the same: " + this.getHost());
+        synchronized (account) {
+            logger.info("Trying to find api domain with protocol");
+            /**
+             * Finds API host and sets it as a plugin property. <br>
+             * Call this before attempting to use a previously found apikey in website mode! <br>
+             * This is needed because some websites are using a different domain or a subdomain for API requests. <br>
+             * Example XFS based website with special API domain: ddownload.com
+             */
+            String url_with_apikey = brc.getRegex("(https?://[^/]+/api/account/info[^<>\"\\']*key=" + apikey + "[^<>\"\\']*)").getMatch(0);
+            boolean api_uses_special_domain = false;
+            if (url_with_apikey == null) {
+                logger.info("Unable to find API domain - assuming it is the same as this plugins' domain");
+            } else {
+                try {
+                    url_with_apikey = Encoding.htmlOnlyDecode(url_with_apikey);
+                    final URL apiurl = new URL(url_with_apikey);
+                    final String apihost = Browser.getHost(apiurl, true);
+                    if (apihost.equalsIgnoreCase(this.getHost())) {
+                        logger.info("API domain and main domain are the same: " + this.getHost());
+                    } else {
+                        logger.info(String.format("API domain is %s while main domain of plugin is %s", apihost, this.getHost()));
+                        api_uses_special_domain = true;
+                        final String api_base_url = apiurl.getProtocol() + "://" + apiurl.getHost() + "/api";
+                        this.getPluginConfig().setProperty(PROPERTY_PLUGIN_api_domain_with_protocol, api_base_url);
+                    }
+                } catch (final Throwable e) {
+                    logger.exception("Error while trying to find API domain", e);
                 }
-            } catch (final Throwable e) {
-                logger.exception("Error while trying to find API domain", e);
             }
-        }
-        if (!api_uses_special_domain) {
-            /* Important: Dump old data - maybe apihost was different and is now the same! */
-            this.getPluginConfig().removeProperty(PROPERTY_PLUGIN_api_domain_with_protocol);
+            if (!api_uses_special_domain) {
+                /* Important: Dump old data - maybe apihost was different and is now the same! */
+                this.getPluginConfig().removeProperty(PROPERTY_PLUGIN_api_domain_with_protocol);
+            }
+            account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
         }
     }
 
@@ -4848,6 +4867,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return ret;
     }
 
+    /** Returns url to generate fresh API key from given browser instances html code. */
     protected String regexGenerateAPIKeyURL(final Browser br) {
         return br.getRegex("\"([^\"]*?generate_api_key=1[^\"]*?token=[a-f0-9]{32}[^\"]*?)\"").getMatch(0);
     }
@@ -4946,8 +4966,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
-                 * data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available
+                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = parseSize(Size.TRAFFIC, trafficDetails[0]);
                 final long max = parseSize(Size.TRAFFIC, trafficDetails[1]);
@@ -4958,8 +4978,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
-             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
+             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);

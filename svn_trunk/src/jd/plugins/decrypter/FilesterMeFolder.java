@@ -28,6 +28,8 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -36,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesterMe;
 
-@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52685 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
@@ -73,54 +75,89 @@ public class FilesterMeFolder extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int page = 1;
         final HashSet<String> dupes = new HashSet<String>();
-        FilePackage fp = FilePackage.getInstance();
         final String contenturl = param.getCryptedUrl();
         final String folder_id = new Regex(contenturl, PATTERN_NORMAL).getMatch(0);
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String title = br.getRegex("class=\"folder-title\"[^>]*>([^<]+)</h1>").getMatch(0);
+        String title = br.getRegex("class=\"folder-title\"[^>]*>\\s*([^<]+)\\s*</h1>").getMatch(0);
+        String folder_title;
         if (title != null) {
-            fp.setName(Encoding.htmlDecode(title).trim());
+            folder_title = Encoding.htmlDecode(title).trim();
         } else {
-            logger.warning("Failed to find folder title");
-            fp.setName(folder_id);
+            logger.warning("Failed to find folder title, using folder_id as fallback");
+            folder_title = folder_id;
         }
+        dupes.add(folder_id);
+        String path = this.getAdoptedCloudFolderStructure();
+        if (path == null) {
+            path = folder_title;
+        } else {
+            /* Current path = Last path + current folder_title. */
+            path += "/" + folder_title;
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(path);
         fp.setPackageKey("filester://folder/" + folder_id);
         pagination: do {
             final String[] filenames = br.getRegex("data-name=\"([^\"]+)").getColumn(0);
             final String[] filesizes = br.getRegex("data-size=\"(\\d+)").getColumn(0);
             final String[] file_ids = br.getRegex("downloadFile\\('([a-zA-Z0-9]+)'\\)").getColumn(0);
-            if (file_ids == null || file_ids.length == 0) {
+            final String[] folder_ids = br.getRegex("/f/([a-f0-9]{16})").getColumn(0);
+            if ((file_ids == null || file_ids.length == 0) && (folder_ids == null || folder_ids.length == 0)) {
+                /**
+                 * 2026-04-20: Important! <br>
+                 * Only check for empty folders if we were really unable to find any items! <br>
+                 * Website is buggy so for folders with 0 files and 1+ subfolders it also displays the "empty folder" message!
+                 */
+                if (br.containsHTML("class=\"empty-state\"")) {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, fp.getName());
+                }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             int numberofNewItems = 0;
-            int i = -1;
-            for (final String file_id : file_ids) {
-                i++;
-                if (!dupes.add(file_id)) {
-                    continue;
+            if (file_ids != null) {
+                int i = -1;
+                for (final String file_id : file_ids) {
+                    i++;
+                    if (!dupes.add(file_id)) {
+                        continue;
+                    }
+                    numberofNewItems++;
+                    final String url = "https://" + br.getHost() + "/d/" + file_id;
+                    final DownloadLink link = this.createDownloadlink(url);
+                    if (filenames != null && filenames.length == file_ids.length) {
+                        link.setName(Encoding.htmlDecode(filenames[i]).trim());
+                    } else if (i == 0) {
+                        /* Log only once */
+                        logger.warning("Failed to find filename information");
+                    }
+                    if (filesizes != null && filesizes.length == file_ids.length) {
+                        link.setDownloadSize(Long.parseLong(filesizes[i]));
+                    } else if (i == 0) {
+                        /* Log only once */
+                        logger.warning("Failed to find filesize information");
+                    }
+                    link.setAvailable(true);
+                    link._setFilePackage(fp);
+                    link.setRelativeDownloadFolderPath(path);
+                    ret.add(link);
+                    distribute(link);
                 }
-                numberofNewItems++;
-                final String url = "https://" + br.getHost() + "/d/" + file_id;
-                final DownloadLink link = this.createDownloadlink(url);
-                if (filenames != null && filenames.length == file_ids.length) {
-                    link.setName(Encoding.htmlDecode(filenames[i]).trim());
-                } else if (i == 0) {
-                    /* Log only once */
-                    logger.warning("Failed to find filename information");
+            }
+            if (folder_ids != null) {
+                for (final String folder_id_entry : folder_ids) {
+                    if (!dupes.add(folder_id_entry)) {
+                        continue;
+                    }
+                    numberofNewItems++;
+                    final String url = "https://" + br.getHost() + "/f/" + folder_id_entry;
+                    final DownloadLink link = this.createDownloadlink(url);
+                    link.setRelativeDownloadFolderPath(path);
+                    ret.add(link);
+                    distribute(link);
                 }
-                if (filesizes != null && filesizes.length == file_ids.length) {
-                    link.setDownloadSize(Long.parseLong(filesizes[i]));
-                } else if (i == 0) {
-                    /* Log only once */
-                    logger.warning("Failed to find filesize information");
-                }
-                link.setAvailable(true);
-                link._setFilePackage(fp);
-                ret.add(link);
-                distribute(link);
             }
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             if (numberofNewItems == 0) {
@@ -133,14 +170,25 @@ public class FilesterMeFolder extends PluginForDecrypt {
                 throw new InterruptedException();
             }
             /* Continue to next page */
+            /* Short delay in hope of avoiding rate limit. */
+            this.sleep(2000, param);
             page++;
             br.getPage(contenturl + "?page=" + page);
         } while (!this.isAbort());
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         return ret;
     }
 
     @Override
     public boolean hasCaptcha(CryptedLink link, Account acc) {
         return false;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* Try to avoid rate limit */
+        return 1;
     }
 }

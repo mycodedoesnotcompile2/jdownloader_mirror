@@ -28,6 +28,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
@@ -37,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52291 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52680 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -114,6 +115,17 @@ public class DatanodesTo extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        /* 2026-04-20 */
+        super.scanInfo(html, fileInfo);
+        String filename = new Regex(html, "file-actions link=\"https?://[^/]+/[a-z0-9]{12}/([^/\"]+)\"").getMatch(0);
+        if (!StringUtils.isEmpty(filename)) {
+            fileInfo[0] = filename;
+        }
+        return fileInfo;
     }
 
     @Override

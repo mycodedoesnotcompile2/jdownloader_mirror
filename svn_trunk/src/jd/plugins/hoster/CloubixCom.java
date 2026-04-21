@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52664 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52680 $", interfaceVersion = 3, names = {}, urls = {})
 public class CloubixCom extends XFileSharingProBasic {
     public CloubixCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +103,11 @@ public class CloubixCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        // 2026-04-20
+        return false;
     }
 }
