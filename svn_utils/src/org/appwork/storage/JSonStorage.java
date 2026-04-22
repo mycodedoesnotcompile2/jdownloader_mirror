@@ -39,14 +39,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.lang.ref.WeakReference;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.WeakHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -65,70 +64,48 @@ import org.appwork.utils.IO;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.IO.WriteToFileCallback;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.WeakObjectCache;
 import org.appwork.utils.reflection.Clazz;
 
 public class JSonStorage {
     /* hash map contains file location as string and the storage instance */
-    private static final HashMap<String, Storage>                   MAP               = new HashMap<String, Storage>();
-    private final static WeakHashMap<String, WeakReference<String>> DEDUPEMAP         = new WeakHashMap<String, WeakReference<String>>();
-    public static final AtomicBoolean                               WRITE_ON_SHUTDOWN = new AtomicBoolean(true);
+    private static final HashMap<String, Storage> MAP               = new HashMap<String, Storage>();
+    private static final WeakObjectCache<String>  DEDUPECACHE       = new WeakObjectCache<String>(16) {
+                                                                        @Override
+                                                                        protected boolean equalsObject(String a, String b) {
+                                                                            return StringUtils.equals(a, b);
+                                                                        }
 
-    public static String dedupeString(String string) {
-        if (string != null) {
-            synchronized (DEDUPEMAP) {
-                String ret = null;
-                WeakReference<String> ref = DEDUPEMAP.get(string);
-                if (ref != null && (ret = ref.get()) != null) {
-                    return ret;
-                }
-                ref = new WeakReference<String>(string);
-                DEDUPEMAP.put(string, ref);
-                return string;
-            }
-        } else {
-            return string;
+                                                                        @Override
+                                                                        protected int hashCodeObject(String a) {
+                                                                            return a.hashCode();
+                                                                        }
+                                                                    };
+    public static final AtomicBoolean             WRITE_ON_SHUTDOWN = new AtomicBoolean(true);
+
+    public static String dedupeString(String value) {
+        if (value == null) {
+            return null;
+        }
+        synchronized (DEDUPECACHE) {
+            return DEDUPECACHE.getOrPut(value);
         }
     }
 
-    private static JSONMapper                         JSON_MAPPER = new SimpleMapper() {
-                                                                      protected JSonFactory newJsonFactory(String jsonString) {
-                                                                          return new JSonFactory(jsonString) {
-                                                                                                                                            @Override
-                                                                                                                                            protected String dedupeString(String string) {
-                                                                                                                                                return JSonStorage.dedupeString(string);
-                                                                                                                                            };
-                                                                                                                                        };
-                                                                      };
-                                                                  };
+    private static JSONMapper                         JSON_MAPPER               = new SimpleMapper() {
+                                                                                    protected JSonFactory newJsonFactory(String jsonString) {
+                                                                                        return new JSonFactory(jsonString) {
+                                                                                            @Override
+                                                                                            protected String dedupeString(String string) {
+                                                                                                return JSonStorage.dedupeString(string);
+                                                                                            };
+                                                                                        };
+                                                                                    };
+                                                                                };
     /* default key for encrypted json */
-    static public byte[]                              KEY         = new byte[] { 0x01, 0x02, 0x11, 0x01, 0x01, 0x54, 0x01, 0x01, 0x01, 0x01, 0x12, 0x01, 0x01, 0x01, 0x22, 0x01 };
-    private static final HashMap<File, AtomicInteger> LOCKS       = new HashMap<File, AtomicInteger>();
-    static {
-        /* shutdown hook to save all open Storages */
-        ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
-            @Override
-            public long getMaxDuration() {
-                return 0;
-            }
-
-            @Override
-            public int getHookPriority() {
-                return 0;
-            }
-
-            @Override
-            public void onShutdown(final ShutdownRequest shutdownRequest) {
-                if (WRITE_ON_SHUTDOWN.get()) {
-                    JSonStorage.close();
-                }
-            }
-
-            @Override
-            public String toString() {
-                return "ShutdownEvent: Save JSonStorages";
-            }
-        });
-    }
+    static public byte[]                              KEY                       = new byte[] { 0x01, 0x02, 0x11, 0x01, 0x01, 0x54, 0x01, 0x01, 0x01, 0x01, 0x12, 0x01, 0x01, 0x01, 0x22, 0x01 };
+    private static final HashMap<File, AtomicInteger> LOCKS                     = new HashMap<File, AtomicInteger>();
+    private static final AtomicBoolean                SHUTDOWNEVENT_INITIALIZED = new AtomicBoolean(false);
 
     /**
      * @param returnType
@@ -142,45 +119,81 @@ public class JSonStorage {
         return JSonStorage.JSON_MAPPER;
     }
 
+    private static Map<String, Storage> getMap() {
+        if (SHUTDOWNEVENT_INITIALIZED.compareAndSet(false, true)) {
+            try {
+                /* shutdown hook to save all open Storages */
+                ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
+                    @Override
+                    public long getMaxDuration() {
+                        return 0;
+                    }
+
+                    @Override
+                    public int getHookPriority() {
+                        return 0;
+                    }
+
+                    @Override
+                    public void onShutdown(final ShutdownRequest shutdownRequest) {
+                        if (WRITE_ON_SHUTDOWN.get()) {
+                            JSonStorage.close();
+                        }
+                    }
+
+                    @Override
+                    public String toString() {
+                        return "ShutdownEvent: Save JSonStorages";
+                    }
+                });
+            } catch (IllegalStateException ignore) {
+                org.appwork.loggingv3.LogV3.log(ignore);
+            }
+        }
+        return JSonStorage.MAP;
+    }
+
     /**
      * TODO: Difference to {@link #getStorage(String)} ?
      */
     public static Storage getPlainStorage(final String name) throws StorageException {
+        final Map<String, Storage> map = getMap();
         final String id = name + "_plain";
         Storage ret = null;
-        synchronized (JSonStorage.MAP) {
-            ret = JSonStorage.MAP.get(id);
+        synchronized (map) {
+            ret = map.get(id);
             if (ret != null) {
                 return ret;
             }
         }
         ret = new JsonKeyValueStorage(name, true);
-        synchronized (JSonStorage.MAP) {
-            final Storage ret2 = JSonStorage.MAP.get(id);
+        synchronized (map) {
+            final Storage ret2 = map.get(id);
             if (ret2 != null) {
                 return ret2;
             }
-            JSonStorage.MAP.put(id, ret);
+            map.put(id, ret);
         }
         return ret;
     }
 
     public static Storage getStorage(final String name) throws StorageException {
+        final Map<String, Storage> map = getMap();
         final String id = name + "_crypted";
         Storage ret = null;
-        synchronized (JSonStorage.MAP) {
-            ret = JSonStorage.MAP.get(id);
+        synchronized (map) {
+            ret = map.get(id);
             if (ret != null) {
                 return ret;
             }
         }
         ret = new JsonKeyValueStorage(name);
-        synchronized (JSonStorage.MAP) {
-            final Storage ret2 = JSonStorage.MAP.get(id);
+        synchronized (map) {
+            final Storage ret2 = map.get(id);
             if (ret2 != null) {
                 return ret2;
             }
-            JSonStorage.MAP.put(id, ret);
+            map.put(id, ret);
         }
         return ret;
     }

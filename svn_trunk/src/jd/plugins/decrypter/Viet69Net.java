@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50259 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52696 $", interfaceVersion = 2, names = {}, urls = {})
 public class Viet69Net extends PluginForDecrypt {
     public Viet69Net(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class Viet69Net extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "viet69.moi", "viet69.gg", "viet69.in", "viet69.net", "viet69.co", "viet69.love", "viet69.page", "viet69.vc", "viet69.tube", "viet69.zip", "viet69.ec" });
+        ret.add(new String[] { "viet69.mu", "viet69.moi", "viet69.gg", "viet69.in", "viet69.net", "viet69.co", "viet69.love", "viet69.page", "viet69.vc", "viet69.tube", "viet69.zip", "viet69.ec" });
         return ret;
     }
 
@@ -59,6 +59,7 @@ public class Viet69Net extends PluginForDecrypt {
         deadDomains.add("viet69.co");
         deadDomains.add("viet69.love");
         deadDomains.add("viet69.vc");
+        deadDomains.add("viet69.ec"); // 2026-04-22
         return deadDomains;
     }
 

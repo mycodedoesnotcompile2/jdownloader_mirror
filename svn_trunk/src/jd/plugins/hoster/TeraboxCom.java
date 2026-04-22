@@ -22,18 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -45,6 +38,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
@@ -55,7 +49,15 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 51069 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52695 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -284,10 +286,10 @@ public class TeraboxCom extends PluginForHost {
             // }
             // }
             logger.info("Performing full user-cookie login");
-            br.getPage("https://www." + this.getHost() + "/main?category=all");
+            getPage(this, br, br.createGetRequest("https://www." + this.getHost() + "/main?category=all"));
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* Fallback if link changes e.g. old link was: https://www.terabox.com/disk/home -> Leads to error 404 now */
-                br.getPage("https://" + br.getHost(true) + "/");
+                getPage(this, br, br.createGetRequest("https://" + br.getHost(true) + "/"));
                 /* Unreachable code */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -304,7 +306,7 @@ public class TeraboxCom extends PluginForHost {
             final AccountInfo ai = new AccountInfo();
             final String app_id = "250528";
             final Browser brc = br.cloneBrowser();
-            brc.getPage("/rest/2.0/membership/proxy/user?method=query&membership_version=1.0&channel=dubox&web=1&app_id=" + app_id + "&clienttype=0&bdstoken=" + bdstoken);
+            getPage(this, brc, brc.createGetRequest("/rest/2.0/membership/proxy/user?method=query&membership_version=1.0&channel=dubox&web=1&app_id=" + app_id + "&clienttype=0&bdstoken=" + bdstoken));
             /* 2021-04-14: Only free accounts are existent/supported */
             final Map<String, Object> root = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Number error_code = (Number) root.get("error_code");
@@ -332,7 +334,7 @@ public class TeraboxCom extends PluginForHost {
             }
             if (jstoken == null) {
                 logger.info("Failed to find jstoken so far -> Trying to fetch it via dedicated http call");
-                jstoken = getJsToken(br, br.getHost(false));
+                jstoken = getJsToken(this, br, br.getHost(false));
                 if (jstoken == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find jstoken");
                 }
@@ -341,11 +343,11 @@ public class TeraboxCom extends PluginForHost {
             account.setProperty(PROPERTY_ACCOUNT_JS_TOKEN_REFRESH_TIMESTAMP, Time.systemIndependentCurrentJVMTimeMillis());
             final boolean getExtendedInfo = true;
             if (getExtendedInfo) {
-                brc.getPage("/api/check/login?app_id=" + app_id + "&web=1&channel=dubox&clienttype=0&jsToken=&dp-logid=");
+                getPage(this, brc, brc.createGetRequest("/api/check/login?app_id=" + app_id + "&web=1&channel=dubox&clienttype=0&jsToken=&dp-logid="));
                 final Map<String, Object> root2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 final String user_id = root2.get("uk").toString();
                 // account.setProperty("user_id", user_id);
-                brc.getPage("/api/user/getinfo?app_id=" + app_id + "&web=1&channel=dubox&clienttype=0&jsToken=" + jstoken + "&dp-logid=&client=web&pass_version=2.8&lang=en&clientfrom=h5&pcftoken=" + pcftoken + "&user_list=%5B" + user_id + "%5D&need_relation=0&need_secret_info=1&bdstoken=" + bdstoken);
+                getPage(this, brc, brc.createGetRequest("/api/user/getinfo?app_id=" + app_id + "&web=1&channel=dubox&clienttype=0&jsToken=" + jstoken + "&dp-logid=&client=web&pass_version=2.8&lang=en&clientfrom=h5&pcftoken=" + pcftoken + "&user_list=%5B" + user_id + "%5D&need_relation=0&need_secret_info=1&bdstoken=" + bdstoken));
                 final Map<String, Object> root3 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Map<String, Object> userinfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root3, "records/{0}");
                 final String uname = (String) userinfo.get("uname");
@@ -375,8 +377,21 @@ public class TeraboxCom extends PluginForHost {
         }
     }
 
-    public static String getJsToken(final Browser br, final String host) throws IOException {
-        br.getPage("https://www." + host + "/");
+    private static Object LOCK = new Object();
+
+    public static String getPage(Plugin plugin, Browser br, Request request) throws PluginException, IOException {
+        synchronized (LOCK) {
+            br.getPage(request);
+            if (StringUtils.endsWithCaseInsensitive(br.getURL(), "simple-verify")) {
+                br.getPage("/");
+                br.getPage(request.cloneRequest());
+            }
+            return request.getHtmlCode();
+        }
+    }
+
+    public static String getJsToken(Plugin plugin, final Browser br, final String host) throws PluginException, IOException {
+        getPage(plugin, br, br.createGetRequest("https://www." + host + "/"));
         return regexJsToken(br);
     }
 

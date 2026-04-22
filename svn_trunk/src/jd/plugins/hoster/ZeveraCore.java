@@ -466,6 +466,7 @@ abstract public class ZeveraCore extends UseNet {
         final Map<String, Object> userinfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String customerID = userinfo.get("customer_id").toString();
         if (customerID != null) {
+            /* Ensure that we got a unique username regardless of which value user enters into username field. */
             account.setUser(customerID);
         }
         final Number fair_use_usedO = (Number) userinfo.get("limit_used");
@@ -480,8 +481,8 @@ abstract public class ZeveraCore extends UseNet {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             final boolean boosterWorkaroundActive = isBoosterPointsUnlimitedTrafficWorkaroundActive(account);
-            final double d = fair_use_usedO.doubleValue();
-            final int fairUsagePercentUsed = (int) (d * 100.0);
+            final double fair_use_used_double = fair_use_usedO.doubleValue();
+            final int fairUsagePercentUsed = (int) (fair_use_used_double * 100.0);
             final int fairUsagePercentLeft = 100 - fairUsagePercentUsed;
             if (fairUsagePercentUsed >= 100 && !boosterWorkaroundActive) {
                 throw new AccountUnavailableException("Fair use limit reached", 5 * 60 * 1000l);
@@ -497,7 +498,7 @@ abstract public class ZeveraCore extends UseNet {
             /* Free account -> Either expired premium account or account has always been a free account. */
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(getMaxSimultaneousFreeAccountDownloads());
-            /** Default = Free accounts do not have any traffic. */
+            /** Free accounts don't have any traffic, effectively they cannot be used for anything. */
             ai.setTrafficLeft(0);
             ai.setExpired(true);
         }
@@ -505,52 +506,61 @@ abstract public class ZeveraCore extends UseNet {
         synchronized (global_cache_hosts) {
             global_cache_hosts.clear();
             final Map<String, Object> hosterinfo = this.handleAPIErrors(this, br, null, account);
-            final HashSet<String> supportedHostsMainDomains = new HashSet<String>();
-            final HashSet<String> supportedHostsMainDomainsWithoutCache = new HashSet<String>();
+            final HashSet<String> domainsAll = new HashSet<String>();
+            final HashSet<String> domainsWithoutCache = new HashSet<String>();
             final String[] hosterListTypesToAdd = new String[] { "directdl", "queue" };
             for (final String hosterListTypeToAdd : hosterListTypesToAdd) {
                 final List<String> hosts = (List<String>) hosterinfo.get(hosterListTypeToAdd);
                 if (hosts == null || hosts.isEmpty()) {
                     continue;
                 }
-                supportedHostsMainDomains.addAll(hosts);
-                supportedHostsMainDomainsWithoutCache.addAll(hosts);
+                domainsAll.addAll(hosts);
+                domainsWithoutCache.addAll(hosts);
             }
-            final List<String> cachehosts = (List<String>) hosterinfo.get("cache");
+            final List<String> domainsCache = (List<String>) hosterinfo.get("cache");
             final Map<String, Number> fairusefactor = (Map<String, Number>) hosterinfo.get("fairusefactor");
-            if (cachehosts != null) {
-                supportedHostsMainDomains.addAll(cachehosts);
+            if (domainsCache != null) {
+                domainsAll.addAll(domainsCache);
             }
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-            final Map<String, Object> aliasesmap = (Map<String, Object>) hosterinfo.get("aliases");
-            for (final String mainDomain : supportedHostsMainDomains) {
-                if (mainDomain.equalsIgnoreCase("usenet")) {
+            final Map<String, List<String>> aliasesmap = (Map<String, List<String>>) hosterinfo.get("aliases");
+            boolean supportsUsenetByDomainlist = false;
+            for (final String domain : domainsAll) {
+                if (domain.equalsIgnoreCase("usenet")) {
                     /**
                      * This should not be in the list but just in case let's skip it here. <br>
                      * It's handled separately down below.
                      */
                     logger.info("Usenet is in list of supported hosts, that's new");
+                    supportsUsenetByDomainlist = true;
                     continue;
                 }
-                final boolean isCacheHost = cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomainsWithoutCache.contains(mainDomain);
-                final MultiHostHost mhost = new MultiHostHost(mainDomain);
-                final List<String> allDomains = (List<String>) aliasesmap.get(mainDomain);
+                final boolean isCacheHost = domainsCache != null && domainsCache.contains(domain) && !domainsWithoutCache.contains(domain);
+                final MultiHostHost mhost = new MultiHostHost(domain);
+                final List<String> allDomains = aliasesmap.get(domain);
                 if (allDomains != null) {
                     mhost.addDomains(allDomains);
+                } else {
+                    logger.info("Found entry without aliases values: " + domain);
                 }
-                final Number fairusefactorThisHost = fairusefactor.get(mainDomain);
+                final Number fairusefactorThisHost = fairusefactor.get(domain);
                 if (fairusefactorThisHost != null && fairusefactorThisHost.intValue() != 1) {
                     /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
                     mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
                 }
                 if (isCacheHost) {
                     mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+                    /* This text is visible to the user in GUI. */
                     mhost.setStatusText("Cache only");
+                    /*
+                     * This is important for the internal handling of cache-only hosters. It will make our download system avoid unnecessary
+                     * API requests.
+                     */
                     global_cache_hosts.addAll(allDomains);
                 }
                 supportedhosts.add(mhost);
             }
-            if (supportsUsenet(account)) {
+            if (supportsUsenetByDomainlist || supportsUsenet(account)) {
                 supportedhosts.add(new MultiHostHost("usenet"));
             }
             ai.setMultiHostSupportV2(this, supportedhosts);

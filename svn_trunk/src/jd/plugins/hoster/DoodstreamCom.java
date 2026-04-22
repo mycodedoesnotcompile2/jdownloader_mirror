@@ -56,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52684 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52693 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -84,6 +84,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("pooop.online");
+        deadDomains.add("d-s.io"); // 2026-04-21
         return deadDomains;
     }
 

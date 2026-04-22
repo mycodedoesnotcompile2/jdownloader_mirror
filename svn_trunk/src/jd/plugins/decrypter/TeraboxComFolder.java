@@ -15,7 +15,9 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 52640 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52696 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -138,8 +140,8 @@ public class TeraboxComFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        String[] result = extractSurlAndPath(param.getCryptedUrl());
-        String surl = result[0];
+        final String[] result = extractSurlAndPath(param.getCryptedUrl());
+        final String surl = result[0];
         if (surl == null) {
             /* User has added invalid url */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -148,15 +150,17 @@ public class TeraboxComFolder extends PluginForDecrypt {
         return crawlFolder(this, param, account, null);
     }
 
+    public static AtomicReference<String> protocolAndSubdomain = new AtomicReference<String>();
+
     public ArrayList<DownloadLink> crawlFolder(final Plugin callingPlugin, final CryptedLink param, final Account account, final String targetFileID) throws Exception {
         final String contenturl = getContentURL(param.getCryptedUrl());
-        String[] result = extractSurlAndPath(contenturl);
-        String surl = result[0];
+        final String[] surlAndPath = extractSurlAndPath(contenturl);
+        String surl = surlAndPath[0];
         if (surl == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        String preGivenPath = result[1];
+        final String preGivenPath = surlAndPath[1];
         final TeraboxCom plg = (TeraboxCom) this.getNewPluginForHostInstance(this.getHost());
         /*
          * Login whenever possible. This way we will get direct downloadable URLs right away which we can store --> Saves a LOT of time- and
@@ -177,9 +181,9 @@ public class TeraboxComFolder extends PluginForDecrypt {
             setPasswordCookie(this.br, this.br.getHost(), passwordCookie);
         }
         String jstoken = null;
-        /*
-         * Fix surl value - website would usually do this via redirect. Just really strange that whenever that value starts with "1" they
-         * just remove this in order to be able to use that id as a param for ajax requests.
+        /**
+         * Fix surl value - website would usually do this via redirect. <br>
+         * Whenever that value starts with "1" they just remove this in order to be able to use that id as a param for ajax requests.
          */
         /* 2023-06-26: Looks like this is not needed anymore. */
         boolean useStrangeSUrlWorkaround = false;
@@ -192,26 +196,28 @@ public class TeraboxComFolder extends PluginForDecrypt {
         String protocolAndSubdomain = null;
         Browser surlbrowser = null;
         if (account != null) {
+            /* We are logged in */
             jstoken = account.getStringProperty(TeraboxCom.PROPERTY_ACCOUNT_JS_TOKEN);
             if (jstoken == null) {
                 logger.warning("Failed to find jstoken while account is given -> Download of crawled item(s) may fail!");
             }
             if (useStrangeSUrlWorkaround) {
                 surlbrowser = br.cloneBrowser();
-                surlbrowser.getPage(contenturl);
+                TeraboxCom.getPage(this, surlbrowser, surlbrowser.createGetRequest(contenturl));
                 protocolAndSubdomain = "https://" + surlbrowser.getHost(true);
             }
         } else {
+            /* We are not logged in */
             synchronized (anonymousJstokenTimestamp) {
                 if (anonymousJstoken.get() == null || Time.systemIndependentCurrentJVMTimeMillis() - anonymousJstokenTimestamp.get() < 5 * 60 * 1000 || useStrangeSUrlWorkaround) {
                     logger.info("Obtaining fresh anonymous jstoken");
                     final String newJstoken;
                     if (useStrangeSUrlWorkaround) {
                         surlbrowser = br.cloneBrowser();
-                        surlbrowser.getPage(contenturl);
+                        TeraboxCom.getPage(callingPlugin, surlbrowser, surlbrowser.createGetRequest(contenturl));
                         newJstoken = TeraboxCom.regexJsToken(surlbrowser);
                     } else {
-                        newJstoken = TeraboxCom.getJsToken(br, this.getHost());
+                        newJstoken = TeraboxCom.getJsToken(callingPlugin, br, this.getHost());
                     }
                     if (newJstoken != null) {
                         anonymousJstoken.set(newJstoken);
@@ -223,15 +229,16 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 }
             }
         }
-        if (protocolAndSubdomain == null) {
+        if (protocolAndSubdomain == null && (protocolAndSubdomain = TeraboxComFolder.protocolAndSubdomain.get()) == null) {
             logger.info("Finding protocolAndSubdomain");
             final Browser brc = br.cloneBrowser();
-            brc.getPage("https://" + getHost());
+            TeraboxCom.getPage(this, brc, brc.createGetRequest("https://www." + getHost()));
             // TODO: can cause redirect to /simple-verify, which leads to {"errmsg":"need verify_v2","errno":400210,"request_id":...}
             protocolAndSubdomain = "https://" + brc.getHost(true);
+            TeraboxComFolder.protocolAndSubdomain.set(protocolAndSubdomain);
         }
         if (surlbrowser != null) {
-            final String newSurlValue = UrlQuery.parse(surlbrowser.getURL()).get("surl");
+            final String newSurlValue = UrlQuery.parse(surlbrowser.getURL()).getDecoded("surl");
             if (newSurlValue != null && !newSurlValue.equals(surl)) {
                 logger.info("Found new surl value (mostly only number 1 at beginning is missing): Old" + surl + " | New: " + newSurlValue);
                 surl = newSurlValue;
@@ -255,7 +262,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
         queryFolder.add("desc", "1");
         queryFolder.add("shorturl", surl);
         if (!StringUtils.isEmpty(preGivenPath)) {
-            queryFolder.add("dir", preGivenPath);
+            queryFolder.appendEncoded("dir", preGivenPath);
         } else {
             queryFolder.add("root", "1");
         }
@@ -269,7 +276,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
             queryFolder.addAndReplace("page", Integer.toString(page));
             queryFolder.addAndReplace("num", Integer.toString(maxItemsPerPage));
             final String requesturl = protocolAndSubdomain + "/share/list?" + queryFolder.toString();
-            br.getPage(requesturl);
+            TeraboxCom.getPage(this, br, br.createGetRequest(requesturl));
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             int errno = ((Number) entries.get("errno")).intValue();
             if (errno == -9) {
@@ -299,7 +306,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     /* 2021-04-14: Captcha only happens when adding a lot of items within a short amount of time. */
                     if (errno == -62) {
                         captchaRequired = true;
-                        br.getPage("/api/getcaptcha?prod=shareverify&app_id=" + getAppID() + "&web=1&channel=" + getChannel() + "&clienttype=" + getClientType());
+                        TeraboxCom.getPage(this, br, br.createGetRequest("/api/getcaptcha?prod=shareverify&app_id=" + getAppID() + "&web=1&channel=" + getChannel() + "&clienttype=" + getClientType()));
                         entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                         final String captchaurl = (String) entries.get("vcode_img");
                         final String code = this.getCaptchaCode(captchaurl, param);
@@ -341,14 +348,13 @@ public class TeraboxComFolder extends PluginForDecrypt {
                  */
                 trustPassword = true;
                 /* Repeat the first request -> We should be able to access the folder now. */
-                br.getPage(requesturl);
+                TeraboxCom.getPage(this, br, br.createGetRequest(requesturl));
                 entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             }
             errno = ((Number) entries.get("errno")).intValue();
             final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("list");
             if (errno != 0 || ressourcelist == null) {
-                logger.info("Assume that this folder is offline");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Got error -> Assuming that this folder is offline");
             }
             if (ressourcelist.isEmpty()) {
                 logger.info("Stopping because: Current page doesn't contain any items");
@@ -365,6 +371,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 /* 2023-06-21: jstoken is mandatory when account is given. */
                 query_shorturlinfo.appendEncoded("jsToken", jstoken != null ? jstoken : "");
                 query_shorturlinfo.appendEncoded("dp-logid", "");
+                /* Why do we add "1" here? See "useStrangeSUrlWorkaround". */
                 query_shorturlinfo.appendEncoded("shorturl", "1" + surl);
                 if (!StringUtils.isEmpty(preGivenPath)) {
                     query_shorturlinfo.appendEncoded("dir", preGivenPath);
@@ -372,7 +379,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     query_shorturlinfo.appendEncoded("root", "1");
                 }
                 query_shorturlinfo.appendEncoded("scene", "");
-                br.getPage(protocolAndSubdomain + "/api/shorturlinfo?" + query_shorturlinfo.toString());
+                TeraboxCom.getPage(this, br, br.createGetRequest(protocolAndSubdomain + "/api/shorturlinfo?" + query_shorturlinfo.toString()));
                 final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 errno = ((Number) entries2.get("errno")).intValue();
                 if (errno != 0) {
@@ -489,16 +496,16 @@ public class TeraboxComFolder extends PluginForDecrypt {
             if (ressourcelist.size() < maxItemsPerPage) {
                 logger.info("Stopping because: Current page contains less items than: " + maxItemsPerPage + " (only " + ressourcelist.size() + ")");
                 break;
-            } else {
-                logger.info("Number of items found on current page: " + ressourcelist.size());
-                page++;
-                continue;
             }
+            /* Continue to next page */
+            logger.info("Number of items found on current page: " + ressourcelist.size());
+            page++;
+            continue;
         } while (!this.isAbort());
         return ret;
     }
 
-    private String[] extractSurlAndPath(String contenturl) throws MalformedURLException {
+    private String[] extractSurlAndPath(String contenturl) throws MalformedURLException, UnsupportedEncodingException {
         final List<String> deadDomains = getDeadDomains();
         final String domainOfAddedURL = Browser.getHost(contenturl);
         if (deadDomains.contains(domainOfAddedURL)) {
@@ -506,20 +513,17 @@ public class TeraboxComFolder extends PluginForDecrypt {
             contenturl = contenturl.replaceFirst(Pattern.quote(domainOfAddedURL) + "/", getHost() + "/");
         }
         final UrlQuery paramsOfAddedURL = UrlQuery.parse(contenturl);
-        String surl = null;
-        String preGivenPath = null;
+        String encoded_surl = null;
+        String encoded_path = null;
         if (new Regex(contenturl, TYPE_SHORT).patternFind()) {
-            surl = new Regex(contenturl, TYPE_SHORT).getMatch(0);
+            encoded_surl = new Regex(contenturl, TYPE_SHORT).getMatch(0);
         } else {
-            surl = paramsOfAddedURL.get("surl");
+            encoded_surl = paramsOfAddedURL.get("surl");
         }
-        preGivenPath = paramsOfAddedURL.get("dir");
-        if (preGivenPath == null) {
-            preGivenPath = paramsOfAddedURL.get("path");
+        encoded_path = paramsOfAddedURL.get("dir");
+        if (encoded_path == null) {
+            encoded_path = paramsOfAddedURL.get("path");
         }
-        if (!Encoding.isUrlCoded(preGivenPath)) {
-            preGivenPath = Encoding.urlEncode(preGivenPath);
-        }
-        return new String[] { surl, preGivenPath };
+        return new String[] { encoded_surl == null ? null : URLDecoder.decode(encoded_surl, "UTF-8"), encoded_path == null ? null : URLDecoder.decode(encoded_path, "UTF-8") };
     }
 }

@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52684 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52691 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -249,23 +249,32 @@ public class DdownloadCom extends XFileSharingProBasic {
     public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2020-05-17 */
         super.scanInfo(html, fileInfo);
-        String filename = new Regex(html, "<h1[^>]*class=\"file-info-name\"[^>]*>([^<]+)</h1>").getMatch(0);
+        /* current-2026-04 */
+        String filename = new Regex(html, "class=\"[^\"]*dk-dl-name\"[^>]*>\\s*([^<]+)\\s*</").getMatch(0);
         if (StringUtils.isEmpty(filename)) {
-            /* 2026-03-27 */
-            filename = new Regex(html, "class=\"[^\"]*filename\"[^>]*>([^<]+)</div>").getMatch(0);
+            /* old */
+            filename = new Regex(html, "<h1[^>]*class=\"file-info-name\"[^>]*>([^<]+)</h1>").getMatch(0);
             if (StringUtils.isEmpty(filename)) {
-                /* 2026-04-01 */
-                filename = new Regex(html, "class=\"[^\"]*dl-file-name\"[^>]*>([^<]+)</div>").getMatch(0);
+                /* 2026-03-27 */
+                filename = new Regex(html, "class=\"[^\"]*filename\"[^>]*>\\s*([^<]+)\\s*</").getMatch(0);
+                if (StringUtils.isEmpty(filename)) {
+                    /* 2026-04-01 */
+                    filename = new Regex(html, "class=\"[^\"]*dl-file-name\"[^>]*>\\s*([^<]+)\\s*</").getMatch(0);
+                }
             }
         }
-        /* 2026-04-01 */
-        String filesize = new Regex(html, "class=\"(?:dl-)?file-size\">([^<>\"]+)<").getMatch(0);
+        /* current-2026-04 */
+        String filesize = new Regex(html, "class=\"[^\"]*dk-dl-size\"[^>]*>\\s*([^<]+)\\s*</").getMatch(0);
         if (StringUtils.isEmpty(filesize)) {
-            /* 2021-03-25 */
-            filesize = new Regex(html, "\\[<font[^>]*>(\\d+[^<>\"]+)</font>\\]").getMatch(0);
+            /* old */
+            filesize = new Regex(html, "class=\"(?:dl-)?file-size\">([^<>\"]+)<").getMatch(0);
             if (StringUtils.isEmpty(filesize)) {
-                /* 2026-03-27 */
-                filesize = new Regex(html, "class=\"[^\"]*filesize\"[^>]*>([^<]+)</div>").getMatch(0);
+                /* 2021-03-25 */
+                filesize = new Regex(html, "\\[<font[^>]*>(\\d+[^<>\"]+)</font>\\]").getMatch(0);
+                if (StringUtils.isEmpty(filesize)) {
+                    /* 2026-03-27 */
+                    filesize = new Regex(html, "class=\"[^\"]*filesize\"[^>]*>\\s*([^<]+)\\s*</").getMatch(0);
+                }
             }
         }
         if (!StringUtils.isEmpty(filename)) {
@@ -275,6 +284,16 @@ public class DdownloadCom extends XFileSharingProBasic {
             fileInfo[1] = filesize;
         }
         return fileInfo;
+    }
+
+    @Override
+    protected String regexWaittime(final String html) {
+        /* 2026-04-21 */
+        final String waitStr = new Regex(html, "id=\"dk2CountdownNum\"[^>]*>\\s*(\\d{1,2})").getMatch(0);
+        if (waitStr != null) {
+            return waitStr;
+        }
+        return super.regexWaittime(html);
     }
 
     @Override

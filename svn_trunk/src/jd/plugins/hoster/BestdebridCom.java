@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52670 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52696 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -113,16 +113,20 @@ public class BestdebridCom extends PluginForHost {
             dllink = storedDirecturl;
         } else {
             final String clientIPv4 = new BalancedWebIPCheck(br.getProxy()).getExternalIP().getIP();
-            /* 2019-08-27: Test-code regarding Free Account download which is only possible via website. */
+            /**
+             * 2019-08-27: Test-code regarding Free Account download which is only possible via website. <br>
+             * 2026-04-21: Free Accounts cannot be used to download anything anymore so all free account related code is irrelevant.
+             */
             final boolean use_website_for_free_account_downloads = false;
+            final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
             if (account.getType() == AccountType.FREE && use_website_for_free_account_downloads) {
-                this.br.postPage(API_BASE + "/generateLink", "&ip=" + clientIPv4 + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)) + "&pass=&boxlinklist=0");
+                this.br.postPage(API_BASE + "/generateLink", "&ip=" + clientIPv4 + "&link=" + Encoding.urlEncode(url) + "&pass=&boxlinklist=0");
                 dllink = PluginJSonUtils.getJsonValue(br, "link");
                 if (!StringUtils.isEmpty(dllink) && !dllink.startsWith("http") && !dllink.startsWith("/")) {
                     dllink = "https://" + this.getHost() + "/" + dllink;
                 }
             } else {
-                this.br.getPage(API_BASE + "/generateLink?auth=" + Encoding.urlEncode(account.getPass()) + "&ip=" + clientIPv4 + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+                this.br.getPage(API_BASE + "/generateLink?auth=" + Encoding.urlEncode(account.getPass()) + "&ip=" + clientIPv4 + "&link=" + Encoding.urlEncode(url));
                 final Map<String, Object> entries = handleAPIErrors(br, account, link);
                 dllink = entries.get("link").toString();
             }
@@ -155,7 +159,6 @@ public class BestdebridCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         /*
          * 2019-07-30: This means that an account is owned by a reseller. Reseller accounts have no limits (no daily bandwidth/numberof
          * links limits even compared to premium).
@@ -175,6 +178,7 @@ public class BestdebridCom extends PluginForHost {
         if (creditStr != null && creditStr.matches("\\d+")) {
             credit = Integer.parseInt(creditStr);
         }
+        final AccountInfo ai = new AccountInfo();
         String statusAcc;
         if (validuntil > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
@@ -294,10 +298,12 @@ public class BestdebridCom extends PluginForHost {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
             /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long wait = 60 * 1000;
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait);
             } else {
-                throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+                throw new AccountUnavailableException(msg, wait);
             }
         }
         final int error = ((Number) entries.get("error")).intValue();
@@ -328,6 +334,6 @@ public class BestdebridCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "/en/profile";
+        return "https://" + getHost() + "/profile";
     }
 }
