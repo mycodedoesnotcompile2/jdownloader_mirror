@@ -126,18 +126,27 @@ public class SizeFormatter {
 
     @Deprecated
     public static long getSize(final String string) {
-        return SizeFormatter.getSize(string, true, false);
+        return getSize(null, string, null, false);
+    }
+
+    @Deprecated
+    public static long getSize(String string, boolean kibi, boolean allowNegative) {
+        return getSize(null, string, (Boolean) kibi, allowNegative);
+    }
+
+    @Deprecated
+    public static long getSize(String string, Boolean kibi, boolean allowNegative) {
+        return getSize(null, string, kibi, allowNegative);
+    }
+
+    public static long getSize(final NumberFormat format, String string, boolean kibi, final boolean allowNegative) {
+        return getSize(format, string, (Boolean) kibi, allowNegative);
     }
 
     private static final Pattern DOUBLE = Pattern.compile("([\\d]+)[.,:]([\\d]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("([\\d]+)", Pattern.CASE_INSENSITIVE);
 
-    @Deprecated
-    public static long getSize(String string, boolean kibi, boolean allowNegative) {
-        return getSize(null, string, kibi, allowNegative);
-    }
-
-    public static long getSize(final NumberFormat format, String string, boolean kibi, boolean allowNegative) {
+    public static long getSize(final NumberFormat format, String string, Boolean kibi, final boolean allowNegative) {
         final boolean negative;
         if (allowNegative) {
             negative = Pattern.compile("\\D*\\-.*").matcher(string).matches();
@@ -155,6 +164,9 @@ public class SizeFormatter {
             matches = new Regex(string, SizeFormatter.NUMBER).getMatches();
         }
         if (matches != null && matches.length >= 1) {
+            if (kibi == null) {
+                kibi = new Regex(string, "(ib|ig)").patternFind();
+            }
             final long unitLong = kibi ? SizeFormatter.getBestUnit(string).getBytes1024() : SizeFormatter.getBestUnit(string).getBytes1000();
             if (matches[0].length == 2 && Long.parseLong(matches[0][1]) > 0) {
                 final double ret = Double.parseDouble(matches[0][0] + "." + matches[0][1]) * unitLong;
@@ -184,10 +196,5 @@ public class SizeFormatter {
         } else {
             return Unit.B;
         }
-    }
-
-    @Deprecated
-    public static long getSize(final String string, final boolean kibi) {
-        return SizeFormatter.getSize(string, kibi, false);
     }
 }

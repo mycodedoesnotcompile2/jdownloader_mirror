@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.appwork.builddecision.BuildDecisionRequired;
-import org.appwork.testframework.AWTestValidateClassReference;
+import org.appwork.testhelper.AWTestValidateClassReference;
 
 @BuildDecisionRequired(tags = { DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_YES, DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO }, imports = { DesktopSupportWindowsViaJNA.ORG_APPWORK_UTILS_OS_DESKTOP_SUPPORT_WINDOWS_VIA_JNA, "" }, dependsOn = { org.appwork.JNAHelper.JNA_HELPER_USE_JNA, "" })
 public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {

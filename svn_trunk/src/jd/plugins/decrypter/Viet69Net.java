@@ -15,8 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -33,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52696 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52698 $", interfaceVersion = 2, names = {}, urls = {})
 public class Viet69Net extends PluginForDecrypt {
     public Viet69Net(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,6 +62,8 @@ public class Viet69Net extends PluginForDecrypt {
         deadDomains.add("viet69.love");
         deadDomains.add("viet69.vc");
         deadDomains.add("viet69.ec"); // 2026-04-22
+        deadDomains.add("viet69.moi"); // 2026-04-22
+        deadDomains.add("viet69.page"); // 2026-04-22
         return deadDomains;
     }
 
@@ -76,6 +80,8 @@ public class Viet69Net extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    static final Pattern PATTERN_IGNORE = Pattern.compile("/(?:bai-viet|bdsm|camera|check-hang|lienhe|may-bay-ba-gia|my-videos|sex-viet|sinh-vien|teen|thu-dam|upload|wp-admin|wp-content|wp-includes)(?:/|$)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
@@ -84,15 +90,14 @@ public class Viet69Net extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
+    @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>() {
-            @Override
-            public boolean add(DownloadLink link) {
-                distribute(link);
-                return super.add(link);
-            }
-        };
         String contenturl = param.getCryptedUrl();
+        final String path = new URL(contenturl).getPath();
+        if (new Regex(path, PATTERN_IGNORE).patternFind()) {
+            logger.info("Ignoring invalid/unsupported url");
+            return new ArrayList<DownloadLink>();
+        }
         for (final String deadDomain : getDeadDomains()) {
             contenturl = contenturl.replace(deadDomain, this.getHost());
         }
@@ -109,6 +114,13 @@ public class Viet69Net extends PluginForDecrypt {
         if (videoDetails == null || videoDetails.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>() {
+            @Override
+            public boolean add(DownloadLink link) {
+                distribute(link);
+                return super.add(link);
+            }
+        };
         final String videoType = videoDetails[1];
         int index = 0;
         for (final String videoID : videoIDs) {

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -38,6 +38,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashSet;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.remoteapi.annotations.ApiDocExample;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.Storable;
@@ -57,12 +58,14 @@ import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.KeyValueLong;
 
 /**
  * @author thomas
  * @date 18.10.2022
  *
  */
+@RequiresResource(types = { KeyValueLong.class })
 public class ValidateFlexiAnnotationsTest extends AWTest {
     /*
      * (non-Javadoc)

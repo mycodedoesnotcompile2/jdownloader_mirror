@@ -35,10 +35,10 @@ package org.appwork.testframework;
 
 import static org.appwork.testframework.AWTest.logInfoAnyway;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
@@ -161,9 +161,9 @@ public class PostBuildRunner {
     private static String                  BUILDSCRIPT_PATH;
     private static boolean                 PRINT_CLASSLOADER_ERRORS;
     private static ArrayList<String>       TESTS_OK;
-    private static HashMap<String, String> TESTS_FAILED = new HashMap<String, String>();
+    private static HashMap<String, String> TESTS_FAILED     = new HashMap<String, String>();
     /** Env vars for tests that use AdminExecuter (lock dir, private key); set once after starting the helper. */
-    private static Map<String, String>     ADMIN_HELPER_ENV                          = null;
+    private static Map<String, String>     ADMIN_HELPER_ENV = null;
     private static boolean                 VERBOSE;
 
     /**
@@ -394,6 +394,10 @@ public class PostBuildRunner {
                 if (relative.toUpperCase(Locale.ROOT).endsWith(".CLASS") && !relative.contains("$")) {
                     String classname = relative.replace("/", ".").substring(0, relative.length() - ".class".length());
                     try {
+                        if (isExcludedPostBuildTestClass(classname, relative)) {
+                            LogV3.info("Skipped Test (excluded namespace):" + relative);
+                            continue main;
+                        }
                         for (String p : DO_NOT_TRY_TO_RUN) {
                             if (classname.matches(p)) {
                                 continue main;
@@ -550,6 +554,21 @@ public class PostBuildRunner {
     }
 
     /**
+     * Excludes IDE-only tests from post-build execution.
+     */
+    private static boolean isExcludedPostBuildTestClass(final String classname, final String relativePath) {
+        if (StringUtils.isEmpty(classname) && StringUtils.isEmpty(relativePath)) {
+            return false;
+        }
+        final String normalizedClass = classname == null ? "" : classname.replace('/', '.');
+        if (normalizedClass.contains(".ide.") || normalizedClass.endsWith(".ide")) {
+            return true;
+        }
+        final String normalizedPath = relativePath == null ? "" : relativePath.replace('\\', '/').toLowerCase(Locale.ROOT);
+        return normalizedPath.contains("/ide/");
+    }
+
+    /**
      * @param testClassName
      * @return true if this test is on the may-fail list (skip on missing class, no prompt)
      */
@@ -585,8 +604,8 @@ public class PostBuildRunner {
     }
 
     /**
-     * When a test fails due to missing class and -buildscript= was passed: prompt user to add
-     * missing resource(s) to the build script (with ASM-collected dependencies) or add test to -mayfail list.
+     * When a test fails due to missing class and -buildscript= was passed: prompt user to add missing resource(s) to the build script (with
+     * ASM-collected dependencies) or add test to -mayfail list.
      */
     private static void handleMissingClassInBuildScript(String testClassName, String missingClass, String stdOut, String errOut) {
         Set<String> classesToAdd = new HashSet<String>();
@@ -661,8 +680,8 @@ public class PostBuildRunner {
     }
 
     /**
-     * Add -mayfail=testClassName to the build script so this test is not prompted again on missing class.
-     * Inserts after the last <arg value="-skip= or <arg value="-force= line.
+     * Add -mayfail=testClassName to the build script so this test is not prompted again on missing class. Inserts after the last <arg
+     * value="-skip= or <arg value="-force= line.
      */
     private static void addMayFailToBuildScript(String buildScriptPath, String testClassName) {
         File buildFile = new File(buildScriptPath);
@@ -735,7 +754,7 @@ public class PostBuildRunner {
                 AWTest.setLoggerSilent(false, false);
                 LogV3.info(header("ERROR") + "Class file(s) not in JAR: " + e.getMessage());
                 LogV3.disableSysout();
-                // LogV3.log(e);
+                LogV3.log(e);
                 System.exit(EXIT_NO_CLASS_DEF_FOUND_1);
             }
             // Force to cached error log.

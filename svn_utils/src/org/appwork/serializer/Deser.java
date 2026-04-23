@@ -3,6 +3,7 @@ package org.appwork.serializer;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.builddecision.BuildDecisions;
 import org.appwork.storage.TypeRef;
@@ -11,9 +12,10 @@ import org.appwork.storage.commonInterface.SerializerInterface;
 import org.appwork.utils.reflection.Clazz;
 
 @BuildDecisionRequired(tags = { DeserConstants.DESER_SIMPLE, DeserConstants.DESER_FLEXI }, imports = { DeserConstants.CLASS_SIMPLE, DeserConstants.CLASS_FLEXI })
+@RequiresResource(types = { DeserConstants.class })
 public class Deser {
-    private static SerializerInterface              SERIALIZER           = createDefaultSerializer();
-    private static ThreadLocal<SerializerInterface> THREAD_SERIALIZER    = new ThreadLocal<SerializerInterface>();
+    private static SerializerInterface              SERIALIZER        = createDefaultSerializer();
+    private static ThreadLocal<SerializerInterface> THREAD_SERIALIZER = new ThreadLocal<SerializerInterface>();
 
     public static SerializerInterface createDefaultSerializer() {
         String def = DeserConstants.CLASS_SIMPLE;

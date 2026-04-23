@@ -18,7 +18,13 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -27,10 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
 public class FypttTo extends PluginForHost {
     public FypttTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,10 +45,10 @@ public class FypttTo extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = -2;
-    private static final int     free_maxdownloads = 1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = -2;
+    private String               dllink         = null;
+    private boolean              isHLS          = false;
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -73,7 +76,7 @@ public class FypttTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://fyptt.to/terms-of-service/";
+        return "https://" + getHost() + "/terms-of-service/";
     }
 
     @Override
@@ -91,21 +94,29 @@ public class FypttTo extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1).replace("-", " ").trim() + ".mp4";
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        if (!link.isNameSet()) {
-            link.setFinalFileName(new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1).replace("-", " ").trim() + ".mp4");
-        }
+        dllink = null;
+        link.setFinalFileName(getDefaultFileName(link));
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fileid = br.getRegex("fileid=([^&]+)").getMatch(0);
-        if (fileid != null) {
-            dllink = "https://stream.fyptt.to/" + fileid + ".mp4";
+        String embedVideo = br.getRegex("data-src-no-ap\\s*=\\s*\"(.*?fileid=.*?)\"").getMatch(0);
+        if (embedVideo != null) {
+            embedVideo = Encoding.htmlOnlyDecode(embedVideo);
+            final Browser brc = br.cloneBrowser();
+            brc.getPage(embedVideo);
+            dllink = brc.getRegex("<source src\\s*=\\s*\"(.*?)\"").getMatch(0);
         }
-        if (!StringUtils.isEmpty(dllink)) {
+        isHLS = StringUtils.containsIgnoreCase(dllink, ".m3u8");
+        if (!StringUtils.isEmpty(dllink) && !link.isSizeSet() && !isHLS) {
             basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), ".mp4");
         }
         return AvailableStatus.TRUE;
@@ -117,25 +128,19 @@ public class FypttTo extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
-        handleConnectionErrors(br, dl.getConnection());
-        dl.startDownload();
+        if (isHLS) {
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, dllink);
+            dl.startDownload();
+        } else {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
+            handleConnectionErrors(br, dl.getConnection());
+            dl.startDownload();
+        }
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return 1;
     }
 }

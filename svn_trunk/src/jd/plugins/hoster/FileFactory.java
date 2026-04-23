@@ -25,6 +25,19 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -47,31 +60,27 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52700 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + this.getHost() + "/pricing");
     }
 
-    public static final String   PROPERTY_CLASSIC      = "classic_website";
-    private static final Pattern PATTERN_FILE          = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_TRAFFIC_SHARE = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
+    @Deprecated
+    public static final String   PROPERTY_CLASSIC                     = "classic_website";
+    @Deprecated
+    private static final boolean ALLOW_EXPECT_SPECIAL_CLASSIC_LINKS          = false;
+    @Deprecated
+    private static final boolean ALLOW_EXPECT_SPECIAL_CLASSIC_ACCOUNTS       = false;
+    /* Account related patterns */
+    private static final String  PROPERTY_ACCOUNT_LOGIN_TOKEN         = "login_token";
+    private static final Pattern PATTERN_FILE                         = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_TRAFFIC_SHARE                = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
+    /* 2026-04-22: Not possible anymore */
+    private static final boolean ALLOW_MASS_LINKCHECK_WITHOUT_ACCOUNT = false;
+    /* 2026-04-22: Broken -> Displays all links as offline */
+    private static final boolean ALLOW_MASS_LINKCHECK_WITH_ACCOUNT    = false;
 
     @Override
     public FEATURE[] getFeatures() {
@@ -83,7 +92,9 @@ public class FileFactory extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         // blocking default UA
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("142.0"));
-        br.setCookie(getHost(), "filefactory_relaunch", "seen");
+        br.setCookie(getHost(), "filefactory_relaunch", "seen"); // old
+        br.setCookie(getHost(), "ff_relaunch_message_seen", "true"); // 2026-04-22
+        br.setCookie(getHost(), "filefactory_stream", "seen"); // 2026-04-22
         br.setCookie(getHost(), "cookieConsent", "accepted");
         br.setCookie(getHost(), "locale", "en_US.utf8");
         br.setFollowRedirects(true);
@@ -92,12 +103,24 @@ public class FileFactory extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www." + this.getHost() + "/legal/terms";
+        return getWebsiteBase() + "/legal/terms";
     }
 
     /** Returns true if this link shall be used with the older filefactory.com website accessible via classic.filefactory.com. */
+    @Deprecated
     private boolean isClassicFile(final DownloadLink link) throws PluginException {
-        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */&& link.getPluginPatternMatcher().contains("classic.filefactory.com"));
+        if (!ALLOW_EXPECT_SPECIAL_CLASSIC_LINKS) {
+            return false;
+        }
+        return link.hasProperty(PROPERTY_CLASSIC) || link.getPluginPatternMatcher().contains("classic.filefactory.com");
+    }
+
+    @Deprecated
+    private boolean isAccountUsingClassicWebsite(final Account account) {
+        if (!ALLOW_EXPECT_SPECIAL_CLASSIC_ACCOUNTS) {
+            return false;
+        }
+        return account.hasProperty(PROPERTY_CLASSIC);
     }
 
     private String getContentURL(final DownloadLink link) throws PluginException {
@@ -108,12 +131,16 @@ public class FileFactory extends PluginForHost {
         if (isClassicFile(link) && !disableClassic) {
             return "https://classic." + getHost() + "/file/" + this.getFUID(link);
         } else {
-            return "https://www." + getHost() + "/file/" + this.getFUID(link);
+            return getWebsiteBase() + "/file/" + this.getFUID(link);
         }
     }
 
     private String getWebapiBase() {
         return "https://www." + getHost() + "/api";
+    }
+
+    private String getWebsiteBase() {
+        return "https://www." + getHost();
     }
 
     @Override
@@ -176,7 +203,7 @@ public class FileFactory extends PluginForHost {
     @Override
     protected String getDefaultFileName(final DownloadLink link) {
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
-        final String filenameFromURL = urlinfo.getMatch(2);
+        final String filenameFromURL = urlinfo.getMatch(3);
         if (filenameFromURL != null) {
             return URLEncode.decodeURIComponent(filenameFromURL);
         }
@@ -239,10 +266,12 @@ public class FileFactory extends PluginForHost {
             if (NEXT_REDIRECT != null) {
                 br.getPage(NEXT_REDIRECT);
             }
-            if ("classic.filefactory.com".equals(br.getHost(true))) {
-                link.setProperty(PROPERTY_CLASSIC, Boolean.TRUE);
-            } else {
-                link.removeProperty(PROPERTY_CLASSIC);
+            if (ALLOW_EXPECT_SPECIAL_CLASSIC_LINKS) {
+                if ("classic.filefactory.com".equals(br.getHost(true))) {
+                    link.setProperty(PROPERTY_CLASSIC, Boolean.TRUE);
+                } else {
+                    link.removeProperty(PROPERTY_CLASSIC);
+                }
             }
             if (isPasswordProtectedFile(br)) {
                 link.setPasswordProtected(true);
@@ -271,13 +300,13 @@ public class FileFactory extends PluginForHost {
                     link.setDownloadSize(SizeFormatter.getSize(htmlFilesizeString));
                 }
             }
-            String jsonFileName = getString(br, "disp_filename");// json
+            String jsonFileName = getString(br, "disp_filename");
             if (jsonFileName != null) {
                 link.setFinalFileName(jsonFileName);
             }
-            final String jsonFilesizeBytesStr = getString(br, "size");// json
-            if (jsonFilesizeBytesStr != null) {
-                link.setVerifiedFileSize(Long.parseLong(jsonFilesizeBytesStr));
+            final Number jsonFilesizeBytes = getNumber(br, "size");
+            if (jsonFilesizeBytes != null) {
+                link.setVerifiedFileSize(jsonFilesizeBytes.longValue());
             }
             checkErrorsWebsite(link, account, br);
         } finally {
@@ -299,6 +328,15 @@ public class FileFactory extends PluginForHost {
         return "true".equals(value);
     }
 
+    /** Returns number from any place in json in browser instance., */
+    private Number getNumber(final Browser br, final String key) {
+        final String value = br.getRegex("\"" + Pattern.quote(key) + "(?:\\\\)?\"\\s*:\\s*(\\d+)").getMatch(0);
+        if (value == null) {
+            return null;
+        }
+        return Long.parseLong(value);
+    }
+
     private String getString(Browser br, final String key) {
         final String value = br.getRegex("\"" + Pattern.quote(key) + "(?:\\\\)?\"\\s*:\\s*(?:\\\\)?\"(.*?)(?:\\\\)?\"").getMatch(0);
         if (value == null) {
@@ -307,10 +345,27 @@ public class FileFactory extends PluginForHost {
         return restoreFromString("\"" + value + "\"", TypeRef.STRING);
     }
 
-    public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException, MalformedURLException {
-        final Boolean requiresPremium = getBoolean(br, "requiresPremium");
-        // final Boolean isFree = getBoolean(br, "isFree");
+    /** Checks premium status based on html code. */
+    private Boolean isPremium(final Browser br) {
         final Boolean userIsPremium = getBoolean(br, "userIsPremium");
+        if (userIsPremium != null) {
+            return userIsPremium;
+        }
+        final Boolean userIsFree = getBoolean(br, "isFree");
+        if (userIsFree != null) {
+            /* No free == premium */
+            return !userIsFree;
+        }
+        return null;
+    }
+
+    /** Checks loggedin status based on html code. */
+    private Boolean isLoggedIn(final Browser br) {
+        return getBoolean(br, "isLoggedIn");
+    }
+
+    public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException, MalformedURLException {
+        // final Boolean isFree = getBoolean(br, "isFree");
         final UrlQuery query = UrlQuery.parse(br.getURL());
         String error_code = null;
         String errorData = br.getRegex("\"errorData\\\\\"\\s*:\\s*(\\{.*?\\})\\s*,").getMatch(0);
@@ -331,7 +386,7 @@ public class FileFactory extends PluginForHost {
                 error_code = br.getRegex("\"errorCode(?:\\\\)?\":(?:\\\\)?\"(.*?)(?:\\\\)?\"").getMatch(0);
             }
         }
-        if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
+        if (Boolean.TRUE.equals(getBoolean(br, "requiresPremium")) && !Boolean.TRUE.equals(isPremium(br))) {
             throw new AccountRequiredException();
         }
         if (error_code != null) {
@@ -391,8 +446,7 @@ public class FileFactory extends PluginForHost {
             if (error_type.equalsIgnoreCase("rate_limit")) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Rate limit reached", waitMillis);
             } else {
-                logger.info("Unknown error happened: " + error_type);
-                throw new PluginException(LinkStatus.ERROR_FATAL, error_type);
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown error happened: " + error_type);
             }
         }
     }
@@ -405,9 +459,15 @@ public class FileFactory extends PluginForHost {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
             /* No account given -> Check links via special method. */
+            if (!ALLOW_MASS_LINKCHECK_WITHOUT_ACCOUNT) {
+                return false;
+            }
             return checkLinks_old_public(urls);
         }
-        if (account.hasProperty(PROPERTY_CLASSIC)) {
+        if (!ALLOW_MASS_LINKCHECK_WITH_ACCOUNT) {
+            return false;
+        }
+        if (isAccountUsingClassicWebsite(account)) {
             return this.checkLinks_old(urls, account);
         }
         final Browser br = this.createNewBrowserInstance();
@@ -521,7 +581,7 @@ public class FileFactory extends PluginForHost {
                 query.appendEncoded("links", sb.toString());
                 query.appendEncoded("Submit", "Check Links");
                 /* Set referer */
-                final String url_mass_linkchecker = "https://www." + getHost() + "/account/tools/link-checker.php";
+                final String url_mass_linkchecker = getWebsiteBase() + "/account/tools/link-checker.php";
                 br.setCurrentURL(url_mass_linkchecker);
                 br.postPage(url_mass_linkchecker, query);
                 final String trElements[] = br.getRegex("<tr>(.*?)</tr>").getColumn(0);
@@ -609,7 +669,7 @@ public class FileFactory extends PluginForHost {
                     sb.append("fi:" + fid);
                 }
                 check_this_batch_of_links: {
-                    br.getPage("https://www." + getHost() + "/share/" + sb.toString());
+                    br.getPage(getWebsiteBase() + "/share/" + sb.toString());
                     try {
                         this.checkErrorsWebsite(null, null, br);
                     } catch (final Exception e) {
@@ -698,50 +758,74 @@ public class FileFactory extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         loginWebsite(br, account, true);
-        if (account.hasProperty(PROPERTY_CLASSIC)) {
+        if (isAccountUsingClassicWebsite(account)) {
             return fetchAccountInfo_old(account);
         }
         final AccountInfo ai = new AccountInfo();
-        br.getPage(this.getWebapiBase() + "/dashboard");
-        final Map<String, Object> entries = this.checkErrorsWebapi(br, account);
-        final Map<String, Object> settings = (Map<String, Object>) entries.get("settings");
-        if (Boolean.TRUE.equals(entries.get("isLifetime"))) {
-            account.setType(AccountType.LIFETIME);
-        } else if (Boolean.TRUE.equals(entries.get("isPremium"))) {
-            account.setType(AccountType.PREMIUM);
-            String nextRebillDate = "Never";
-            if (Boolean.TRUE.equals(entries.get("hasActiveRebill"))) {
-                nextRebillDate = entries.get("nextRebillDate").toString();
+        new_website_2026_04: {
+            /* 2026-04-22: Very ugly hack: access fake file url to easily obtain premium status */
+            // TODO: Update this to also find premium expire date
+            if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/file/jdlogincheck")) {
+                this.checkLoginStatus(br, account);
             }
-            final int daysRemaining = ((Number) entries.get("daysRemaining")).intValue();
-            ai.setValidUntil(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(daysRemaining), br);
-            ai.setStatus(AccountType.PREMIUM.getLabel() + " | Next rebill date: " + nextRebillDate);
-        } else {
-            /* Expired/free account */
-            account.setType(AccountType.FREE);
-            account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
+            final Boolean premium = this.isPremium(br);
+            if (premium != null) {
+                if (premium) {
+                    account.setType(AccountType.PREMIUM);
+                } else {
+                    account.setType(AccountType.FREE);
+                }
+                return ai;
+            }
+            logger.warning("Failed to find premium status -> Broken plugin or maybe older website version is in use again");
         }
-        final String usedSpaceGB_Str = (String) entries.get("usedSpace");
-        if (usedSpaceGB_Str != null && usedSpaceGB_Str.matches("\\d+")) {
-            ai.setUsedSpace(Long.parseLong(usedSpaceGB_Str) * 1024 * 1024 * 1024);
-        }
-        find_and_set_real_user_email: if (account.loadUserCookies() != null) {
-            /* Ensure to have unique usernames when user is using cookie login */
-            final String email = (String) settings.get("email");
-            if (email != null) {
-                account.setUser(email);
+        /* Old handling */
+        {
+            logger.info("New website handling failed -> Fallback to old handling");
+            br.getPage(this.getWebapiBase() + "/dashboard");
+            if (!br.getURL().endsWith("/dashboard")) {
+            }
+            final Map<String, Object> entries = this.checkErrorsWebapi(br, account);
+            final Map<String, Object> settings = (Map<String, Object>) entries.get("settings");
+            if (Boolean.TRUE.equals(entries.get("isLifetime"))) {
+                account.setType(AccountType.LIFETIME);
+            } else if (Boolean.TRUE.equals(entries.get("isPremium"))) {
+                account.setType(AccountType.PREMIUM);
+                String nextRebillDate = "Never";
+                if (Boolean.TRUE.equals(entries.get("hasActiveRebill"))) {
+                    nextRebillDate = entries.get("nextRebillDate").toString();
+                }
+                final int daysRemaining = ((Number) entries.get("daysRemaining")).intValue();
+                ai.setValidUntil(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(daysRemaining), br);
+                ai.setStatus(AccountType.PREMIUM.getLabel() + " | Next rebill date: " + nextRebillDate);
             } else {
-                /* Possibly Google login user? */
-                logger.warning("WTF account has no email?");
+                /* Expired/free account */
+                account.setType(AccountType.FREE);
+                account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
             }
+            final String usedSpaceGB_Str = (String) entries.get("usedSpace");
+            if (usedSpaceGB_Str != null && usedSpaceGB_Str.matches("\\d+")) {
+                ai.setUsedSpace(Long.parseLong(usedSpaceGB_Str) * 1024 * 1024 * 1024);
+            }
+            find_and_set_real_user_email: if (account.loadUserCookies() != null) {
+                /* Ensure to have unique usernames when user is using cookie login */
+                final String email = (String) settings.get("email");
+                if (email != null) {
+                    account.setUser(email);
+                } else {
+                    /* Possibly Google login user? */
+                    logger.warning("WTF account has no email?");
+                }
+            }
+            return ai;
         }
-        return ai;
     }
 
     /** Obtains account information from old website */
+    @Deprecated
     private AccountInfo fetchAccountInfo_old(final Account account) throws Exception {
         if (br.getURL() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/account/")) {
-            br.getPage("https://www." + this.getHost() + "/account/");
+            br.getPage(getWebsiteBase() + "/account/");
         }
         find_and_set_real_user_email: if (account.loadUserCookies() != null) {
             /* Users using cookie login could enter whatever they want into the username field -> Correct that. */
@@ -766,7 +850,8 @@ public class FileFactory extends PluginForHost {
                     accountType = AccountType.PREMIUM;
                 }
                 /**
-                 * Other possible values: </br> "expired" -> Free Account
+                 * Other possible values: </br>
+                 * "expired" -> Free Account
                  */
             }
             if (accountType == null) {
@@ -858,7 +943,7 @@ public class FileFactory extends PluginForHost {
                 }
                 /* Verify cookies */
                 try {
-                    this.checkLoginStatus(br, account);
+                    checkLoginStatus(br, account);
                     logger.info("Cookie login successful");
                     if (userCookies == null) {
                         account.saveCookies(br.getCookies(br.getHost()), "");
@@ -868,6 +953,7 @@ public class FileFactory extends PluginForHost {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
                     if (userCookies != null) {
+                        /* Dead end */
                         logger.info("User Cookie login failed");
                         if (account.hasEverBeenValid()) {
                             throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
@@ -877,13 +963,9 @@ public class FileFactory extends PluginForHost {
                     }
                 }
             }
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
             logger.info("Performing full login");
-            br.getPage("https://www." + getHost() + "/signin?from=%2Fdashboard");
-            logger.info("Full login via new website");
-            br.setCookie(getHost(), "recaptcha-verified", "true");
+            br.getPage(getWebsiteBase() + "/signin");
+            br.setCookie(getHost(), "recaptcha-verified", "true"); // Skips login captcha
             {
                 final Map<String, Object> loginJson = new HashMap<String, Object>();
                 loginJson.put("action", "auth:signIn");
@@ -899,10 +981,19 @@ public class FileFactory extends PluginForHost {
                 br.getPage(request);
                 // response contains token json
             }
-            checkErrorsWebapi(br, account, null, null);
+            /**
+             * 2026-04-22: Also always answers with: "refreshToken": "dummy" <br>
+             * -> lol
+             */
+            final Map<String, Object> entries = checkErrorsWebapi(br, account, null);
+            String token = (String) entries.get("token");
+            if (token == null) {
+                final Map<String, Object> tokens = (Map<String, Object>) entries.get("tokens");
+                token = tokens.get("token").toString();
+            }
             checkLoginStatus(br, account);
-            account.removeProperty(PROPERTY_CLASSIC);
             account.saveCookies(br.getCookies(br.getHost()), "");
+            account.setProperty(PROPERTY_ACCOUNT_LOGIN_TOKEN, token);
         }
     }
 
@@ -924,15 +1015,18 @@ public class FileFactory extends PluginForHost {
     public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception {
         requestFileInformationWebsite(account, link);
         if (this.dl == null) {
+            if (account != null && Boolean.FALSE.equals(this.isLoggedIn(br))) {
+                throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000l);
+            }
             if (link.isPasswordProtected()) {
                 /*
                  * 2025-09-10: Website json implies that password protected links exist but I was unable to create- or find such test-links.
                  */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Password protected links are not yet supported");
             }
-            final boolean isPremium = this.isPremiumAccount(account);
+            final boolean isPremium = this.isPremiumAccount(account) || this.isPremium(br);
             if (!isPremium) {
-                // ads
+                // JDownloader ads
                 if (checkShowFreeDialog(getHost())) {
                     showFreeDialog(getHost());
                 }
@@ -940,8 +1034,8 @@ public class FileFactory extends PluginForHost {
             String finallink = null;
             old_website: {
                 /* Download via old/legacy/classic website */
-                final boolean isSpecialImageDownload = br.getURL().matches("https?://[^/]+/preview/.+");
-                final boolean isSpecialTrafficShareDownload = br.getURL().matches("https?://[^/]+/trafficshare/.+");
+                final boolean isSpecialImageDownload = br.getURL().matches("(?i)https?://[^/]+/preview/.+");
+                final boolean isSpecialTrafficShareDownload = br.getURL().matches("(?i)https?://[^/]+/trafficshare/.+");
                 if (isSpecialTrafficShareDownload) {
                     /* Trafficshare link = Can be downloaded like a premium user, even by free users */
                     finallink = regexTrafficShareDirecturl_old_website(br);
@@ -986,17 +1080,15 @@ public class FileFactory extends PluginForHost {
                 if (dltoken != null) {
                     /**
                      * Not all items require a "download token". <br>
-                     * For example small images can be downloaded without that token.
+                     * For example small images can be downloaded without token.
                      */
                     postdata.put("token", dltoken);
                 }
-                // if (isPremium) {
-                // postdata.put("type", "premium");
-                // } else {
-                // postdata.put("type", "free");
-                // }
-                /* 2025-09-09: Even in premium mode, the value of this is "free". */
-                postdata.put("type", "free");
+                if (isPremium) {
+                    postdata.put("type", "premium");
+                } else {
+                    postdata.put("type", "free");
+                }
                 /* Website has 45-60 seconds of pre download wait time for free (& free-account) users which can be skipped. */
                 br.postPageRaw(this.getWebapiBase() + "/download/initiate", JSonStorage.serializeToJson(postdata));
                 final Map<String, Object> entries = checkErrorsWebapi(br, account, link);
@@ -1013,9 +1105,8 @@ public class FileFactory extends PluginForHost {
                     /* 2025-10-01: atm fields "fileSize" and "filesize" both exist at the same time. */
                     fileSizeEntry = entries.get("filesize");
                 }
-                final long fileSize = JavaScriptEngineFactory.toLong(fileSizeEntry, -1l);
-                if (fileSize != -1) {
-                    link.setVerifiedFileSize(fileSize);
+                if (fileSizeEntry != null && fileSizeEntry.toString().matches("\\d+")) {
+                    link.setVerifiedFileSize(Long.parseLong(fileSizeEntry.toString()));
                 }
                 final String filename = (String) entries.get("filename");
                 if (filename != null) {
@@ -1057,24 +1148,25 @@ public class FileFactory extends PluginForHost {
 
     /**
      * Checks if we're logged in via Web-API. <br>
-     * Throws AccountInvalidException on invalid login.
+     * Throws Exception if we're not logged in. <br>
+     * Returns either map or null.
      */
     private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
         final class NewWebsite {
             private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
+                new_website_2026_04: {
+                    br.getPage(FileFactory.this.getWebsiteBase() + "/file/jdlogincheck");
+                    final Boolean loginstatus = FileFactory.this.isLoggedIn(br);
+                    if (loginstatus != null) {
+                        return null;
+                    }
+                }
                 br.getPage(FileFactory.this.getWebapiBase() + "/auth/session");
                 if (br.getHttpConnection().getResponseCode() == 404) {
-                    return null;
+                    throw new AccountInvalidException("Session expired?");
                 }
-                try {
-                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                    account.removeProperty(PROPERTY_CLASSIC);
-                    checkErrorsWebapi(br, account, null, entries);
-                    return entries;
-                } catch (final JSonMapperException ignore) {
-                    logger.log(ignore);
-                }
-                return null;
+                final Map<String, Object> entries = checkErrorsWebapi(br, account, null);
+                return entries;
             }
         }
         final Map<String, Object> ret = new NewWebsite().checkLoginStatus(br, account);
@@ -1119,6 +1211,10 @@ public class FileFactory extends PluginForHost {
             }
         }
         if (StringUtils.containsIgnoreCase(br.getURL(), "signin?error=CredentialsSignin&code=credentials")) {
+            throw new AccountInvalidException();
+        }
+        if (br.getHttpConnection().getResponseCode() == 400) {
+            /* 2026-04-22: POST on "/api/auth" with invalid credentials */
             throw new AccountInvalidException();
         }
     }

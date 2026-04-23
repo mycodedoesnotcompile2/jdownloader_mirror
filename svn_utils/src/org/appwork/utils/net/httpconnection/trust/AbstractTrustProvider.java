@@ -21,7 +21,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509TrustManager;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.testframework.AWTestValidateClassReference;
+import org.appwork.testhelper.AWTestValidateClassReference;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.IllegalSSLHostnameException;

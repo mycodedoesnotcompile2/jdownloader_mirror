@@ -35,12 +35,14 @@ package org.appwork.console;
 
 import java.io.IOException;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.uio.UIOConstants;
 import org.appwork.utils.Application;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 
+@RequiresResource(types = { UIOConstants.class })
 public class ConsoleDialog implements ConsoleDialogInterface {
     private final AbstractConsole console;
     private boolean               stdBefore;

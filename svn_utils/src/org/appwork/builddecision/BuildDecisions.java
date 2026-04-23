@@ -51,7 +51,7 @@ import java.util.jar.Manifest;
 import org.appwork.builddecision.BuildDecisionData.Option;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.testframework.AWTestValidateClassReference;
+import org.appwork.testhelper.AWTestValidateClassReference;
 import org.appwork.utils.Application;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.DebugMode;

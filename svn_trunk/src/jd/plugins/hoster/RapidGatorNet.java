@@ -73,7 +73,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
-@HostPlugin(revision = "$Revision: 52535 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52699 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -356,7 +356,7 @@ public class RapidGatorNet extends PluginForHost {
                     link.setFinalFileName(filename);
                 }
                 if (filesize != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(filesize));
+                    link.setDownloadSize(SizeFormatter.getSize(null, filesize, false, false));
                 }
                 final String md5 = br.getRegex(">\\s*MD5\\s*:\\s*([A-Fa-f0-9]{32})<").getMatch(0);
                 if (md5 != null) {

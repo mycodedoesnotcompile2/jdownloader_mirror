@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
 public class DropdenCom extends PluginForDecrypt {
     public DropdenCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,6 +86,8 @@ public class DropdenCom extends PluginForDecrypt {
         do {
             br.getPage("https://" + this.getHost() + "/" + folderID + ".json");
             if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.getURL().matches("https?://[^/]+/?$")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (attempts >= 4) {
                 throw new DecrypterException(DecrypterException.PASSWORD);

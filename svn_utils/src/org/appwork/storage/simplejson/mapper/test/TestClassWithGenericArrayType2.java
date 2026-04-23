@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -36,7 +36,7 @@ package org.appwork.storage.simplejson.mapper.test;
 import java.util.ArrayList;
 
 import org.appwork.storage.Storable;
-import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testhelper.IgnoreInAWTest;
 
 /**
  * @author thomas

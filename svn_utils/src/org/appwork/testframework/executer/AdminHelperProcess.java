@@ -379,9 +379,9 @@ public final class AdminHelperProcess {
         }
         LogV3.info("Shutdown hook finished.");
         if (showDebugWindow) {
-            LogV3.info("Exit in 20s");
+            LogV3.info("Exit in 5s");
             try {
-                Thread.sleep(20000);
+                Thread.sleep(5000);
             } catch (InterruptedException e) {
                 LogV3.log(e);
             }
@@ -597,6 +597,37 @@ public final class AdminHelperProcess {
                 } catch (IOException e) {
                 }
             }
+        }
+    }
+
+    /**
+     * Merges JVM process stdout/stderr (e.g. from redirected stdout.txt/stderr.txt under LocalSystem) into the hex-encoded
+     * {@link AdminTaskResultWrapper} read from result.hex. Same semantics as RUN_TASK subprocess pipe merge: wrapper streams are replaced
+     * with process capture so {@link AdminExecuter#deserializeTaskResult} can forward them to the caller.
+     */
+    static String mergeTaskResultHexWithProcessStreams(String hexEncodedWrapper, String processStdout, String processStderr) {
+        if (hexEncodedWrapper == null || hexEncodedWrapper.trim().length() == 0) {
+            return hexEncodedWrapper;
+        }
+        try {
+            byte[] resultBytes = HexFormatter.hexToByteArray(hexEncodedWrapper.trim());
+            if (resultBytes == null || resultBytes.length == 0) {
+                return hexEncodedWrapper;
+            }
+            AdminTaskResultWrapper wrapper = deserializeResultWrapper(resultBytes);
+            final String out = processStdout != null ? processStdout : "";
+            final String err = processStderr != null ? processStderr : "";
+            AdminTaskResultWrapper merged;
+            if (wrapper.hasTaskFailure()) {
+                merged = new AdminTaskResultWrapper(wrapper.getReturnValue(), out, err, wrapper.getExceptionStackTrace());
+            } else {
+                merged = new AdminTaskResultWrapper(wrapper.getReturnValue(), out, err);
+            }
+            byte[] mergedBytes = serializeResult(merged);
+            return mergedBytes != null && mergedBytes.length > 0 ? HexFormatter.byteArrayToHex(mergedBytes) : hexEncodedWrapper;
+        } catch (Throwable t) {
+            LogV3.warning("mergeTaskResultHexWithProcessStreams failed: " + t.getMessage());
+            return hexEncodedWrapper;
         }
     }
 
@@ -1069,10 +1100,11 @@ public final class AdminHelperProcess {
             String stderr = "";
             if (resultHexDir != null && resultHexDir.isDirectory()) {
                 File resultHexFile = new File(resultHexDir, "result.hex");
+                String resultHex = "";
                 if (resultHexFile.isFile()) {
-                    stdout = IO.readFileToString(resultHexFile).trim();
+                    resultHex = IO.readFileToString(resultHexFile).trim();
                 }
-                if (stdout.length() == 0) {
+                if (resultHex.length() == 0) {
                     if (stderrFile.isFile()) {
                         stderr = new String(IO.readStream(-1, new java.io.FileInputStream(stderrFile)), UTF8);
                     }
@@ -1082,6 +1114,15 @@ public final class AdminHelperProcess {
                     }
                     throw new Exception(msg);
                 }
+                String jvmOut = "";
+                String jvmErr = "";
+                if (stdoutFile.isFile()) {
+                    jvmOut = new String(IO.readStream(-1, new java.io.FileInputStream(stdoutFile)), UTF8);
+                }
+                if (stderrFile.isFile()) {
+                    jvmErr = new String(IO.readStream(-1, new java.io.FileInputStream(stderrFile)), UTF8);
+                }
+                stdout = mergeTaskResultHexWithProcessStreams(resultHex, jvmOut, jvmErr);
             } else {
                 if (stdoutFile.isFile()) {
                     stdout = new String(IO.readStream(-1, new java.io.FileInputStream(stdoutFile)), UTF8);

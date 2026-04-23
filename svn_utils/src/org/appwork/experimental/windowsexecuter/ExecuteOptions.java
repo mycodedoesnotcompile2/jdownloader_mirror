@@ -12,7 +12,7 @@ import java.io.File;
 import java.util.Collections;
 import java.util.Map;
 
-import org.appwork.testframework.executer.LogCallback;
+import org.appwork.utils.LogCallback;
 import org.appwork.utils.os.WindowsUtils;
 
 /**
@@ -36,8 +36,14 @@ public final class ExecuteOptions {
     private final String             sid;
     /** When true, run process in active console user session (no SID passed). Used by runViaWindowsScheduler fallback when requested SID matches active console. */
     private final boolean           runInActiveSession;
+    /**
+     * WTS session id as decimal string (e.g. {@code "3"}), serializable for IPC. When the caller is LocalSystem,
+     * {@link WindowsExecuter#runAsNonElevatedUser} requires this (no active-console auto-pick). Otherwise, when set, the user token is resolved via
+     * {@link WindowsUtils#getUserTokenForSessionId(int)} instead of falling back to the active physical console — needed for RDP vs console.
+     */
+    private final String            wtsSessionId;
 
-    private ExecuteOptions(String[] cmd, File workingDir, boolean waitFor, Map<String, String> env, boolean showWindow, boolean noErrorUI, LogCallback logCallback, String sid, boolean runInActiveSession) {
+    private ExecuteOptions(String[] cmd, File workingDir, boolean waitFor, Map<String, String> env, boolean showWindow, boolean noErrorUI, LogCallback logCallback, String sid, boolean runInActiveSession, String wtsSessionId) {
         this.cmd = cmd;
         this.workingDir = workingDir;
         this.waitFor = waitFor;
@@ -47,6 +53,7 @@ public final class ExecuteOptions {
         this.logCallback = logCallback;
         this.sid = sid;
         this.runInActiveSession = runInActiveSession;
+        this.wtsSessionId = wtsSessionId;
     }
 
     public String[] getCmd() {
@@ -103,6 +110,15 @@ public final class ExecuteOptions {
         return runInActiveSession;
     }
 
+    /**
+     * Decimal string of the target WTS session id (e.g. from {@link WindowsUtils#getCurrentProcessSessionId()}). Required when the caller is
+     * LocalSystem for {@link WindowsExecuter#runAsNonElevatedUser}; otherwise null or empty selects the active physical console session token
+     * when no explicit session is needed.
+     */
+    public String getWtsSessionId() {
+        return wtsSessionId;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -117,6 +133,7 @@ public final class ExecuteOptions {
         private LogCallback         logCallback;
         private String             sid;
         private boolean            runInActiveSession = false;
+        private String             wtsSessionId;
 
         public Builder cmd(String... cmd) {
             this.cmd = cmd;
@@ -183,11 +200,20 @@ public final class ExecuteOptions {
             return this;
         }
 
+        /**
+         * Target WTS session id as decimal string (serializable). Mandatory for LocalSystem + {@link WindowsExecuter#runAsNonElevatedUser}; also
+         * use when the interactive session is not the physical console (e.g. RDP).
+         */
+        public Builder wtsSessionId(String wtsSessionId) {
+            this.wtsSessionId = wtsSessionId;
+            return this;
+        }
+
         public ExecuteOptions build() {
             if (cmd == null || cmd.length == 0) {
                 throw new IllegalArgumentException("cmd cannot be null or empty");
             }
-            return new ExecuteOptions(cmd, workingDir, waitFor, env, showWindow, noErrorUI, logCallback, sid, runInActiveSession);
+            return new ExecuteOptions(cmd, workingDir, waitFor, env, showWindow, noErrorUI, logCallback, sid, runInActiveSession, wtsSessionId);
         }
     }
 }

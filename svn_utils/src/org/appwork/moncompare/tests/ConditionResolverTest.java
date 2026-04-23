@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -37,9 +37,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.moncompare.Condition;
+import org.appwork.moncompare.Conditions;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
 
@@ -49,6 +51,7 @@ import org.appwork.testframework.TestDependency;
  *
  */
 @TestDependency({ "org.appwork.moncompare.Conditions" })
+@RequiresResource(types = { Conditions.class })
 public class ConditionResolverTest extends AWTest {
     /**
      *
@@ -183,7 +186,6 @@ public class ConditionResolverTest extends AWTest {
         assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "abc", "§a" }).evaluate(regex), "(..def");
         assertEquals(new Condition(Condition.$IF, new Object[] { new Condition("valid", new Condition("§eq", "abc.def")), "§a", "false" }).evaluate(regex), "(.");
         assertEquals(new Condition(Condition.$IF, new Object[] { new Condition("valid", new Condition("§eq", "abcdef")), "§a", "false" }).evaluate(regex), "false");
-
         assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "abc", "§a" }).evaluate(regex), "(..def");
         assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "a(.)c", "-$1", 1 }).evaluate(regex), "a-$1c.def");
         assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "a(.)c", "-$1", 1 }).option(Condition.OPTIONS_ALLOW_REFERENCES, true).evaluate(regex), "a-bc.def");

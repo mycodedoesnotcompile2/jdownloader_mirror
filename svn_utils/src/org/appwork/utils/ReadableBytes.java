@@ -44,7 +44,7 @@ import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.TypeRef;
-import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testhelper.IgnoreInAWTest;
 import org.appwork.utils.ReadableBytes.ReadableBytesParseException;
 
 /**

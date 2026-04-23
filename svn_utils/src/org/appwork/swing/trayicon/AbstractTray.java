@@ -80,7 +80,6 @@ public abstract class AbstractTray implements TrayMouseListener {
 
     private void runTray() throws AWTException {
         final SystemTray systemTray = SystemTray.getSystemTray();
-
         this.trayIcon = initTray();
         this.ma = new TrayMouseAdapter(this, this.trayIcon);
         this.trayIcon.addMouseListener(this.ma);
@@ -405,7 +404,9 @@ public abstract class AbstractTray implements TrayMouseListener {
     }
 
     public void setName(final String trayTitle) {
-        AbstractTray.this.trayIcon.setToolTip(trayTitle);
+        if (trayIcon != null) {
+            AbstractTray.this.trayIcon.setToolTip(trayTitle);
+        }
     }
 
     /**
@@ -413,6 +414,8 @@ public abstract class AbstractTray implements TrayMouseListener {
      * @param msg
      */
     public void showMessage(String title, String msg) {
-        trayIcon.displayMessage(title, msg, MessageType.WARNING);
+        if (trayIcon != null) {
+            trayIcon.displayMessage(title, msg, MessageType.WARNING);
+        }
     }
 }

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -62,6 +62,7 @@ import java.util.regex.Pattern;
 
 import javax.swing.Timer;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.swing.ExtJFrame;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
@@ -71,6 +72,7 @@ import org.appwork.utils.StringUtils;
  * @author Thomas
  *
  */
+@RequiresResource(types = { ExtJFrame.class })
 public class WindowsWindowManager extends WindowManager {
     private final AtomicReference<Robot>     robot                = new AtomicReference<Robot>(null);
     private volatile String                  blocker;

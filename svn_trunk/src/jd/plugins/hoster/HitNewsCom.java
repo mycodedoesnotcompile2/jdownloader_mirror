@@ -6,12 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -27,7 +21,13 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51971 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+
+@HostPlugin(revision = "$Revision: 52699 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
 public class HitNewsCom extends UseNet {
     public HitNewsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,7 +81,7 @@ public class HitNewsCom extends UseNet {
         if (!"block".equals(prodtype)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported product type \"" + prodtype + "\", please contact JDownloader support!");
         }
-        final long maxTraffic = SizeFormatter.getSize(prod, false);
+        final long maxTraffic = SizeFormatter.getSize(prod, false, false);
         if (maxTraffic != -1) {
             ai.setTrafficMax(maxTraffic);
         } else if ("25gb".equals(prod)) {

@@ -15,13 +15,14 @@ import java.util.List;
 
 import org.appwork.experimental.windowsexecuter.ExecuteOptions;
 import org.appwork.experimental.windowsexecuter.WindowsExecuter;
+import org.appwork.jna.windows.Kernel32Ext;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.TypeRef;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
 import org.appwork.testframework.executer.AdminExecuter;
 import org.appwork.testframework.executer.ElevatedTestTask;
-import org.appwork.testframework.executer.LogCallback;
+import org.appwork.utils.LogCallback;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.processes.ProcessOutput;
@@ -202,6 +203,8 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
      * not elevated (net session). Asserts the child is non-elevated.
      */
     private void testRunAsAdminThenRunAsNonElevated() throws Exception {
+        LogV3.info("RUN testRunAsAdminThenRunAsNonElevated");
+        testSidActiveConsoleUserInTask();
         Integer result = AdminExecuter.runAsAdmin(new ElevatedTestTask() {
             private static final long serialVersionUID = 1L;
 
@@ -223,7 +226,7 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
                         .cmd("cmd.exe", "/c", "echo", "NON_ELEVATED_MARKER") //
                         .waitFor(true) //
                         .build());
-                LogV3.info(echoOut + "");
+                LogV3.info("ECHOOUT: " + echoOut + "");
                 assertTrue(echoOut != null && echoOut.getStdOutString() != null && echoOut.getStdOutString().contains("NON_ELEVATED_MARKER"), "stdout must contain marker");
                 // Test other ExecuteOptions: workingDir, waitFor(false), logCallback
                 testWorkingDirInTask();
@@ -234,7 +237,6 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
             }
         }, TypeRef.INT);
         assertTrue(result != null && result.intValue() == 0, "task should return 0");
-        testSidActiveConsoleUserInTask();
     }
 
     /** Test workingDir from inside elevated task. */
@@ -292,11 +294,18 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
     }
 
     /**
-     * Test ExecuteOptions.runInActiveSession(true): run as LocalSystem, then run process with runInActiveSession and assert it runs under
-     * active console user (whoami /user).
+     * From LocalSystem, {@link WindowsExecuter#runAsNonElevatedUser} requires an explicit {@link ExecuteOptions#getWtsSessionId()} (no
+     * automatic active-console pick). Pass the physical active-console session id ({@code WTSGetActiveConsoleSessionId}), then from a
+     * LocalSystem task run {@code whoami /user} and assert the token matches {@link WindowsUtils#getActiveConsoleAccount()}.
      */
     private void testSidActiveConsoleUserInTask() throws Exception {
         LogV3.info("testSidActiveConsoleUserInTask");
+        final int activeConsoleSessionId = Kernel32Ext.INSTANCE.WTSGetActiveConsoleSessionId();
+        if (activeConsoleSessionId == (int) 0xFFFFFFFFL) {
+            logInfoAnyway("testSidActiveConsoleUserInTask: no active console session (WTSGetActiveConsoleSessionId), skipped.");
+            return;
+        }
+        final String wtsSessionIdForChild = String.valueOf(activeConsoleSessionId);
         Integer result = AdminExecuter.runAsLocalSystem(new ElevatedTestTask() {
             @Override
             public Serializable run() throws Exception {
@@ -306,12 +315,12 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
                 ProcessOutput out = WindowsExecuter.runAsNonElevatedUser(ExecuteOptions.builder() //
                         .cmd("cmd.exe", "/c", "whoami", "/user") //
                         .waitFor(true) //
-                        .runInActiveSession(true) //
+                        .wtsSessionId(wtsSessionIdForChild) //
                         .build());
                 LogV3.info("Output: " + out);
                 assertTrue(out != null, "ProcessOutput must not be null");
                 assertTrue(out.getStdOutString() != null, "stdout must not be null");
-                assertTrue(out.getStdOutString().contains(activeAccount.sidString), "Process must run under active console SID " + activeAccount.sidString + "; whoami /user output must contain that SID (got: " + out.getStdOutString() + ")");
+                assertTrue(out.getStdOutString().contains(activeAccount.sidString), "Process must run under active console SID " + activeAccount.sidString + "; whoami /user output must contain that SID (got: " + out + ")");
                 return Integer.valueOf(0);
             }
         }, TypeRef.INT, null);

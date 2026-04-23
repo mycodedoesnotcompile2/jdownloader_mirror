@@ -46,6 +46,7 @@ import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.loggingv3.NoLogSource;
 import org.appwork.resources.AWUTheme;
 import org.appwork.uio.UIOConstants;
 import org.appwork.uio.UIOManager;
@@ -199,6 +200,10 @@ public class Dialog {
      */
     @Deprecated
     public static final int       STYLE_PASSWORD                  = UIOConstants.STYLE.STYLE_PASSWORD;
+    /**
+     * {@link InputDialog}: do not write the default input value to debug logs (use for passwords and other secrets).
+     */
+    public static final int       STYLE_SENSITIVE_INPUT          = 1 << 13;
 
     /**
      * tries to find some special markers in the text and selects an appropriate icon
@@ -457,6 +462,7 @@ public class Dialog {
         return showConfirmDialog(flag, title, message, tmpicon, okOption, cancelOption, null);
     }
 
+    @NoLogSource
     public int showConfirmDialog(final int flag, final String title, final String message, final Icon tmpicon, final String okOption, final String cancelOption, final String dontShowAgainKey) throws DialogClosedException, DialogCanceledException {
         final Icon icon;
         if (tmpicon == null) {
@@ -492,6 +498,7 @@ public class Dialog {
      * @throws DialogClosedException
      * @throws DialogCanceledException
      */
+    @NoLogSource
     public <T> T showDialog(final AbstractDialog<T> dialog) throws DialogClosedException, DialogCanceledException {
         LogV3.info("[Dialog] at " + Exceptions.stacktraceElementToThrownAtString(new Exception().getStackTrace()[1], true));
         final DialogHandler lhandler = handler;

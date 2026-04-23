@@ -5,18 +5,21 @@ import static org.appwork.moncompare.Condition.C;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.moncompare.Condition;
 import org.appwork.moncompare.Scope;
 import org.appwork.moncompare.TypeHandler;
 import org.appwork.moncompare.fromjson.FlexiCondition;
 import org.appwork.moncompare.typehandler.FlexiTypeHandler;
+import org.appwork.storage.SimpleSerializer;
 import org.appwork.storage.flexijson.FlexiJSONParser;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.JSPath;
 import org.appwork.testframework.AWTest;
 
+@RequiresResource(types = { SimpleSerializer.class })
 public class ConditionsOnFlexiTest extends AWTest {
     @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override

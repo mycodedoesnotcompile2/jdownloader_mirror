@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -85,7 +85,7 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
-import org.appwork.testframework.AWTestValidateClassReference;
+import org.appwork.testhelper.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;

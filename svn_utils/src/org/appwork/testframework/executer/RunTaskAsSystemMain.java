@@ -20,6 +20,7 @@ import java.io.Serializable;
 import java.nio.charset.Charset;
 
 import org.appwork.builddecision.BuildDecisions;
+import org.appwork.loggingv3.simple.SimpleLoggerFactory;
 import org.appwork.utils.Application;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.IO;
@@ -54,6 +55,7 @@ public final class RunTaskAsSystemMain {
         File tempDir = new File(args[0]);
         String taskId = args.length >= 2 && args[1] != null && args[1].trim().length() > 0 ? args[1].trim() : "unknown";
         Application.setApplication("adminexecute." + taskId);
+        ensureLogV3MirrorsToStdStreamsForRemoteParent();
         if (!tempDir.isDirectory()) {
             System.err.println("RunTaskAsSystemMain: Not a directory: " + tempDir);
             System.exit(1);
@@ -94,6 +96,7 @@ public final class RunTaskAsSystemMain {
             System.err.println("RunTaskAsSystemMain: running task");
             Serializable result = task.run();
             System.err.println("RunTaskAsSystemMain: task.run() returned, writing result.hex");
+            flushStdStreams();
             AdminTaskResultWrapper wrapper = new AdminTaskResultWrapper(result, "", "");
             byte[] wrapperBytes = serializeWrapper(wrapper);
             String hex = HexFormatter.byteArrayToHex(wrapperBytes);
@@ -111,7 +114,7 @@ public final class RunTaskAsSystemMain {
         } catch (Throwable t) {
             String stack = Exceptions.getStackTrace(t);
             System.err.println("RunTaskAsSystemMain: Task execution failed: " + stack);
-            System.err.flush();
+            flushStdStreams();
             try {
                 AdminTaskResultWrapper failureWrapper = new AdminTaskResultWrapper(null, "", stack, stack);
                 byte[] wrapperBytes = serializeWrapper(failureWrapper);
@@ -121,6 +124,30 @@ public final class RunTaskAsSystemMain {
                 System.err.println("RunTaskAsSystemMain: failed to write result.hex with exception: " + writeEx.getMessage());
             }
             System.exit(1);
+        }
+    }
+
+    /**
+     * Replaces logging with a {@link SimpleLoggerFactory} that writes to stdout/stderr only, so helper capture (pipe or redirected files)
+     * sees all org.appwork.loggingv3.LogV3 lines. Avoids {@link org.appwork.loggingv3.PreInitLoggerFactory} buffering and keeps streams aligned with
+     * {@link org.appwork.loggingv3.simple.sink.LogToStdOutSink} after {@link Application} may have wrapped System.out.
+     */
+    private static void ensureLogV3MirrorsToStdStreamsForRemoteParent() {
+        try {
+            new SimpleLoggerFactory().initDefaults().set();
+        } catch (Throwable t) {
+            // ignore
+        }
+    }
+
+    private static void flushStdStreams() {
+        try {
+            System.out.flush();
+        } catch (Throwable t) {
+        }
+        try {
+            System.err.flush();
+        } catch (Throwable t) {
         }
     }
 

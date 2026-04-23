@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -91,8 +91,8 @@ import org.appwork.storage.validator.classvalidator.StorableClassValidator1;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator2;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator3;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.IgnoreInAWTest;
 import org.appwork.testframework.TestDependency;
+import org.appwork.testhelper.IgnoreInAWTest;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;

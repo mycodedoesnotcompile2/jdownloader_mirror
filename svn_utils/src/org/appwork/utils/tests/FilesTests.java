@@ -38,10 +38,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.testframework.TestDependency;
 import org.appwork.testframework.JREExecuter;
 import org.appwork.testframework.JREExecuter.JreOptions;
+import org.appwork.testhelper.AWTestValidateClassReference;
 import org.appwork.utils.Application;
 import org.appwork.utils.ExtIOException;
 import org.appwork.utils.Files17;

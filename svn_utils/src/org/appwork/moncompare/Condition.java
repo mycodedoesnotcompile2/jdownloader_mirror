@@ -71,7 +71,7 @@ import org.appwork.storage.flexijson.InvalidPathException;
 import org.appwork.storage.flexijson.JSPath;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
-import org.appwork.testframework.AWTestValidateClassReference;
+import org.appwork.testhelper.AWTestValidateClassReference;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.DebugMode;

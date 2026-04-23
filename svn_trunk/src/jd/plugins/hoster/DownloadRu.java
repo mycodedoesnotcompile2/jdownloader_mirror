@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51029 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
 public class DownloadRu extends PluginForHost {
     public DownloadRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,8 +82,9 @@ public class DownloadRu extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME    = true;
-    private static final int     FREE_MAXCHUNKS = 0;
+    private static final boolean FREE_RESUME        = true;
+    private static final int     FREE_MAXCHUNKS     = 0;
+    public static final String   PROPERTY_FOLDER_ID = "folder_id";
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -102,26 +103,67 @@ public class DownloadRu extends PluginForHost {
     private Map<String, Object> entries = null;
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
         br.getHeaders().put("Referer", link.getPluginPatternMatcher());
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
+        final String folder_id = link.getStringProperty(PROPERTY_FOLDER_ID);
+        final String file_id = this.getFID(link);
         /* 2020-09-25: Their website can be used like an API. Their official API is broken or not yet usable: https://download.ru/api */
-        br.getPage("https://" + this.getHost() + "/files/" + this.getFID(link) + ".json");
-        final PluginEnvironment pe = this.getPluginEnvironment();
-        if (br.getHttpConnection().getResponseCode() == 403) {
-            /* Item is online but account is required to download it */
-            /* {"code":403,"reason":"permission_denied","message":"Permission denied"} */
-            if (pe != PluginEnvironment.LINK_CHECK) {
-                throw new AccountRequiredException();
+        try {
+            if (folder_id != null) {
+                /*
+                 * 2026-04-22: Workaround for files that are part of a folder: Via browser they might only be downloadable for logged in
+                 * users but in context of a folder we can download them without account.
+                 */
+                br.getPage("https://" + getHost() + "/folders/" + folder_id + ".json");
+                if (br.getHttpConnection().getResponseCode() == 403) {
+                    /* No permission e.g. private folder */
+                    throw new AccountRequiredException();
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("contents");
+                if (items.isEmpty()) {
+                    /* Looks like all items of this folder have been deleted */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                for (final Map<String, Object> item : items) {
+                    if (item.get("id").toString().equals(file_id)) {
+                        this.entries = item;
+                        break;
+                    }
+                }
+                if (this.entries == null) {
+                    /* Looks like file has been deleted from folder */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+            } else {
+                br.getPage("https://" + this.getHost() + "/files/" + file_id + ".json");
+                if (br.getHttpConnection().getResponseCode() == 403) {
+                    /* Item is online but account is required to download it */
+                    /* {"code":403,"reason":"permission_denied","message":"Permission denied"} */
+                    throw new AccountRequiredException();
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
+                    /* 2020-09-25: E.g. {"code":404,"reason":"file","message":"File not found."} */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                entries = (Map<String, Object>) entries.get("object");
             }
-            return AvailableStatus.TRUE;
-        } else if (br.getHttpConnection().getResponseCode() == 404) {
-            /* 2020-09-25: E.g. {"code":404,"reason":"file","message":"File not found."} */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } catch (final AccountRequiredException exception) {
+            if (this.getPluginEnvironment() == PluginEnvironment.LINK_CHECK) {
+                logger.info("File is online but we cannot find any information about it");
+                return AvailableStatus.TRUE;
+            }
+            throw exception;
         }
-        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        entries = (Map<String, Object>) entries.get("object");
         parseFileInfo(link, entries);
         return AvailableStatus.TRUE;
     }
@@ -153,13 +195,13 @@ public class DownloadRu extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link);
-        doFree(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        handleDownload(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
     }
 
-    private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
         String dllink = checkDirectLink(link, directlinkproperty);
         if (dllink == null) {
+            requestFileInformation(link);
             final boolean inline = ((Boolean) entries.get("inline")).booleanValue();
             dllink = (String) entries.get("secure_url");
             if (StringUtils.isEmpty(dllink)) {

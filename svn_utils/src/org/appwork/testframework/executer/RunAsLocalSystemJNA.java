@@ -168,12 +168,22 @@ public final class RunAsLocalSystemJNA {
             String stderr = "";
             if (resultHexDir != null && resultHexDir.isDirectory()) {
                 File resultHexFile = new File(resultHexDir, "result.hex");
+                String resultHex = "";
                 if (resultHexFile.isFile()) {
-                    stdout = IO.readFileToString(resultHexFile).trim();
+                    resultHex = IO.readFileToString(resultHexFile).trim();
                 }
-                if (stdout.length() == 0 && stdoutFile.isFile()) {
+                if (resultHex.length() == 0 && stdoutFile.isFile()) {
                     throw new Exception("runAsLocalSystem (JNA) task did not produce result.hex. exitCode=" + exitCode);
                 }
+                String jvmOut = "";
+                String jvmErr = "";
+                if (stdoutFile.isFile()) {
+                    jvmOut = new String(IO.readStream(-1, new FileInputStream(stdoutFile)), UTF8);
+                }
+                if (stderrFile.isFile()) {
+                    jvmErr = new String(IO.readStream(-1, new FileInputStream(stderrFile)), UTF8);
+                }
+                stdout = AdminHelperProcess.mergeTaskResultHexWithProcessStreams(resultHex, jvmOut, jvmErr);
             } else {
                 if (stdoutFile.isFile()) {
                     stdout = new String(IO.readStream(-1, new FileInputStream(stdoutFile)), UTF8);

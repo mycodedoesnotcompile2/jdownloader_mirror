@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -38,9 +38,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.exceptions.WTFException;
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
+import org.appwork.storage.SimpleSerializer;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.Storable;
 import org.appwork.storage.flexijson.FlexiJSonObject;
@@ -58,6 +60,7 @@ import org.appwork.testframework.AWTest.AssertAnException.MODE;
  * @date 21.11.2022
  *
  */
+@RequiresResource(types = { SimpleSerializer.class })
 public class FlexiVariablesTest extends AWTest {
     public static void main(String[] args) {
         run();

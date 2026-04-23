@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -61,6 +61,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.regex.PatternSyntaxException;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.moncompare.Condition;
@@ -86,6 +87,13 @@ import org.appwork.utils.duration.TimeSpan;
  */
 @TestDependency({ "org.appwork.moncompare.Conditions" })
 public class ConditionTest extends AWTest {
+    /**
+     * Marker for reduced builds: plain-build generators scan the whole source file for {@link RequiresResource} and treat
+     * {@link RequiresResource#types()} entries like extra bytecode dependencies.
+     */
+    @SuppressWarnings("unused")
+    private static final Class<?> BUILD_REQUIRES_CONDITIONS = Conditions.class;
+
     /**
      *
      */

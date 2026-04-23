@@ -14,7 +14,6 @@ import java.io.UnsupportedEncodingException;
 
 import org.appwork.JNAHelper;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.testframework.executer.LogCallback;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
 import org.appwork.utils.processes.ProcessBuilderFactory;
@@ -36,6 +35,7 @@ import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
 import com.sun.jna.platform.win32.WinNT.PSIDByReference;
 import com.sun.jna.ptr.IntByReference;
 
+import org.appwork.utils.LogCallback;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 
@@ -63,14 +63,82 @@ public final class WindowsExecuter {
     }
 
     /**
-     * (SAFER_LEVELID_NORMALUSER), SaferComputeTokenFromLevel, SetTokenInformation(TokenIntegrityLevel), then CreateProcessAsUser. The
-     * process runs with medium integrity even if the caller is elevated.
+     * Resolves the user token for {@link ExecuteOptions#isRunInActiveSession()} / SID flows (non-LocalSystem). If
+     * {@link ExecuteOptions#getWtsSessionId()} is set, uses {@link WindowsUtils#getUserTokenForSessionId(int)}; otherwise falls back to
+     * {@link WindowsUtils#getActiveConsoleUserToken()}.
+     */
+    private static HANDLE resolveInteractiveSessionUserToken(ExecuteOptions options) {
+        String sessionStr = options.getWtsSessionId();
+        if (sessionStr != null && sessionStr.trim().length() > 0) {
+            return requireUserTokenForWtsSessionIdString(sessionStr);
+        }
+        HANDLE h = WindowsUtils.getActiveConsoleUserToken();
+        if (h == null) {
+            throw new IllegalStateException(
+                    "No active console user token; pass wtsSessionId (decimal) from the target interactive session (e.g. WindowsUtils.getCurrentProcessSessionId()).");
+        }
+        return h;
+    }
+
+    /**
+     * LocalSystem: only an explicit {@link ExecuteOptions#getWtsSessionId()} is allowed — no automatic active-console session (cannot guarantee
+     * the correct interactive user, e.g. RDP vs physical console).
+     */
+    private static HANDLE resolveLocalSystemSessionUserToken(ExecuteOptions options) {
+        String sessionStr = options.getWtsSessionId();
+        if (sessionStr == null || sessionStr.trim().length() == 0) {
+            throw new IllegalStateException(
+                    "From LocalSystem, wtsSessionId (decimal string) is required; automatic active-console session selection is not supported.");
+        }
+        return requireUserTokenForWtsSessionIdString(sessionStr);
+    }
+
+    private static HANDLE requireUserTokenForWtsSessionIdString(String sessionStr) {
+        int sessionId;
+        try {
+            sessionId = Integer.parseInt(sessionStr.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Invalid wtsSessionId (expected decimal string): " + sessionStr);
+        }
+        if (sessionId < 0 || sessionId == (int) 0xFFFFFFFFL) {
+            throw new IllegalStateException("Invalid WTS session id: " + sessionId);
+        }
+        HANDLE h = WindowsUtils.getUserTokenForSessionId(sessionId);
+        if (h == null) {
+            throw new IllegalStateException("Cannot obtain user token for WTS session " + sessionId + " (WTSQueryUserToken failed).");
+        }
+        return h;
+    }
+
+    /**
+     * When {@link ExecuteOptions#getSid()} is set, ensures the token belongs to that account.
+     */
+    private static void verifySessionTokenMatchesSidIfSet(HANDLE sessionUserToken, ExecuteOptions options) throws Exception {
+        String sid = options.getSid();
+        if (sid == null || sid.trim().length() == 0) {
+            return;
+        }
+        Advapi32Util.Account account = Advapi32Util.getTokenAccount(sessionUserToken);
+        if (account == null || !sid.equals(account.sidString)) {
+            throw new IllegalStateException("SID does not match interactive session user token (expected " + sid + ", got " + (account != null ? account.sidString : "null") + ").");
+        }
+    }
+
+    /**
+     * Runs a child with medium integrity (non-elevated) via Safer APIs when the caller is elevated but not LocalSystem. When the caller is
+     * LocalSystem, {@link ExecuteOptions#getWtsSessionId()} is mandatory (decimal string, e.g. from
+     * {@link org.appwork.utils.os.WindowsUtils#getCurrentProcessSessionId()} before IPC); active-console auto-selection is not used. For
+     * non-LocalSystem, if {@link ExecuteOptions#isRunInActiveSession()} is true or a {@link ExecuteOptions#getSid() SID} is set, an interactive
+     * user token is required via {@code wtsSessionId} or the active physical console session. There is no Safer fallback in those cases;
+     * failure throws {@link IllegalStateException} or {@link Win32Exception}.
      *
      * @param options
      *            command, working dir, waitFor, env
      * @return ProcessOutput with exit code and stdout/stderr; when waitFor is true, waits for process exit
      * @throws UnsupportedOperationException
      *             if not Windows or JNA not available
+     * @throws IllegalStateException
+     *             if LocalSystem without {@code wtsSessionId}, or runInActiveSession / SID path cannot obtain a matching user token
      * @throws Exception
      *             on API or I/O errors
      */
@@ -86,22 +154,20 @@ public final class WindowsExecuter {
         String commandLine = ShellParser.createCommandLine(Style.WINDOWS, cmd);
         LogV3.info("WindowsExecuter.runAsNonElevatedUser: " + commandLine);
 
-        // When running as Local System, prefer the active console user token so the child runs as the logged-in user (e.g. thomas), not as SYSTEM with reduced integrity.
+        // When running as Local System, require explicit wtsSessionId only — no Safer fallback (would still be SYSTEM).
         if (WindowsUtils.isRunningAsLocalSystem()) {
             HANDLE consoleToken = null;
             HANDLE primaryToken = null;
             try {
-                consoleToken = WindowsUtils.getActiveConsoleUserToken();
-                if (consoleToken != null) {
-                    HANDLEByReference pPrimary = new HANDLEByReference();
-                    if (Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
-                        primaryToken = pPrimary.getValue();
-                        LogV3.info("WindowsExecuter: running as LocalSystem, using active console user token for runAsNonElevatedUser");
-                        return runWithToken(primaryToken, options);
-                    }
+                consoleToken = resolveLocalSystemSessionUserToken(options);
+                verifySessionTokenMatchesSidIfSet(consoleToken, options);
+                HANDLEByReference pPrimary = new HANDLEByReference();
+                if (!Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
                 }
-            } catch (Throwable t) {
-                LogV3.log(t);
+                primaryToken = pPrimary.getValue();
+                LogV3.info("WindowsExecuter: running as LocalSystem, using interactive session user token for runAsNonElevatedUser");
+                return runWithToken(primaryToken, options);
             } finally {
                 if (consoleToken != null) {
                     Kernel32.INSTANCE.CloseHandle(consoleToken);
@@ -110,24 +176,21 @@ public final class WindowsExecuter {
                     Kernel32.INSTANCE.CloseHandle(primaryToken);
                 }
             }
-            LogV3.info("WindowsExecuter: LocalSystem but active console token unavailable, falling back to lowest privilege (child may still be SYSTEM)");
         }
 
-        // When runInActiveSession is set (e.g. by runViaWindowsScheduler fallback), run under active console token without SID check.
+        // When runInActiveSession is set (e.g. by runViaWindowsScheduler fallback), require interactive session token — no Safer fallback.
         if (options.isRunInActiveSession()) {
             HANDLE consoleToken = null;
             HANDLE primaryToken = null;
             try {
-                consoleToken = WindowsUtils.getActiveConsoleUserToken();
-                if (consoleToken != null) {
-                    HANDLEByReference pPrimary = new HANDLEByReference();
-                    if (Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
-                        primaryToken = pPrimary.getValue();
-                        return runWithToken(primaryToken, options);
-                    }
+                consoleToken = resolveInteractiveSessionUserToken(options);
+                verifySessionTokenMatchesSidIfSet(consoleToken, options);
+                HANDLEByReference pPrimary = new HANDLEByReference();
+                if (!Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
                 }
-            } catch (Throwable t) {
-                LogV3.log(t);
+                primaryToken = pPrimary.getValue();
+                return runWithToken(primaryToken, options);
             } finally {
                 if (consoleToken != null) {
                     Kernel32.INSTANCE.CloseHandle(consoleToken);
@@ -136,29 +199,22 @@ public final class WindowsExecuter {
                     Kernel32.INSTANCE.CloseHandle(primaryToken);
                 }
             }
-            LogV3.info("WindowsExecuter: runInActiveSession failed (no token), falling back to lowest privilege");
         }
 
-        // When explicit SID is set (e.g. by direct callers/tests), try to run under that user if it matches active console; otherwise run with lowest privilege.
+        // When explicit SID is set (e.g. by direct callers/tests), require that user via interactive session token — no Safer fallback.
         String sid = options.getSid();
         if (sid != null && sid.trim().length() > 0) {
             HANDLE consoleToken = null;
             HANDLE primaryToken = null;
             try {
-                consoleToken = WindowsUtils.getActiveConsoleUserToken();
-                if (consoleToken != null) {
-                    Advapi32Util.Account account = Advapi32Util.getTokenAccount(consoleToken);
-                    if (account != null && sid.equals(account.sidString)) {
-                        HANDLEByReference pPrimary = new HANDLEByReference();
-                        // SecurityImpersonation = 2; TokenPrimary = 1
-                        if (Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
-                            primaryToken = pPrimary.getValue();
-                            return runWithToken(primaryToken, options);
-                        }
-                    }
+                consoleToken = resolveInteractiveSessionUserToken(options);
+                verifySessionTokenMatchesSidIfSet(consoleToken, options);
+                HANDLEByReference pPrimary = new HANDLEByReference();
+                if (!Advapi32DuplicateTokenEx.INSTANCE.DuplicateTokenEx(consoleToken, 0, null, 2, Advapi32Safer.TOKEN_TYPE_PRIMARY, pPrimary)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
                 }
-            } catch (Throwable t) {
-                LogV3.log(t);
+                primaryToken = pPrimary.getValue();
+                return runWithToken(primaryToken, options);
             } finally {
                 if (consoleToken != null) {
                     Kernel32.INSTANCE.CloseHandle(consoleToken);
@@ -167,8 +223,6 @@ public final class WindowsExecuter {
                     Kernel32.INSTANCE.CloseHandle(primaryToken);
                 }
             }
-            // SID path failed or no match; fall through to lowest-privilege path
-            LogV3.info("WindowsExecuter: running with lowest privilege (SID " + sid + " not available or no match)");
         }
 
         HANDLE levelHandle = null;
@@ -261,6 +315,14 @@ public final class WindowsExecuter {
         File workingDir = options.getWorkingDir();
         boolean waitFor = options.isWaitFor();
         String workDirPath = workingDir != null ? workingDir.getAbsolutePath() : null;
+        // CreateProcessAsUser with null lpCurrentDirectory inherits the parent's CWD; under LocalSystem / task helpers that path is often
+        // inaccessible to the duplicated interactive user token, and cmd.exe fails with ERROR_DIRECTORY / "current directory is invalid".
+        if (workDirPath == null || workDirPath.trim().length() == 0) {
+            String systemRoot = System.getenv("SystemRoot");
+            if (systemRoot != null && systemRoot.trim().length() > 0) {
+                workDirPath = new File(systemRoot, "System32").getAbsolutePath();
+            }
+        }
         String commandLine = ShellParser.createCommandLine(Style.WINDOWS, cmd);
         LogV3.info("runWithToken: commandLine.length=" + commandLine.length() + " cmdLine=\"" + (commandLine.length() > 200 ? commandLine.substring(0, 200) + "..." : commandLine) + "\" workDirPath=" + workDirPath + " waitFor=" + waitFor);
         HANDLE stdInHandle = Kernel32.INSTANCE.GetStdHandle(Kernel32.STD_INPUT_HANDLE);

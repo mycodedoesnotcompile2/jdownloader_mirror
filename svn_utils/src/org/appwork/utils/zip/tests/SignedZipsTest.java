@@ -166,8 +166,11 @@ public class SignedZipsTest extends OnClassPathZipJarTests {
         AWSign.verify(new byte[] { 1 }, pub, testSig, false);
         ByteArrayOutputStream baos;
         File testFile = Application.getTempUniqueResource(".test");
-        IO.secureWrite(testFile, "12345".getBytes());
-        ZipIOWriter zipper = new ZipIOWriter(baos = new ByteArrayOutputStream()) {
+        File testRoot = createSignedZipTestData();
+        File file = null;
+        try {
+            IO.secureWrite(testFile, "12345".getBytes());
+            ZipIOWriter zipper = new ZipIOWriter(baos = new ByteArrayOutputStream()) {
             /**
              * @see org.appwork.utils.zip.ZipIOWriter#ignore(java.util.zip.ZipEntry)
              */
@@ -178,14 +181,14 @@ public class SignedZipsTest extends OnClassPathZipJarTests {
                 }
                 return false;
             }
-        };
-        zipper.setLogger(LogV3.defaultLogger());
-        zipper.setSignaturePrivateKey(priv);
-        zipper.add(Application.getResource("cfg"), true);
-        zipper.add(testFile, false, testFile.getName());
-        zipper.close();
-        final ByteArrayOutputStream damaged;
-        ZipIOWriter zipper2 = new ZipIOWriter(damaged = new ByteArrayOutputStream()) {
+            };
+            zipper.setLogger(LogV3.defaultLogger());
+            zipper.setSignaturePrivateKey(priv);
+            zipper.add(testRoot, true);
+            zipper.add(testFile, false, testFile.getName());
+            zipper.close();
+            final ByteArrayOutputStream damaged;
+            ZipIOWriter zipper2 = new ZipIOWriter(damaged = new ByteArrayOutputStream()) {
             /**
              * @see org.appwork.utils.zip.ZipIOWriter#ignore(java.util.zip.ZipEntry)
              */
@@ -210,36 +213,129 @@ public class SignedZipsTest extends OnClassPathZipJarTests {
                     super.updateSigner(len, buf, zipAdd);
                 }
             }
-        };
-        zipper2.setLogger(LogV3.defaultLogger());
-        zipper2.setSignaturePrivateKey(priv);
-        zipper2.add(Application.getResource("cfg"), true);
-        zipper2.add(testFile, false, testFile.getName());
-        zipper2.close();
-        final byte[] bytes = baos.toByteArray();
-        assertEqualsNot(bytes, damaged.toByteArray());
-        File file = Application.getTempUniqueResource(".zip");
-        file.delete();
-        IO.secureWrite(file, bytes);
-        file.deleteOnExit();
-        testREader(new ZipIOReader(file));
-        testREader(new ZipIOReader(bytes));
-        new AssertAnException<Exception>() {
-            @Override
-            protected void run() throws Exception {
-                // damage a byte.warning... this might not be a data byte and this create no - or a different exception
-                testREader(new ZipIOReader(damaged.toByteArray()) {
-                    /**
-                     * @see org.appwork.utils.zip.ZipIOReader#crcCheck(java.util.zip.ZipEntry, java.util.zip.CheckedInputStream)
-                     */
-                    @Override
-                    protected void crcCheck(ZipEntry entry, CheckedInputStream in) throws ZipIOException {
-                        // we would get a crc error instead a sig val
-                    }
-                });
+            };
+            zipper2.setLogger(LogV3.defaultLogger());
+            zipper2.setSignaturePrivateKey(priv);
+            zipper2.add(testRoot, true);
+            zipper2.add(testFile, false, testFile.getName());
+            zipper2.close();
+            final byte[] bytes = baos.toByteArray();
+            assertEqualsNot(bytes, damaged.toByteArray());
+            file = Application.getTempUniqueResource(".zip");
+            file.delete();
+            IO.secureWrite(file, bytes);
+            file.deleteOnExit();
+            testREader(new ZipIOReader(file));
+            testREader(new ZipIOReader(bytes));
+            File extract = Application.getTempUniqueResource(".extract");
+            try {
+                ZipIOReader extractedReader = new ZipIOReader(file);
+                try {
+                    extractedReader.extractTo(extract);
+                } finally {
+                    extractedReader.close();
+                }
+                assertExtractedTree(extract, testRoot);
+            } finally {
+                if (extract.exists()) {
+                    Files.deleteRecursive(extract, false);
+                }
             }
-        };
-        file.delete();
+            new AssertAnException<Exception>() {
+                @Override
+                protected void run() throws Exception {
+                    // damage a byte.warning... this might not be a data byte and this create no - or a different exception
+                    testREader(new ZipIOReader(damaged.toByteArray()) {
+                        /**
+                         * @see org.appwork.utils.zip.ZipIOReader#crcCheck(java.util.zip.ZipEntry, java.util.zip.CheckedInputStream)
+                         */
+                        @Override
+                        protected void crcCheck(ZipEntry entry, CheckedInputStream in) throws ZipIOException {
+                            // we would get a crc error instead a sig val
+                        }
+                    });
+                }
+            };
+        } finally {
+            if (file != null && file.exists()) {
+                Files.deleteRecursive(file, false);
+            }
+            if (testFile.exists()) {
+                Files.deleteRecursive(testFile, false);
+            }
+            if (testRoot.exists()) {
+                Files.deleteRecursive(testRoot, false);
+            }
+        }
+    }
+
+    private File createSignedZipTestData() throws IOException {
+        final File root = Application.getTempUniqueResource(".signedziptest");
+        if (!root.exists() && !root.mkdirs()) {
+            throw new IOException("Could not create temp test root: " + root);
+        }
+        writeTextFile(root, "workspace-copy/tests/SignedZipsTest.txt",
+                "signed zip test data",
+                "generated locally",
+                "alpha beta gamma");
+        writeTextFile(root, "workspace-copy/tests/OnClassPathZipJarTests.txt",
+                "class path test data",
+                "generated locally",
+                "delta epsilon");
+        writeTextFile(root, "workspace-copy/core/ZipIOWriter.txt",
+                "zip writer test data",
+                "generated locally",
+                "zeta eta theta");
+        writeTextFile(root, "workspace-copy/core/deep/nested/test-data.txt",
+                "deep nested file",
+                "folder structure check");
+        final File emptyDir = new File(root, "empty-dir/nested");
+        if (!emptyDir.mkdirs() && !emptyDir.exists()) {
+            throw new IOException("Could not create empty test directory: " + emptyDir);
+        }
+        final File loneDir = new File(root, "lonely-dir");
+        if (!loneDir.mkdirs() && !loneDir.exists()) {
+            throw new IOException("Could not create lonely directory: " + loneDir);
+        }
+        IO.secureWrite(new File(root, "empty-file.txt"), new byte[0]);
+        IO.secureWrite(new File(root, "folder with spaces/edge case.txt"), "edge-case".getBytes("UTF-8"));
+        IO.secureWrite(new File(root, "numbers/0001.txt"), "1\n2\n3\n4\n".getBytes("UTF-8"));
+        return root;
+    }
+
+    private void writeTextFile(final File root, final String relativePath, final String... lines) throws IOException {
+        final File target = new File(root, relativePath);
+        final File parent = target.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("Could not create parent folder: " + parent);
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) {
+                sb.append('\n');
+            }
+            sb.append(lines[i]);
+        }
+        IO.secureWrite(target, sb.toString().getBytes("UTF-8"));
+    }
+
+    private void assertExtractedTree(final File extractedRoot, final File testRoot) throws Exception {
+        assertTrue(new File(extractedRoot, "empty-file.txt").isFile());
+        assertEquals(0L, new File(extractedRoot, "empty-file.txt").length());
+        assertTrue(new File(extractedRoot, "empty-dir/nested").isDirectory());
+        assertTrue(new File(extractedRoot, "lonely-dir").isDirectory());
+        assertFileEquals(new File(testRoot, "workspace-copy/tests/SignedZipsTest.txt"), new File(extractedRoot, "workspace-copy/tests/SignedZipsTest.txt"));
+        assertFileEquals(new File(testRoot, "workspace-copy/tests/OnClassPathZipJarTests.txt"), new File(extractedRoot, "workspace-copy/tests/OnClassPathZipJarTests.txt"));
+        assertFileEquals(new File(testRoot, "workspace-copy/core/ZipIOWriter.txt"), new File(extractedRoot, "workspace-copy/core/ZipIOWriter.txt"));
+        assertFileEquals(new File(testRoot, "workspace-copy/core/deep/nested/test-data.txt"), new File(extractedRoot, "workspace-copy/core/deep/nested/test-data.txt"));
+        assertFileEquals(new File(testRoot, "folder with spaces/edge case.txt"), new File(extractedRoot, "folder with spaces/edge case.txt"));
+        assertFileEquals(new File(testRoot, "numbers/0001.txt"), new File(extractedRoot, "numbers/0001.txt"));
+    }
+
+    private void assertFileEquals(final File expected, final File actual) throws Exception {
+        assertTrue(expected.isFile());
+        assertTrue(actual.isFile());
+        assertEquals(Hash.getFileHash(expected, Hash.HASH_TYPE_SHA256), Hash.getFileHash(actual, Hash.HASH_TYPE_SHA256));
     }
 
     protected void testREader(ZipIOReader reader) throws Exception {

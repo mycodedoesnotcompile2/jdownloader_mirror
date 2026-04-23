@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -42,13 +42,14 @@ import java.awt.event.HierarchyListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.swing.ExtJFrame;
 import org.appwork.swing.PropertyStateEventProviderInterface;
 import org.appwork.swing.event.PropertySetListener;
 import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
 
+@RequiresResource(types = { ExtJFrame.class })
 public class WindowResetListener implements PropertySetListener, HierarchyListener, WindowListener {
-
     private FrameState state;
     private Window     w;
     private boolean    oldFocusableWindowState;
@@ -105,7 +106,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     public void setState(final FrameState flags) {
         state = flags;
-
     }
 
     /**
@@ -113,25 +113,20 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     public void resetProperties() {
         removeListeners();
-
         switch (getState()) {
         case TO_FRONT:
         case TO_FRONT_FOCUSED:
-
             windowsWindowManager.setFocusableWindowState(w, oldFocusableWindowState);
             windowsWindowManager.setFocusable(w, oldFocusable);
             windowsWindowManager.setAlwaysOnTop(w, oldAlwaysOnTop);
             break;
         default:
-
             windowsWindowManager.setFocusableWindowState(w, oldFocusableWindowState);
             windowsWindowManager.setFocusable(w, oldFocusable);
             if (w instanceof Frame) {
-
                 windowsWindowManager.setExtendedState(((Frame) w), frameExtendedState);
             }
         }
-
         w.setLocation(location);
     }
 
@@ -151,46 +146,37 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
     @Override
     public void hierarchyChanged(final HierarchyEvent hierarchyevent) {
         windowOpened(null);
-
     }
 
     public void windowOpened(final WindowEvent windowevent) {
         // System.out.println("Reset After Window Opened");
         removeListeners();
-
         switch (getState()) {
         case TO_FRONT:
         case TO_FRONT_FOCUSED:
-
             // it is important to reset focus states before calling
             // toFront
             windowsWindowManager.setFocusableWindowState(w, oldFocusableWindowState);
             windowsWindowManager.setFocusable(w, oldFocusable);
             windowsWindowManager.setAlwaysOnTop(w, oldAlwaysOnTop);
             windowsWindowManager.setZState(w, getState());
-
             break;
         default:
             if (w instanceof Frame) {
-
                 windowsWindowManager.setExtendedState((Frame) w, frameExtendedState);
             }
             // it's important to call toBack first. else we see a flicker
             // (window appears and disappears)
             windowsWindowManager.toBack(w);
-
             windowsWindowManager.setFocusableWindowState(w, oldFocusableWindowState);
             windowsWindowManager.setFocusable(w, oldFocusable);
-
         }
         // this avoids that the maximized frame gets moved (it did for me under win10
         if (w instanceof Frame) {
-
             switch (windowsWindowManager.getExtendedState((Frame) w)) {
             case NORMAL:
                 w.setLocation(location);
             }
-
         } else {
             w.setLocation(location);
         }
@@ -219,7 +205,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
         } else if (ExtJFrame.PROPERTY_EXTENDED_STATE.equals(propertyName)) {
             frameExtendedState = (Integer) newValue;
         }
-
     }
 
     /**
@@ -229,7 +214,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
         w.addHierarchyListener(this);
         // do not use the window opened listener. it is only called the FIRST time a window gets visible
         // w.addWindowListener(this);
-
     }
 
     /*
@@ -238,7 +222,7 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      * @see java.awt.event.WindowListener#windowActivated(java.awt.event.WindowEvent)
      */
     @Override
-    public void windowActivated(final WindowEvent windowevent) { 
+    public void windowActivated(final WindowEvent windowevent) {
     }
 
     /*
@@ -285,5 +269,4 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
     @Override
     public void windowIconified(final WindowEvent windowevent) {
     }
-
 }

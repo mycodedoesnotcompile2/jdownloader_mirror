@@ -17,6 +17,7 @@ import java.util.Map;
 import org.appwork.processes.ProcessHandlerFactory;
 import org.appwork.processes.ProcessInfo;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.LogCallback;
 
 /**
  * Options for process launch used by {@link AdminExecuter#runAsAdmin(File, String[], ProcessOptions)} and

@@ -9,9 +9,9 @@ import java.util.Map;
 
 import org.appwork.storage.Storable;
 import org.appwork.storage.StorableDoc;
+import org.appwork.utils.Application;
 import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.ide.IDEUtils;
 
 public class DependencyInfo {
     public static final org.appwork.storage.TypeRef<DependencyInfo> TYPE = new org.appwork.storage.TypeRef<DependencyInfo>(DependencyInfo.class) {
@@ -201,10 +201,26 @@ public class DependencyInfo {
     public boolean requiredBy(final File file, final String artefact, final String provider, final String version) {
         final RequiredBy req = new RequiredBy();
         req.setArtefact(artefact);
-        req.setFile(Files.getRelativePath(IDEUtils.getWorkSpace(), file));
+        final File workspace = getWorkspaceRoot();
+        final String relative = Files.getRelativePath(workspace, file);
+        req.setFile(relative != null ? relative : file.getAbsolutePath());
         req.setProvider(provider);
         req.setVersion(version);
         return this.requiredBy.add(req);
+    }
+
+    private static File getWorkspaceRoot() {
+        final File projectRoot = Application.getRootByClass(DependencyInfo.class, null);
+        if (projectRoot != null) {
+            final File projectFolder = projectRoot.getParentFile();
+            if (projectFolder != null) {
+                final File workspaceRoot = projectFolder.getParentFile();
+                if (workspaceRoot != null) {
+                    return workspaceRoot;
+                }
+            }
+        }
+        return new File(System.getProperty("user.dir"));
     }
 
     private boolean autoRenameEnabled = true;

@@ -36,6 +36,7 @@ package org.appwork.uio;
 import javax.swing.Icon;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.NoLogSource;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -45,6 +46,7 @@ public class BasicDialogHandler implements UserIOHandlerInterface {
     private static final Dialog D = Dialog.I();
 
     @Override
+    @NoLogSource
     public boolean showConfirmDialog(int flags, String title, String message, Icon icon, String ok, String cancel, String dontShowAgainKey) {
         try {
             D.showConfirmDialog(flags, title, message, icon, ok, cancel, dontShowAgainKey);
@@ -54,18 +56,22 @@ public class BasicDialogHandler implements UserIOHandlerInterface {
         return false;
     }
 
+    @NoLogSource
     public boolean showConfirmDialog(final int flags, final String title, final String message, final Icon icon, final String ok, final String cancel) {
         return showConfirmDialog(flags, title, message, icon, ok, cancel, null);
     }
 
+    @NoLogSource
     public boolean showConfirmDialog(final int flags, final String title, final String message) {
         return showConfirmDialog(flags, title, message, null, null, null, null);
     }
 
+    @NoLogSource
     public void showMessageDialog(final String message) {
         D.showMessageDialog(message);
     }
 
+    @NoLogSource
     public <T extends UserIODefinition> T show(final Class<T> class1, final T impl) {
         try {
             if (impl instanceof AbstractDialog) {
@@ -78,10 +84,12 @@ public class BasicDialogHandler implements UserIOHandlerInterface {
         return impl;
     }
 
+    @NoLogSource
     public void showErrorMessage(final String message) {
         D.showErrorDialog(message);
     }
 
+    @NoLogSource
     @Override
     public void showException(String message, Throwable e) {
         D.showExceptionDialog(_AWU.T.DIALOG_ERROR_TITLE(), message, e);

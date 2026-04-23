@@ -72,12 +72,14 @@ public class IDEUtils {
         final File workSpace = getWorkSpace();
         final String javaFile = "/src/" + cls.getName().replace(".", "/") + ".java";
         final File[] projects = workSpace.listFiles();
-        for (File project : projects) {
-            if (new File(project, javaFile).isFile()) {
-                return project;
+        if (projects != null) {
+            for (File project : projects) {
+                if (new File(project, javaFile).isFile()) {
+                    return project;
+                }
             }
         }
-        return getProjectFolder(orgClass);
+        return null;
     }
 
     public static File getProjectFolderByClassFile(final Class<?> cls) {
@@ -112,7 +114,7 @@ public class IDEUtils {
         if (inWorkSpace != null) {
             return inWorkSpace;
         }
-        return getProjectFolderByJavaFile(cls);
+        return getProjectFolderByClassFile(cls);
     }
 
     public static File getProjectFolder() throws ClassNotFoundException {

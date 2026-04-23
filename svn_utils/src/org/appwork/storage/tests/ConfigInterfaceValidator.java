@@ -7,8 +7,8 @@ import java.util.List;
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.ClassCache.Rules;
-import org.appwork.testframework.IgnoreInAWTest;
 import org.appwork.testframework.TestDependency;
+import org.appwork.testhelper.IgnoreInAWTest;
 import org.appwork.utils.ClassPathScanner;
 
 @TestDependency({ "org.appwork.storage.StorableValidatorIgnoresMissingGetter" })

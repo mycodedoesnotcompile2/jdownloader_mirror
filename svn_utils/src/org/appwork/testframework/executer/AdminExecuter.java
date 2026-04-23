@@ -40,6 +40,7 @@ import org.appwork.serializer.Deser;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
+import org.appwork.utils.LogCallback;
 import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.os.CrossSystem;
@@ -573,7 +574,8 @@ public final class AdminExecuter {
                 if (logCallback != null) {
                     streamRemoteOutputToLogV3("runAsAdmin", wrapper.getStdout(), wrapper.getStderr(), logCallback);
                 } else {
-                    forwardTaskOutput(wrapper.getStdout(), wrapper.getStderr());
+                    // Eclipse / IDETestRunner surface LogV3 to the console; raw System.out from remote tasks is often not shown.
+                    streamRemoteOutputToLogV3("elevatedTask", wrapper.getStdout(), wrapper.getStderr(), null);
                 }
                 if (wrapper.hasTaskFailure()) {
                     throw new Exception("Task failed: " + wrapper.getExceptionStackTrace());
@@ -639,26 +641,6 @@ public final class AdminExecuter {
         // Keep it single-line for logs.
         s = s.replace("\r", "\\r").replace("\n", "\\n");
         return "\"" + s + "\"";
-    }
-
-    /**
-     * Forwards stdout/stderr from the elevated task to the calling process's System.out and System.err.
-     */
-    private static void forwardTaskOutput(String stdout, String stderr) {
-        if (stdout != null && stdout.length() > 0) {
-            System.out.print(stdout);
-            if (!stdout.endsWith("\n")) {
-                System.out.println();
-            }
-            System.out.flush();
-        }
-        if (stderr != null && stderr.length() > 0) {
-            System.err.print(stderr);
-            if (!stderr.endsWith("\n")) {
-                System.err.println();
-            }
-            System.err.flush();
-        }
     }
 
     /**

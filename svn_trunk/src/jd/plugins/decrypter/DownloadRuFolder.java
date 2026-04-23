@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DownloadRu;
 
-@DecrypterPlugin(revision = "$Revision: 51105 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { DownloadRu.class })
 public class DownloadRuFolder extends PluginForDecrypt {
     public DownloadRuFolder(PluginWrapper wrapper) {
@@ -110,6 +110,7 @@ public class DownloadRuFolder extends PluginForDecrypt {
             } else {
                 final DownloadLink link = this.createDownloadlink("https://" + this.getHost() + "/files/" + item.get("id"));
                 hosterplugin.parseFileInfo(link, item);
+                link.setProperty(DownloadRu.PROPERTY_FOLDER_ID, folder_id);
                 link.setRelativeDownloadFolderPath(path);
                 link._setFilePackage(fp);
                 ret.add(link);

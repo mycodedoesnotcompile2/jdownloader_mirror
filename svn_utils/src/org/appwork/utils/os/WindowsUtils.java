@@ -3336,6 +3336,41 @@ public class WindowsUtils {
     }
 
     /**
+     * Returns the Terminal Services session ID of the current process. Used to pass {@code wtsSessionId} into {@link ExecuteOptions} when
+     * {@link org.appwork.experimental.windowsexecuter.WindowsExecuter#runAsNonElevatedUser(ExecuteOptions)} runs under LocalSystem but must
+     * target the interactive user (e.g. RDP session instead of physical console).
+     *
+     * @return session id, or {@code -1} if {@link Kernel32Ext#ProcessIdToSessionId} fails
+     */
+    public static int getCurrentProcessSessionId() {
+        IntByReference ref = new IntByReference();
+        if (!Kernel32Ext.INSTANCE.ProcessIdToSessionId(Kernel32.INSTANCE.GetCurrentProcessId(), ref)) {
+            return -1;
+        }
+        return ref.getValue();
+    }
+
+    /**
+     * Returns the primary user token for the given WTS session id (same as {@link #getActiveConsoleUserToken()} but for an explicit session).
+     * Requires LocalSystem or sufficient privilege. Caller must close the handle.
+     *
+     * @param sessionId
+     *            valid session id (not {@code 0xFFFFFFFF})
+     * @return token handle, or {@code null} if {@link Wtsapi32Ext#WTSQueryUserToken} fails
+     */
+    public static HANDLE getUserTokenForSessionId(int sessionId) {
+        if (sessionId < 0 || sessionId == 0xFFFFFFFF) {
+            return null;
+        }
+        final PointerByReference token = new PointerByReference();
+        if (!Wtsapi32Ext.INSTANCE.WTSQueryUserToken(sessionId, token)) {
+            LogV3.log(new Win32Exception(Kernel32.INSTANCE.GetLastError()));
+            return null;
+        }
+        return new HANDLE(token.getValue());
+    }
+
+    /**
      * Fallback when scheduler-based run fails: run via WindowsExecuter.runAsNonElevatedUser.
      * Used by runViaWindowsScheduler for both WTFException and RuntimeException.
      */

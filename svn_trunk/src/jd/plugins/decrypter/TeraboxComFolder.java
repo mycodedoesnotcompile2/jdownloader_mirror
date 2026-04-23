@@ -52,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 52696 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52697 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,10 +121,10 @@ public class TeraboxComFolder extends PluginForDecrypt {
         br.setCookie(host, "BOXCLND", passwordCookie);
     }
 
-    private static final Pattern           TYPE_SHORT                = Pattern.compile("https?://[^/]+/s/(.+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           TYPE_SHORT_NEW            = Pattern.compile("https?://[^/]+/(?:[a-z0-9]+/)?sharing/link\\?surl=([A-Za-z0-9\\-_]+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_SHORT                = Pattern.compile("/s/([A-Za-z0-9\\-_]+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_SHORT_NEW            = Pattern.compile("/(?:[a-z0-9]+/)?sharing/link\\?surl=([A-Za-z0-9\\-_]+).*", Pattern.CASE_INSENSITIVE);
     /* For such URLs leading to single files we'll crawl all items of the folder that file is in -> Makes it easier */
-    private static final Pattern           TYPE_SINGLE_VIDEO         = Pattern.compile("https?://[^/]+/web/share/videoPlay\\?surl=([A-Za-z0-9\\-_]+)\\&dir=([^\\&]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_SINGLE_VIDEO         = Pattern.compile("/web/share/videoPlay\\?surl=([A-Za-z0-9\\-_]+)\\&dir=([^\\&]+)", Pattern.CASE_INSENSITIVE);
     private static final AtomicLong        anonymousJstokenTimestamp = new AtomicLong(-1);
     private static AtomicReference<String> anonymousJstoken          = new AtomicReference<String>(null);
 
@@ -140,7 +140,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String[] result = extractSurlAndPath(param.getCryptedUrl());
+        final String[] result = extractUrlInfo(param.getCryptedUrl());
         final String surl = result[0];
         if (surl == null) {
             /* User has added invalid url */
@@ -154,13 +154,14 @@ public class TeraboxComFolder extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> crawlFolder(final Plugin callingPlugin, final CryptedLink param, final Account account, final String targetFileID) throws Exception {
         final String contenturl = getContentURL(param.getCryptedUrl());
-        final String[] surlAndPath = extractSurlAndPath(contenturl);
+        final String[] surlAndPath = extractUrlInfo(contenturl);
         String surl = surlAndPath[0];
         if (surl == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String preGivenPath = surlAndPath[1];
+        final String fsid = surlAndPath[2];
         final TeraboxCom plg = (TeraboxCom) this.getNewPluginForHostInstance(this.getHost());
         /*
          * Login whenever possible. This way we will get direct downloadable URLs right away which we can store --> Saves a LOT of time- and
@@ -263,6 +264,9 @@ public class TeraboxComFolder extends PluginForDecrypt {
         queryFolder.add("shorturl", surl);
         if (!StringUtils.isEmpty(preGivenPath)) {
             queryFolder.appendEncoded("dir", preGivenPath);
+            if (fsid != null) {
+                queryFolder.add("fid", fsid);
+            }
         } else {
             queryFolder.add("root", "1");
         }
@@ -272,7 +276,6 @@ public class TeraboxComFolder extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
-            logger.info("Crawling page: " + page);
             queryFolder.addAndReplace("page", Integer.toString(page));
             queryFolder.addAndReplace("num", Integer.toString(maxItemsPerPage));
             final String requesturl = protocolAndSubdomain + "/share/list?" + queryFolder.toString();
@@ -493,37 +496,40 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     }
                 }
             }
+            logger.info("Crawled page" + page + " | Items on this page: " + ressourcelist.size() + " | Items found so far: " + ret.size());
             if (ressourcelist.size() < maxItemsPerPage) {
                 logger.info("Stopping because: Current page contains less items than: " + maxItemsPerPage + " (only " + ressourcelist.size() + ")");
                 break;
             }
             /* Continue to next page */
-            logger.info("Number of items found on current page: " + ressourcelist.size());
             page++;
             continue;
         } while (!this.isAbort());
         return ret;
     }
 
-    private String[] extractSurlAndPath(String contenturl) throws MalformedURLException, UnsupportedEncodingException {
-        final List<String> deadDomains = getDeadDomains();
-        final String domainOfAddedURL = Browser.getHost(contenturl);
-        if (deadDomains.contains(domainOfAddedURL)) {
-            /* Fix domain inside URL */
-            contenturl = contenturl.replaceFirst(Pattern.quote(domainOfAddedURL) + "/", getHost() + "/");
+    /**
+     * Returns stringarray with important url-decoded values from given url. <br>
+     * Returns array of null values if zero values are found. <br>
+     * If âll values exist, returnarray looks like this: [surl, path, fsid].
+     */
+    private String[] extractUrlInfo(final String contenturl) throws MalformedURLException, UnsupportedEncodingException {
+        final UrlQuery query = UrlQuery.parse(contenturl);
+        String encoded_surl = new Regex(contenturl, TYPE_SHORT).getMatch(0);
+        if (encoded_surl == null) {
+            encoded_surl = query.get("surl");
         }
-        final UrlQuery paramsOfAddedURL = UrlQuery.parse(contenturl);
-        String encoded_surl = null;
-        String encoded_path = null;
-        if (new Regex(contenturl, TYPE_SHORT).patternFind()) {
-            encoded_surl = new Regex(contenturl, TYPE_SHORT).getMatch(0);
-        } else {
-            encoded_surl = paramsOfAddedURL.get("surl");
-        }
-        encoded_path = paramsOfAddedURL.get("dir");
+        String encoded_path = query.get("dir");
         if (encoded_path == null) {
-            encoded_path = paramsOfAddedURL.get("path");
+            encoded_path = query.get("path");
         }
-        return new String[] { encoded_surl == null ? null : URLDecoder.decode(encoded_surl, "UTF-8"), encoded_path == null ? null : URLDecoder.decode(encoded_path, "UTF-8") };
+        String fid = query.get("fsid");
+        if (fid != null && !fid.matches("\\d+")) {
+            /* Must be a number */
+            fid = null;
+        }
+        final String surl = encoded_surl != null ? URLDecoder.decode(encoded_surl, "UTF-8") : null;
+        final String path = encoded_path != null ? URLDecoder.decode(encoded_path, "UTF-8") : null;
+        return new String[] { surl, path, fid };
     }
 }

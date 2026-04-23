@@ -22,6 +22,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -49,15 +57,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52695 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52697 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -163,41 +163,40 @@ public class TeraboxCom extends PluginForHost {
         if (checkDirectLink(link, PROPERTY_DIRECTURL) != null) {
             logger.info("Availablecheck via directurl complete");
             return AvailableStatus.TRUE;
-        } else {
-            /*
-             * Crawl the folder again to get a fresh directurl. There is no other way to do this. If the folder is big and the crawler has
-             * to go through pagination, this can take a while!
-             */
-            final PluginForDecrypt crawler = getNewPluginForDecryptInstance(getHost());
-            final CryptedLink param = new CryptedLink(link.getContainerUrl(), link);
-            if (link.getDownloadPassword() != null) {
-                /* Crawler should not ask user again for that password! */
-                param.setDecrypterPassword(link.getDownloadPassword());
+        }
+        /*
+         * Crawl the folder again to get a fresh directurl. There is no other way to do this. If the folder is big and the crawler has to go
+         * through pagination, this can take a while!
+         */
+        final PluginForDecrypt crawler = getNewPluginForDecryptInstance(getHost());
+        final CryptedLink param = new CryptedLink(link.getContainerUrl(), link);
+        if (link.getDownloadPassword() != null) {
+            /* Crawler should not ask user again for that password! */
+            param.setDecrypterPassword(link.getDownloadPassword());
+        }
+        try {
+            /* 2021-04-24: Handling has been changed so array should only contain the one element we need! */
+            final ArrayList<DownloadLink> items = ((jd.plugins.decrypter.TeraboxComFolder) crawler).crawlFolder(this, param, account, this.getFID(link));
+            DownloadLink target = null;
+            for (final DownloadLink tmp : items) {
+                if (StringUtils.equals(this.getFID(tmp), this.getFID(link))) {
+                    target = tmp;
+                    break;
+                }
             }
-            try {
-                /* 2021-04-24: Handling has been changed so array should only contain the one element we need! */
-                final ArrayList<DownloadLink> items = ((jd.plugins.decrypter.TeraboxComFolder) crawler).crawlFolder(this, param, account, this.getFID(link));
-                DownloadLink target = null;
-                for (final DownloadLink tmp : items) {
-                    if (StringUtils.equals(this.getFID(tmp), this.getFID(link))) {
-                        target = tmp;
-                        break;
-                    }
-                }
-                /* Assume that item is offline (deleted within folder). */
-                if (target == null) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (!target.hasProperty(PROPERTY_DIRECTURL)) {
-                    logger.warning("Failed to refresh directurl");
-                    return AvailableStatus.UNCHECKABLE;
-                } else {
-                    logger.info("Successfully refreshed directurl");
-                    link.setProperty(PROPERTY_DIRECTURL, target.getStringProperty(PROPERTY_DIRECTURL));
-                    return AvailableStatus.TRUE;
-                }
-            } catch (final Exception e) {
+            /* Assume that item is offline (deleted within folder). */
+            if (target == null) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (!target.hasProperty(PROPERTY_DIRECTURL)) {
+                logger.warning("Failed to refresh directurl");
                 return AvailableStatus.UNCHECKABLE;
+            } else {
+                logger.info("Successfully refreshed directurl");
+                link.setProperty(PROPERTY_DIRECTURL, target.getStringProperty(PROPERTY_DIRECTURL));
+                return AvailableStatus.TRUE;
             }
+        } catch (final Exception e) {
+            return AvailableStatus.UNCHECKABLE;
         }
     }
 
