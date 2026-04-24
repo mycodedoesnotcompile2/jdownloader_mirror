@@ -53,6 +53,7 @@ import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.TextComponentInterface;
 import org.appwork.uio.InputDialogInterface;
+import org.appwork.uio.UIOConstants;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
@@ -80,7 +81,7 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
 
     public InputDialog(final int flag, final String title, final String message, final String defaultMessage, final Icon icon, final String okOption, final String cancelOption) {
         super(flag, title, icon, okOption, cancelOption);
-        if (BinaryLogic.containsAll(flag, Dialog.STYLE_SENSITIVE_INPUT)) {
+        if (BinaryLogic.containsAll(flag, UIOConstants.STYLE.STYLE_SENSITIVE_INPUT)) {
             getLogger().fine("Dialog    [" + okOption + "][" + cancelOption + "]\r\nflag:  " + Integer.toBinaryString(flag) + "\r\ntitle: " + title + "\r\nmsg:   \r\n" + message + "\r\ndef:   <sensitive input omitted from log>");
         } else {
             getLogger().fine("Dialog    [" + okOption + "][" + cancelOption + "]\r\nflag:  " + Integer.toBinaryString(flag) + "\r\ntitle: " + title + "\r\nmsg:   \r\n" + message + "\r\ndef:   \r\n" + StringUtils.abr(defaultMessage, 50, "[...]"));
@@ -101,7 +102,7 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.swing.dialog.AbstractDialog#getRetValue()
      */
     @Override
@@ -232,7 +233,6 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
             return pw;
         } else {
             final ExtTextField ttx = new ExtTextField();
-
             ttx.addKeyListener(this);
             ttx.addMouseListener(this);
             return ttx;
@@ -297,7 +297,7 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.uio.InputDialogInterface#getText()
      */
     @Override

@@ -53,7 +53,16 @@ public class CountingGZIPInputStream extends GZIPInputStream implements Counting
      * @throws IOException
      */
     public CountingGZIPInputStream(InputStream is) throws IOException {
-        this((CountingInputStreamInterface) new CountingInputStream(is));
+        this(new CountingInputStream(is));
+    }
+
+    /**
+     * @param in
+     * @throws IOException
+     */
+    public CountingGZIPInputStream(CountingInputStream is) throws IOException {
+        super(is.getInputStream());
+        this.is = is;
     }
 
     /**
@@ -67,7 +76,7 @@ public class CountingGZIPInputStream extends GZIPInputStream implements Counting
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.net.CountingInputStreamInterface#getInputStream()
      */
     @Override
@@ -77,7 +86,7 @@ public class CountingGZIPInputStream extends GZIPInputStream implements Counting
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.net.CountingConnection#transferedBytes()
      */
     @Override

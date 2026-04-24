@@ -29,6 +29,8 @@ import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -37,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DownloadRu;
 
-@DecrypterPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52702 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { DownloadRu.class })
 public class DownloadRuFolder extends PluginForDecrypt {
     public DownloadRuFolder(PluginWrapper wrapper) {
@@ -92,6 +94,9 @@ public class DownloadRuFolder extends PluginForDecrypt {
         final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("contents");
         final Map<String, Object> folder = (Map<String, Object>) entries.get("object");
         final String folder_title = folder.get("name").toString();
+        if (items.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, folder_title);
+        }
         String path = this.getAdoptedCloudFolderStructure();
         if (path == null) {
             path = folder_title;

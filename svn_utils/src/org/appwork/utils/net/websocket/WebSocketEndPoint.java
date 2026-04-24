@@ -125,6 +125,7 @@ public abstract class WebSocketEndPoint {
         if (webSocketFrame.hasPayLoad()) {
             os.write(webSocketFrame.getPayload());
         }
+        os.flush();
     }
 
     /**

@@ -132,12 +132,16 @@ public abstract class AbstractLogger implements LogInterface {
      */
     private static boolean isNoLogSource(final StackTraceElement es) {
         final String key = es.getClassName() + "#" + es.getMethodName();
-        Boolean cached = NO_LOG_SOURCE_CACHE.get(key);
+        final Boolean cached = NO_LOG_SOURCE_CACHE.get(key);
         if (cached != null) {
             return cached.booleanValue();
         }
         try {
             final Class<?> clazz = Class.forName(es.getClassName());
+            if (clazz.getAnnotation(NoLogSource.class) != null) {
+                NO_LOG_SOURCE_CACHE.put(key, Boolean.TRUE);
+                return true;
+            }
             final Method[] methods = clazz.getDeclaredMethods();
             for (int i = 0; i < methods.length; i++) {
                 final Method m = methods[i];

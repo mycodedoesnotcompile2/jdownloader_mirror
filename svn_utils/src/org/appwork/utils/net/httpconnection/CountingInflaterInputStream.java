@@ -46,7 +46,11 @@ import org.appwork.utils.net.CountingInputStreamInterface;
  *
  */
 public class CountingInflaterInputStream extends AutoWrapInflaterInputStream implements CountingInputStreamInterface {
-    private final CountingInputStream countingStream;
+    private final CountingInputStreamInterface countingStream;
+
+    public CountingInflaterInputStream(InputStream is) throws IOException {
+        this(new CountingInputStream(is));
+    }
 
     /**
      * @param rawInputStream
@@ -54,6 +58,15 @@ public class CountingInflaterInputStream extends AutoWrapInflaterInputStream imp
      */
     public CountingInflaterInputStream(CountingInputStream is) throws IOException {
         super(is);
+        countingStream = is;
+    }
+
+    /**
+     * @param in
+     * @throws IOException
+     */
+    public CountingInflaterInputStream(CountingInputStreamInterface is) throws IOException {
+        super(is.getInputStream());
         countingStream = is;
     }
 

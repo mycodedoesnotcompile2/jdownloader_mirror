@@ -17,11 +17,13 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -30,9 +32,12 @@ import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.websocket.WebSocketFrame;
+import org.appwork.utils.net.websocket.WriteWebSocketFrame;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -59,8 +64,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.websocket.WebSocketClient;
 
-@HostPlugin(revision = "$Revision: 52700 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52710 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -68,23 +74,23 @@ public class FileFactory extends PluginForHost {
     }
 
     @Deprecated
-    public static final String   PROPERTY_CLASSIC                     = "classic_website";
+    public static final String   PROPERTY_CLASSIC                      = "classic_website";
     @Deprecated
-    private static final boolean ALLOW_EXPECT_SPECIAL_CLASSIC_LINKS          = false;
+    private static final boolean ALLOW_EXPECT_SPECIAL_CLASSIC_LINKS    = false;
     @Deprecated
-    private static final boolean ALLOW_EXPECT_SPECIAL_CLASSIC_ACCOUNTS       = false;
+    private static final boolean ALLOW_EXPECT_SPECIAL_CLASSIC_ACCOUNTS = false;
     /* Account related patterns */
-    private static final String  PROPERTY_ACCOUNT_LOGIN_TOKEN         = "login_token";
-    private static final Pattern PATTERN_FILE                         = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_TRAFFIC_SHARE                = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
+    private static final String  PROPERTY_ACCOUNT_LOGIN_TOKEN          = "login_token";
+    private static final Pattern PATTERN_FILE                          = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_TRAFFIC_SHARE                 = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
     /* 2026-04-22: Not possible anymore */
-    private static final boolean ALLOW_MASS_LINKCHECK_WITHOUT_ACCOUNT = false;
+    private static final boolean ALLOW_MASS_LINKCHECK_WITHOUT_ACCOUNT  = false;
     /* 2026-04-22: Broken -> Displays all links as offline */
-    private static final boolean ALLOW_MASS_LINKCHECK_WITH_ACCOUNT    = false;
+    private static final boolean ALLOW_MASS_LINKCHECK_WITH_ACCOUNT     = false;
 
     @Override
     public FEATURE[] getFeatures() {
-        return new FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+        return new FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL /* , untested: LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL */ };
     }
 
     @Override
@@ -148,7 +154,7 @@ public class FileFactory extends PluginForHost {
         if (this.isPremiumAccount(account)) {
             return true;
         } else {
-            /* Free(anonymous) and unknown account type */
+            /* Free(anonymous) or unknown account type */
             return false;
         }
     }
@@ -200,12 +206,23 @@ public class FileFactory extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    @Override
-    protected String getDefaultFileName(final DownloadLink link) {
+    /** Returns decoded filename from url if url contains a filename, returns null otherwise. */
+    private String getFilenameFromURL(final DownloadLink link) {
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
         final String filenameFromURL = urlinfo.getMatch(3);
         if (filenameFromURL != null) {
+            /* Return url from filename -> Not all URLs contain a filename */
             return URLEncode.decodeURIComponent(filenameFromURL);
+        }
+        return null;
+    }
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        final String filenameFromURL = getFilenameFromURL(link);
+        if (filenameFromURL != null) {
+            /* Return url from filename -> Not all URLs contain a filename */
+            return filenameFromURL;
         }
         return this.getFUID(link);
     }
@@ -364,6 +381,14 @@ public class FileFactory extends PluginForHost {
         return getBoolean(br, "isLoggedIn");
     }
 
+    private boolean isPasswordProtectedFile(final Browser br) {
+        if (Boolean.TRUE.equals(getBoolean(br, "requiresPassword"))) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException, MalformedURLException {
         // final Boolean isFree = getBoolean(br, "isFree");
         final UrlQuery query = UrlQuery.parse(br.getURL());
@@ -385,6 +410,9 @@ public class FileFactory extends PluginForHost {
             if (error_code == null) {
                 error_code = br.getRegex("\"errorCode(?:\\\\)?\":(?:\\\\)?\"(.*?)(?:\\\\)?\"").getMatch(0);
             }
+        }
+        if (account != null && Boolean.FALSE.equals(this.isLoggedIn(br))) {
+            throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000l);
         }
         if (Boolean.TRUE.equals(getBoolean(br, "requiresPremium")) && !Boolean.TRUE.equals(isPremium(br))) {
             throw new AccountRequiredException();
@@ -640,6 +668,7 @@ public class FileFactory extends PluginForHost {
     }
 
     /* Checks links in batches without the need to be logged in. */
+    @Deprecated
     private boolean checkLinks_old_public(final DownloadLink[] urls) {
         if (urls == null || urls.length == 0) {
             return false;
@@ -743,9 +772,9 @@ public class FileFactory extends PluginForHost {
             return;
         }
         /* Set fallback name */
-        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
+        final String filenameFromURL = this.getFilenameFromURL(link);
         if (filenameFromURL != null) {
-            link.setName(URLEncode.decodeURIComponent(filenameFromURL));
+            link.setName(filenameFromURL);
             return;
         }
         /* Final fallback */
@@ -757,68 +786,130 @@ public class FileFactory extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        loginWebsite(br, account, true);
+        final AccountInfo ai = loginWebsite(br, account, true);
+        if (ai != null) {
+            return ai;
+        }
         if (isAccountUsingClassicWebsite(account)) {
             return fetchAccountInfo_old(account);
         }
-        final AccountInfo ai = new AccountInfo();
-        new_website_2026_04: {
-            /* 2026-04-22: Very ugly hack: access fake file url to easily obtain premium status */
-            // TODO: Update this to also find premium expire date
-            if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/file/jdlogincheck")) {
-                this.checkLoginStatus(br, account);
-            }
-            final Boolean premium = this.isPremium(br);
-            if (premium != null) {
-                if (premium) {
-                    account.setType(AccountType.PREMIUM);
-                } else {
-                    account.setType(AccountType.FREE);
-                }
-                return ai;
-            }
-            logger.warning("Failed to find premium status -> Broken plugin or maybe older website version is in use again");
+        return fetchAccountInfo(br, account, account.getStringProperty(PROPERTY_ACCOUNT_LOGIN_TOKEN));
+    }
+
+    public boolean isTokenValid(final String token) {
+        if (token == null) {
+            return false;
         }
-        /* Old handling */
-        {
-            logger.info("New website handling failed -> Fallback to old handling");
-            br.getPage(this.getWebapiBase() + "/dashboard");
-            if (!br.getURL().endsWith("/dashboard")) {
+        try {
+            String jwtContent = new Regex(token, ".*?\\.(.*?)\\.").getMatch(0);
+            final int pad = jwtContent.length() % 4;
+            switch (pad) {
+            case 1:
+                jwtContent += "===";
+                break;
+            case 2:
+                jwtContent += "==";
+                break;
+            case 3:
+                jwtContent += "=";
+                break;
+            case 0:
+                break;
             }
-            final Map<String, Object> entries = this.checkErrorsWebapi(br, account);
-            final Map<String, Object> settings = (Map<String, Object>) entries.get("settings");
-            if (Boolean.TRUE.equals(entries.get("isLifetime"))) {
-                account.setType(AccountType.LIFETIME);
-            } else if (Boolean.TRUE.equals(entries.get("isPremium"))) {
-                account.setType(AccountType.PREMIUM);
-                String nextRebillDate = "Never";
-                if (Boolean.TRUE.equals(entries.get("hasActiveRebill"))) {
-                    nextRebillDate = entries.get("nextRebillDate").toString();
-                }
-                final int daysRemaining = ((Number) entries.get("daysRemaining")).intValue();
-                ai.setValidUntil(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(daysRemaining), br);
-                ai.setStatus(AccountType.PREMIUM.getLabel() + " | Next rebill date: " + nextRebillDate);
+            final String jwt = Base64.decodeToString(jwtContent);
+            final String exp = new Regex(jwt, "\"exp\"\\s*:\\s*(\\d+)").getMatch(0);
+            final long expireOn = Long.parseLong(exp) * 1000;
+            if (System.currentTimeMillis() + (5 * 60 * 1000) < expireOn) {
+                // only use if still valid for at last 5 minutes
+                return true;
             } else {
-                /* Expired/free account */
-                account.setType(AccountType.FREE);
-                account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
+                return false;
             }
-            final String usedSpaceGB_Str = (String) entries.get("usedSpace");
-            if (usedSpaceGB_Str != null && usedSpaceGB_Str.matches("\\d+")) {
-                ai.setUsedSpace(Long.parseLong(usedSpaceGB_Str) * 1024 * 1024 * 1024);
-            }
-            find_and_set_real_user_email: if (account.loadUserCookies() != null) {
-                /* Ensure to have unique usernames when user is using cookie login */
-                final String email = (String) settings.get("email");
-                if (email != null) {
-                    account.setUser(email);
-                } else {
-                    /* Possibly Google login user? */
-                    logger.warning("WTF account has no email?");
+        } catch (Exception e) {
+            logger.log(e);
+            return false;
+        }
+    }
+
+    private AccountInfo fetchAccountInfo(final Browser br, final Account account, final String token) throws Exception {
+        final WebSocketClient wsc = new WebSocketClient(br, new URL("https://tacit-mammoth-55.eu-west-1.convex.cloud/api/1.31.7/sync")) {
+            @Override
+            public void writeFrame(WriteWebSocketFrame webSocketFrame) throws IOException {
+                super.writeFrame(webSocketFrame);
+                try {
+                    // required else we will trigger fast CLOSE
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    throw new IOException(e);
                 }
             }
-            return ai;
+        };
+        wsc.connect();
+        boolean closedFlag = false;
+        try {
+            wsc.writeFrame(wsc.buildUTF8TextFrame("{\"connectionCount\":0,\"lastCloseReason\":\"InitialConnect\",\"clientTs\":" + System.currentTimeMillis() + ",\"type\":\"Connect\",\"sessionId\":\"" + UUID.randomUUID() + "\"}"));
+            wsc.writeFrame(wsc.buildUTF8TextFrame("{\"type\":\"Authenticate\",\"baseVersion\":0,\"tokenType\":\"User\",\"value\":\"" + token + "\"}"));
+            wsc.writeFrame(wsc.buildUTF8TextFrame("{\"type\":\"ModifyQuerySet\",\"baseVersion\":0,\"newVersion\":1,\"modifications\":[]}"));
+            wsc.writeFrame(wsc.buildUTF8TextFrame("{\"type\":\"ModifyQuerySet\",\"baseVersion\":1,\"newVersion\":2,\"modifications\":[{\"type\":\"Add\",\"queryId\":0,\"udfPath\":\"users:me\",\"args\":[{}]}]}"));
+            nextFrame: while (true) {
+                final WebSocketFrame frame = wsc.readNextFrame();
+                if (frame == null) {
+                    break;
+                }
+                switch (frame.getOpCode()) {
+                case CLOSE:
+                    closedFlag = true;
+                    break nextFrame;
+                case UTF8_TEXT:
+                    payload: if (frame.hasPayLoad()) {
+                        final Map<String, Object> response = restoreFromString(new String(frame.getPayload(), "UTF-8"), TypeRef.MAP);
+                        if ("AuthError".equals(response.get("type"))) {
+                            throw new AccountInvalidException();
+                        }
+                        final List<Map<String, Object>> modifications = (List<Map<String, Object>>) response.get("modifications");
+                        if (modifications == null) {
+                            break payload;
+                        }
+                        for (final Map<String, Object> modification : modifications) {
+                            if (((Number) modification.get("queryId")).intValue() == 0) {
+                                final Map<String, Object> value = (Map<String, Object>) modification.get("value");
+                                final AccountInfo ai = new AccountInfo();
+                                final String email = (String) value.get("email");
+                                if (email != null) {
+                                    account.setUser(email);
+                                }
+                                final Number premiumUntil = (Number) value.get("premiumUntil");
+                                if (Boolean.TRUE.equals(value.get("isLifetime"))) {
+                                    account.setType(AccountType.LIFETIME);
+                                    ai.setValidUntil(-1);
+                                } else if (Boolean.TRUE.equals(value.get("isPremium")) && premiumUntil != null) {
+                                    account.setType(AccountType.PREMIUM);
+                                    ai.setValidUntil(premiumUntil.longValue());
+                                } else {
+                                    account.setType(AccountType.FREE);
+                                    ai.setValidUntil(-1);
+                                }
+                                return ai;
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    break;
+                }
+            }
+        } finally {
+            try {
+                if (!closedFlag) {
+                    wsc.close();
+                } else {
+                    wsc.disconnect();
+                }
+            } catch (IOException e) {
+                logger.log(e);
+            }
         }
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     /** Obtains account information from old website */
@@ -926,31 +1017,34 @@ public class FileFactory extends PluginForHost {
         return ai;
     }
 
-    private void loginWebsite(final Browser br, final Account account, final boolean validateCookies) throws Exception {
+    private AccountInfo loginWebsite(final Browser br, final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             setBrowserExclusive();
             final Cookies cookies = account.loadCookies("");
             final Cookies userCookies = account.loadUserCookies();
-            if (cookies != null || userCookies != null) {
+            verify: if (cookies != null || userCookies != null) {
                 if (userCookies != null) {
                     br.setCookies(userCookies);
                 } else {
                     br.setCookies(cookies);
                 }
-                if (!validateCookies) {
-                    /* Do not verify cookies */
-                    return;
+                final String token = account.getStringProperty(PROPERTY_ACCOUNT_LOGIN_TOKEN);
+                if (!isTokenValid(token)) {
+                    break verify;
+                } else if (!validateCookies) {
+                    /* Do not verify cookies/token */
+                    return null;
                 }
                 /* Verify cookies */
                 try {
-                    checkLoginStatus(br, account);
-                    logger.info("Cookie login successful");
+                    final AccountInfo ai = fetchAccountInfo(br, account, token);
+                    logger.info("Token login successful");
                     if (userCookies == null) {
                         account.saveCookies(br.getCookies(br.getHost()), "");
                     }
-                    return;
+                    return ai;
                 } catch (final AccountInvalidException e) {
-                    logger.info("Cookie login failed");
+                    logger.info("Token login failed");
                     br.clearCookies(null);
                     if (userCookies != null) {
                         /* Dead end */
@@ -991,9 +1085,10 @@ public class FileFactory extends PluginForHost {
                 final Map<String, Object> tokens = (Map<String, Object>) entries.get("tokens");
                 token = tokens.get("token").toString();
             }
-            checkLoginStatus(br, account);
+            final AccountInfo ai = fetchAccountInfo(br, account, token);
             account.saveCookies(br.getCookies(br.getHost()), "");
             account.setProperty(PROPERTY_ACCOUNT_LOGIN_TOKEN, token);
+            return ai;
         }
     }
 
@@ -1015,9 +1110,6 @@ public class FileFactory extends PluginForHost {
     public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception {
         requestFileInformationWebsite(account, link);
         if (this.dl == null) {
-            if (account != null && Boolean.FALSE.equals(this.isLoggedIn(br))) {
-                throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000l);
-            }
             if (link.isPasswordProtected()) {
                 /*
                  * 2025-09-10: Website json implies that password protected links exist but I was unable to create- or find such test-links.
@@ -1146,33 +1238,6 @@ public class FileFactory extends PluginForHost {
         this.handleDownloadWebsite(link, account);
     }
 
-    /**
-     * Checks if we're logged in via Web-API. <br>
-     * Throws Exception if we're not logged in. <br>
-     * Returns either map or null.
-     */
-    private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
-        final class NewWebsite {
-            private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
-                new_website_2026_04: {
-                    br.getPage(FileFactory.this.getWebsiteBase() + "/file/jdlogincheck");
-                    final Boolean loginstatus = FileFactory.this.isLoggedIn(br);
-                    if (loginstatus != null) {
-                        return null;
-                    }
-                }
-                br.getPage(FileFactory.this.getWebapiBase() + "/auth/session");
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new AccountInvalidException("Session expired?");
-                }
-                final Map<String, Object> entries = checkErrorsWebapi(br, account, null);
-                return entries;
-            }
-        }
-        final Map<String, Object> ret = new NewWebsite().checkLoginStatus(br, account);
-        return ret;
-    }
-
     private Map<String, Object> checkErrorsWebapi(final Browser br, final Account account) throws PluginException, InterruptedException {
         return checkErrorsWebapi(br, account, null);
     }
@@ -1216,14 +1281,6 @@ public class FileFactory extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 400) {
             /* 2026-04-22: POST on "/api/auth" with invalid credentials */
             throw new AccountInvalidException();
-        }
-    }
-
-    private boolean isPasswordProtectedFile(final Browser br) {
-        if (Boolean.TRUE.equals(getBoolean(br, "requiresPassword"))) {
-            return true;
-        } else {
-            return false;
         }
     }
 

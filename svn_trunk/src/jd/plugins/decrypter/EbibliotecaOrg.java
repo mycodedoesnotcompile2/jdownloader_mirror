@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48286 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52706 $", interfaceVersion = 3, names = {}, urls = {})
 public class EbibliotecaOrg extends PluginForDecrypt {
     public EbibliotecaOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,18 +61,19 @@ public class EbibliotecaOrg extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(lecturas/\\?/v/\\d+|descargar\\.php\\?x=\\d+\\&sec=\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + TYPE_COLLECTION.pattern().substring(1) + "|" + TYPE_SINGLE.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
 
-    private final Pattern TYPE_COLLECTION = Pattern.compile("https?://[^/]+/lecturas/\\?/v/(\\d+)");
-    private final Pattern TYPE_SINGLE     = Pattern.compile("https?://[^/]+/descargar\\.php\\?x=\\d+\\&sec=\\d+");
+    private static final Pattern TYPE_COLLECTION = Pattern.compile("/lecturas/\\?/v/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SINGLE     = Pattern.compile("/descargar\\.php\\?.+", Pattern.CASE_INSENSITIVE);
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(false);
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -88,7 +89,7 @@ public class EbibliotecaOrg extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }
-        if (new Regex(param.getCryptedUrl(), TYPE_COLLECTION).patternFind()) {
+        if (new Regex(contenturl, TYPE_COLLECTION).patternFind()) {
             String fpName = br.getRegex("<h3[^>]*><strong>([^<]+)</strong></h3>").getMatch(0);
             final String[] htmls = br.getRegex("openUnload\\(([0-9, ]+)\\)").getColumn(0);
             if (htmls == null || htmls.length == 0) {
@@ -124,7 +125,7 @@ public class EbibliotecaOrg extends PluginForDecrypt {
                     progr++;
                 }
             }
-        } else if (new Regex(param.getCryptedUrl(), TYPE_SINGLE).patternFind()) {
+        } else if (new Regex(contenturl, TYPE_SINGLE).patternFind()) {
             if (br.containsHTML(">\\s*Error 399")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

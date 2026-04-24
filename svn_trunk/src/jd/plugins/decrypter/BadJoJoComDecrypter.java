@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 52650 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52704 $", interfaceVersion = 3, names = {}, urls = {})
 public class BadJoJoComDecrypter extends PornEmbedParser {
     public BadJoJoComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +44,7 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "badjojo.com", "realityxxxtube.com" });
+        ret.add(new String[] { "badjojo.com", "realityxxxtube.com", "pornmaki.com", "recordedcams.com", "shockingmovies.com", "rookiepornvideos.com", "chickswithdicks.video", "amateurgaymovies.com", "watchtwinks.com", "chopsticktube.com", "bisexualmantube.com", "realthaisluts.com", "realteenmovies.com", "habibiporn.com", "xlactating.com", "cumloadedgirls.com", "skeetporntube.com", "nopixeljaps.com", "sexyfeet.tv", "facialcumtube.com", "machinefucked.me", "tinydicktube.com" });
         return ret;
     }
 
@@ -83,7 +83,7 @@ public class BadJoJoComDecrypter extends PornEmbedParser {
         }
         /* 2017-03-21: Handle special case */
         // <a href="/out.php?siteid=89&amp;id=14064863&amp;url=http%3A%2F%2Fnudez.com%2Fvideo%2F...-221490.html"
-        String externID = br.getRegex("<h4>Source</h4>\\s*<a href=\"[^\"]+?url=([^\"]+)\"").getMatch(0);
+        String externID = br.getRegex("<h4>Source\\s*</h4>\\s*<a href=\"[^\"]+?url=([^\"]+)\"").getMatch(0);
         if (externID != null) {
             externID = Encoding.urlDecode(externID, true);
             logger.info("externID: " + externID);

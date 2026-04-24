@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52706 $", interfaceVersion = 3, names = {}, urls = {})
 public class EliteBabesCom extends PluginForDecrypt {
     public EliteBabesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,6 +100,22 @@ public class EliteBabesCom extends PluginForDecrypt {
                 }
                 video.setAvailable(true);
                 ret.add(video);
+            }
+        }
+        if (ret.isEmpty()) {
+            /**
+             * 2026-04-23: This is just a cheap workaround for category links: See the main plugin pattern of this plugin will always also
+             * accept category URLs which we do not really support. <br>
+             * My idea in order to still return something was to just return the thumbnail/overview images in this case. <br>
+             * Example: /stunning-18
+             */
+            final String[] imgs2 = br.getRegex("\"(https?://cdn\\.[^/]+/content/\\d+/[\\w\\-]+\\.jpg)\"").getColumn(0);
+            if (imgs2 != null && imgs2.length > 0) {
+                for (final String url : imgs2) {
+                    final DownloadLink image = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                    image.setAvailable(true);
+                    ret.add(image);
+                }
             }
         }
         if (ret.isEmpty()) {

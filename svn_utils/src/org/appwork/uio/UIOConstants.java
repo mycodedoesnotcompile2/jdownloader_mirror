@@ -34,6 +34,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.uio;
 
+import org.appwork.utils.swing.dialog.InputDialog;
+
 /**
  * @author daniel
  * @date Apr 14, 2026
@@ -62,6 +64,10 @@ public final class UIOConstants {
          * Inputdialogs will use passwordfields instead of textfields
          */
         public static final int STYLE_PASSWORD                  = 1 << 9;
+        /**
+         * {@link InputDialog}: do not write the default input value to debug logs (use for passwords and other secrets).
+         */
+        public static final int STYLE_SENSITIVE_INPUT           = 1 << 13;
     }
 
     public static final class LOGIC {

@@ -203,7 +203,8 @@ public class Dialog {
     /**
      * {@link InputDialog}: do not write the default input value to debug logs (use for passwords and other secrets).
      */
-    public static final int       STYLE_SENSITIVE_INPUT          = 1 << 13;
+    @Deprecated
+    public static final int       STYLE_SENSITIVE_INPUT           = UIOConstants.STYLE.STYLE_SENSITIVE_INPUT;
 
     /**
      * tries to find some special markers in the text and selects an appropriate icon

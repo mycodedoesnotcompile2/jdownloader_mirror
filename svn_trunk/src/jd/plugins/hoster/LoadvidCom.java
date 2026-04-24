@@ -17,19 +17,15 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -39,15 +35,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52703 $", interfaceVersion = 3, names = {}, urls = {})
-public class VidaraTo extends PluginForHost {
-    public VidaraTo(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 52710 $", interfaceVersion = 3, names = {}, urls = {})
+public class LoadvidCom extends PluginForHost {
+    public LoadvidCom(PluginWrapper wrapper) {
         super(wrapper);
-    }
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -59,21 +50,14 @@ public class VidaraTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost() + "/tos";
+        return "https://" + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidara.to", "vidara.so", "streamix.so", "streamix.so", "stmix.io" });
+        ret.add(new String[] { "loadvid.com" });
         return ret;
-    }
-
-    protected List<String> getDeadDomains() {
-        final ArrayList<String> deadDomains = new ArrayList<String>();
-        deadDomains.add("stmix.io");
-        deadDomains.add("streamix.so");
-        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -85,10 +69,12 @@ public class VidaraTo extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/videos/play/([a-zA-Z0-9]{15,})", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:e|v)/([A-Za-z0-9]{12,})");
+            ret.add("https?://cdn\\." + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -108,11 +94,6 @@ public class VidaraTo extends PluginForHost {
     }
 
     @Override
-    protected String getDefaultFileName(DownloadLink link) {
-        return this.getFID(link) + ".mp4";
-    }
-
-    @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
         return true;
     }
@@ -121,34 +102,25 @@ public class VidaraTo extends PluginForHost {
         return 0;
     }
 
-    private String hls_master = null;
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".mp4";
+    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        this.hls_master = null;
-        final String fid = this.getFID(link);
         this.setBrowserExclusive();
-        Map<String, Object> json = new HashMap<String, Object>();
-        json.put("filecode", fid);
-        json.put("device", "web");
-        PostRequest request = br.createJSonPostRequest("https://" + getHost() + "/api/stream", json);
-        br.getPage(request);
+        br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
-            /* {"error":"Video not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (link.getFinalFileName() == null) {
-            String filename = entries.get("title").toString();
-            if (StringUtils.isEmpty(filename)) {
-                final Browser brc = createNewBrowserInstance();
-                brc.getPage(link.getPluginPatternMatcher());
-                filename = brc.getRegex("<title>\\s*(.*?)\\s*<").getMatch(0);
-                filename = StringUtils.firstNotEmpty(filename, fid);
-            }
-            link.setFinalFileName(this.correctOrApplyFileNameExtension(filename, ".mp4", null));
+        String filename = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setFinalFileName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
-        this.hls_master = entries.get("streaming_url").toString();
         return AvailableStatus.TRUE;
     }
 
@@ -159,17 +131,13 @@ public class VidaraTo extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        if (StringUtils.isEmpty(this.hls_master)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        String hlsurl = br.getRegex("const newUrl = '(http[^\"']+)").getMatch(0);
+        if (StringUtils.isEmpty(hlsurl)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
-        br.getPage(this.hls_master);
-        final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
-        if (hlsbest == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String url_hls = hlsbest.getDownloadurl();
+        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         checkFFmpeg(link, "Download a HLS Stream");
-        dl = new HLSDownloader(link, br, url_hls);
+        dl = new HLSDownloader(link, br, hlsurl);
         dl.startDownload();
     }
 

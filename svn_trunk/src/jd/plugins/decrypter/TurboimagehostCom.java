@@ -37,14 +37,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52432 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52704 $", interfaceVersion = 3, names = {}, urls = {})
 public class TurboimagehostCom extends PluginForDecrypt {
     public TurboimagehostCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     // Single image page, e.g. https://www.turboimagehost.com/p/12345/imagename.html
-    public static final Pattern PATTERN_IMAGE     = Pattern.compile("/p/(\\d+)/(\\d+[^/]+\\.html)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_IMAGE     = Pattern.compile("/p/(\\d+)/([^/]+)(\\.html)", Pattern.CASE_INSENSITIVE);
     // Thumbnail/direct CDN URL, e.g. https://abc123.turboimg.net/t1/12345_imagename.jpg
     public static final Pattern PATTERN_THUMBNAIL = Pattern.compile("//([a-z0-9\\-]+\\.turboimg\\.net)/t1/(\\d+)_([^/]+(\\.jpe?g|png|gif))", Pattern.CASE_INSENSITIVE);
     // Album page, e.g. https://www.turboimagehost.com/album/67890/albumname/
@@ -124,8 +124,10 @@ public class TurboimagehostCom extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int page = 1;
         pagination: while (!isAbort()) {
-            final String urls[] = br.getRegex("(https?://(?:www\\.)?turboimagehost\\.com/p/\\d+/[^/]+\\.html)").getColumn(0);
+            final String urls[] = br.getRegex(PATTERN_IMAGE).getColumn(-1);
             for (String url : urls) {
+                /* path to url */
+                url = br.getURL(url).toExternalForm();
                 final DownloadLink image = createDownloadlink(url);
                 image._setFilePackage(fp);
                 ret.add(image);
@@ -151,7 +153,7 @@ public class TurboimagehostCom extends PluginForDecrypt {
         final Regex thumbnail = new Regex(param.getCryptedUrl(), PATTERN_THUMBNAIL);
         final String contenturl;
         if (thumbnail.patternFind()) {
-            /* Change thumbnail --> Normal URL --> Then we can crawl the fullsize URL. */
+            /* Change thumbnail --> Normal URL --> Then we can crawl the full size URL. */
             contenturl = "https://www." + this.getHost() + "/p/" + thumbnail.getMatch(1) + "/" + thumbnail.getMatch(2) + ".html";
         } else {
             contenturl = param.getCryptedUrl();

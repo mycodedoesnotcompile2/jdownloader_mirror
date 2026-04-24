@@ -186,7 +186,7 @@ public abstract class AbstractPostRequest extends HttpRequest {
                         inputStream = new CountingGZIPInputStream(inputStream);
                     } else if ("deflate".equalsIgnoreCase(encoding) || "x-deflate".equalsIgnoreCase(encoding)) {
                         // Deflate encoding
-                        inputStream = new CountingInflaterInputStream(inputStream instanceof CountingInputStream ? (CountingInputStream) inputStream : new CountingInputStream(inputStream));
+                        inputStream = new CountingInflaterInputStream(inputStream);
                     }
                     // Note: "identity" or "none" means no encoding, so we don't wrap
                 }

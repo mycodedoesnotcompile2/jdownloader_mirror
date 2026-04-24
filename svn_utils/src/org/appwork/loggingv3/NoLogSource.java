@@ -39,11 +39,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a method so that it is not used as "thrown at" in log output. When resolving the log source (e.g. for
- * getThrownAt()), stack frames whose method is annotated with {@link NoLogSource} are skipped and the next
- * frame is considered.
+ * Marks a method so that it is not used as "thrown at" in log output. When resolving the log source (e.g. for getThrownAt()), stack frames
+ * whose method is annotated with {@link NoLogSource} are skipped and the next frame is considered.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.METHOD })
+@Target({ ElementType.METHOD, ElementType.TYPE })
 public @interface NoLogSource {
 }

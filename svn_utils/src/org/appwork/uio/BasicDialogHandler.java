@@ -42,6 +42,7 @@ import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 
+@NoLogSource
 public class BasicDialogHandler implements UserIOHandlerInterface {
     private static final Dialog D = Dialog.I();
 
