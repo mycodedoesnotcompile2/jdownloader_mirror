@@ -3,7 +3,6 @@ package org.jdownloader.plugins.components;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import java.util.Random;
 import java.util.regex.Pattern;
 
 import javax.script.ScriptEngine;
@@ -38,7 +37,7 @@ import jd.plugins.components.PluginJSonUtils;
  * @author bismarck - parts of the original
  * @author psp - parts of the original
  */
-@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52717 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     public abstractSafeLinking(PluginWrapper wrapper) {
         super(wrapper);
@@ -346,18 +345,17 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             ret.add(decryptSingleLink(br));
         } else {
             // handleCaptcha_oldStyle(param);
-            ret.addAll(decryptMultipleLinks(param));
+            ret.addAll(crawlMultipleLinks(param));
         }
         if (ret.isEmpty()) {
             logger.warning("Decrypter out of date for link: " + parameter);
             return null;
-        } else {
-            return ret;
         }
+        return ret;
     }
 
-    protected String getUID(final String parameter) {
-        return new Regex(parameter, "/([A-Za-z0-9]+)$").getMatch(0);
+    protected String getUID(final String url) {
+        return new Regex(url, "/([A-Za-z0-9]+)$").getMatch(0);
     }
 
     protected boolean isOffline() {
@@ -506,16 +504,14 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
      */
     protected void handleCaptcha_oldStyle(final CryptedLink param) throws Exception {
         br.setFollowRedirects(true);
-        /* First handle "Click to continue" step without any captcha */
-        final Form preForm = formProtected();
-        if ("Click+To+Proceed".equals(preForm.getInputFieldByType("button").getValue()) || preForm.containsHTML(">\\s*Click To Proceed\\s*</button>")) {
-            /* E.g. kprotector.com */
+        Form preForm = this.findClickToContinueForm();
+        if (preForm != null) {
             logger.info("Found preForm");
             this.submitForm(preForm);
         } else {
             logger.info("No preForm available");
         }
-        LinkedHashMap<String, String> captchaRegex = new LinkedHashMap<String, String>();
+        final LinkedHashMap<String, String> captchaRegex = new LinkedHashMap<String, String>();
         captchaRegex.put("solvemedia", regexCaptchaSolveMedia());
         captchaRegex.put("recaptcha", regexCaptchaRecaptcha());
         captchaRegex.put("basic", regexCaptchaBasic());
@@ -525,87 +521,53 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         captchaRegex.put("simplecaptcha", regexCaptchaSimplecaptcha());
         captchaRegex.put("cool", this.regexCaptchaCoolcaptcha());
         captchaRegex.put("cats", regexCaptchaCatAndDog());
-        /* search for protected form */
-        Form protectedForm = formProtected();
-        if (protectedForm != null) {
-            String psw = null;
-            boolean password = false;
-            prepareCaptchaAdress(protectedForm.getHtmlCode(), captchaRegex);
-            final int repeat = 5;
-            int timesNoUserInput = 0;
-            final int timesNoCaptchaLimit = 1;
-            for (int i = 0; i < repeat; i++) {
-                if (timesNoUserInput > timesNoCaptchaLimit) {
-                    /* Fail-safe */
-                    logger.info("Too many times no captcha with user interaction --> Stepping out of captcha loop --> Possible plugin failure");
+        Form protectedForm = findCaptchaForm();
+        if (protectedForm == null) {
+            logger.info("No captcha required");
+            return;
+        }
+        String pw = null;
+        prepareCaptchaAdress(protectedForm.getHtmlCode(), captchaRegex);
+        final int repeat = 5;
+        int timesNoUserInput = 0;
+        final int timesNoCaptchaLimit = 1;
+        for (int i = 0; i < repeat; i++) {
+            if (timesNoUserInput > timesNoCaptchaLimit) {
+                logger.info("Too many times no captcha with user interaction --> Stepping out of captcha loop --> Possible plugin failure");
+                break;
+            }
+            while (protectedForm.hasInputFieldByName("%5C")) {
+                protectedForm.remove("%5C");
+            }
+            final boolean password = formInputFieldContainsProperties(protectedForm, formPasswordInputProperties());
+            if (password) {
+                timesNoUserInput = 0;
+                if ((i <= 2 && isCaptchaSkipable()) || (i <= 1 && !isCaptchaSkipable())) {
+                    pw = param.getDecrypterPassword();
+                }
+                if (StringUtils.isEmpty(pw)) {
+                    pw = getUserInput(parameter, param);
+                    if (StringUtils.isEmpty(pw)) {
+                        throw new DecrypterException(DecrypterException.PASSWORD);
+                    }
+                }
+                protectedForm.put("password", Encoding.urlEncode(pw));
+            }
+            final int captchatypeNumber = getCaptchaTypeNumber();
+            if (captchatypeNumber == 0) {
+                timesNoUserInput++;
+                if (crawlMultipleLinks(param).size() > 0) {
                     break;
                 }
-                while (protectedForm.hasInputFieldByName("%5C")) {
-                    protectedForm.remove("%5C");
+                if (!password) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                password = formInputFieldContainsProperties(protectedForm, formPasswordInputProperties());
-                if (password) {
-                    /* Reset this */
-                    timesNoUserInput = 0;
-                    if ((i <= 2 && isCaptchaSkipable()) || (i <= 1 && !isCaptchaSkipable())) {
-                        // only use this twice, once for auto solvemedia, and second time with manual captcha!
-                        psw = param.getDecrypterPassword();
-                    }
-                    if (StringUtils.isEmpty(psw)) {
-                        psw = getUserInput(parameter, param);
-                        if (StringUtils.isEmpty(psw)) {
-                            throw new DecrypterException(DecrypterException.PASSWORD);
-                        }
-                    }
-                    protectedForm.put("password", Encoding.urlEncode(psw));
-                }
-                Browser captchaBr = null;
-                if (!"notDetected".equals(cType)) {
-                    captchaBr = br.cloneBrowser();
-                }
-                switch (getCaptchaTypeNumber()) {
-                case 0:
-                /* No captcha */
-                {
-                    timesNoUserInput++;
-                    if (decryptMultipleLinks(param).size() > 0) {
-                        break;
-                    } else if (!password) {
-                        // // unsupported types
-                        // // short wait to prevent hammering
-                        // sleep(2500, param);
-                        // // maybe also good to clear cookies?
-                        // getPage(br.getURL());
-                        // protectedForm = formProtected();
-                        // prepareCaptchaAdress(protectedForm.getHtmlCode(), captchaRegex);
-                        // continue;
-                        /* 2021-12-08: Form available + no captcha + no password --> Should never happen?! */
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
+            } else {
+                final Browser captchaBr = br.cloneBrowser();
+                switch (captchatypeNumber) {
                 case 1:
-                    /* 2020-01-28:cannot even be selected as a captcha type when creating new short URLs! */
-                    final boolean solvemediaNotUsedAnymore = true;
-                    if (solvemediaNotUsedAnymore) {
-                        logger.info("Skippingcaptcha as it does not exist anymore --> False-positive");
-                        break;
-                    } else {
-                        if (i == 0 && isCaptchaSkipable()) {
-                            long wait = 0;
-                            while (wait < 3000) {
-                                wait = 1272 * new Random().nextInt(6);
-                            }
-                            sleep(wait, param);
-                            protectedForm.put("captchatype", "Simple");
-                            protectedForm.put("used_captcha", "SolveMedia");
-                            protectedForm.put("adcopy_challenge", "null");
-                            protectedForm.put("adcopy_response", "");
-                            break;
-                        } else {
-                            /* captcha handling used to be here butdoes not exist anymore. */
-                            break;
-                        }
-                    }
+                    logger.info("Skipping solvemedia captcha as it does not exist anymore --> False-positive");
+                    break;
                 case 2: {
                     final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                     protectedForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
@@ -623,8 +585,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                 }
                 case 5: {
                     captchaBr.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    final String fancyCaptchaURL = "/fancycaptcha/captcha/captcha.php";
-                    getPage(captchaBr, fancyCaptchaURL);
+                    getPage(captchaBr, "/fancycaptcha/captcha/captcha.php");
                     protectedForm.put(getCaptchaFancyInputfieldName(), captchaBr.toString().trim());
                     break;
                 }
@@ -645,11 +606,10 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                 case 8:
                 case 9: {
                     final String captchaurl = br.getRegex(this.regexCaptchaCoolcaptcha()).getMatch(0);
-                    final String result = getCaptchaCode(captchaurl, param);
                     if (!protectedForm.hasInputFieldByName("captchatype")) {
                         protectedForm.put("captchatype", "Cool");
                     }
-                    protectedForm.put("captcha_cool", Encoding.urlEncode(result));
+                    protectedForm.put("captcha_cool", Encoding.urlEncode(getCaptchaCode(captchaurl, param)));
                     break;
                 }
                 case 10:
@@ -657,42 +617,37 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                     break;
                 case 12: {
                     final String captchaurl = br.getRegex(this.regexCaptchaSimplecaptcha()).getMatch(0);
-                    final String result = getCaptchaCode(captchaurl, param);
                     if (!protectedForm.hasInputFieldByName("captchatype")) {
                         protectedForm.put("captchatype", "Simple");
                     }
-                    protectedForm.put("norobot", Encoding.urlEncode(result));
+                    protectedForm.put("norobot", Encoding.urlEncode(getCaptchaCode(captchaurl, param)));
                     break;
                 }
                 }
-                if (captchaRegex.containsKey(cType) || password) {
-                    /*
-                     * Wrong captchas can also send us back to our "Click here to continue" Form --> Reset this counter to prevent this
-                     * getting cancelled too early!
-                     */
-                    timesNoUserInput = 0;
-                    submitForm(protectedForm);
-                    // if (br.getHttpConnection().getResponseCode() == 500) {
-                    // logger.warning("500 Internal Server Error. Link: " + parameter);
-                    // continue;
-                    // }
-                    protectedForm = formProtected();
-                    if (protectedForm != null) {
-                        if (i + 1 > repeat) {
-                            logger.info("Too many wrong captchas and/or passwords");
-                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                        }
-                        /* We cannot know whether only captcha or also password were asked and wrong --> Ask again! */
-                        psw = null;
-                        continue;
-                    }
-                    break;
-                } else {
-                    logger.info("Sending form without any captcha input -> Looks like neither captcha nor password is required");
-                    submitForm(protectedForm);
-                }
+            }
+            if (!captchaRegex.containsKey(cType) && !password) {
+                logger.info("Sending form without any captcha input -> Looks like neither captcha nor password is required");
+                submitForm(protectedForm);
                 break;
             }
+            timesNoUserInput = 0;
+            submitForm(protectedForm);
+            preForm = this.findClickToContinueForm();
+            if (preForm != null) {
+                logger.info("Found preForm again -> Strong indicator that user has entered wrong captcha");
+                submitForm(preForm);
+            }
+            protectedForm = findCaptchaForm();
+            if (protectedForm == null) {
+                logger.info("Captcha success");
+                break;
+            }
+            if (i + 1 >= repeat) {
+                logger.info("Too many wrong captchas and/or passwords");
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            }
+            logger.info("Invalid captcha");
+            pw = null;
         }
     }
 
@@ -764,13 +719,28 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         return false;
     }
 
-    protected Form formProtected() {
+    protected Form findProtectedForm() {
         Form f = br.getFormbyProperty("id", "protected-form");
         if (f == null) {
             /* 2020-01-24 */
             f = br.getFormByInputFieldPropertyKeyValue("name", "frmprotect");
         }
         return f;
+    }
+
+    protected Form findCaptchaForm() {
+        return findProtectedForm();
+    }
+
+    protected Form findClickToContinueForm() {
+        final Form f = this.findCaptchaForm();
+        if (f == null) {
+            return null;
+        }
+        if (f.containsHTML(">\\s*Click To Proceed\\s*</button>") || "Click+To+Proceed".equals(f.getInputFieldByType("button").getValue())) {
+            return f;
+        }
+        return null;
     }
 
     private void prepareCaptchaAdress(String captcha, LinkedHashMap<String, String> captchaRegex) {
@@ -826,7 +796,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         return "\"(https?://[^/]*" + regexSupportedDomains() + "/c/[a-z0-9]+" + format + ")";
     }
 
-    protected ArrayList<DownloadLink> decryptMultipleLinks(final CryptedLink param) throws Exception {
+    protected ArrayList<DownloadLink> crawlMultipleLinks(final CryptedLink param) throws Exception {
         // TODO: Add handling for offline links/containers
         if (supportsContainers()) {
             /* Container handling (if no containers found, use webprotection) */

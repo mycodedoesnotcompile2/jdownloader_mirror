@@ -15,8 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -32,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52706 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52713 $", interfaceVersion = 3, names = {}, urls = {})
 public class EliteBabesCom extends PluginForDecrypt {
     public EliteBabesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,10 +67,12 @@ public class EliteBabesCom extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_IGNORE = Pattern.compile("/(?:18usc2257|advertisers|community|contribute|dmca|erotic-art-channels|faves|history|leaderboard|models|privacy-policy|tags|watch-later)(?:/|$)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9\\-]+)-\\d+/?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9\\-]+)/?");
         }
         return ret.toArray(new String[0]);
     }
@@ -76,6 +80,11 @@ public class EliteBabesCom extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
+        final String path = new URL(contenturl).getPath();
+        if (new Regex(path, PATTERN_IGNORE).patternFind()) {
+            logger.info("Ignoring invalid/unsupported url");
+            return new ArrayList<DownloadLink>();
+        }
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

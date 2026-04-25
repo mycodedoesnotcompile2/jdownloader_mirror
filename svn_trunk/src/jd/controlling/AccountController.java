@@ -33,6 +33,27 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.http.Browser;
+import jd.http.BrowserSettingsThread;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.Account.AccountPropertyChangeHandler;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountProperty;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.Plugin;
+import jd.plugins.Plugin.PluginEnvironment;
+import jd.plugins.PluginForHost;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
@@ -66,27 +87,6 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.AccountData;
 import org.jdownloader.settings.AccountSettings;
 
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.http.Browser;
-import jd.http.BrowserSettingsThread;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.Account.AccountPropertyChangeHandler;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountProperty;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.Plugin;
-import jd.plugins.Plugin.PluginEnvironment;
-import jd.plugins.PluginForHost;
-
 public class AccountController implements AccountControllerListener, AccountPropertyChangeHandler {
     private static final long                                                    serialVersionUID = -7560087582989096645L;
     private final HashMap<String, List<Account>>                                 ACCOUNTS;
@@ -94,11 +94,11 @@ public class AccountController implements AccountControllerListener, AccountProp
     private final HashMap<String, Map<Account, Object>>                          MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
-                                                                                                      @Override
-                                                                                                      protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
-                                                                                                          listener.onAccountControllerEvent(event);
-                                                                                                      }
-                                                                                                  };
+        @Override
+        protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
+            listener.onAccountControllerEvent(event);
+        }
+    };
 
     public Eventsender<AccountControllerListener, AccountControllerEvent> getEventSender() {
         return broadcaster;
@@ -697,13 +697,13 @@ public class AccountController implements AccountControllerListener, AccountProp
         } else {
             /* No existing account found -> Add this account to list of accounts. */
             synchronized (AccountController.this) {
-                newAccount.setAccountController(this);
                 List<Account> accs = ACCOUNTS.get(host);
                 if (accs == null) {
                     accs = new ArrayList<Account>();
                     ACCOUNTS.put(host, accs);
                 }
                 accs.add(newAccount);
+                newAccount.setAccountController(this);
             }
             getEventSender().fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.ADDED, newAccount));
             return newAccount;
@@ -814,6 +814,7 @@ public class AccountController implements AccountControllerListener, AccountProp
 
     public void onAccountControllerEvent(final AccountControllerEvent event) {
         final Account acc = event.getAccount();
+        final PluginForHost plugin = acc.getPlugin();
         delayedSaver.resetAndStart();
         final PluginEnvironment pluginEnvironment = Plugin.PluginEnvironment.getPluginEnvironment();
         boolean forceRecheck = false;
@@ -841,8 +842,12 @@ public class AccountController implements AccountControllerListener, AccountProp
                 }
                 forceRecheck = true;
                 break;
-            case PASSWORD:
             case USERNAME:
+                if (plugin != null && plugin.hasFeature(FEATURE.API_KEY_LOGIN)) {
+                    // account depends on api key only, no need to do anything on change of username
+                    break;
+                }
+            case PASSWORD:
                 if (PluginEnvironment.UNKNOWN.equals(pluginEnvironment)) {
                     // username/password has changed outside of a Plugin
                     // *reset* Account and dump all previous stored information (AccountInfo, Properties...)

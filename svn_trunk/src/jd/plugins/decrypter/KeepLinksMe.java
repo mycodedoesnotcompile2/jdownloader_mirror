@@ -26,7 +26,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 45273 $", interfaceVersion = 3, names = { "kprotector.com", "keeplinks.org" }, urls = { "https?://(?:www\\.)?kprotector\\.com/(p\\d*|d)/[a-z0-9]+", "https?://(?:www\\.)?keeplinks\\.(me|eu|co|org)/(p\\d*|d)/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52715 $", interfaceVersion = 3, names = { "kprotector.com", "keeplinks.org" }, urls = { "https?://(?:www\\.)?kprotector\\.com/(p\\d*|d)/[a-z0-9]+", "https?://(?:www\\.)?keeplinks\\.(me|eu|co|org)/(p\\d*|d)/[a-z0-9]+" })
 public class KeepLinksMe extends abstractSafeLinking {
     public KeepLinksMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +80,7 @@ public class KeepLinksMe extends abstractSafeLinking {
     }
 
     @Override
-    protected Form formProtected() {
+    protected Form findProtectedForm() {
         return br.getFormbyProperty("id", "frmprotect");
     }
 
@@ -103,9 +103,9 @@ public class KeepLinksMe extends abstractSafeLinking {
     }
 
     @Override
-    protected String correctLink(final String string) {
-        final String s = string.replaceFirst("^https?://", enforcesHTTPS() && supportsHTTPS() ? "https://" : "http://").replaceFirst("(keeplinks\\.(me|eu|co|org)/)", "keeplinks.org/");
-        return s;
+    protected String correctLink(final String url) {
+        final String newUrl = url.replaceFirst("^https?://", enforcesHTTPS() && supportsHTTPS() ? "https://" : "http://").replaceFirst("(keeplinks\\.(me|eu|co|org)/)", "keeplinks.org/");
+        return newUrl;
     }
 
     @Override

@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -33,7 +29,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52701 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52711 $", interfaceVersion = 3, names = {}, urls = {})
 public class FypttTo extends PluginForHost {
     public FypttTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,6 +114,9 @@ public class FypttTo extends PluginForHost {
             final Browser brc = br.cloneBrowser();
             brc.getPage(embedVideo);
             dllink = brc.getRegex("<source src\\s*=\\s*\"(.*?)\"").getMatch(0);
+            if (dllink == null) {
+                dllink = brc.getRegex("player\\.setup\\(\\s*\\{\\s*file\\s*:\\s*\"(.*?)\"").getMatch(0);
+            }
         }
         isHLS = StringUtils.containsIgnoreCase(dllink, ".m3u8");
         if (!StringUtils.isEmpty(dllink) && !link.isSizeSet() && !isHLS) {

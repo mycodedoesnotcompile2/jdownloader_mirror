@@ -24,7 +24,6 @@ import jd.plugins.PluginException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ImageProvider.ImageProvider;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -42,7 +41,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCheapcaptchaCom;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52443 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52716 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -103,9 +102,9 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         final String username = account.getUser();
         final String password = account.getPass();
-        final UrlQuery query = new UrlQuery();
-        query.addAndReplace("username", URLEncode.encodeRFC2396(username));
-        query.addAndReplace("password", URLEncode.encodeRFC2396(password));
+        final UrlQuery query = new UrlQuery(true);
+        query.append("username", username, true);
+        query.append("password", password, true);
         final Request req = br.createPostRequest(this.getApiBase() + "/user", query);
         final Map<String, Object> entries = this.callAPI(req);
         final Double creditsInDollarCent = ((Number) entries.get("balance")).doubleValue();
@@ -230,8 +229,8 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        UrlQuery query = new UrlQuery();
-        query.addAndReplace("password", URLEncode.encodeRFC2396(account.getPass())).addAndReplace("username", URLEncode.encodeRFC2396(account.getUser()));
+        UrlQuery query = new UrlQuery(true);
+        query.append("password", account.getPass(), true).append("username", account.getUser(), true);
         try {
             final Request req = br.createPostRequest(this.getApiBase() + "/captcha/" + response.getCaptchaSolverTaskID() + "/report", query);
             this.callAPI(req);

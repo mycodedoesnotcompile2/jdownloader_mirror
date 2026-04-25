@@ -10,15 +10,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
@@ -75,6 +66,16 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -288,9 +289,9 @@ public class ChallengeResponseController {
         if (solvers.size() == 0) {
             logger.info("No solver available!");
             if (c instanceof CloudflareTurnstileChallenge) {
-                showNoBrowserSolverInfoDialog(c, "Cloudflare Turnstile");
+                showNoBrowserSolverInfoDialog(c);
             } else if (c instanceof CutCaptchaChallenge) {
-                showNoBrowserSolverInfoDialog(c, "CutCaptcha");
+                showNoBrowserSolverInfoDialog(c);
             }
             /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");
@@ -364,22 +365,24 @@ public class ChallengeResponseController {
 
     protected final static Map<String, Long> TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new HashMap<String, Long>();
 
-    public <T> Thread showNoBrowserSolverInfoDialog(final Challenge<T> c, String captcha_challenge_type) {
-        if (captcha_challenge_type == null) {
-            captcha_challenge_type = c.getTypeID();
+    public <T> Thread showNoBrowserSolverInfoDialog(final Challenge<T> c) {
+        String captcha_challenge_type_title = null;
+        final CAPTCHA_TYPE captcha_type = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        if (captcha_type != null) {
+            captcha_challenge_type_title = captcha_type.getDisplayName();
+        } else {
+            logger.warning("captcha_type is null");
+            captcha_challenge_type_title = c.getTypeID();
         }
         synchronized (TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED) {
-            final Long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get(captcha_challenge_type);
+            final Long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get(captcha_challenge_type_title);
             if (lastDisplay != null && Time.systemIndependentCurrentJVMTimeMillis() - lastDisplay.longValue() < TimeUnit.HOURS.toMillis(1)) {
                 /* Dialog has been shown already just recently -> Do not display now. */
                 return null;
             }
-            TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.put(captcha_challenge_type, Time.systemIndependentCurrentJVMTimeMillis());
+            TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.put(captcha_challenge_type_title, Time.systemIndependentCurrentJVMTimeMillis());
         }
-        if (captcha_challenge_type != null && captcha_challenge_type.contains("turnstile")) {
-            captcha_challenge_type = "Cloudflare Turnstile";
-        }
-        final String captcha_challenge_type_final = captcha_challenge_type;
+        final String captcha_challenge_type_final = captcha_challenge_type_title;
         final Thread thread = new Thread() {
             public void run() {
                 try {

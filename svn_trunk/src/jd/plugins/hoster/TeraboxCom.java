@@ -57,7 +57,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 52697 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52714 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -169,17 +169,19 @@ public class TeraboxCom extends PluginForHost {
          * through pagination, this can take a while!
          */
         final PluginForDecrypt crawler = getNewPluginForDecryptInstance(getHost());
-        final CryptedLink param = new CryptedLink(link.getContainerUrl(), link);
-        if (link.getDownloadPassword() != null) {
+        final CryptedLink param = new CryptedLink(link.getPluginPatternMatcher(), link);
+        final String downloadpassword = link.getDownloadPassword();
+        if (downloadpassword != null) {
             /* Crawler should not ask user again for that password! */
-            param.setDecrypterPassword(link.getDownloadPassword());
+            param.setDecrypterPassword(downloadpassword);
         }
+        final String fid = this.getFID(link);
         try {
             /* 2021-04-24: Handling has been changed so array should only contain the one element we need! */
-            final ArrayList<DownloadLink> items = ((jd.plugins.decrypter.TeraboxComFolder) crawler).crawlFolder(this, param, account, this.getFID(link));
+            final ArrayList<DownloadLink> items = ((jd.plugins.decrypter.TeraboxComFolder) crawler).crawlFolder(this, param, account);
             DownloadLink target = null;
             for (final DownloadLink tmp : items) {
-                if (StringUtils.equals(this.getFID(tmp), this.getFID(link))) {
+                if (StringUtils.equals(this.getFID(tmp), fid)) {
                     target = tmp;
                     break;
                 }
@@ -506,10 +508,6 @@ public class TeraboxCom extends PluginForHost {
         } else {
             return super.canHandle(link, account);
         }
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

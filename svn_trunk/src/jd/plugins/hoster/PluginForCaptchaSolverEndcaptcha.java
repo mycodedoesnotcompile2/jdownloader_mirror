@@ -24,7 +24,6 @@ import jd.plugins.PluginException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ImageProvider.ImageProvider;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -43,7 +42,7 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigEndcaptcha;
 
-@HostPlugin(revision = "$Revision: 52443 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52718 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,9 +97,9 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
 
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        final UrlQuery query = new UrlQuery();
-        query.addAndReplace("username", URLEncode.encodeRFC2396(account.getUser()));
-        query.addAndReplace("password", URLEncode.encodeRFC2396(account.getPass()));
+        final UrlQuery query = new UrlQuery(true);
+        query.append("username", account.getUser(), true);
+        query.append("password", account.getPass(), true);
         final Request req = br.createPostRequest(this.getApiBase() + "/balance", query);
         this.callAPI(req);
         final Double creditsInDollarCent = Double.parseDouble(br.getRequest().getHtmlCode());
@@ -203,10 +202,10 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
         /* API docs: https://deathbycaptcha.com/api#api_details_report */
-        final UrlQuery query = new UrlQuery();
-        query.addAndReplace("username", URLEncode.encodeRFC2396(account.getUser()));
-        query.addAndReplace("password", URLEncode.encodeRFC2396(account.getPass()));
-        query.addAndReplace("captcha_id", response.getCaptchaSolverTaskID());
+        final UrlQuery query = new UrlQuery(true);
+        query.append("username", account.getUser(), true);
+        query.append("password", account.getPass(), true);
+        query.append("captcha_id", response.getCaptchaSolverTaskID(), true);
         try {
             final Request req = br.createPostRequest(this.getApiBase() + "/report", query);
             this.callAPI(req);

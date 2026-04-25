@@ -18,6 +18,21 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import jd.PluginWrapper;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
@@ -25,7 +40,6 @@ import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -45,22 +59,7 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigImaget
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.seamless.util.io.IO;
 
-import jd.PluginWrapper;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import net.miginfocom.swing.MigLayout;
-
-@HostPlugin(revision = "$Revision: 52455 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52716 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -168,15 +167,15 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         for (int i = 0; i < tryCount; i++) {
             final boolean isLastTry = i >= tryCount;
             final int currentLoginType = loginTypesToTry[i];
-            final UrlQuery query = new UrlQuery();
+            final UrlQuery query = new UrlQuery(true);
             query.addAndReplace("action", "REQUESTBALANCE");
             final String path;
             if (currentLoginType == ACCOUNT_LOGIN_TYPE_AUTHTOKEN) {
-                query.addAndReplace("token", URLEncode.encodeRFC2396(password));
+                query.append("token", password, true);
                 path = "/Forms/RequestBalanceToken.ashx";
             } else {
-                query.addAndReplace("username", URLEncode.encodeRFC2396(username));
-                query.addAndReplace("password", URLEncode.encodeRFC2396(password));
+                query.append("username", username, true);
+                query.append("password", password, true);
                 path = "/Forms/RequestBalance.ashx";
             }
             try {
@@ -332,16 +331,16 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
         /* API docs: https://www.imagetyperz.com/Forms/NewAPI.aspx */
-        UrlQuery query = new UrlQuery();
+        UrlQuery query = new UrlQuery(true);
         query.addAndReplace("action", "SETBADIMAGE");
         query.addAndReplace("imageid", response.getCaptchaSolverTaskID());
         final String path;
         if (this.isLoginViaAuthtoken(account)) {
-            query = query.addAndReplace("token", URLEncode.encodeRFC2396(account.getPass()));
+            query = query.append("token", account.getPass(), true);
             path = "/Forms/SetBadImageToken.htm";
         } else {
-            query.addAndReplace("username", URLEncode.encodeRFC2396(account.getPass()));
-            query.addAndReplace("username", URLEncode.encodeRFC2396(account.getUser()));
+            query.append("password", account.getPass(), true);
+            query.append("username", account.getUser(), true);
             path = "/Forms/SetBadImage.ashx";
         }
         try {

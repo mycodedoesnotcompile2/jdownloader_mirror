@@ -6,6 +6,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.config.Type;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -20,18 +29,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.config.Type;
-
-@DecrypterPlugin(revision = "$Revision: 49914 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52723 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebArchiveOrg extends PluginForDecrypt {
     private static final Pattern PATTERN_DIRECT = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OTHER  = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
@@ -83,6 +84,7 @@ public class WebArchiveOrg extends PluginForDecrypt {
         final Regex regexFile = new Regex(param.getCryptedUrl(), PATTERN_FILE);
         final String originalURL = new Regex(param.getCryptedUrl(), PATTERN_OTHER).getMatch(1);
         final PluginForDecrypt yt = getNewPluginForDecryptInstance("youtube.com");
+        final PluginForHost directhttp = getNewPluginForHostInstance("http links");
         final String youtubeVideoID = yt != null && yt.canHandle(originalURL) ? TbCmV2.getVideoIDFromUrl(param.getCryptedUrl()) : null;
         boolean looksLikeOfflineContent = false;
         if (youtubeVideoID != null) {
@@ -109,35 +111,47 @@ public class WebArchiveOrg extends PluginForDecrypt {
             final URLConnectionAdapter con = this.br.openRequestConnection(getRequest);
             try {
                 if (this.looksLikeDownloadableContent(con)) {
+                    /* Direct downloadable url */
                     final DownloadLink direct = getCrawler().createDirectHTTPDownloadLink(getRequest, con);
                     ret.add(direct);
+                    return ret;
+                }
+                /* Not a direct downloadable url -> Check what we got */
+                br.followConnection();
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    looksLikeOfflineContent = true;
+                } else if (!br.getURL().contains(fileID)) {
+                    /* E.g. redirect to main page */
+                    looksLikeOfflineContent = true;
                 } else {
-                    br.followConnection();
-                    if (br.getHttpConnection().getResponseCode() == 404) {
-                        looksLikeOfflineContent = true;
-                    } else if (!br.getURL().contains(fileID)) {
-                        /* E.g. redirect to main page */
-                        looksLikeOfflineContent = true;
-                    } else {
-                        if (PluginJsonConfig.get(getConfigInterface()).isCrawlEmbeddedFilesEnabled()) {
-                            final String links[] = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
-                            if (links != null) {
-                                final Set<String> dupes = new HashSet<String>();
-                                for (final String link : links) {
-                                    if (canHandle(link) && dupes.add(link) && PATTERN_DIRECT.matcher(link).matches()) {
-                                        ret.add(this.createDownloadlink(link));
-                                    }
+                    if (PluginJsonConfig.get(getConfigInterface()).isCrawlEmbeddedFilesEnabled()) {
+                        final String links[] = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+                        if (links != null) {
+                            final Set<String> dupes = new HashSet<String>();
+                            for (final String link : links) {
+                                if (!canHandle(link)) {
+                                    continue;
+                                }
+                                if (PATTERN_DIRECT.matcher(link).matches() && dupes.add(link)) {
+                                    ret.add(this.createDownloadlink(link));
+                                    continue;
+                                }
+                                final String websiteLink = new Regex(link, "https?://.*?(https*://.+)").getMatch(0);
+                                if (false && websiteLink != null && directhttp.canHandle(websiteLink) && dupes.add(link)) {
+                                    // currently shows a donation page, fake the "go click"
+                                    ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(link)));
+                                    continue;
                                 }
                             }
                         }
-                        /* E.g. embedded PDF */
-                        final String directurl = br.getRegex("<iframe id=\"playback\"[^>]*src=\"(https?://[^\"]+)").getMatch(0);
-                        if (ret.size() == 0 && directurl == null) {
-                            logger.info("URL is not supported or content is offline");
-                            looksLikeOfflineContent = true;
-                        } else {
-                            ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl)));
-                        }
+                    }
+                    /* E.g. embedded PDF */
+                    final String directurl = br.getRegex("<iframe id=\"playback\"[^>]*src=\"(https?://[^\"]+)").getMatch(0);
+                    if (ret.size() == 0 && directurl == null) {
+                        logger.info("URL is not supported or content is offline");
+                        looksLikeOfflineContent = true;
+                    } else {
+                        ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl)));
                     }
                 }
             } finally {
@@ -152,9 +166,8 @@ public class WebArchiveOrg extends PluginForDecrypt {
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-        } else {
-            return ret;
         }
+        return ret;
     }
 
     @PluginHost(host = "web.archive.org", type = Type.CRAWLER)

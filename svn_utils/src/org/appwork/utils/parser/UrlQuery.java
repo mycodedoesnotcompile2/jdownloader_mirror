@@ -5,6 +5,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -79,8 +80,14 @@ public class UrlQuery {
     }
 
     private final List<KeyValueStringEntry> list = new ArrayList<KeyValueStringEntry>();
+    private final boolean                   isFormData;
 
     public UrlQuery() {
+        this(false);
+    }
+
+    public UrlQuery(final boolean isFormData) {
+        this.isFormData = isFormData;
     }
 
     @Override
@@ -282,9 +289,23 @@ public class UrlQuery {
         if (value == null) {
             this.addAndReplace(key, "");
         } else {
-            this.addAndReplace(key, urlencode ? URLEncode.encodeRFC2396(value) : value);
+            this.addAndReplace(key, urlencode ? urlEncode(value) : value);
         }
         return this;
+    }
+
+    public boolean isFormData() {
+        return isFormData;
+    }
+
+    protected String urlEncode(final String value) {
+        if (isFormData()) {
+            try {
+                return URLEncoder.encode(value, "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+            }
+        }
+        return URLEncode.encodeURIComponent(value);
     }
 
     public UrlQuery appendEncoded(String key, String value) {

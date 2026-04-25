@@ -6,7 +6,7 @@ import javax.swing.Icon;
 
 import jd.plugins.DownloadLink;
 
-import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testhelper.IgnoreInAWTest;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;

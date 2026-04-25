@@ -1,7 +1,7 @@
 package org.jdownloader.api.downloads;
 
 import org.appwork.storage.Storable;
-import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testhelper.IgnoreInAWTest;
 import org.jdownloader.myjdownloader.client.json.DownloadListDiff;
 
 @IgnoreInAWTest

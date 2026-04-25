@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -39,12 +40,11 @@ import jd.plugins.PluginException;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51740 $", interfaceVersion = 5, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52716 $", interfaceVersion = 5, names = {}, urls = {})
 public class NaughtyBlgOrg extends antiDDoSForDecrypt {
     private enum Category {
         UNDEF,
@@ -120,8 +120,8 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
             form.put("action", "validate_input");
             form.put("nonce", nonce);
             form.put("post_id", post_id);
-            form.put("protection", URLEncode.encodeRFC2396(data_protection));
-            form.put("area", URLEncode.encodeRFC2396(data_area));
+            form.put("protection", URLEncoder.encode(data_protection, "UTF-8"));
+            form.put("area", URLEncoder.encode(data_area, "UTF-8"));
             form.put("captcha_id", data_psid);
             form.put("type", "recaptcha");
             try {

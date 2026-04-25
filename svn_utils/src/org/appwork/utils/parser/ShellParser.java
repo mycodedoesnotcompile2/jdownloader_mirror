@@ -70,7 +70,6 @@ public class ShellParser {
     }
 
     public static enum ShellParserHint {
-
         STYLE_UNIX,
         STYLE_WINDOWS_CMDEXE,
         STYLE_WINDOWS_POWERSHELL
@@ -93,7 +92,6 @@ public class ShellParser {
      * @param command
      * @return
      */
-
     public static java.util.List<String> splitCommandString(String command, ShellParserHint... hints) {
         // Style selection; default depends on OS
         boolean styleUnix;
@@ -111,7 +109,6 @@ public class ShellParser {
             styleCmd = false;
             break;
         }
-
         if (hints != null) {
             for (ShellParserHint h : hints) {
                 if (h == ShellParserHint.STYLE_UNIX) {
@@ -129,16 +126,13 @@ public class ShellParser {
                 }
             }
         }
-
         // Behavior per style
         final boolean singleQuoteActive = !styleCmd; // in CMD, single quotes are literal
         final boolean doubleQuoteActive = true; // all styles
         final char escForQuote = styleUnix ? '\\' : (stylePs ? '`' : '^'); // CMD: ^ only escapes quotes
         final char escGeneral = styleUnix ? '\\' : (stylePs ? '`' : '^');
-
         final java.util.List<String> ret = new ArrayList<String>();
         final StringBuilder acc = new StringBuilder(); // current token (concatenates across quote segments)
-
         while (true) {
             // 1) find next splitting whitespace (style-aware)
             int whitespace = -1;
@@ -147,7 +141,6 @@ public class ShellParser {
                 if (!Character.isWhitespace(ch)) {
                     continue;
                 }
-
                 if (styleUnix || stylePs) {
                     // In UNIX/PS, escGeneral can escape whitespace (e.g., "\ " or "` ")
                     int escapes = 0, ec = 1;
@@ -163,7 +156,6 @@ public class ShellParser {
                 whitespace = i;
                 break;
             }
-
             // 2) locate next unescaped single quote
             int q = singleQuoteActive ? command.indexOf('\'') : -1;
             if (singleQuoteActive) {
@@ -182,7 +174,6 @@ public class ShellParser {
                     q = command.indexOf('\'', q + 1);
                 }
             }
-
             // 3) locate next unescaped double quote
             int dq = doubleQuoteActive ? command.indexOf('"') : -1;
             if (doubleQuoteActive) {
@@ -201,9 +192,7 @@ public class ShellParser {
                     dq = command.indexOf('"', dq + 1);
                 }
             }
-
             final int min = ShellParser.min(whitespace, q, dq);
-
             // 4) nothing left -> flush & return
             if (min == Integer.MAX_VALUE) {
                 if (command.length() > 0) {
@@ -217,7 +206,6 @@ public class ShellParser {
                 }
                 return ret;
             }
-
             // 5) consume next element
             if (min == whitespace) {
                 String p = command.substring(0, min);
@@ -226,20 +214,17 @@ public class ShellParser {
                     p = p.substring(0, p.length() - 1);
                 }
                 acc.append(p);
-
                 String tok = unescapeSpecials(acc.toString(), styleUnix, styleCmd, stylePs, escGeneral).trim();
                 if (!tok.isEmpty()) {
                     ret.add(tok);
                 }
                 acc.setLength(0);
-
                 command = command.substring(min + 1);
             } else if (min == q) {
                 // single-quoted block (UNIX/PS only)
                 if (min > 0) {
                     acc.append(command.substring(0, min));
                 }
-
                 int nq = command.indexOf('\'', min + 1);
                 if (escForQuote != 0) {
                     while (nq != -1) {
@@ -272,7 +257,6 @@ public class ShellParser {
                     }
                     acc.append(prefix);
                 }
-
                 int nq = command.indexOf('"', min + 1);
                 if (escForQuote != 0) {
                     while (nq != -1) {
@@ -327,8 +311,8 @@ public class ShellParser {
                     i++;
                     continue;
                 } // ^" -> "
-                // caret before space is already removed when splitting;
-                // any other caret remains as literal.
+                  // caret before space is already removed when splitting;
+                  // any other caret remains as literal.
             }
             sb.append(c);
         }
@@ -336,6 +320,10 @@ public class ShellParser {
     }
 
     public static String createCommandLine(Style style, String... commandline) {
+        return createCommandLine(style, true, commandline);
+    }
+
+    public static String createCommandLine(Style style, boolean exceptionOnValidationError, String... commandline) {
         if (style == null) {
             switch (CrossSystem.getOSFamily()) {
             case WINDOWS:
@@ -394,10 +382,12 @@ public class ShellParser {
             final boolean parameterIsAlreadyQuoted = !cmd[i].equals(ensureNoQuotes);
             final boolean parameterContainsInternalQuotes = ensureNoQuotes.contains("\"");
             // handle forbidden quoptes constellations
-            if (isExe && parameterIsAlreadyQuoted && parameterContainsInternalQuotes) {
-                throw new IllegalArgumentException("Parameter " + i + " for *.exe call is quoted and contains internal quotes");
-            } else if (!isExe && parameterContainsInternalQuotes) {
-                throw new IllegalArgumentException("Parameter " + i + " for *.bat/cmd call contains internal quotes");
+            if (exceptionOnValidationError) {
+                if (isExe && parameterIsAlreadyQuoted && parameterContainsInternalQuotes) {
+                    throw new IllegalArgumentException("Parameter " + i + " for *.exe call is quoted and contains internal quotes");
+                } else if (!isExe && parameterContainsInternalQuotes) {
+                    throw new IllegalArgumentException("Parameter " + i + " for *.bat/cmd call contains internal quotes");
+                }
             }
             if (!escapingRequired && !parameterIsAlreadyQuoted) {
                 for (final char c : isExe ? new char[] { ' ', '\t', '\"', '<', '>' } : new char[] { ' ', '\t', '\"', '<', '>', '&', '|', '^' }) {
@@ -446,9 +436,8 @@ public class ShellParser {
     /**
      * Escape a single argument for use in a POSIX shell command line.
      *
-     * - If the argument only contains "safe" characters, it is returned as-is
-     * - Otherwise, it is enclosed in single quotes, and inner single quotes are
-     *   escaped using the standard <code>'foo'\'bar'</code> style.
+     * - If the argument only contains "safe" characters, it is returned as-is - Otherwise, it is enclosed in single quotes, and inner
+     * single quotes are escaped using the standard <code>'foo'\'bar'</code> style.
      */
     private static String escapeUnixArg(final String arg) {
         if (arg == null || arg.length() == 0) {

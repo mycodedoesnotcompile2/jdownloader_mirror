@@ -37,6 +37,24 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.FileBytesMap;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -96,24 +114,6 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.raf.FileBytesMap;
 
 //http://tools.ietf.org/html/draft-pantos-http-live-streaming-13
 public class HLSDownloader extends DownloadInterface {
@@ -666,15 +666,16 @@ public class HLSDownloader extends DownloadInterface {
     private volatile Object cachedStreamInfo = null;
 
     protected String getFFmpegFormat(final AbstractFFmpegBinary ffmpeg) throws Exception {
-        String name = link.getForcedFileName();
-        if (StringUtils.isEmpty(name)) {
-            name = link.getFinalFileName();
+        String name;
+        if (link.isNameSet()) {
+            name = link.getDefaultFileName(link.getLivePlugin());
+        } else {
+            name = link.getForcedFileName();
             if (StringUtils.isEmpty(name)) {
-                name = link.getRawName();
-            }
-            if (StringUtils.isEmpty(name)) {
-                final String url = link.getContentUrlOrPatternMatcher();
-                name = Plugin.extractFileNameFromURL(url);
+                name = link.getFinalFileName();
+                if (StringUtils.isEmpty(name)) {
+                    name = link.getRawName();
+                }
             }
         }
         String format = ffmpeg.getDefaultFormatByFileName(name);

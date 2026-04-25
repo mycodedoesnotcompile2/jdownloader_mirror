@@ -30,10 +30,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 //IMPORTANT: The name of the plugin is CORRECT!
-@HostPlugin(revision = "$Revision: 49988 $", interfaceVersion = 2, names = { "f2h.io" }, urls = { "https?://(?:www\\.)?(?:f2h(?:\\.nana\\d+)?\\.co\\.il|f2h\\.io)/((he/)?[a-z0-9]+|[0-9]+)" })
+@HostPlugin(revision = "$Revision: 52713 $", interfaceVersion = 2, names = { "f2h.io" }, urls = { "https?://(?:www\\.)?(?:f2h(?:\\.nana\\d+)?\\.co\\.il|f2h\\.io)/((he/)?[a-z0-9]+|[0-9]+)" })
 public class File2HostCom extends PluginForHost {
     public File2HostCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        /* 2026-04-24: Website is extremely slow */
+        br.setConnectTimeout(90 * 1000);
+        br.setReadTimeout(90 * 1000);
+        return br;
     }
 
     @Override
@@ -62,12 +71,8 @@ public class File2HostCom extends PluginForHost {
     }
 
     @Override
-    public String rewriteHost(final String host) {
-        if (host == null || host.equalsIgnoreCase("file2host.com")) {
-            return this.getHost();
-        } else {
-            return super.rewriteHost(host);
-        }
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
     }
 
     @Override
@@ -133,15 +138,7 @@ public class File2HostCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

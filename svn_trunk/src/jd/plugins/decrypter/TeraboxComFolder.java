@@ -52,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 52697 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52714 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,12 +147,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        return crawlFolder(this, param, account, null);
+        return crawlFolder(this, param, account);
     }
 
     public static AtomicReference<String> protocolAndSubdomain = new AtomicReference<String>();
 
-    public ArrayList<DownloadLink> crawlFolder(final Plugin callingPlugin, final CryptedLink param, final Account account, final String targetFileID) throws Exception {
+    public ArrayList<DownloadLink> crawlFolder(final Plugin callingPlugin, final CryptedLink param, final Account account) throws Exception {
         final String contenturl = getContentURL(param.getCryptedUrl());
         final String[] surlAndPath = extractUrlInfo(contenturl);
         String surl = surlAndPath[0];
@@ -271,9 +271,6 @@ public class TeraboxComFolder extends PluginForDecrypt {
             queryFolder.add("root", "1");
         }
         Map<String, Object> entries = null;
-        if (targetFileID != null) {
-            logger.info("Trying to find item with the following fs_id ONLY: " + targetFileID);
-        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
             queryFolder.addAndReplace("page", Integer.toString(page));
@@ -480,23 +477,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
                         }
                         dl._setFilePackage(fp);
                     }
-                    if (targetFileID == null) {
-                        /* We want to crawl all items. */
-                        distribute(dl);
-                        ret.add(dl);
-                    } else if (!StringUtils.equalsIgnoreCase(fsidStr, targetFileID)) {
-                        /* we' re looking for a single item but this is not it. */
-                        ret.add(dl);
-                    } else {
-                        /* We're looking for a single item and found it! */
-                        ret.clear();
-                        ret.add(dl);
-                        logger.info("Stopping because: Found item matching target fileID: " + targetFileID);
-                        return ret;
-                    }
+                    /* We want to crawl all items. */
+                    distribute(dl);
+                    ret.add(dl);
                 }
             }
-            logger.info("Crawled page" + page + " | Items on this page: " + ressourcelist.size() + " | Items found so far: " + ret.size());
+            logger.info("Crawled page " + page + " | Items on this page: " + ressourcelist.size() + " | Items found so far: " + ret.size());
             if (ressourcelist.size() < maxItemsPerPage) {
                 logger.info("Stopping because: Current page contains less items than: " + maxItemsPerPage + " (only " + ressourcelist.size() + ")");
                 break;

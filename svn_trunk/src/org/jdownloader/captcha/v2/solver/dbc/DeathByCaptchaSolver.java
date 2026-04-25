@@ -351,11 +351,11 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     private DBCGetUserResponse getUserData() throws UnsupportedEncodingException, IOException {
         final String username = config.getUserName();
         final String password = config.getPassword();
-        UrlQuery query = new UrlQuery();
+        UrlQuery query = new UrlQuery(true);
         if (StringUtils.isEmpty(username)) {
-            query = query.addAndReplace("authtoken", URLEncode.encodeRFC2396(password));
+            query = query.append("authtoken", password, true);
         } else {
-            query = query.addAndReplace("password", URLEncode.encodeRFC2396(password)).addAndReplace("username", URLEncode.encodeRFC2396(username));
+            query = query.append("password", password, true).append("username", username, true);
         }
         final String json = createNewBrowserInstance(null).postPage(API_BASE + "/user", query);
         if (StringUtils.containsIgnoreCase(json, "<htm")) {

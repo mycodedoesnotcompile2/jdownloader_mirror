@@ -45,7 +45,6 @@ import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.ImageProvider.ImageProvider;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -66,7 +65,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigDeathbycaptcha;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52443 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52718 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -169,12 +168,12 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         for (int i = 0; i < tryCount; i++) {
             final boolean isLastTry = i >= tryCount;
             final int currentLoginType = loginTypesToTry[i];
-            final UrlQuery query = new UrlQuery();
+            final UrlQuery query = new UrlQuery(true);
             if (currentLoginType == ACCOUNT_LOGIN_TYPE_AUTHTOKEN) {
-                query.addAndReplace("authtoken", URLEncode.encodeRFC2396(password));
+                query.append("authtoken", password, true);
             } else {
-                query.addAndReplace("username", URLEncode.encodeRFC2396(username));
-                query.addAndReplace("password", URLEncode.encodeRFC2396(password));
+                query.append("username", username, true);
+                query.append("password", password, true);
             }
             try {
                 final Request req = br.createPostRequest(this.getApiBase() + "/user", query);
@@ -318,11 +317,11 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
         /* API docs: https://deathbycaptcha.com/api#api_details_report */
-        UrlQuery query = new UrlQuery();
+        UrlQuery query = new UrlQuery(true);
         if (this.isLoginViaAuthtoken(account)) {
-            query.addAndReplace("authtoken", URLEncode.encodeRFC2396(account.getPass()));
+            query.append("authtoken", account.getPass(), true);
         } else {
-            query.addAndReplace("password", URLEncode.encodeRFC2396(account.getPass())).addAndReplace("username", URLEncode.encodeRFC2396(account.getUser()));
+            query.append("password", account.getPass(), true).append("username", account.getUser(), true);
         }
         try {
             final Request req = br.createPostRequest(this.getApiBase() + "/captcha/" + response.getCaptchaSolverTaskID() + "/report", query);
