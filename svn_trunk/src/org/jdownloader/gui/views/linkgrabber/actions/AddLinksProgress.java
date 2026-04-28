@@ -3,6 +3,7 @@ package org.jdownloader.gui.views.linkgrabber.actions;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dialog.ModalityType;
+import java.awt.FontMetrics;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.concurrent.atomic.AtomicReference;
@@ -77,11 +78,11 @@ public class AddLinksProgress extends AbstractDialog<Object> {
         p.add(duration = new JLabel(), "width 50:n:n,growx");
         p.add(new JLabel(new AbstractIcon(IconKey.ICON_GO_NEXT, 18)));
         p.add(label(_GUI.T.AddLinksProgress_found()));
-        p.add(old = new JLabel());
+        p.add(old = new JLabel(), "wmin " + getJLabelMinWidth("10000") + "lp");
         JLabel lbl;
         p.add(lbl = new JLabel(new AbstractIcon(IconKey.ICON_FILTER, 18)));
         lbl.setToolTipText(_GUI.T.AddLinksProgress_filter());
-        p.add(filtered = new JLabel(), "alignx right,sg 1");
+        p.add(filtered = new JLabel(), "alignx right,sg 1,wmin " + getJLabelMinWidth("10000") + "lp");
         startTime = System.currentTimeMillis();
         updateTimer = new Timer(500, new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -97,6 +98,12 @@ public class AddLinksProgress extends AbstractDialog<Object> {
         updateTimer.setRepeats(true);
         updateTimer.start();
         return p;
+    }
+
+    private final int getJLabelMinWidth(final String text) {
+        final JLabel label = new JLabel();
+        final FontMetrics metrics = label.getFontMetrics(label.getFont());
+        return metrics.stringWidth(text);
     }
 
     public Thread getAddLinksDialogThread(final LinkCollectingJob job, final AtomicReference<LinkCrawler> lcReference) {

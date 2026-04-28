@@ -99,10 +99,10 @@ public class MyJDownloaderPostRequest extends PostRequest implements MyJDownload
                     /*
                      * JSonObject has customized .toString which converts Map to Json!
                      */
-                    postParameters.add(new KeyValuePair(parameter.toString()));
+                    postParameters.add(new KeyValuePair(KeyValuePair.SOURCE.JSON, null, parameter.toString()));
                 } else {
                     final String jsonParameter = parameter + "";
-                    postParameters.add(new KeyValuePair(jsonParameter));
+                    postParameters.add(new KeyValuePair(KeyValuePair.SOURCE.JSON, null, jsonParameter));
                 }
             }
         }

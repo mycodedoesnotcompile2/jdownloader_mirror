@@ -9,6 +9,7 @@ import javax.swing.JComponent;
 
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
+import jd.plugins.PluginForHost;
 
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.contextmenu.MenuItemData;
@@ -54,7 +55,11 @@ public class LinkgrabberPluginLink extends MenuItemData implements MenuLink {
                 final Collection<PluginView<CrawledLink>> views = selectionInfo.getPluginViews();
                 final List<JComponent> menuEntries = new ArrayList<JComponent>();
                 for (PluginView<CrawledLink> pv : views) {
-                    final List<JComponent> pluginMenuEntries = pv.getPlugin().extendLinkgrabberContextMenu(menuBuilder.getCancelled(), root, pv, views);
+                    final PluginForHost plugin = pv.getPlugin();
+                    if (plugin == null) {
+                        continue;
+                    }
+                    final List<JComponent> pluginMenuEntries = plugin.extendLinkgrabberContextMenu(menuBuilder.getCancelled(), root, pv, views);
                     if (pluginMenuEntries != null) {
                         menuEntries.addAll(pluginMenuEntries);
                     }

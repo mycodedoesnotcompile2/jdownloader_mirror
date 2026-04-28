@@ -14,8 +14,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import javax.swing.Icon;
-
 import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcollector.LinkOrigin;
@@ -34,6 +32,7 @@ import jd.utils.JDUtilities;
 import net.sf.image4j.codec.ico.ICOEncoder;
 
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.remoteapi.exceptions.InternalApiException;
@@ -47,7 +46,10 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.images.IconIO;
+import org.appwork.utils.net.ChunkedOutputStream;
 import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.net.httpserver.requests.GetRequest;
+import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.RemoteAPIConfig;
@@ -82,7 +84,6 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     private void writeString(RemoteAPIResponse response, RemoteAPIRequest request, String string, boolean wrapCallback) throws InternalApiException {
         OutputStream out = null;
         try {
-
             if (wrapCallback && request.getJqueryCallback() != null) {
                 response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/json", false));
                 if (string == null) {
@@ -337,7 +338,7 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         }
         if (StringUtils.isNotEmpty(finalPasswords)) {
             final List<String> pws = new ArrayList<String>();
-            pws.add(finalPasswords);
+            pws.addAll(Arrays.asList(Regex.getLines(request.getParameterbyKey("finalPasswords"))));
             job.setArchivPasswords(pws);
             modifiers.add(new CrawledLinkModifier() {
                 @Override
@@ -397,43 +398,49 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     @Override
     public void add(RemoteAPIRequest request, RemoteAPIResponse response, String passwordParam, String sourceParam, String urlParam) throws InternalApiException {
         try {
+            final List<KeyValuePair> urlParameters = request.getRequestedURLParameters();
             String source = null;
-            final boolean keyValueParams = request.getParameterbyKey("urls") != null;
-            try {
-                if (keyValueParams) {
-                    source = request.getParameterbyKey("source");
-                } else if (request.getParameters() != null && request.getParameters().length >= 3) {
-                    source = request.getParameters()[2];
+            source: try {
+                source = request.getParameterbyKey("source");
+                if (source != null) {
+                    break source;
+                } else if (urlParameters != null && urlParameters.size() > 1) {
+                    source = urlParameters.get(urlParameters.size() - 2).value;
+                    break source;
+                } else if (request.getHttpRequest() instanceof GetRequest) {
+                    source = sourceParam;
+                    break source;
                 }
             } catch (IOException e) {
-            }
-            if (source == null) {
-                source = sourceParam;
             }
             askPermission(request, source, null);
             String urls = null;
-            try {
-                if (keyValueParams) {
-                    urls = request.getParameterbyKey("urls");
-                } else if (request.getParameters() != null && request.getParameters().length >= 4) {
-                    urls = request.getParameters()[3];
+            urls: try {
+                urls = request.getParameterbyKey("urls");
+                if (urls != null) {
+                    break urls;
+                } else if (urlParameters != null && urlParameters.size() > 0) {
+                    urls = urlParameters.get(urlParameters.size() - 1).value;
+                    break urls;
+                } else if (request.getHttpRequest() instanceof GetRequest) {
+                    urls = urlParam;
+                    break urls;
                 }
             } catch (IOException e) {
-            }
-            if (urls == null) {
-                urls = urlParam;
             }
             String passwords = null;
-            try {
-                if (keyValueParams) {
-                    passwords = request.getParameterbyKey("passwords");
-                } else if (request.getParameters() != null && request.getParameters().length >= 2) {
-                    passwords = request.getParameters()[1];
+            passwords: try {
+                passwords = request.getParameterbyKey("passwords");
+                if (passwords != null) {
+                    break passwords;
+                } else if (urlParameters != null && urlParameters.size() > 2) {
+                    passwords = urlParameters.get(urlParameters.size() - 3).value;
+                    break passwords;
+                } else if (request.getHttpRequest() instanceof GetRequest) {
+                    passwords = passwordParam;
+                    break passwords;
                 }
             } catch (IOException e) {
-            }
-            if (passwords == null) {
-                passwords = passwordParam;
             }
             final String finalPasswords = passwords;
             final String finalComment = request.getParameterbyKey("comment");
@@ -454,8 +461,9 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
             if (StringUtils.isNotEmpty(finalComment)) {
                 modifiers.add(new CommentModifier(finalComment));
             }
-            if (request.getParameterbyKey("autostart") != null) {
-                final Boolean finalAutostart = "true".equals(request.getParameterbyKey("autostart"));
+            final String autostart = request.getParameterbyKey("autostart");
+            if (autostart != null) {
+                final Boolean finalAutostart = "true".equals(autostart);
                 modifiers.add(new CrawledLinkModifier() {
                     @Override
                     public boolean modifyCrawledLink(CrawledLink link) {
@@ -467,7 +475,7 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
             }
             if (StringUtils.isNotEmpty(finalPasswords)) {
                 final List<String> pws = new ArrayList<String>();
-                pws.add(finalPasswords);
+                pws.addAll(Arrays.asList(Regex.getLines(request.getParameterbyKey("finalPasswords"))));
                 job.setArchivPasswords(pws);
                 modifiers.add(new CrawledLinkModifier() {
                     @Override
@@ -594,10 +602,14 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     public void favicon(RemoteAPIResponse response, RemoteAPIRequest request) throws InternalApiException {
         OutputStream out = null;
         try {
+            final AbstractIcon logo = new AbstractIcon(IconKey.ICON_LOGO_JD_LOGO_128_128, 32);
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "image/x-icon", false));
-            out = MyJDownloaderController.getOutputStream(response, request);
-            Icon logo = new AbstractIcon(IconKey.ICON_LOGO_JD_LOGO_128_128, 32);
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CACHE_CONTROL, "no-store, no-cache"));
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING, HTTPConstants.HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED));
+            response.setResponseCode(ResponseCode.SUCCESS_OK);
+            out = new ChunkedOutputStream(response.getOutputStream(true));
             ICOEncoder.write(IconIO.toBufferedImage(logo), out);
+            out.close();
         } catch (Throwable e) {
             throw new InternalApiException(e);
         } finally {

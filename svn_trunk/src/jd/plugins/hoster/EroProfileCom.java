@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.http.Browser;
@@ -40,7 +36,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(?:\\w+\\.)?eroprofile\\.com/(m|p)/(videos|photos)/view/([A-Za-z0-9\\-_]+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52724 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(?:\\w+\\.)?eroprofile\\.com/(m|p)/(videos|photos)/view/([A-Za-z0-9\\-_]+)" })
 public class EroProfileCom extends PluginForHost {
     public EroProfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -159,7 +159,7 @@ public class EroProfileCom extends PluginForHost {
                 /* Fallback */
                 filename = fid;
             }
-            dllink = br.getRegex("<\\s*div\\s+class=\"viewPhotoContainer\">\\s*<\\s*a\\s+href=\"((?:https?:)?//[^<>\"]*?)\"").getMatch(0);
+            dllink = br.getRegex("<\\s*div\\s+class\\s*=\\s*\"(?:viewPhotoContainer|photo-container)\">\\s*<\\s*a\\s+href=\"((?:https?:)?//[^<>\"]*?)\"").getMatch(0);
             if (dllink == null) {
                 dllink = br.getRegex("class\\s*=\\s*\"photoPlayer\"\\s*src\\s*=\\s*\"((?:https?:)?//[^<>\"]*?)\"").getMatch(0);
             }

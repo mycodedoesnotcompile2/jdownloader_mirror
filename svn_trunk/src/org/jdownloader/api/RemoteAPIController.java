@@ -18,6 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import jd.nutils.DiffMatchPatch;
+import jd.nutils.DiffMatchPatch.Diff;
+import jd.nutils.DiffMatchPatch.Patch;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -54,9 +58,13 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.HeaderCollection;
+import org.appwork.utils.net.NullOutputStream;
+import org.appwork.utils.net.httpserver.HttpServerConnection.ConnectionHook;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
+import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.requests.KeyValuePair;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.net.websocket.ReadWebSocketFrame;
 import org.appwork.utils.net.websocket.WebSocketEndPoint;
@@ -108,10 +116,6 @@ import org.jdownloader.myjdownloader.client.bindings.interfaces.EventsInterface;
 import org.jdownloader.myjdownloader.client.bindings.interfaces.Linkable;
 import org.jdownloader.myjdownloader.client.json.AbstractJsonData;
 import org.jdownloader.myjdownloader.client.json.ObjectData;
-
-import jd.nutils.DiffMatchPatch;
-import jd.nutils.DiffMatchPatch.Diff;
-import jd.nutils.DiffMatchPatch.Patch;
 
 public class RemoteAPIController {
     private static RemoteAPIController INSTANCE = new RemoteAPIController();
@@ -719,7 +723,22 @@ public class RemoteAPIController {
     }
 
     public Object call(final String namespace, final String methodName, Object... params) throws BasicRemoteAPIException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
-        final RemoteAPIMethod dummyMethod = this.rapi.getRemoteAPIMethod(new HttpRequest(null) {
+        final GetRequest dummyHttpRequest = new GetRequest(null) {
+            {
+                requestHeaders = new HeaderCollection();
+                requestHeaders.add(new HTTPHeader("jd.randomNumber", System.getProperty("jd.randomNumber")));
+            }
+
+            @Override
+            public boolean isSSL() {
+                return false;
+            }
+
+            @Override
+            public HTTP_VERSION getHTTPVersion() {
+                return HTTP_VERSION.HTTP_1_1;
+            }
+
             @Override
             public String getRequestedPath() {
                 return "/" + namespace + "/" + methodName;
@@ -731,15 +750,17 @@ public class RemoteAPIController {
             }
 
             @Override
-            public String[] getParametersbyKey(String key) throws IOException {
+            public List<KeyValuePair> getRequestedURLParameters() {
                 return null;
             }
 
             @Override
-            public RequestMethod getRequestMethod() {
-                return RequestMethod.GET;
+            public String[] getParametersbyKey(String key) throws IOException {
+                return null;
             }
-        });
+
+        };
+        final RemoteAPIMethod dummyMethod = this.rapi.getRemoteAPIMethod(dummyHttpRequest);
         final InterfaceHandler<?> iface = dummyMethod.getInterfaceHandler();
         final Method method = iface.getMethod(methodName, params.length);
         final ArrayList<String> stringParams = new ArrayList<String>();
@@ -750,18 +771,29 @@ public class RemoteAPIController {
         int count = 0;
         for (int i = 0; i < parameters.length; i++) {
             if (RemoteAPIRequest.class.isAssignableFrom(method.getParameterTypes()[i])) {
-                if (true) {
-                    final RemoteAPIRequest dummyRequest = new RemoteAPIRequest(iface, methodName, stringParams.toArray(new String[0]), null, null);
-                    parameters[i] = dummyRequest;
-                } else {
-                    throw new BasicRemoteAPIException("Not Found", ResponseCode.ERROR_NOT_FOUND);
-                }
+                final RemoteAPIRequest dummyRemoteAPIRequest = new RemoteAPIRequest(iface, methodName, stringParams.toArray(new String[0]), dummyHttpRequest, null);
+                parameters[i] = dummyRemoteAPIRequest;
             } else if (RemoteAPIResponse.class.isAssignableFrom(method.getParameterTypes()[i])) {
-                if (false) {
-                    parameters[i] = null;
-                } else {
-                    throw new BasicRemoteAPIException("Not Found", ResponseCode.ERROR_NOT_FOUND);
-                }
+                final HttpResponse dummyHttpResponse = new HttpResponse(null) {
+
+                    private final NullOutputStream devNull = new NullOutputStream();
+
+                    @Override
+                    public OutputStream getOutputStream(boolean sendResponseHeaders) throws IOException {
+                        return devNull;
+                    }
+
+                    @Override
+                    public void setHook(ConnectionHook hook) {
+                    }
+
+                    @Override
+                    public void closeConnection() {
+                    }
+
+                };
+                final RemoteAPIResponse dummyRemoteAPIResponse = new RemoteAPIResponse(dummyHttpResponse, rapi);
+                parameters[i] = dummyRemoteAPIResponse;
             } else {
                 try {
                     parameters[i] = RemoteAPI.convert(stringParams.get(count), method.getGenericParameterTypes()[i]);

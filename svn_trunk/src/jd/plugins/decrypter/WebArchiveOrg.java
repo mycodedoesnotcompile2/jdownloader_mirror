@@ -6,15 +6,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.config.Type;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -32,7 +23,15 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52723 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.Type;
+
+@DecrypterPlugin(revision = "$Revision: 52734 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebArchiveOrg extends PluginForDecrypt {
     private static final Pattern PATTERN_DIRECT = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OTHER  = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
@@ -51,7 +50,6 @@ public class WebArchiveOrg extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "web.archive.org" });
         return ret;
     }
@@ -108,7 +106,7 @@ public class WebArchiveOrg extends PluginForDecrypt {
             final String url = "https://web.archive.org/web/" + fileID + "if_" + "/" + linkpart;
             /* First check if maybe the user has added a directURL. */
             final GetRequest getRequest = br.createGetRequest(url);
-            final URLConnectionAdapter con = this.br.openRequestConnection(getRequest);
+            final URLConnectionAdapter con = br.openRequestConnection(getRequest);
             try {
                 if (this.looksLikeDownloadableContent(con)) {
                     /* Direct downloadable url */
@@ -124,7 +122,7 @@ public class WebArchiveOrg extends PluginForDecrypt {
                     /* E.g. redirect to main page */
                     looksLikeOfflineContent = true;
                 } else {
-                    if (PluginJsonConfig.get(getConfigInterface()).isCrawlEmbeddedFilesEnabled()) {
+                    if (get(getConfigInterface()).isCrawlEmbeddedFilesEnabled()) {
                         final String links[] = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
                         if (links != null) {
                             final Set<String> dupes = new HashSet<String>();
@@ -137,9 +135,10 @@ public class WebArchiveOrg extends PluginForDecrypt {
                                     continue;
                                 }
                                 final String websiteLink = new Regex(link, "https?://.*?(https*://.+)").getMatch(0);
-                                if (false && websiteLink != null && directhttp.canHandle(websiteLink) && dupes.add(link)) {
-                                    // currently shows a donation page, fake the "go click"
-                                    ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(link)));
+                                if (websiteLink != null && directhttp.canHandle(websiteLink) && dupes.add(websiteLink)) {
+                                    final String directURL = "https://web.archive.org/web/" + fileID + "if_" + "/" + websiteLink;
+                                    // rewrite to direct download URL
+                                    ret.add(this.createDownloadlink(directURL));
                                     continue;
                                 }
                             }
@@ -158,7 +157,7 @@ public class WebArchiveOrg extends PluginForDecrypt {
                 con.disconnect();
             }
         } else {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Unsupported URL");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Unsupported URL:" + param.getCryptedUrl());
         }
         if (ret.isEmpty()) {
             if (looksLikeOfflineContent) {

@@ -21,6 +21,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -33,9 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52726 $", interfaceVersion = 3, names = {}, urls = {})
 public class ExLoadCom extends XFileSharingProBasic {
     public ExLoadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -69,7 +69,7 @@ public class ExLoadCom extends XFileSharingProBasic {
         return ExLoadCom.buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern TYPE_SPECIAL = Pattern.compile("https?://[^/]+/dl\\?op=download1\\&id=([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SPECIAL = Pattern.compile("https?://[^/]+/dl\\?op=download1\\&id=([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -81,11 +81,11 @@ public class ExLoadCom extends XFileSharingProBasic {
 
     @Override
     protected String getContentURL(final DownloadLink link) {
-        final Regex special = new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL);
+        final Regex special = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL);
         if (special.patternFind()) {
             /* Return links for "normal" linktype */
             final String fuid = special.getMatch(0);
-            return this.getMainPage(link) + this.buildURLPath(link, fuid, URL_TYPE.NORMAL);
+            return "https://" + getHost() + this.buildURLPath(link, fuid, URL_TYPE.NORMAL);
         } else {
             return super.getContentURL(link);
         }
@@ -175,7 +175,7 @@ public class ExLoadCom extends XFileSharingProBasic {
 
     @Override
     public String getFUIDFromURL(final DownloadLink link) {
-        final String fuidFromSpecialLinktype = new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL).getMatch(0);
+        final String fuidFromSpecialLinktype = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL).getMatch(0);
         if (fuidFromSpecialLinktype != null) {
             return fuidFromSpecialLinktype;
         } else {
@@ -188,7 +188,7 @@ public class ExLoadCom extends XFileSharingProBasic {
         if (link == null) {
             return null;
         }
-        if (new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL).patternFind()) {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL).patternFind()) {
             return URL_TYPE.NORMAL;
         } else {
             return super.getURLType(link);

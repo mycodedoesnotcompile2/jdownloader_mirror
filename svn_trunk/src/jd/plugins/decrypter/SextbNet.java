@@ -20,25 +20,31 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 52724 $", interfaceVersion = 3, names = {}, urls = {})
 public class SextbNet extends PluginForDecrypt {
     public SextbNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,6 +53,7 @@ public class SextbNet extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        PornHubCom.setSSLSocketStreamOptions(br);// TLS1.2 blocked
         br.setFollowRedirects(true);
         return br;
     }
@@ -74,7 +81,7 @@ public class SextbNet extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9\\-_]+)$");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9\\-_]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -96,7 +103,10 @@ public class SextbNet extends PluginForDecrypt {
             /* 404 error page with http response 200 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String title = br.getRegex("<title>([^>]+)</title>").getMatch(0);
+        String title = br.getRegex("<title>\\s*([^>]+)\\s*</title>").getMatch(0);
+        if ("Access Restricted".endsWith(title) || br.containsHTML("Sorry, this website is currently unavailable in your region or has been temporarily restricted")) {
+            throw new DecrypterRetryException(RetryReason.GEO, "Sorry, this website is currently unavailable in your region or has been temporarily restricted");
+        }
         if (title == null) {
             /* Fallback */
             title = slug.replace("-", " ").trim();
@@ -108,6 +118,11 @@ public class SextbNet extends PluginForDecrypt {
         }
         final String[] mirrorIDs = br.getRegex("data-id=\"(\\d+)").getColumn(0);
         if (mirrorIDs == null || mirrorIDs.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        String pt = br.getRegex("window\\.__pt\\s*=\\s*\"(.*?)\"").getMatch(0);
+        String pk = br.getRegex("window\\.__pk\\s*=\\s*\"(.*?)\"").getMatch(0);
+        if (pt == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final HashSet<String> dupes = new HashSet<String>();
@@ -126,9 +141,21 @@ public class SextbNet extends PluginForDecrypt {
             final UrlQuery query = new UrlQuery();
             query.add("episode", mirrorID);
             query.add("filmId", filmID);
-            brc.postPage("/ajax/player", query);
+            query.add("pt", pt);
+            Request request = brc.createPostRequest("/ajax/player", query);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://sextb.net");
+            request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            brc.getPage(request);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String html = entries.get("player").toString();
+            String player_enc = (String) entries.get("player_enc");
+            String html = null;
+            if (player_enc != null) {
+                html = xorDecrypt(player_enc, pk);
+                pk = (String) entries.get("next_pk");
+                pt = (String) entries.get("next_pt");
+            } else {
+                html = entries.get("player").toString();
+            }
             if (StringUtils.containsIgnoreCase(html, "This is a server for VIP Members")) {
                 logger.info("Potential premium only mirror: " + mirrorID);
             }
@@ -149,5 +176,25 @@ public class SextbNet extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    private String xorDecrypt(String encoded, String key) {
+        // Validierung wie im Original
+        if (encoded == null || encoded.isEmpty() || key == null || key.isEmpty()) {
+            return "";
+        }
+        // 1. Base64-Dekodierung (entspricht atob)
+        byte[] decodedBytes = Base64.decode(encoded);
+        StringBuilder result = new StringBuilder();
+        // 2. XOR-Verknüpfung
+        for (int i = 0; i < decodedBytes.length; i++) {
+            // Wir holen uns den entsprechenden Character des Keys (Modulo für Wiederholung)
+            char keyChar = key.charAt(i % key.length());
+            // XOR Operation: Das Byte wird mit dem Key-Char verknüpft
+            // In Java ergibt (byte ^ char) einen int, den wir zurück in char casten
+            char decryptedChar = (char) (decodedBytes[i] ^ keyChar);
+            result.append(decryptedChar);
+        }
+        return result.toString();
     }
 }

@@ -333,10 +333,10 @@ public abstract class AbstractPostRequest extends HttpRequest {
                             /*
                              * JSonObject has customized .toString which converts Map to Json!
                              */
-                            ret.add(new KeyValuePair(null, parameter.toString()));
+                            ret.add(new KeyValuePair(KeyValuePair.SOURCE.JSON, null, parameter.toString()));
                         } else {
                             final String jsonParameter = getDeser(this).toString(parameter, SC.NETWORK_TRANSFER);
-                            ret.add(new KeyValuePair(null, jsonParameter));
+                            ret.add(new KeyValuePair(KeyValuePair.SOURCE.JSON, null, jsonParameter));
                         }
                     }
                     return ret;
@@ -347,7 +347,13 @@ public abstract class AbstractPostRequest extends HttpRequest {
                 final byte[] formBytes = IO.readStream(-1, inputStream);
                 String formString = new String(formBytes, charSet);
                 formString = modifyByContentType(content_type, formString);
-                return HttpServerConnection.parseParameterList(formString);
+                final List<KeyValuePair> ret = HttpServerConnection.parseParameterList(formString);
+                if (ret != null) {
+                    for (KeyValuePair kvp : ret) {
+                        kvp.source = KeyValuePair.SOURCE.FORM;
+                    }
+                }
+                return ret;
             }
             case UNKNOWN:
             default:

@@ -109,7 +109,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                 final String params[] = parameter.split("=", 2);
                 if (params.length == 1) {
                     /* no value */
-                    requestedURLParameters.add(new KeyValuePair(null, URLDecoder.decode(params[0], "UTF-8")));
+                    requestedURLParameters.add(new KeyValuePair(KeyValuePair.SOURCE.QUERY, null, URLDecoder.decode(params[0], "UTF-8")));
                 } else {
                     /* key = value */
                     if ("_".equals(params[0])) {
@@ -118,7 +118,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
                         // + params[1]);
                         continue;
                     }
-                    requestedURLParameters.add(new KeyValuePair(URLDecoder.decode(params[0], "UTF-8"), URLDecoder.decode(params[1], "UTF-8")));
+                    requestedURLParameters.add(new KeyValuePair(KeyValuePair.SOURCE.QUERY, URLDecoder.decode(params[0], "UTF-8"), URLDecoder.decode(params[1], "UTF-8")));
                 }
             }
         }
@@ -225,8 +225,8 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
     }
 
     /**
-     * Returns the nanosecond value (e.g. {@link System#nanoTime()}) when this socket was accepted. Use with
-     * {@link System#nanoTime()} to compute elapsed time since accept. 0 if unknown (e.g. connection created before this was tracked).
+     * Returns the nanosecond value (e.g. {@link System#nanoTime()}) when this socket was accepted. Use with {@link System#nanoTime()} to
+     * compute elapsed time since accept. 0 if unknown (e.g. connection created before this was tracked).
      *
      * @return socket connection accept time in nanoseconds, or 0 if unknown
      */

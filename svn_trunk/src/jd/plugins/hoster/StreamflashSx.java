@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52726 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamflashSx extends PluginForHost {
     public StreamflashSx(PluginWrapper wrapper) {
         super(wrapper);
@@ -130,9 +130,6 @@ public class StreamflashSx extends PluginForHost {
     }
 
     private String getContentURL(final DownloadLink link) {
-        if (link == null) {
-            return null;
-        }
         final String originalURL = link.getPluginPatternMatcher();
         if (originalURL == null) {
             return null;
@@ -177,7 +174,7 @@ public class StreamflashSx extends PluginForHost {
             link.setName(fid + ext_default);
         }
         this.setBrowserExclusive();
-        br.getPage(this.getContentURL(link));
+        br.getPage(getContentURL(link));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*This video was deleted")) {

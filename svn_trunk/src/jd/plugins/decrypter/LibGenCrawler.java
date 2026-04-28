@@ -23,9 +23,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,7 +40,10 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.LibGenInfo;
 
-@DecrypterPlugin(revision = "$Revision: 52549 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 52724 $", interfaceVersion = 2, names = {}, urls = {})
 public class LibGenCrawler extends PluginForDecrypt {
     public LibGenCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class LibGenCrawler extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         /* Keep in sync with hoster- and crawler plugin! */
-        ret.add(new String[] { "libgen.li", "libgen.gs", "libgen.lc", "libgen.rocks", "libgen.org", "libgen.vg", "libgen.io", "gen.lib.rus.ec", "booksdl.org", "libgen.pm", "libgen.rs", "libgen.is", "libgen.st", "library.lol", "libgen.fun", "libgen.la", "libgen.bz", "libgen.gl", "llhlf.com" });
+        ret.add(new String[] { "libgen.li", "libgen.gs", "libgen.lc", "libgen.rocks", "libgen.org", "libgen.vg", "libgen.io", "gen.lib.rus.ec", "booksdl.org", "libgen.pm", "libgen.rs", "libgen.is", "libgen.st", "libgen.fun", "libgen.la", "libgen.bz", "libgen.gl", "llhlf.com" });
         return ret;
     }
 
@@ -86,6 +86,7 @@ public class LibGenCrawler extends PluginForDecrypt {
         deadDomains.add("libgen.pm");
         deadDomains.add("libgen.rocks");
         deadDomains.add("libgen.st");
+        deadDomains.add("library.lol");
         return deadDomains;
     }
 
