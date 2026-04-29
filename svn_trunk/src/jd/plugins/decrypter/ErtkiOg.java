@@ -16,6 +16,9 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -30,63 +33,106 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48342 $", interfaceVersion = 3, names = { "erotelki.org" }, urls = { "http://(www\\.)?erotelki\\.org/([\\w\\-]+/([\\w\\-]+/)?\\d+\\-[\\w+\\-]+\\.html|engine/go\\.php\\?url=[^<>\"\\']+)" })
+@DecrypterPlugin(revision = "$Revision: 52740 $", interfaceVersion = 3, names = {}, urls = {})
 public class ErtkiOg extends PluginForDecrypt {
     public ErtkiOg(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "erotelki.org" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_CONTENT  = Pattern.compile("/((photos|videos)/)?([\\w\\-]+)/(\\d+)\\-([\\w+\\-]+)\\.html", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_REDIRECT = Pattern.compile("/engine/go\\.php\\?url=([^<>\"']+)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_CONTENT.pattern().substring(1) + "|" + PATTERN_REDIRECT.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
     // DEV NOTES
-    // newer content is base64encoded with occasional htmlencoding characters at
+    // newer content is base64encoded with occasional html encoding characters at
     // the end of string, mainly for =chars
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String parameter = param.getCryptedUrl();
+        final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(false);
         br.setCookiesExclusive(true);
-        if (parameter.matches("http://(www\\.)?erotelki\\.org/[\\w\\-]+/([\\w\\-]+/)?\\d+\\-[\\w+\\-]+\\.html")) {
+        final Regex regex_content = new Regex(parameter, PATTERN_CONTENT);
+        if (regex_content.patternFind()) {
+            final String title_from_url = regex_content.getMatch(4);
             br.getPage(parameter);
-            if (br.containsHTML(">К сожалению, данная страница для Вас не доступна, возможно был изменен ее адрес или она была удалена\\.") || this.br.getHttpConnection().getResponseCode() == 404) {
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(">\\s*К сожалению, данная страница для Вас не доступна, возможно был изменен ее адрес или она была удалена\\.")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            // set packagename
-            String fpName = br.getRegex("<title>(.*?) \\&raquo\\;").getMatch(0);
-            if (fpName == null) {
-                fpName = br.getRegex("<h1 class=\"title_h\">(.*?)</h1>").getMatch(0);
+            String title = br.getRegex("<title>(.*?) \\&raquo\\;").getMatch(0);
+            if (title == null) {
+                title = br.getRegex("<h1 class=\"title_h\">(.*?)</h1>").getMatch(0);
             }
-            if (fpName == null) {
-                fpName = br.getRegex("<meta name=\"description\" content=\"NUDolls (.*?)\" />").getMatch(0);
+            if (title == null) {
+                title = br.getRegex("<meta name=\"description\" content=\"NUDolls (.*?)\" />").getMatch(0);
             }
-            // now we find
-            final String[] regexes = { "url=([^<>\"\\']+)", "<a href=\"([^\"\\'<>]+)\" target=\"_blank\">", "href=\"(http://(www\\.)?erotelki\\.org/uploads/posts/[^<>\"]*?)\" onclick=\"return hs\\.expand", "\"(http://(www\\.)?erotelki\\.org/uploads/posts/[^<>\"]*?)\"" };
+            final String[] regexes = { "url=([^<>\"']+)", "<a href=\"([^\"\\'<>]+)\" target=\"_blank\">", "href=\"(https?://(?:www\\.)?erotelki\\.org/uploads/posts/[^<>\"]*?)\" onclick=\"return hs\\.expand", "\"(https?://(?:www\\.)?erotelki\\.org/uploads/posts/[^<>\"]*?)\"" };
+            final HashSet<String> dupes = new HashSet<String>();
             for (final String regex : regexes) {
-                final String[] finallinks = br.getRegex(regex).getColumn(0);
-                if (finallinks != null) {
-                    for (final String link : finallinks) {
-                        /* Skip these as we get them directly via RegEx already */
-                        if (link.contains("engine/")) {
-                            continue;
-                        }
-                        String final_link;
-                        if (!link.startsWith("http")) {
-                            final_link = Encoding.Base64Decode(Encoding.htmlDecode(link));
-                        } else {
-                            final_link = link;
-                            if (final_link.matches("(?i).+erotelki\\.org/uploads/.+")) {
-                                final_link = DirectHTTP.createURLForThisPlugin(final_link);
-                            }
-                        }
-                        ret.add(createDownloadlink(final_link));
+                final String[] urls = br.getRegex(regex).getColumn(0);
+                if (urls == null) {
+                    continue;
+                }
+                for (final String url : urls) {
+                    if (new Regex(url, PATTERN_REDIRECT).patternFind()) {
+                        /* Skip these links here as they will be handled separately, see "url=" regex that picks up base64 elements. */
+                        continue;
                     }
+                    if (!dupes.add(url)) {
+                        /* Skip dupes */
+                        continue;
+                    }
+                    final String finalurl;
+                    if (url.startsWith("aHR0")) {
+                        /* Base64 encoded url */
+                        finalurl = Encoding.Base64Decode(Encoding.htmlDecode(url));
+                    } else if (url.matches("(?i).+erotelki\\.org/uploads/.+")) {
+                        finalurl = DirectHTTP.createURLForThisPlugin(url);
+                    } else {
+                        finalurl = url;
+                    }
+                    ret.add(createDownloadlink(finalurl));
                 }
             }
-            if (fpName != null) {
-                FilePackage fp = FilePackage.getInstance();
-                fp.setName(fpName);
-                fp.addLinks(ret);
+            final FilePackage fp = FilePackage.getInstance();
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
+                fp.setName(title);
+            } else {
+                /* Fallback */
+                logger.warning("Failed to find title in html code");
+                fp.setName(title_from_url.replace("-", " ").trim());
             }
+            fp.addLinks(ret);
         } else {
-            String finallink = Encoding.Base64Decode(Encoding.htmlDecode(new Regex(parameter, "url=([^<>\"\\']+)").getMatch(0)));
+            final String finallink = Encoding.Base64Decode(Encoding.htmlDecode(new Regex(parameter, PATTERN_REDIRECT).getMatch(0)));
             ret.add(createDownloadlink(finallink));
         }
         return ret;

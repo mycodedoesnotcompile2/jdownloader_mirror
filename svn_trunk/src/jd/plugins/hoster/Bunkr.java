@@ -9,17 +9,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.encoding.URLEncode.Decoder;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -40,7 +32,16 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 52074 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.encoding.URLEncode.Decoder;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 52736 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -818,16 +819,16 @@ public class Bunkr extends PluginForHost {
         } else if (parsedExpectedFilesize > 0 && con.getCompleteContentLength() > 0 && con.getCompleteContentLength() < (parsedExpectedFilesize * 0.5)) {
             /*
              * Content-Type: image/jpeg
-             *
+             * 
              * Content-Length: 5534281
-             *
+             * 
              * Cf-Bgj: imgq:100,h2pri
-             *
+             * 
              * Cf-Polished: origSize=5817221
              */
             final String origSize = new Regex(con.getHeaderField("Cf-Polished"), "origSize=(\\d+)").getMatch(0);
             if (origSize == null || Long.parseLong(origSize) == parsedExpectedFilesize) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is too small: File under maintenance?", 1 * 60 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is too small: File under maintenance?", TimeUnit.HOURS.toMillis(1));
             } else if (Long.parseLong(origSize) != parsedExpectedFilesize) {
                 logger.info("apply cloudflare polish workaround:" + origSize + "!=" + parsedExpectedFilesize);
                 link.setVerifiedFileSize(-1);
@@ -836,13 +837,17 @@ public class Bunkr extends PluginForHost {
     }
 
     private void handleHTMLErrors(final DownloadLink link, final Browser br) throws PluginException {
+        if (br.containsHTML(">\\s*Server under maintenance\\s*<")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "The server hosting this file is temporarily unavailable for maintenance", TimeUnit.HOURS.toMillis(2));
+        }
+
         final String downloadDisabledError = br.getRegex("class=\"down_disabled\"[^>]*>([^<]+)</div>").getMatch(0);
         if (downloadDisabledError != null) {
             /*
              * E.g. <div class="down_disabled">The server hosting this file is currently overloaded. We've limited the download of this file
              * for now until the server is no longer overloaded. Apologies.</div>
              */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, Encoding.htmlDecode(downloadDisabledError).trim(), 2 * 60 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, Encoding.htmlDecode(downloadDisabledError).trim(), TimeUnit.HOURS.toMillis(2));
         }
     }
 

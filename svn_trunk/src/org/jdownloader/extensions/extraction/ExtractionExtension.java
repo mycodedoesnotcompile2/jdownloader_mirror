@@ -759,19 +759,25 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         }
     }
 
-    public static final ThreadLocal<Map<Object, Object>> ARCHIVE_FACTORY_OPTIMIZATION = new ThreadLocal<Map<Object, Object>>();
+    public static final ThreadLocal<Map<Object, Object>> ARCHIVE_FACTORY_OPTIMIZATION              = new ThreadLocal<Map<Object, Object>>();
+    private static final String                          ARCHIVE_FACTORY_OPTIMIZATION_ARCHIVES     = "archives";
+    private static final String                          ARCHIVE_FACTORY_OPTIMIZATION_ARCHIVEIDSET = "skipArchiveIDSet";
 
     public static boolean isAlreadyProcessed(ArchiveFactory factory) {
         final Map<Object, Object> map = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
         if (map == null) {
             return false;
         }
-        final Object archives = map.get("archives");
-        if (archives == null) {
-            return false;
+        final Object archives;
+        final Set<String> skipArchiveIDSet;
+        synchronized (map) {
+            archives = map.get(ARCHIVE_FACTORY_OPTIMIZATION_ARCHIVES);
+            if (archives == null) {
+                return false;
+            }
+            skipArchiveIDSet = (Set<String>) map.get(ARCHIVE_FACTORY_OPTIMIZATION_ARCHIVEIDSET);
         }
         synchronized (archives) {
-            final Set<String> skipArchiveIDSet = (Set<String>) map.get("skipArchiveIDSet");
             if (skipArchiveIDSet == null) {
                 return false;
             } else if (skipArchiveIDSet.contains(factory.getArchiveID())) {
@@ -785,9 +791,9 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     public List<Archive> getArchivesFromPackageChildren(final List<? extends Object> nodes, Set<String> ignoreArchiveIDs, final int maxArchives) {
         final Map<Object, Object> packageChildrenCache = new HashMap<Object, Object>();
         final HashSet<String> skipArchiveIDSet = new HashSet<String>();
-        packageChildrenCache.put("skipArchiveIDSet", skipArchiveIDSet);
+        packageChildrenCache.put(ARCHIVE_FACTORY_OPTIMIZATION_ARCHIVEIDSET, skipArchiveIDSet);
         final ArrayList<Archive> archives = new ArrayList<Archive>();
-        packageChildrenCache.put("archives", archives);
+        packageChildrenCache.put(ARCHIVE_FACTORY_OPTIMIZATION_ARCHIVES, archives);
         if (ignoreArchiveIDs != null) {
             skipArchiveIDSet.addAll(ignoreArchiveIDs);
         }
@@ -807,25 +813,38 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                     }
                     final File directory = LinkTreeUtils.getDownloadDirectory(parentNode);
                     List<AbstractPackageChildrenNode> packageChildren = null;
-                    getPackageChildren: synchronized (packageChildrenCache) {
-                        packageChildren = (List<AbstractPackageChildrenNode>) packageChildrenCache.get(parentNode);
-                        if (packageChildren != null) {
-                            break getPackageChildren;
+                    getPackageChildren: {
+                        synchronized (packageChildrenCache) {
+                            packageChildren = (List<AbstractPackageChildrenNode>) packageChildrenCache.get(parentNode);
+                            if (packageChildren != null) {
+                                break getPackageChildren;
+                            }
                         }
                         final ModifyLock modifyLock = parentNode.getModifyLock();
+                        // check synchronized und modifyLock
                         boolean readL = modifyLock.readLock();
                         try {
-                            packageChildrenCache.put(parentNode, packageChildren = new CopyOnWriteArrayList<AbstractPackageChildrenNode>(parentNode.getChildren()));
+                            packageChildren = new CopyOnWriteArrayList<AbstractPackageChildrenNode>(parentNode.getChildren());
                         } finally {
                             modifyLock.readUnlock(readL);
                         }
-                        if (directory != null && !packageChildrenCache.containsKey(directory)) {
-                            final File[] files = directory.listFiles();
-                            if (files != null) {
-                                packageChildrenCache.put(directory, new CopyOnWriteArrayList<File>(files));
-                            } else {
-                                packageChildrenCache.put(directory, null);
+                        directory: if (directory != null) {
+                            synchronized (packageChildrenCache) {
+                                if (packageChildrenCache.containsKey(directory)) {
+                                    break directory;
+                                }
                             }
+                            final File[] files = directory.listFiles();
+                            synchronized (packageChildrenCache) {
+                                if (files != null) {
+                                    packageChildrenCache.put(directory, new CopyOnWriteArrayList<File>(files));
+                                } else {
+                                    packageChildrenCache.put(directory, null);
+                                }
+                            }
+                        }
+                        synchronized (packageChildrenCache) {
+                            packageChildrenCache.put(parentNode, packageChildren);
                         }
                         return packageChildren;
                     }

@@ -62,7 +62,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52620 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52738 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -840,13 +840,22 @@ public abstract class TurbobitCore extends PluginForHost {
                     if (mirrorList != null) {
                         break;
                     } else if (verifiedLogin) {
+                        if (Boolean.FALSE.equals(downloadmap.get("premium"))) {
+                            /* we are no longer premium ? */
+                            throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+                        } else if (mirrorList == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
                         break;
                     }
                     logger.info("Looks like session has expired -> Ensuring that we're logged in");
-                    this.login(account, true);
+                    final Map<String, Object> entries = this.login(account, true);
+                    if (entries != null) {
+                        parseAccountInfo(account, account.getAccountInfo(), entries);
+                    }
                     verifiedLogin = true;
-                    // continue;
                 } while (!this.isAbort());
+
                 mirrors = mirrorList.toArray(new String[0]);
                 logger.info("Available premium mirrors: " + mirrors.length);
             } else {

@@ -22,9 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -38,7 +35,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52726 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52741 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamflashSx extends PluginForHost {
     public StreamflashSx(PluginWrapper wrapper) {
         super(wrapper);
@@ -179,6 +179,8 @@ public class StreamflashSx extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*This video was deleted")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\sThis video is no longer available")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* 2025-07-08: Filename in h5 tag is only available for original file uploader */
         String filename = br.getRegex("<h5 style=\"color: #e0e0e0; font-weight: 500;\"[^>]*>([^<]+)</h5>").getMatch(0);
@@ -200,23 +202,29 @@ public class StreamflashSx extends PluginForHost {
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         final String fid = this.getFID(link);
-        try {
-            final String viewToken = br.getRegex("const viewToken = \"([a-f0-9]{64})\";").getMatch(0);
-            if (viewToken == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find viewToken");
+        if (false) {
+            // no longer needed?
+            try {
+                final String viewToken = br.getRegex("const\\s*viewToken\\s*=\\s*\"([a-f0-9]{64})\";").getMatch(0);
+                if (viewToken == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find viewToken");
+                }
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("/record_view.php?id=" + fid + "&token=" + viewToken);
+            } catch (final Throwable e) {
+                logger.log(e);
+                logger.info("View count handling failed");
             }
-            final Browser brc = br.cloneBrowser();
-            brc.getPage("/record_view.php?id=" + fid + "&token=" + viewToken);
-        } catch (final Throwable e) {
-            logger.log(e);
-            logger.info("View count handling failed");
         }
-        final String officialVideoDownload = br.getRegex("\"(download_page\\.php\\?video_id=" + fid + ")").getMatch(0);
+        final String officialVideoDownload = br.getRegex("\"(download_page\\.php\\?v(?:ideo_id)?=" + fid + ")").getMatch(0);
         if (officialVideoDownload != null) {
             /* Prefer official video download */
             logger.info("Performing official video download");
             br.getPage(officialVideoDownload);
-            final Form dlform = br.getFormbyKey("video_id");
+            Form dlform = br.getFormbyKey("video_id");
+            if (dlform == null) {
+                dlform = br.getFormbyKey("v");
+            }
             if (dlform == null) {
                 if (br.getHttpConnection().getResponseCode() == 403) {
                     /* Along with plaintext response "Downloads are not allowed for this video." */
@@ -232,8 +240,12 @@ public class StreamflashSx extends PluginForHost {
             }
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform, this.isResumeable(link, null), this.getMaxChunks(link, null));
         } else {
+            final String videoID = br.getRegex("const\\s*videoId\\s*=\\s*(\\d+)").getMatch(0);
+            if (videoID == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             logger.info("Performing stream download");
-            final String dllink = "/stream.php?id=" + fid + "&type=video";
+            final String dllink = "/stream.php?id=" + videoID + "&type=video";
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         }
         this.handleConnectionErrors(br, dl.getConnection());

@@ -41,7 +41,6 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
@@ -129,7 +128,7 @@ public class FlexiStorageInterfaceValidatorTest extends AWTest {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
@@ -629,7 +628,7 @@ public class FlexiStorageInterfaceValidatorTest extends AWTest {
                 }
             }
         }
-        ArrayList<FlexiTypeMapper> mappers = FlexiJSonMapper.getThreadMappers();
+        final List<FlexiTypeMapper> mappers = FlexiJSonMapper.getThreadMappers();
         if (mappers != null) {
             for (FlexiTypeMapper m : mappers) {
                 if (m instanceof DateMapper) {

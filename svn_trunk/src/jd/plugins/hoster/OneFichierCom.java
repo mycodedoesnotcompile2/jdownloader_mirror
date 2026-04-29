@@ -102,7 +102,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 52659 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52740 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -1345,31 +1345,31 @@ public class OneFichierCom extends PluginForHost {
         if ("de".equals(language)) {
             sb.append("Ungültiger API-Schlüssel!");
             sb.append("\r\nDu findest deinen API-Schlüssel hier: 1fichier.com/console/params.pl");
-            sb.append("\r\nWenn du einen 'Premium-Schlüssel' / 'Gutschein' / 'Aktivierungsschlüssel' von einem Reseller gekauft hast, musst du ein 1fichier-Konto erstellen, dich anmelden und diesen Code hier einlösen: 1fichier.com/console/vu.pl");
+            sb.append("\r\nWenn du einen 'Premium-Schlüssel' / 'Gutschein' / 'Aktivierungsschlüssel' von einem Reseller gekauft hast, musst du einen 1fichier Account erstellen, dich anmelden und diesen Code hier einlösen: 1fichier.com/console/vu.pl");
             sb.append("\r\nBitte beachte, dass API-Schlüssel nur von Premium-Nutzern zum Herunterladen verwendet werden können.");
-            sb.append("\r\nInformationen für Nutzer von 1fichier-FREE-Konten oder kostenlosen Konten mit bezahlten CDN-Guthaben:");
-            sb.append("\r\nUm solche Konten in JDownloader zu verwenden, wähle im Konto-Hinzufügen-Dialog den korrekten Kontotyp aus (z. B. Webseiten-Login oder API-Login).");
+            sb.append("\r\nInformationen für Nutzer von 1fichier-FREE-Accounts oder kostenlosen Accounts mit bezahlten CDN-Guthaben:");
+            sb.append("\r\nUm solche Accounts in JDownloader zu verwenden, wähle im Account-Hinzufügen-Dialog einen Account-Typ aus, der den Zusatz 'Login über Webseite' trägt.");
         } else if ("es".equals(language)) {
             sb.append("¡Clave API inválida!");
             sb.append("\r\nPuedes encontrar tu clave API aquí: 1fichier.com/console/params.pl");
             sb.append("\r\nSi compraste una 'clave premium' / 'cupón' / 'clave de activación' de un revendedor, necesitas crear una cuenta de 1fichier, iniciar sesión y canjear ese código aquí: 1fichier.com/console/vu.pl");
             sb.append("\r\nTen en cuenta que las claves API solo pueden ser utilizadas para descargar por usuarios premium.");
             sb.append("\r\nInformación para usuarios de cuentas GRATUITAS de 1fichier o cuentas gratuitas con créditos CDN pagados:");
-            sb.append("\r\nPara usar dichas cuentas en JDownloader, asegúrate de seleccionar el tipo de cuenta correcto en el diálogo para añadir cuentas (por ejemplo, inicio de sesión web o API).");
+            sb.append("\r\nPara usar dichas cuentas en JDownloader, selecciona un tipo de cuenta que incluya la opción 'inicio de sesión web' en el diálogo para añadir cuentas.");
         } else if ("fr".equals(language)) {
             sb.append("Clé API invalide !");
             sb.append("\r\nTu peux trouver ta clé API ici : 1fichier.com/console/params.pl");
             sb.append("\r\nSi tu as acheté une 'clé premium' / 'coupon' / 'clé d'activation' auprès d'un revendeur, tu dois créer un compte 1fichier, te connecter et échanger ce code ici : 1fichier.com/console/vu.pl");
             sb.append("\r\nNote que les clés API ne peuvent être utilisées pour télécharger que par les utilisateurs premium.");
             sb.append("\r\nInformations pour les utilisateurs de comptes GRATUITS 1fichier ou de comptes gratuits avec crédits CDN payants :");
-            sb.append("\r\nPour utiliser ces comptes dans JDownloader, veille à sélectionner le type de compte correct dans la boîte de dialogue d’ajout de compte (par exemple, connexion web ou API).");
+            sb.append("\r\nPour utiliser ces comptes dans JDownloader, sélectionne un type de compte comportant la mention 'connexion web' dans la boîte de dialogue d'ajout de compte.");
         } else {
             sb.append("Invalid API Key!");
             sb.append("\r\nYou can find your API key here: 1fichier.com/console/params.pl");
             sb.append("\r\nIf you bought a 'Premium Key', 'Voucher', or 'Activation Key' from a reseller, you need to create a 1fichier account, log in, and redeem that code here: 1fichier.com/console/vu.pl");
             sb.append("\r\nPlease note that API keys can only be used for downloading by Premium users.");
             sb.append("\r\nInformation for users of 1fichier FREE accounts or free accounts with paid CDN credits:");
-            sb.append("\r\nTo use such accounts in JDownloader, be sure to select the correct account type in the add account dialog (e.g. website login or API login).");
+            sb.append("\r\nTo use such accounts in JDownloader, select an account type labeled 'website login' in the add account dialog.");
             sb.append("\r\nFor headless setups: Enter your email and password, or your email and API key, into the username and password fields.");
         }
         throw new AccountInvalidException(sb.toString());
@@ -1793,18 +1793,18 @@ public class OneFichierCom extends PluginForHost {
                     final String title;
                     final String language = System.getProperty("user.language").toLowerCase();
                     if ("de".equals(language)) {
-                        title = "Information über unbekannten Kontotyp";
-                        message += "<br>JDownloader konnte den Typ deines Kontos momentan nicht erkennen.";
+                        title = "Information über unbekannten Account-Typ";
+                        message += "<br>JDownloader konnte den Typ deines Accounts momentan nicht erkennen.";
                         message += "<br>Dies kann manchmal aufgrund von API-Beschränkungen von 1fichier passieren.";
-                        message += "<br>Wenn dein Konto ein Premium-Konto ist, kannst du diese Nachricht ignorieren und mit dem Herunterladen beginnen.";
-                        message += "<br>Wenn dein Konto ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits ist, wirst du nicht über die API herunterladen können.";
+                        message += "<br>Wenn dein Account ein Premium-Account ist, kannst du diese Nachricht ignorieren und mit dem Herunterladen beginnen.";
+                        message += "<br>Wenn dein Account ein Free-Account oder ein Free-Account mit <b>bezahlten</b> CDN-Credits ist, wirst du nicht über die API herunterladen können.";
                         message += "<br>In diesem Fall gehe so vor:";
-                        message += "<br>1. Gehe zu Einstellungen -> Account Manager und entferne dieses Konto";
-                        message += "<br>2. Gehe zu Einstellungen -> Account Manager -> 1fichier.com -> Wähle im Hinzufügen-Dialog einen Kontotyp mit Webseiten-Login";
+                        message += "<br>1. Gehe zu Einstellungen -> Account Manager und entferne diesen Account";
+                        message += "<br>2. Gehe zu Einstellungen -> Account Manager -> [1fichier.com](http://1fichier.com) -> Wähle im Hinzufügen-Dialog einen Account-Typ mit Webseiten-Login";
                         message += "<br>3. Gib deine E-Mail und dein Passwort ein und klicke auf 'Speichern'";
                         message += "<br>4. Starte den Download.";
                         message += "<br>";
-                        message += "<br><b>Warnung:</b> Wenn du ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits besitzt und den API-Key-Login verwendest, werden Downloads fehlschlagen und dein Konto wird in einen roten Fehlerzustand wechseln!";
+                        message += "<br><b>Warnung:</b> Wenn du einen Free-Account oder einen Free-Account mit <b>bezahlten</b> CDN-Credits besitzt und den API-Key-Login verwendest, werden Downloads fehlschlagen und dein Account wird in einen roten Fehlerzustand wechseln!";
                     } else if ("es".equals(language)) {
                         title = "Información sobre tipo de cuenta desconocido";
                         message += "<br>JDownloader no pudo detectar el tipo de tu cuenta en este momento.";
@@ -1948,14 +1948,14 @@ public class OneFichierCom extends PluginForHost {
 
         private static Map<String, String> getGermanTranslations() {
             Map<String, String> translations = new HashMap<String, String>();
-            translations.put(ACCOUNT_TYPE, "Kontotyp:");
-            translations.put(PREMIUM_API, "Premium-Konto | Login über API [Empfohlen]");
-            translations.put(PREMIUM_GOLD_API, "Premium GOLD-Konto | Login über API [Empfohlen]");
-            translations.put(PREMIUM_WEB, "Premium-Konto | Login über Webseite");
-            translations.put(PREMIUM_GOLD_WEB, "Premium GOLD-Konto | Login über Webseite");
-            translations.put(FREE_CDN, "Kostenloses Konto mit bezahlten CDN-Credits");
-            translations.put(FREE, "Kostenloses Konto");
-            translations.put(PREMIUM_USERS, "Premium-Kontonutzer:");
+            translations.put(ACCOUNT_TYPE, "Account-Typ:");
+            translations.put(PREMIUM_API, "Premium-Account | Login über API [Empfohlen]");
+            translations.put(PREMIUM_GOLD_API, "Premium GOLD-Account | Login über API [Empfohlen]");
+            translations.put(PREMIUM_WEB, "Premium-Account | Login über Webseite");
+            translations.put(PREMIUM_GOLD_WEB, "Premium GOLD-Account | Login über Webseite");
+            translations.put(FREE_CDN, "Kostenloser Account mit bezahlten CDN-Credits");
+            translations.put(FREE, "Kostenloser Account");
+            translations.put(PREMIUM_USERS, "Premium-Account-Nutzer:");
             translations.put(ENTER_API_KEY, "API-Schlüssel eingeben (hier klicken)");
             translations.put(API_KEY_LABEL, "Premium-API-Schlüssel: ");
             translations.put(OBTAIN_API_KEY, "API-Schlüssel hier erhalten: ");
