@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48400 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52745 $", interfaceVersion = 2, names = {}, urls = {})
 public class PastedCo extends PluginForDecrypt {
     public PastedCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,6 @@ public class PastedCo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "controlc.com", "tinypaste.com", "tny.cz", "pasted.co", "binbox.io" });
-        ret.add(new String[] { "paste3.org" });
         return ret;
     }
 
@@ -70,7 +69,7 @@ public class PastedCo extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!tools|terms|api|contact|login|register|press)([0-9a-z]+|.*?id=[0-9a-z]+|[0-9]{3,})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!tools|terms|api|contact|login|register|press)([a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -82,14 +81,15 @@ public class PastedCo extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*404\\s*:\\s*Not found|>\\s*404 - Not found\\s*<")) {
+        } else if (br.containsHTML(">\\s*404\\s*:\\s*Not found|>\\s*404 - Not found\\s*<")) {
             /* 404 in html with response code 200 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*This page was either removed or never existed at all|>\\s*This paste either never existed or was removed")) {
+        } else if (br.containsHTML(">\\s*This page was either removed or never existed at all|>\\s*This paste either never existed or was removed")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String pwRegex = "(?i)(Enter the correct password|has been password protected)";
+        final String pwRegex = "(Enter the correct password|has been password protected)";
         if (br.containsHTML(pwRegex)) {
+            boolean pwsuccess = false;
             for (int i = 0; i <= 3; i++) {
                 String id = new Regex(param.getCryptedUrl(), "/.*?id=([0-9a-z]+)$").getMatch(0);
                 if (id == null) {
@@ -105,29 +105,21 @@ public class PastedCo extends PluginForDecrypt {
                 if (br.containsHTML(pwRegex)) {
                     continue;
                 }
+                pwsuccess = true;
                 break;
             }
-            if (br.containsHTML("(Enter the correct password|has been password protected)")) {
+            if (!pwsuccess) {
                 throw new DecrypterException(DecrypterException.PASSWORD);
             }
         }
-        String pasteFrame = br.getRegex("frameborder=.0.\\s*id=.pasteFrame.\\s*src\\s*=\\s*.(https?://(?:www\\.)?[^/]+/[^<>\"\\']+)").getMatch(0);
-        if (pasteFrame == null) {
-            pasteFrame = br.getRegex("\"(https?://(?:www\\.)?[^/]+/[a-z0-9]+/fullscreen\\.php\\?hash=[a-z0-9]+\\&linenum=(false|true))\"").getMatch(0);
+        String pasteText = br.getRegex("<div class=\"paste-content\" tabindex=\"0\"[^>]*>(.*?)</div>\\s*</div>").getMatch(0);
+        if (pasteText == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (pasteFrame == null) {
-            if (!this.canHandle(br.getURL())) {
-                /* E.g. redirect to mainpage */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                logger.warning("Decrypter broken for link: " + param);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-        }
-        br.getPage(pasteFrame.trim());
-        String[] links = HTMLParser.getHttpLinks(br.toString(), null);
+        String[] links = HTMLParser.getHttpLinks(pasteText, null);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (links == null || links.length == 0) {
+            logger.info("Failed to find any links in pastebin text");
             return ret;
         }
         final Set<String> pws = PasswordUtils.getPasswords(br.getRequest().getHtmlCode());

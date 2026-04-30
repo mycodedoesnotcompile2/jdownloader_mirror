@@ -17,8 +17,12 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -34,6 +38,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -45,14 +50,15 @@ import jd.plugins.PluginForHost;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.EpornerComConfig;
 import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
 import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52748 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,6 +153,166 @@ public class EPornerCom extends PluginForHost {
         return requestFileInformation(link, null, false);
     }
 
+    private Object[] getDownloadURL(final Browser br, final Account account, final DownloadLink link) throws Exception {
+        long filesize = -1;
+        String dllink = null;
+        long filesizeBestH264 = 0;
+        long filesizeSelectedH264 = 0;
+        String dllinkBestH264 = null;
+        String dllinkSelectedH264 = null;
+        long filesizeBestAV1 = 0;
+        long filesizeSelectedAV1 = -1;
+        String dllinkBestAV1 = null;
+        String dllinkSelectedAV1 = null;
+        final String vq = getPreferredStreamQuality(account, link);
+        final Set<String> blockedVq = new HashSet<String>();
+        boolean skippedVq = false;
+        if (account == null) {
+            // require being logged in
+            blockedVq.add("2160p");
+            blockedVq.add("1440p");
+            blockedVq.add("1080p");
+        }
+        final PreferredVideoCodec codec = getPreferredVideoCodec(link);
+        /* Official downloadurls */
+        final String[][] dloadinfo = br.getRegex("href=\"(/dload/[^<>\"]+)\"[^>]*>[^<]* MP4 \\((\\d+)p, ([^<>\"\\)]+)\\)</a>").getMatches();
+        if (dloadinfo != null && dloadinfo.length != 0) {
+            nextDownload: for (final String[] dlinfo : dloadinfo) {
+                final String directurl = dlinfo[0];
+                for (String block : blockedVq) {
+                    if (directurl.contains(block)) {
+                        skippedVq = true;
+                        logger.info("skip download(missing account:" + Arrays.toString(dlinfo));
+                        continue nextDownload;
+                    }
+                }
+                // final String heightStr = dlinfo[1];
+                final String filesizeStr = dlinfo[2];
+                final long tempsize = SizeFormatter.getSize(filesizeStr);
+                if (StringUtils.containsIgnoreCase(directurl, "av1")) {
+                    if (dllinkBestAV1 == null || tempsize > filesizeBestAV1) {
+                        filesizeBestAV1 = tempsize;
+                        dllinkBestAV1 = directurl;
+                    }
+                    if (vq != null && directurl.contains(vq)) {
+                        dllinkSelectedAV1 = directurl;
+                        filesizeSelectedAV1 = tempsize;
+                    }
+                } else {
+                    if (dllinkBestH264 == null || tempsize > filesizeBestH264) {
+                        filesizeBestH264 = tempsize;
+                        dllinkBestH264 = directurl;
+                    }
+                    if (vq != null && directurl.contains(vq)) {
+                        dllinkSelectedH264 = directurl;
+                        filesizeSelectedH264 = tempsize;
+                    }
+                }
+            }
+        }
+        switch (codec.getActualPreferredVideoCodec()) {
+        case AV1:
+            if (dllinkSelectedAV1 != null) {
+                // wished codec + wished resolution
+                dllink = dllinkSelectedAV1;
+                filesize = filesizeSelectedAV1;
+            } else if (dllinkSelectedH264 != null) {
+                // still wished resolution
+                dllink = dllinkSelectedH264;
+                filesize = filesizeSelectedH264;
+            } else if (dllinkBestAV1 != null) {
+                /* Fallback / best wished AV1 */
+                dllink = dllinkBestAV1;
+                filesize = filesizeBestAV1;
+            } else if (dllinkBestH264 != null) {
+                /* Fallback / best H264 */
+                dllink = dllinkBestH264;
+                filesize = filesizeBestH264;
+            }
+            break;
+        case H264:
+            if (dllinkSelectedH264 != null) {
+                // wished codec + wished resolution
+                dllink = dllinkSelectedH264;
+                filesize = filesizeSelectedH264;
+            } else if (dllinkSelectedAV1 != null) {
+                // still wished resolution
+                dllink = dllinkSelectedAV1;
+                filesize = filesizeSelectedAV1;
+            } else if (dllinkBestH264 != null) {
+                /* Fallback / best wished H264 */
+                dllink = dllinkBestH264;
+                filesize = filesizeBestH264;
+            } else if (dllinkBestAV1 != null) {
+                /* Fallback / best AV1 */
+                dllink = dllinkBestAV1;
+                filesize = filesizeBestAV1;
+            }
+            break;
+        }
+        return new Object[] { vq, dllink, filesize, skippedVq };
+    }
+
+    private Object[] getStreamURL(final Browser br, final Account account, final DownloadLink link) throws Exception {
+        final String vid = br.getRegex("EP\\.video\\.player\\.vid\\s*=\\s*'(.*?)'").getMatch(0);
+        final String hash = br.getRegex("EP\\.video\\.player\\.hash\\s*=\\s*'(.*?)'").getMatch(0);
+        if (!StringUtils.isAllNotEmpty(vid, hash)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getPage("/xhr/video/" + vid + "?hash=" + convertHash(hash) + "&domain=" + brc.getHost(true) + "&pixelRatio=1.0526315789473684&playerWidth=0&playerHeight=0&fallback=false&embed=false&supportedFormats=hls,dash,h265,vp9,av1,mp4&_=" + Time.now());
+        final PreferredVideoCodec codec = getPreferredVideoCodec(link);
+        final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        Map<String, Object> sources = null;
+        switch (codec) {
+        case H264:
+            sources = (Map<String, Object>) JavaScriptEngineFactory.walkJson(response, "sources/mp4");
+            if (sources == null) {
+                sources = (Map<String, Object>) JavaScriptEngineFactory.walkJson(response, "sources/av1");
+            }
+            break;
+        case AV1:
+            sources = (Map<String, Object>) JavaScriptEngineFactory.walkJson(response, "sources/av1");
+            if (sources == null) {
+                sources = (Map<String, Object>) JavaScriptEngineFactory.walkJson(response, "sources/mp4");
+            }
+            break;
+        }
+        if (sources == null) {
+            return null;
+        }
+        final String vq = getPreferredStreamQuality(account, link);
+        String bestURL = null;
+        int bestQ = -1;
+        for (Entry<String, Object> source : sources.entrySet()) {
+            final String id = source.getKey();
+            final Map<String, Object> value = (Map<String, Object>) source.getValue();
+            final String src = (String) value.get("src");
+            final String q = new Regex((String) value.get("labelShort"), "(\\d+)").getMatch(0);
+            if (q == null) {
+                continue;
+            }
+            if (bestURL == null || Integer.parseInt(q) > bestQ) {
+                bestURL = src;
+                bestQ = Integer.parseInt(q);
+            }
+            if (vq != null && src.contains(vq)) {
+                bestURL = src;
+                break;
+            }
+        }
+        return new Object[] { vq, bestURL, null, false };
+    }
+
+    private String convertHash(String r) throws Exception {
+        // Validierung: Nicht null und genau 32 Zeichen lang
+        if (r == null || r.length() != 32) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        // Die vier Blöcke parsen und in Base36 konvertieren
+        return Long.toString(Long.parseLong(r.substring(0, 8), 16), 36) + Long.toString(Long.parseLong(r.substring(8, 16), 16), 36) + Long.toString(Long.parseLong(r.substring(16, 24), 16), 36) + Long.toString(Long.parseLong(r.substring(24, 32), 16), 36);
+    }
+
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         final String extDefault;
         final boolean isVideo;
@@ -201,118 +367,52 @@ public class EPornerCom extends PluginForHost {
         if (isAgeVerificationBlocked) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Age verification required! Change your IP or add a verified eporner account.");
         }
-        long filesize = -1;
-        String dllink = null;
-        long filesizeBestH264 = 0;
-        long filesizeSelectedH264 = 0;
-        String dllinkBestH264 = null;
-        String dllinkSelectedH264 = null;
-        long filesizeBestAV1 = 0;
-        long filesizeSelectedAV1 = -1;
-        String dllinkBestAV1 = null;
-        String dllinkSelectedAV1 = null;
-        String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+
+        String title = br.getRegex("<title>\\s*([^<]+)\\s*</title>").getMatch(0);
         String pic[] = null;
+        Number downloadSize = null;
+        String downloadURL = null;
         if (isVideo) {
             final String betterTitleByURL = new Regex(br.getURL(), PATTERN_VIDEO).getMatch(2);
             if (betterTitleByURL != null) {
                 fallbackFilename = betterTitleByURL.replace("-", " ").trim() + extDefault;
             }
-            final String vq = getPreferredStreamQuality(link);
-            PreferredVideoCodec codec = getPreferredVideoCodec(link);
-            /* Official downloadurls */
-            final String[][] dloadinfo = br.getRegex("href=\"(/dload/[^<>\"]+)\"[^>]*>[^<]* MP4 \\((\\d+)p, ([^<>\"\\)]+)\\)</a>").getMatches();
-            if (dloadinfo != null && dloadinfo.length != 0) {
-                for (final String[] dlinfo : dloadinfo) {
-                    final String directurl = dlinfo[0];
-                    // final String heightStr = dlinfo[1];
-                    final String filesizeStr = dlinfo[2];
-                    final long tempsize = SizeFormatter.getSize(filesizeStr);
-                    if (StringUtils.containsIgnoreCase(directurl, "av1")) {
-                        if (dllinkBestAV1 == null || tempsize > filesizeBestAV1) {
-                            filesizeBestAV1 = tempsize;
-                            dllinkBestAV1 = directurl;
-                        }
-                        if (vq != null && directurl.contains(vq)) {
-                            dllinkSelectedAV1 = directurl;
-                            filesizeSelectedAV1 = tempsize;
-                        }
-                    } else {
-                        if (dllinkBestH264 == null || tempsize > filesizeBestH264) {
-                            filesizeBestH264 = tempsize;
-                            dllinkBestH264 = directurl;
-                        }
-                        if (vq != null && directurl.contains(vq)) {
-                            dllinkSelectedH264 = directurl;
-                            filesizeSelectedH264 = tempsize;
-                        }
+            findURL: {
+                String vq = null;
+                Boolean skippedVq = null;
+                final Object[] download = getDownloadURL(br, account, link);
+                if (download != null) {
+                    skippedVq = (Boolean) download[3];
+                    vq = (String) download[0];
+                    downloadURL = (String) download[1];
+                    downloadSize = (Number) download[2];
+                    if (vq != null && downloadURL.contains(vq)) {
+                        break findURL;
+                    } else if (vq == null && account != null) {
+                        // we assume with account we can find/download best
+                        break findURL;
+                    }
+                }
+                if (Boolean.TRUE.equals(skippedVq) && get(getConfigInterface()).isFallbackStreamDownloadEnabled()) {
+                    final Object[] stream = getStreamURL(br, account, link);
+                    if (stream != null) {
+                        vq = (String) stream[0];
+                        downloadURL = (String) stream[1];
+                        downloadSize = null;
                     }
                 }
             }
-            switch (codec.getActualPreferredVideoCodec()) {
-            case AV1:
-                if (dllinkSelectedAV1 != null) {
-                    // wished codec + wished resolution
-                    dllink = dllinkSelectedAV1;
-                    filesize = filesizeSelectedAV1;
-                } else if (dllinkSelectedH264 != null) {
-                    // still wished resolution
-                    dllink = dllinkSelectedH264;
-                    filesize = filesizeSelectedH264;
-                } else if (dllinkBestAV1 != null) {
-                    /* Fallback / best wished AV1 */
-                    dllink = dllinkBestAV1;
-                    filesize = filesizeBestAV1;
-                } else if (dllinkBestH264 != null) {
-                    /* Fallback / best H264 */
-                    dllink = dllinkBestH264;
-                    filesize = filesizeBestH264;
-                }
-                break;
-            case H264:
-                if (dllinkSelectedH264 != null) {
-                    // wished codec + wished resolution
-                    dllink = dllinkSelectedH264;
-                    filesize = filesizeSelectedH264;
-                } else if (dllinkSelectedAV1 != null) {
-                    // still wished resolution
-                    dllink = dllinkSelectedAV1;
-                    filesize = filesizeSelectedAV1;
-                } else if (dllinkBestH264 != null) {
-                    /* Fallback / best wished H264 */
-                    dllink = dllinkBestH264;
-                    filesize = filesizeBestH264;
-                } else if (dllinkBestAV1 != null) {
-                    /* Fallback / best AV1 */
-                    dllink = dllinkBestAV1;
-                    filesize = filesizeBestAV1;
-                }
-                break;
-            }
-            if (dllink == null && isDownload) {
-                /* Fallback to stream download */
-                final String correctedBR = br.getRequest().getHtmlCode().replace("\\", "");
-                final String continueLink = new Regex(correctedBR, "(\"|\\')(/config\\d+/\\w+/[0-9a-f]+(/)?)(\"|\\')").getMatch(1);
-                if (continueLink == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                br.getPage(Encoding.htmlOnlyDecode(continueLink) + (continueLink.endsWith("/") ? "1920" : "/1920"));
-                dllink = br.getRegex("<hd\\.file>(https?://.*?)</hd\\.file>").getMatch(0);
-                if (dllink == null) {
-                    dllink = br.getRegex("<file>(https?://.*?)</file>").getMatch(0);
-                    if (dllink == null) {
-                        dllink = br.getRegex("file:[\r\n\r ]*?\"(https?://[^<>\"]*?)\"").getMatch(0);
-                    }
-                }
+            if (downloadURL == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         } else {
             /* Photo */
             pic = br.getRegex(">\\s*Pic\\s*(\\d+)\\s*of\\s*(\\d+)\\s*see").getRow(0);
-            dllink = br.getRegex("src=\"(https?://[^\"]+)\" autoplay ").getMatch(0); // gifs -> mp4
-            if (dllink == null) {
-                dllink = br.getRegex("\"contentUrl\"\\s*:\\s*\"(.*?\\.(jpe?g|png))\"").getMatch(0);
-                if (dllink == null) {
-                    dllink = br.getRegex("class=\"mainphoto\" src=\"(https?://[^\"]+)").getMatch(0); // normal image -> jpg
+            downloadURL = br.getRegex("src=\"(https?://[^\"]+)\" autoplay ").getMatch(0); // gifs -> mp4
+            if (downloadURL == null) {
+                downloadURL = br.getRegex("\"contentUrl\"\\s*:\\s*\"(.*?\\.(jpe?g|png))\"").getMatch(0);
+                if (downloadURL == null) {
+                    downloadURL = br.getRegex("class=\"mainphoto\" src=\"(https?://[^\"]+)").getMatch(0); // normal image -> jpg
                 }
             }
             final String[] jsons = br.getRegex("<script type=\"application/ld\\+json\">([^<]+)</script>").getColumn(0);
@@ -333,8 +433,8 @@ public class EPornerCom extends PluginForHost {
             }
         }
         String ext = null;
-        if (dllink != null) {
-            ext = Plugin.getFileNameExtensionFromURL(dllink);
+        if (downloadURL != null) {
+            ext = Plugin.getFileNameExtensionFromURL(downloadURL);
         }
         if (ext == null) {
             ext = extDefault;
@@ -352,8 +452,8 @@ public class EPornerCom extends PluginForHost {
         } else {
             link.setFinalFileName(fallbackFilename);
         }
-        if (dllink != null && !isBadDirecturl(dllink)) {
-            final String completeURL = br.getURL(dllink).toExternalForm();
+        if (downloadURL != null && !isBadDirecturl(downloadURL)) {
+            final String completeURL = br.getURL(downloadURL).toExternalForm();
             link.setProperty(PROPERTY_DIRECTURL, completeURL);
             link.setProperty(PROPERTY_LAST_DIRECTURL, completeURL);
         }
@@ -361,16 +461,16 @@ public class EPornerCom extends PluginForHost {
          * 2020-05-26: Checking their downloadlink counts towards their daily downloadlimit so only check them if the filesize has not been
          * found already!
          */
-        if (filesize > 0) {
-            link.setDownloadSize(filesize);
-        } else if (link.getView().getBytesTotal() <= 0 && dllink != null && !isBadDirecturl(dllink)) {
+        if (downloadSize != null) {
+            link.setDownloadSize(downloadSize.longValue());
+        } else if (link.getView().getBytesTotal() <= 0 && downloadURL != null && !isBadDirecturl(downloadURL)) {
             /* Only get filesize from url if we were not able to find it in html --> Saves us time! */
             final Browser br2 = br.cloneBrowser();
             br2.setFollowRedirects(true);
             // In case the link redirects to the finallink
             URLConnectionAdapter con = null;
             try {
-                con = br2.openHeadConnection(dllink);
+                con = br2.openHeadConnection(downloadURL);
                 connectionErrorhandling(con, link, account);
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -407,7 +507,7 @@ public class EPornerCom extends PluginForHost {
                 return PreferredVideoCodec.H264;
             }
         }
-        final EpornerComConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final EpornerComConfig cfg = get(getConfigInterface());
         final PreferredVideoCodec ret = cfg.getPreferredVideoCodec();
         if (ret == PreferredVideoCodec.DEFAULT) {
             return PreferredVideoCodec.H264;
@@ -450,6 +550,15 @@ public class EPornerCom extends PluginForHost {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, true, 0);
             connectionErrorhandling(dl.getConnection(), link, account);
         } catch (final Exception e) {
+            if (e instanceof PluginException) {
+                switch (((PluginException) e).getLinkStatus()) {
+                case LinkStatus.ERROR_IP_BLOCKED:
+                case LinkStatus.ERROR_PREMIUM:
+                    throw e;
+                default:
+                    break;
+                }
+            }
             if (storedDirecturl != null) {
                 link.removeProperty(PROPERTY_DIRECTURL);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
@@ -480,6 +589,8 @@ public class EPornerCom extends PluginForHost {
                 } else {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Daily download limit reached", 60 * 60 * 1000l);
                 }
+            } else if (br.containsHTML(">\\s*Login & create account") || StringUtils.containsIgnoreCase(br.getURL(), "/login/")) {
+                throw new AccountRequiredException("Account required for download in this resolution");
             } else {
                 errorBrokenVideo();
             }
@@ -498,12 +609,12 @@ public class EPornerCom extends PluginForHost {
         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken video?", 5 * 60 * 1000l);
     }
 
-    private String getPreferredStreamQuality(final DownloadLink link) {
+    private String getPreferredStreamQuality(final Account account, final DownloadLink link) {
         final Regex videoUrlRegex = new Regex(link.getProperty(PROPERTY_LAST_DIRECTURL, link.getPluginPatternMatcher()), PATTERN_VIDEO_URL);
         if (videoUrlRegex.patternFind()) {
             return videoUrlRegex.getMatch(1) + "p";
         }
-        final EpornerComConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final EpornerComConfig cfg = get(getConfigInterface());
         final PreferredStreamQuality quality = cfg.getPreferredStreamQuality();
         switch (quality) {
         case Q2160P:

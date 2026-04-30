@@ -18,13 +18,17 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -32,13 +36,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 52748 $", interfaceVersion = 3, names = {}, urls = {})
-public class BbuploadTo extends PluginForHost {
-    public BbuploadTo(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 52745 $", interfaceVersion = 3, names = {}, urls = {})
+public class LoadmeCc extends PluginForHost {
+    public LoadmeCc(PluginWrapper wrapper) {
         super(wrapper);
+        // this.enablePremium("");
     }
 
     @Override
@@ -56,7 +58,7 @@ public class BbuploadTo extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bbupload.to", "bbupload.cc", "bbupload.com" });
+        ret.add(new String[] { "loadme.cc" });
         return ret;
     }
 
@@ -69,12 +71,12 @@ public class BbuploadTo extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL = Pattern.compile("/download\\?v=([A-Z0-9]{8})");
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/file/([a-f0-9]{20})/?");
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://download\\." + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern());
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -107,30 +109,22 @@ public class BbuploadTo extends PluginForHost {
         return this.getFID(link);
     }
 
-    private String dllink = null;
-
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        dllink = null;
         this.setBrowserExclusive();
-        final String fid = this.getFID(link);
-        br.getPage("https://download.bbupload.to/ajax.php?action=getdownload&data=" + fid);
+        br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-        final String filename = (String) data.get("FileName");
-        if (filename == null) {
-            /**
-             * 2026-04-24: API doesn't return any kind of error for invalid/deleted file-ids. <br>
-             * Instead it will return the data map with both "FileName" and "filesize" fields null.
-             */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        String filename = br.getRegex("File name:?\\s*</strong>([^<]+)</p>").getMatch(0);
+        String filesize = br.getRegex("Size:?\\s*</strong>([^<]+)</p>").getMatch(0);
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename);
         }
-        link.setFinalFileName(filename);
-        link.setVerifiedFileSize(Long.parseLong(data.get("filesize").toString()));
-        dllink = data.get("downloadUrl").toString();
+        if (filesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesize));
+        }
         return AvailableStatus.TRUE;
     }
 
@@ -141,7 +135,21 @@ public class BbuploadTo extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
+        String dllink = br.getRegex("(/download/[a-f0-9]{20})").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
+            String filePrice = br.getRegex("File price:\\s*<b>(\\d+) USD</b>").getMatch(0);
+            if (filePrice == null) {
+                filePrice = br.getRegex("Get access to this file for only\\s*<b>(\\d+) USD").getMatch(0);
+                if (filePrice == null) {
+                    filePrice = br.getRegex("Price:\\s*</strong>\\s*(\\d+) USD").getMatch(0);
+                }
+            }
+            if (filePrice != null) {
+                throw new AccountRequiredException("Buy this file for " + filePrice + " USD");
+            }
+            if (br.containsHTML(">\\s*This file is available only for")) {
+                throw new AccountRequiredException();
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));

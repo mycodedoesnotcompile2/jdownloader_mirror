@@ -461,9 +461,8 @@ abstract public class ZeveraCore extends UseNet {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        login(br, account, true);
         final AccountInfo ai = new AccountInfo();
-        final Map<String, Object> userinfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> userinfo = login(br, account, true);
         final String customerID = userinfo.get("customer_id").toString();
         if (customerID != null) {
             /* Ensure that we got a unique username regardless of which value user enters into username field. */
@@ -475,20 +474,26 @@ abstract public class ZeveraCore extends UseNet {
         if (space_usedO != null) {
             ai.setUsedSpace(space_usedO.longValue());
         }
+        final Number booster_points = (Number) userinfo.get("booster_points");
         /* E.g. free account: "premium_until":false or "premium_until":null */
         if (premium_untilO instanceof Number) {
             /* Premium account */
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
-            final boolean boosterWorkaroundActive = isBoosterPointsUnlimitedTrafficWorkaroundActive(account);
+            final boolean boosterPointsAvailable;
+            if (booster_points != null && booster_points.intValue() > 0) {
+                boosterPointsAvailable = true;
+            } else {
+                boosterPointsAvailable = isBoosterPointsUnlimitedTrafficWorkaroundActive(account);
+            }
             final double fair_use_used_double = fair_use_usedO.doubleValue();
             final int fairUsagePercentUsed = (int) (fair_use_used_double * 100.0);
             final int fairUsagePercentLeft = 100 - fairUsagePercentUsed;
-            if (fairUsagePercentUsed >= 100 && !boosterWorkaroundActive) {
+            if (fairUsagePercentUsed >= 100 && !boosterPointsAvailable) {
                 throw new AccountUnavailableException("Fair use limit reached", 5 * 60 * 1000l);
             }
             String statustext = String.format(Locale.ROOT, "Premium | Fair-Use Status: %d%% left", fairUsagePercentLeft);
-            if (boosterWorkaroundActive) {
+            if (boosterPointsAvailable) {
                 statustext += " | Unlimited Traffic Booster workaround enabled";
             }
             ai.setStatus(statustext);
@@ -568,7 +573,7 @@ abstract public class ZeveraCore extends UseNet {
         return ai;
     }
 
-    public void login(final Browser br, final Account account, final boolean force) throws Exception {
+    private Map<String, Object> login(final Browser br, final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final boolean useWorkaround = true;
@@ -589,11 +594,11 @@ abstract public class ZeveraCore extends UseNet {
                         hasTriedOldToken = true;
                         callAPI(br, account, "/api/account/info");
                         try {
-                            this.handleAPIErrors(this, br, null, account);
+                            final Map<String, Object> userinfo = this.handleAPIErrors(this, br, null, account);
                             logger.info("Token login successful");
-                            return;
+                            return userinfo;
                         } catch (final Throwable ignore) {
-                            logger.info("Token expired or user has revoked access --> Full login required");
+                            logger.log(ignore);
                         }
                         logger.info("Token expired or user has revoked access --> Full login required");
                     }
@@ -652,7 +657,7 @@ abstract public class ZeveraCore extends UseNet {
                     account.setProperty("token_valid_until", System.currentTimeMillis() + ((Number) entries.get("expires_in")).longValue());
                     setAuthHeader(br, account);
                     callAPI(br, account, "/api/account/info");
-                    this.handleAPIErrors(this, br, null, account);
+                    return this.handleAPIErrors(this, br, null, account);
                     /* No Exception = Success */
                 } finally {
                     /*
@@ -663,12 +668,12 @@ abstract public class ZeveraCore extends UseNet {
                     account.setPass(null);
                 }
             } else {
-                if (account.hasEverBeenValid() && !force) {
+                if (account.hasEverBeenValid() && !validateCookies) {
                     /* Do not validate logins */
-                    return;
+                    return null;
                 }
                 callAPI(br, account, "/api/account/info");
-                this.handleAPIErrors(this, br, null, account);
+                return this.handleAPIErrors(this, br, null, account);
                 /* No Exception = Success */
             }
         }
@@ -703,7 +708,7 @@ abstract public class ZeveraCore extends UseNet {
             /* Login via access_token:access_token */
             return account.getStringProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
         } else {
-            /* Login via APIKEY:APIKEY */
+            /* Usenet login via APIKEY:APIKEY */
             return account.getPass();
         }
     }
@@ -714,7 +719,7 @@ abstract public class ZeveraCore extends UseNet {
             /* Login via access_token:access_token */
             return account.getStringProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
         } else {
-            /* Login via APIKEY:APIKEY */
+            /* Usenet login via APIKEY:APIKEY */
             return account.getPass();
         }
     }
@@ -795,6 +800,7 @@ abstract public class ZeveraCore extends UseNet {
      * This workaround can set accounts to unlimited traffic so that users will still be able to download.</br>
      * Remove this workaround once Premiumize has integrated their booster points into their API.
      */
+    @Deprecated
     public boolean isBoosterPointsUnlimitedTrafficWorkaroundActive(final Account account) {
         return false;
     }

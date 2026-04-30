@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BuzzheavierCom;
 
-@DecrypterPlugin(revision = "$Revision: 52054 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52742 $", interfaceVersion = 3, names = {}, urls = {})
 public class BuzzheavierComFolder extends PluginForDecrypt {
     public BuzzheavierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,7 @@ public class BuzzheavierComFolder extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "buzzheavier.com" });
+        ret.add(new String[] { "buzzheavier.com", "bzzhr.co" });
         ret.add(new String[] { "fuckingfast.net" });
         return ret;
     }

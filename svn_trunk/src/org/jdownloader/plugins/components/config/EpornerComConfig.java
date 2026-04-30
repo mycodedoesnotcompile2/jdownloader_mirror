@@ -1,6 +1,7 @@
 package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
@@ -121,4 +122,12 @@ public interface EpornerComConfig extends PluginConfigInterface {
     PreferredVideoCodec getPreferredVideoCodec();
 
     void setPreferredVideoCodec(PreferredVideoCodec quality);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("If download quality is not available/possible, try stream download")
+    @Order(210)
+    boolean isFallbackStreamDownloadEnabled();
+
+    void setFallbackStreamDownloadEnabled(boolean enabled);
 }

@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 52740 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52744 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -323,6 +323,11 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "aparat.com" });
         ret.add(new String[] { "uploadfile.pl", "wyslij-plik.pl", "wrzucplik.pl" });
         ret.add(new String[] { "fbjav.net", "fbjav.com" });
+        ret.add(new String[] { "imgclick.net" });
+        /* 2026-04-29: All domains from FEmbedDecrypter START */
+        ret.add(new String[] { "fembed.com", "fembed.net", "there.to", "gcloud.live", "plycdn.xyz", "hlsmp4.com", "svpri.xyz", "asianclub.nl", "asianclub.tv", "javcl.me", "javjav.top", "feurl.com", "zidiplay.com", "embed.media", "javideo.pw", "playvideo.best", "ffem.club", "dunbed.xyz", "embed.casa", "sexhd.co", "fileone.tv", "luxubu.review", "anime789.com", "femax20.com", "smartshare.tv", "cercafilm.net", "watchjavnow.xyz", "layarkacaxxi.icu", "mycloudzz.com", "purefiles.in", "rapidplay.org", "2tazhfx9vrx4jnvaxt87sknw5eqbd6as.club", "av-th.info", "embedsito.com", "vanfem.com" });
+        ret.add(new String[] { "watch-jav-english.live", "dutrag.com", "nekolink.site", "pornhole.club", "javip.pro", "javlove.club", "javguru.tk", "diasfem.com", "cloudrls.com", "embedaio.com", "fakyutube.com", "javhdfree.icu", "fembed-hd.com", "suzihaza.com", "mambast.tk", "javpoll.com", "fembed9hd.com", "faurl.ga", "i18n.pw", "zojav.com", "imfb.xyz", "javenglish.me" });
+        /* 2026-04-29: All domains from FEmbedDecrypter END */
         if (cache != null) {
             cache.put(cacheID, ret);
         }

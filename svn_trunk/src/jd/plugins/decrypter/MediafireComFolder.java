@@ -22,9 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -43,7 +40,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediafireCom;
 
-@DecrypterPlugin(revision = "$Revision: 52073 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 52748 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,8 +98,11 @@ public class MediafireComFolder extends PluginForDecrypt {
         if (direct.patternFind()) {
             directurl = parameter;
         }
-        final String multipleContentIDsCommaSeparated = new Regex(param.getCryptedUrl(), "https?://[^/]+/\\?([a-z0-9,]+)").getMatch(0);
-        if (multipleContentIDsCommaSeparated != null) {
+        String multipleContentIDsCommaSeparated = new Regex(param.getCryptedUrl(), "https?://[^/]+/\\?([a-z0-9,]+)").getMatch(0);
+        if (multipleContentIDsCommaSeparated == null) {
+            multipleContentIDsCommaSeparated = new Regex(param.getCryptedUrl(), "https?://[^/]+/folder/([a-z0-9,]+)(/shared)?").getMatch(0);
+        }
+        if (multipleContentIDsCommaSeparated != null && multipleContentIDsCommaSeparated.contains(",")) {
             /* Multiple files in one link */
             final String[] contentIDs = multipleContentIDsCommaSeparated.split(",");
             for (final String contentID : contentIDs) {

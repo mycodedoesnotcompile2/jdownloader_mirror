@@ -54,7 +54,10 @@ import org.appwork.swing.MigPanel;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.InterruptibleThread;
+import org.appwork.utils.Time;
+import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.EDT;
 import org.appwork.utils.swing.EDTHelper;
 
 /**
@@ -110,7 +113,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.swing.dialog.AbstractDialog#getRetValue()
      */
     @Override
@@ -123,18 +126,37 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
         if (isDisposed()) {
             return;
         }
-        System.out.println("Dispose Progressdialog");
-        if (this.executer.isAlive()) {
-            this.executer.interrupt();
-            final long waitFor = this.getWaitForTermination();
-            if (waitFor > 0) {
-                try {
-                    this.executer.join(waitFor);
-                } catch (final InterruptedException e) {
-                }
-            }
+        this.executer.interrupt();
+        final long waitFor = this.getWaitForTermination();
+        if (!this.executer.isAlive() || waitFor <= 0) {
+            super.dispose();
+            return;
         }
-        super.dispose();
+        if (textField != null) {
+            textField.setText(_AWU.T.lit_please_wait_dot_dot_dot());
+        }
+        final long started = Time.systemIndependentCurrentJVMTimeMillis();
+        new Thread("Wait for ProgressDialog Executer:" + this) {
+            {
+                setDaemon(true);
+            }
+
+            public void run() {
+                while (executer.isAlive() && Time.systemIndependentCurrentJVMTimeMillis() - started < waitFor) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+                EDT.run(new Runnable() {
+                    @Override
+                    public void run() {
+                        ProgressDialog.super.dispose();
+                    }
+                });
+            };
+        }.start();
     }
 
     protected void hyperlinkUpdate(final HyperlinkEvent e) {
@@ -301,7 +323,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.swing.dialog.ProgressInterface#getMessage()
      */
     @Override
@@ -311,7 +333,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.swing.dialog.ProgressInterface#getValue()
      */
     @Override

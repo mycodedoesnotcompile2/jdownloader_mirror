@@ -23,8 +23,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
 import jd.plugins.HostPlugin;
 
 import org.appwork.utils.StringUtils;
@@ -33,7 +31,7 @@ import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet;
 import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet.PreferredDomain;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@HostPlugin(revision = "$Revision: 52611 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52748 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurboBitNet extends TurbobitCore {
     public TurboBitNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,15 +83,6 @@ public class TurboBitNet extends TurbobitCore {
         default:
             return this.getHost();
         }
-    }
-
-    @Override
-    public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        final AccountInfo ai = super.fetchAccountInfo(account);
-        if (Account.AccountType.PREMIUM.equals(account.getType()) && ai != null && !ai.isExpired() && ai.getBooleanProperty("getAndSetPremiumInformationWebsiteV1", false) == false) {
-            getAndSetPremiumInformationWebsiteV1(account, ai);
-        }
-        return ai;
     }
 
     public static String[] getAnnotationNames() {

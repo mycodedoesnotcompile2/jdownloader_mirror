@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BuzzheavierComFolder;
 
-@HostPlugin(revision = "$Revision: 52054 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52743 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BuzzheavierComFolder.class })
 public class BuzzheavierCom extends PluginForHost {
     public BuzzheavierCom(PluginWrapper wrapper) {
@@ -119,10 +119,19 @@ public class BuzzheavierCom extends PluginForHost {
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
+        /**
+         * sha1 hash is not always available. <br>
+         * Example html when sha1 is unavailable: <br>
+         * <li><strong>SHA-1:</strong><code>&lt;nil&gt;</code></li>
+         */
         final String sha1hash = br.getRegex("SHA-1:?\\s*</strong>\\s*<code>\\s*([a-f0-9]{40})").getMatch(0);
         if (sha1hash != null) {
             link.setSha1Hash(sha1hash);
