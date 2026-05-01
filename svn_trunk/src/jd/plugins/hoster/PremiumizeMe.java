@@ -18,24 +18,16 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.handler.KeyHandler;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetConfigPanel;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.config.AccountConfigInterface;
-import org.jdownloader.plugins.config.Order;
-
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.HostPlugin;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52652 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+
+@HostPlugin(revision = "$Revision: 52755 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
 public class PremiumizeMe extends ZeveraCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("premiumize.me");
 
@@ -47,6 +39,14 @@ public class PremiumizeMe extends ZeveraCore {
     @Override
     public String getClientID() {
         return "616325511";
+    }
+
+    public static interface PremiumizeMeAccountConfigInterface extends UsenetAccountConfigInterface {
+    };
+
+    @Override
+    public Class<PremiumizeMeAccountConfigInterface> getAccountConfigInterface(Account account) {
+        return PremiumizeMeAccountConfigInterface.class;
     }
 
     @Override
@@ -79,54 +79,6 @@ public class PremiumizeMe extends ZeveraCore {
         return -1;
     }
 
-    public static interface PremiumizeMeConfigInterface extends UsenetAccountConfigInterface {
-        public class Translation {
-            // public String getEnablePairingLogin_label() {
-            // return "Enable pairing login?\r\nOnce enabled, you won't be able to use Usenet with Premiumize in JD anymore!!";
-            // }
-            public String getEnableBoosterPointsUnlimitedTrafficWorkaround_label() {
-                return "Enable booster points unlimited traffic workaround for this account? \r\nThis is only for owners of booster-points! \r\nMore information: premiumize.me/booster";
-            }
-        }
-
-        public static final PremiumizeMeConfigInterface.Translation TRANSLATION = new Translation();
-
-        @AboutConfig
-        @DefaultBooleanValue(false)
-        @Order(30)
-        boolean isEnableBoosterPointsUnlimitedTrafficWorkaround();
-
-        void setEnableBoosterPointsUnlimitedTrafficWorkaround(boolean b);
-    };
-
-    @Override
-    protected PluginConfigPanelNG createConfigPanel() {
-        return new UsenetConfigPanel() {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            protected boolean showKeyHandler(KeyHandler<?> keyHandler) {
-                return "enableboosterpointsunlimitedtrafficworkaround".equals(keyHandler.getKey());
-            }
-
-            @Override
-            protected boolean useCustomUI(KeyHandler<?> keyHandler) {
-                return !"enableboosterpointsunlimitedtrafficworkaround".equals(keyHandler.getKey());
-            }
-
-            @Override
-            protected void initAccountConfig(PluginForHost plgh, Account acc, Class<? extends AccountConfigInterface> cf) {
-                super.initAccountConfig(plgh, acc, cf);
-                extend(this, getHost(), getAvailableUsenetServer(), getAccountJsonConfig(acc));
-            }
-        };
-    }
-
-    @Override
-    public PremiumizeMeConfigInterface getAccountJsonConfig(final Account acc) {
-        return (PremiumizeMeConfigInterface) super.getAccountJsonConfig(acc);
-    }
-
     @Override
     public boolean supportsUsenet(final Account account) {
         /**
@@ -143,15 +95,6 @@ public class PremiumizeMe extends ZeveraCore {
     @Override
     public boolean usePairingLogin(final Account account) {
         return false;
-    }
-
-    @Override
-    public boolean isBoosterPointsUnlimitedTrafficWorkaroundActive(final Account account) {
-        if (this.getAccountJsonConfig(account).isEnableBoosterPointsUnlimitedTrafficWorkaround()) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     @Override

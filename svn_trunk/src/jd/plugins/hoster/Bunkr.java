@@ -40,7 +40,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 52746 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52749 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -786,12 +786,13 @@ public class Bunkr extends PluginForHost {
         final String media_under_maintenance_text = "Media temporarily not available due to ongoing server maintenance.";
         final long media_under_maintenance_wait = 2 * 60 * 60 * 1000l;
         final String path = con.getURL().getPath();
+        final int min_filesize_percent = this.get(this.getConfigInterface()).getMinimumFileSizePercentage();
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             handleResponsecodeErrors(con);
             handleHTMLErrors(link, br);
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File broken or temporarily unavailable", 2 * 60 * 60 * 1000l);
-        } else if (con.getURL().getPath().equalsIgnoreCase("/maintenance-vid.mp4") || con.getURL().getPath().equalsIgnoreCase("/v/maintenance-kek-bunkr.webm") || con.getURL().getPath().equalsIgnoreCase("/maintenance.mp4")) {
+        } else if (path.equalsIgnoreCase("/maintenance-vid.mp4") || path.equalsIgnoreCase("/v/maintenance-kek-bunkr.webm") || path.equalsIgnoreCase("/maintenance.mp4")) {
             con.disconnect();
             /* https://bnkr.b-cdn.net/maintenance-vid.mp4 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, media_under_maintenance_text, media_under_maintenance_wait);
@@ -799,7 +800,8 @@ public class Bunkr extends PluginForHost {
             /* 2026-01-09 */
             /* https://3d09xl1.b-cdn.net/c4f36040-bdd1-40b6-aea1-034dfbe88ba2/maint.mp4 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, media_under_maintenance_text, media_under_maintenance_wait);
-        } else if (parsedExpectedFilesize > 0 && con.getCompleteContentLength() > 0 && con.getCompleteContentLength() < (parsedExpectedFilesize * 0.5)) {
+        } else if (parsedExpectedFilesize > 0 && con.getCompleteContentLength() > 0 && con.getCompleteContentLength() < (parsedExpectedFilesize * min_filesize_percent / 100)) {
+            /* File size we got is smaller than user defined min threshold. */
             /*
              * Content-Type: image/jpeg
              *
@@ -810,12 +812,16 @@ public class Bunkr extends PluginForHost {
              * Cf-Polished: origSize=5817221
              */
             final String origSize = new Regex(con.getHeaderField("Cf-Polished"), "origSize=(\\d+)").getMatch(0);
-            if (origSize == null || Long.parseLong(origSize) == parsedExpectedFilesize) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is too small: File under maintenance?", TimeUnit.HOURS.toMillis(1));
-            } else if (Long.parseLong(origSize) != parsedExpectedFilesize) {
-                logger.info("apply cloudflare polish workaround:" + origSize + "!=" + parsedExpectedFilesize);
-                link.setVerifiedFileSize(-1);
+            final String error_msg = "File is too small (" + con.getCompleteContentLength() * 100 / parsedExpectedFilesize + "% of expected size, minimum is " + min_filesize_percent + "%). Change threshold in plugin settings or try again later.";
+            if (origSize == null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, error_msg, TimeUnit.HOURS.toMillis(1));
             }
+            final long origSizeLong = Long.parseLong(origSize);
+            if (origSizeLong == parsedExpectedFilesize) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, error_msg, TimeUnit.HOURS.toMillis(1));
+            }
+            logger.info("apply cloudflare polish workaround:" + origSizeLong + "!=" + parsedExpectedFilesize);
+            link.setVerifiedFileSize(-1);
         }
     }
 

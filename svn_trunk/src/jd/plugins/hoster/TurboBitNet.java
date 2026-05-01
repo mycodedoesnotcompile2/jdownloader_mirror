@@ -31,7 +31,7 @@ import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet;
 import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet.PreferredDomain;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@HostPlugin(revision = "$Revision: 52748 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52753 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurboBitNet extends TurbobitCore {
     public TurboBitNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -39,7 +39,7 @@ public class TurboBitNet extends TurbobitCore {
 
     /* Keep this up2date! */
     public static String[] domains      = new String[] { "turbobit.net", "ifolder.com.ua", "turo-bit.net", "depositfiles.com.ua", "dlbit.net", "hotshare.biz", "sibit.net", "turbobit.ru", "xrfiles.ru", "turbabit.net", "filedeluxe.com", "filemaster.ru", "файлообменник.рф", "turboot.ru", "kilofile.com", "twobit.ru", "forum.flacmania.ru", "filhost.ru", "fayloobmennik.com", "rapidfile.tk", "turbo.to", "cccy.su", "turbo-bit.net", "turbobit.cc", "turbobit.pw", "turbo.to", "turb.to", "turbo-bit.pw", "turbobit.cloud", "turbobit.online", "turbobit.live", "wayupload.com", "turb.cc", "turbobit5.net", "turbobith.net", "turbobi.pw", "turbobbit.com", "turbobyt.com", "trubobit.com", "turboget.net", "turbobiyt.net", "turbobif.com", "turbobite.net", "tourbobit.com", "turbobitn.com", "turbobeet.net", "turbobita.net", "turboobit.com", "turbobitt.net", "turbobyte.net", "trbt.cc", "torbobit.net" };
-    public static String[] domains_dead = new String[] { "turbobbit.com", "ifolder.com.ua", "turbobitt.net" };
+    public static String[] domains_dead = new String[] { "turbobbit.com", "ifolder.com.ua", "turbobitt.net", "cccy.su", "depositfiles.com.ua", "dlbit.net", "filedeluxe.com", "filhost.ru", "sibit.net", "turbabit.net", "turbo-bit.net", "turbo-bit.pw", "turbobit.cloud", "turbobit.live", "turbobit.online", "turbobit.pw", "turbobit.ru", "turbobit5.net", "turbobith.net", "turbobitt.net", "turbobiyt.net", "turboobit.com", "turo-bit.net" };
 
     /* Setting domains */
     // protected final String[] user_domains = new String[] { "turbo.to", "turb.to", "turbobit.net", "turbobit.pw" };

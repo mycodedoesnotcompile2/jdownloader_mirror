@@ -85,15 +85,15 @@ public class NZBSAXHandler extends DefaultHandler {
     private String                              date              = null;
     private boolean                             isyEnc            = false;
     private final Comparator<UsenetFileSegment> segmentComparator = new Comparator<UsenetFileSegment>() {
-                                                                      public int compare(int x, int y) {
-                                                                          return (x < y) ? -1 : ((x == y) ? 0 : 1);
-                                                                      }
+        public int compare(int x, int y) {
+            return (x < y) ? -1 : ((x == y) ? 0 : 1);
+        }
 
-                                                                      @Override
-                                                                      public int compare(UsenetFileSegment o1, UsenetFileSegment o2) {
-                                                                          return compare(o1.getIndex(), o2.getIndex());
-                                                                      }
-                                                                  };
+        @Override
+        public int compare(UsenetFileSegment o1, UsenetFileSegment o2) {
+            return compare(o1.getIndex(), o2.getIndex());
+        }
+    };
 
     public NZBSAXHandler(ArrayList<DownloadLink> downloadLinks) {
         this.downloadLinks = downloadLinks;
@@ -185,6 +185,53 @@ public class NZBSAXHandler extends DefaultHandler {
         }
     }
 
+    public static String parseFilenameFromSubject(final String subject) {
+        String nameBySubject = new Regex(subject, "( |^)\"([^\"]+?\\.[a-z0-9]{2,4})\"").getMatch(1);
+        if (nameBySubject != null) {
+            // quotation marks at the beginning or with leading space
+            return nameBySubject;
+        }
+        nameBySubject = new Regex(subject, "( \"|^\"?)([^\"]+?\\.[a-z0-9]{2,4})\"").getMatch(1);
+        if (nameBySubject != null) {
+            // no quotation at the beginning or quotation with leading space
+            return nameBySubject;
+        }
+        nameBySubject = new Regex(subject, "^([^ ]+)\\s*\\(\\s*[0]*1\\s*/\\s*\\d+").getMatch(0);
+        if (nameBySubject != null) {
+            // no spaces, until trailing counter
+            return nameBySubject;
+        }
+        nameBySubject = new Regex(subject, "(.+  |^)(.+?)\\s*\\(\\s*[0]*1\\s*/\\s*\\d+").getMatch(1);
+        if (nameBySubject != null) {
+            // everything from the beginning or minimum two leading spaces, until counter
+            return nameBySubject;
+        }
+        nameBySubject = new Regex(subject, "\"([^\"]+)\"").getMatch(0);
+        if (nameBySubject != null) {
+            // quotation marks
+            return nameBySubject;
+        }
+        if (nameBySubject == null) {
+            final String fileNameExtension = Files.getExtension(subject);
+            final ExtensionsFilterInterface compiled = CompiledFiletypeFilter.getExtensionsFilterInterface(fileNameExtension);
+            if (compiled != null) {
+                // everything, known file extension
+                return subject;
+            } else {
+                nameBySubject = "Unsupported Subject:" + subject;
+            }
+        }
+        return nameBySubject;
+    }
+
+    public static String parseFilesizeFromYEncSubject(final String subject) {
+        String fileSize = new Regex(subject, "\\s*yEnc\\s*\\(\\s*[0]*1\\s*/\\s*(\\d+)\\s*\\)\\s*\\[?([0-9\\.,]+\\s*(kb|mb|gb|b|$))").getMatch(1);
+        if (fileSize == null) {
+            fileSize = new Regex(subject, "\\s*([0-9\\.,]+\\s*?(kb|mb|gb|b))\\s*yEnc").getMatch(0);
+        }
+        return fileSize;
+    }
+
     public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
         if (StringUtils.equalsIgnoreCase("meta", qName)) {
             for (int index = 0; index < attributes.getLength(); index++) {
@@ -198,25 +245,7 @@ public class NZBSAXHandler extends DefaultHandler {
             currentFile = new UsenetFile();
             date = attributes.getValue("date");
             final String subject = attributes.getValue("subject");
-            // XXXXX - "Filename.jpg" [XX/XX] 52,44 MB yEnc (1/41)
-            String nameBySubject = new Regex(subject, "( |^)\"([^\"]+?\\.[a-z0-9]{2,4})\"").getMatch(1);
-            if (nameBySubject == null) {
-                nameBySubject = new Regex(subject, "( \"|^\"?)([^\"]+?\\.[a-z0-9]{2,4})\"").getMatch(1);
-                if (nameBySubject == null) {
-                    // XXX - NNNNNNNN - XXX XXX - NNNNNN - [0001 of 0100] - XX - 100.52 Kb - Filename.jpg (1/1)
-                    // Filename.jpg (1/1)
-                    nameBySubject = new Regex(subject, "(.+ |^)(.+?)\\s*\\(\\s*[0]*1\\s*/\\s*\\d+").getMatch(1);
-                }
-            }
-            if (nameBySubject == null) {
-                final String fileNameExtension = Files.getExtension(subject);
-                final ExtensionsFilterInterface compiled = CompiledFiletypeFilter.getExtensionsFilterInterface(fileNameExtension);
-                if (compiled != null) {
-                    nameBySubject = subject;
-                } else {
-                    nameBySubject = "Unsupported Subject:" + subject;
-                }
-            }
+            String nameBySubject = parseFilenameFromSubject(subject);
             currentFile.setName(nameBySubject);
             if (subject.contains(" yEnc ")) {
                 isyEnc = true;
@@ -224,20 +253,15 @@ public class NZBSAXHandler extends DefaultHandler {
                 if (parts != null) {
                     currentFile.setNumSegments(Integer.parseInt(parts));
                 }
-                String fileSize = new Regex(subject, "\\s*yEnc\\s*\\(\\s*[0]*1\\s*/\\s*(\\d+)\\s*\\)\\s*\\[([0-9\\.,]+\\s*(kb|mb|gb|b))").getMatch(0);
+                final String fileSize = parseFilesizeFromYEncSubject(subject);
                 if (fileSize != null) {
-                    currentFile.setSize(SizeFormatter.getSize(fileSize));
-                } else {
-                    fileSize = new Regex(subject, "\\s*([0-9\\.,]+\\s*?(kb|mb|gb|b))\\s*yEnc").getMatch(0);
-                    if (fileSize != null) {
-                        currentFile.setSize(SizeFormatter.getSize(fileSize));
-                    }
+                    currentFile.setSize(SizeFormatter.getSize(fileSize, false, false));
                 }
             } else {
                 isyEnc = false;
-                String fileSize = new Regex(subject, "([0-9\\.,]+\\s*?(kb|mb|gb))").getMatch(0);
+                String fileSize = new Regex(subject, "([0-9\\.,]+\\s*?(kb|mb|gb|b))").getMatch(0);
                 if (fileSize != null) {
-                    currentFile.setSize(SizeFormatter.getSize(fileSize));
+                    currentFile.setSize(SizeFormatter.getSize(fileSize, false, false));
                 }
             }
         } else if (StringUtils.equalsIgnoreCase("segment", qName)) {

@@ -109,7 +109,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
     }
 
     @Override
-    public void openFile(final File file, boolean tryToReuseWindows) throws IOException {
+    public void openFile(final File file, final boolean tryToReuseWindows) throws IOException {
         // workaround for windows
         // see http://bugs.sun.com/view_bug.do?bug_id=6599987
         if (!file.exists()) {
@@ -126,14 +126,22 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
                 @Override
                 public void run() {
                     try {
-                        Desktop.getDesktop().open(file);
+                        if (tryToReuseWindows) {
+                            // we need to go this cmd /c way, because explorer.exe seems to
+                            // do some strange parameter parsing.
+                            new ProcessBuilder("cmd", "/c", "explorer /select,\"" + file.getAbsolutePath() + "\"").start();
+                        } else {
+                            Desktop.getDesktop().open(file);
+                        }
                         synchronized (resultReference) {
                             resultReference.set(Boolean.TRUE);
-                            resultReference.notifyAll();
                         }
                     } catch (IOException e) {
                         synchronized (resultReference) {
                             resultReference.set(e);
+                        }
+                    } finally {
+                        synchronized (resultReference) {
                             resultReference.notifyAll();
                         }
                     }

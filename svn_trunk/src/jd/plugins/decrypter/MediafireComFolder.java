@@ -43,7 +43,7 @@ import jd.plugins.hoster.MediafireCom;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 
-@DecrypterPlugin(revision = "$Revision: 52748 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52756 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,20 +91,26 @@ public class MediafireComFolder extends PluginForDecrypt {
     // https://www.mediafire.com/developers/core_api/1.5/getting_started/#error_codes
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         String directurl = null;
-        final String fid = getFileIDFRomURL(parameter);
-        final Regex direct = new Regex(parameter, TYPE_DIRECT);
+        final String fid = getFileIDFRomURL(contenturl);
+        final Regex direct = new Regex(contenturl, TYPE_DIRECT);
         if (direct.patternFind()) {
-            directurl = parameter;
+            directurl = contenturl;
         }
-        String multipleContentIDsCommaSeparated = new Regex(param.getCryptedUrl(), "https?://[^/]+/\\?([a-z0-9,]+)").getMatch(0);
+        String multipleContentIDsCommaSeparated = new Regex(contenturl, "https?://[^/]+/\\?([a-z0-9,]+)").getMatch(0);
         if (multipleContentIDsCommaSeparated == null) {
-            multipleContentIDsCommaSeparated = new Regex(param.getCryptedUrl(), "https?://[^/]+/folder/([a-z0-9,]+)(/shared)?").getMatch(0);
+            multipleContentIDsCommaSeparated = new Regex(contenturl, "/folder/([a-z0-9,]+)(/shared)?").getMatch(0);
         }
-        if (multipleContentIDsCommaSeparated != null && multipleContentIDsCommaSeparated.contains(",")) {
-            /* Multiple files in one link */
+        if (multipleContentIDsCommaSeparated != null) {
+            /**
+             * Multiple file or folder-ids in one url <br>
+             * Website requires at least two items or one item and a comma but we also allow one id without comma e.g. "/folder/<id>/shared"
+             */
             final String[] contentIDs = multipleContentIDsCommaSeparated.split(",");
+            if (contentIDs.length == 1 && isFolderID(contentIDs[0])) {
+                return crawlFolder(param);
+            }
             for (final String contentID : contentIDs) {
                 final DownloadLink link;
                 if (isFolderID(contentID)) {

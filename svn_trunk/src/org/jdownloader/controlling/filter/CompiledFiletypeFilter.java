@@ -396,6 +396,7 @@ public class CompiledFiletypeFilter {
                 return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
             }
         },
+        DIZ,
         DOC {
             private final Pattern pattern = Pattern.compile("(?i)application/msword");
 

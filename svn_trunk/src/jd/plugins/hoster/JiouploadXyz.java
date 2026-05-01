@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52602 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52749 $", interfaceVersion = 3, names = {}, urls = {})
 public class JiouploadXyz extends PluginForHost {
     public JiouploadXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -262,30 +262,6 @@ public class JiouploadXyz extends PluginForHost {
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty) throws Exception {
-        final String url = link.getStringProperty(directlinkproperty);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
     }
 
     @Override

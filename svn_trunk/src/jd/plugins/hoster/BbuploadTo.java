@@ -32,10 +32,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 52748 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52754 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbuploadTo extends PluginForHost {
     public BbuploadTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -144,6 +145,7 @@ public class BbuploadTo extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();

@@ -6,14 +6,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.Type;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -32,11 +24,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52737 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52752 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebArchiveOrg extends PluginForDecrypt {
-    private static final Pattern PATTERN_DIRECT = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_OTHER  = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_FILE   = Pattern.compile("^https?://[^/]+/web/(\\d+)[^/]*/(.+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_DIRECT = Pattern.compile("/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_OTHER  = Pattern.compile("/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_FILE   = Pattern.compile("/web/(\\d+)[^/]*/(.+)", Pattern.CASE_INSENSITIVE);
 
     public WebArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +134,7 @@ public class WebArchiveOrg extends PluginForDecrypt {
                         /* Ignore unsupported links */
                         continue;
                     }
-                    if (PATTERN_DIRECT.matcher(url).matches() && direct_url.add(url)) {
+                    if (new Regex(url, PATTERN_DIRECT).patternFind() && direct_url.add(url)) {
                         direct_url.add(url);
                     } else {
                         final String externalWebsiteLink = new Regex(url, "https?://.*?(https*://.+)").getMatch(0);
@@ -186,21 +178,5 @@ public class WebArchiveOrg extends PluginForDecrypt {
             result._setFilePackage(fp);
         }
         return ret;
-    }
-
-    @PluginHost(host = "web.archive.org", type = Type.CRAWLER)
-    public static interface WebArchiveOrgConfig extends PluginConfigInterface {
-        @AboutConfig
-        @DefaultBooleanValue(false)
-        @DescriptionForConfigEntry("Crawl embedded files from web.archive.org link?")
-        @Order(10)
-        boolean isCrawlEmbeddedFilesEnabled();
-
-        void setCrawlEmbeddedFilesEnabled(boolean b);
-    }
-
-    @Override
-    public Class<WebArchiveOrgConfig> getConfigInterface() {
-        return WebArchiveOrgConfig.class;
     }
 }

@@ -21,6 +21,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -33,11 +37,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 52741 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52752 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -121,22 +121,26 @@ public class KenfilesCom extends XFileSharingProBasic {
         return -1;
     }
 
-    /** Function to find the final downloadlink. */
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, final String src) {
-        String dllink = new Regex(src, "(\"|\\')(https?://(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|([\\w\\-]+\\.)?(kfs\\.space|sfile\\.cc))(:\\d{1,4})?/(files|d|p|f|b|cgi\\-bin/dl\\.cgi)/(\\d+/)?[a-z0-9]+/[^<>\"/]*?)(\"|\\')").getMatch(1);
-        if (dllink == null) {
-            final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
-            if (cryptedScripts != null && cryptedScripts.length != 0) {
-                for (String crypted : cryptedScripts) {
-                    dllink = decodeDownloadLink(link, account, br, crypted);
-                    if (dllink != null) {
-                        break;
-                    }
+        String dllink = new Regex(src, "href=\"(https?://[^\"]+)\" target=\"_blank\" title=\"Download file").getMatch(0);
+        if (dllink != null) {
+            return dllink;
+        }
+        dllink = new Regex(src, "(\"|\\')(https?://(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|([\\w\\-]+\\.)?(kfs\\.space|sfile\\.cc))(:\\d{1,4})?/(files|d|p|f|b|cgi\\-bin/dl\\.cgi)/(\\d+/)?[a-z0-9]+/[^<>\"/]*?)(\"|\\')").getMatch(1);
+        if (dllink != null) {
+            return dllink;
+        }
+        final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
+        if (cryptedScripts != null && cryptedScripts.length != 0) {
+            for (String crypted : cryptedScripts) {
+                dllink = decodeDownloadLink(link, account, br, crypted);
+                if (dllink != null) {
+                    return dllink;
                 }
             }
         }
-        return dllink;
+        return super.getDllink(link, account, br, src);
     }
 
     @Override
@@ -193,12 +197,12 @@ public class KenfilesCom extends XFileSharingProBasic {
 
     @Override
     protected String regexWaittime(Browser br) {
-        String waitStr = super.regexWaittime(br);
-        if (waitStr == null) {
-            /* 2020-09-02: Special */
-            waitStr = new Regex(br.getRequest().getHtmlCode(), ">(\\d+)</span> seconds<").getMatch(0);
+        /* 2020-09-02: Special */
+        final String waitStr = new Regex(br.getRequest().getHtmlCode(), ">(\\d+)</span>\\s*seconds\\s*<").getMatch(0);
+        if (waitStr != null) {
+            return waitStr;
         }
-        return waitStr;
+        return super.regexWaittime(br);
     }
 
     @Override

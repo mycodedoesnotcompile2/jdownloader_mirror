@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
@@ -36,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52752 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
 public class FilesFmFolder extends PluginForDecrypt {
     public FilesFmFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,25 +71,27 @@ public class FilesFmFolder extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (this.br.containsHTML("name=\"upl_passw\"")) {
             /* 2017-01-30: Password protected */
-            logger.info("Password protected urls are not yet supported");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Password protected urls are not yet supported");
         }
+        final HashSet<String> dupes = new HashSet<String>();
+        /* Add id of current folder to dupes to avoid re-adding link to current folder. */
+        dupes.add(folderID);
         String[] folders = br.getRegex("files\\.fm/u/([a-z0-9]+)").getColumn(0);
         for (String folderIDTmp : folders) {
-            /* Do not re-add current folder */
-            if (folderIDTmp.equals(folderID)) {
+            if (!dupes.add(folderIDTmp)) {
                 continue;
             }
-            final String contentUrl = br.getURL("/u/" + folderIDTmp).toString();
+            final String contentUrl = br.getURL("/u/" + folderIDTmp).toExternalForm();
             ret.add(createDownloadlink(contentUrl));
         }
         String[] htmls = br.getRegex("id=\"report_[^\"]+\".*?class=\"OrderID\"").getColumn(-1);
         if (htmls == null || htmls.length == 0) {
             if (folders != null && folders.length > 0) {
                 /* Only subfolders and no single files */
+                logger.info("Found only subfolders and no single files");
                 return ret;
             } else if (hostplg.canHandle(br.getURL())) {
-                /* Folder redirected to single file-link */
+                logger.info("Folder redirected to single file-link");
                 ret.add(this.createDownloadlink(br.getURL()));
                 return ret;
             } else {
@@ -123,16 +126,19 @@ public class FilesFmFolder extends PluginForDecrypt {
                 filename += ext;
             }
             final String contentUrl = Request.getLocation("/down.php?i=" + fileid + "&n=" + filename, br.getRequest());
-            final DownloadLink dl = createDownloadlink(contentUrl);
-            dl.setProperty("mainlink", param.getCryptedUrl());
-            dl.setContentUrl(contentUrl);
-            dl.setLinkID(fileid);
-            dl.setAvailable(true);
-            dl.setName(Encoding.htmlDecode(filename));
-            dl.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(filesize)));
-            dl.setProperty("originalname", filename);
-            dl._setFilePackage(fp);
-            ret.add(dl);
+            final DownloadLink file = createDownloadlink(contentUrl);
+            file.setProperty("mainlink", param.getCryptedUrl());
+            file.setContentUrl(contentUrl);
+            file.setLinkID(fileid);
+            file.setAvailable(true);
+            file.setName(Encoding.htmlDecode(filename));
+            file.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(filesize)));
+            file.setProperty("originalname", filename);
+            file._setFilePackage(fp);
+            ret.add(file);
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
     }

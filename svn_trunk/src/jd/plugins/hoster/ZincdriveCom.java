@@ -18,8 +18,11 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
@@ -27,18 +30,19 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52751 $", interfaceVersion = 3, names = {}, urls = {})
-public class LoadmeCc extends PluginForHost {
-    public LoadmeCc(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 52749 $", interfaceVersion = 3, names = {}, urls = {})
+public class ZincdriveCom extends PluginForHost {
+    public ZincdriveCom(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium("");
     }
@@ -47,6 +51,7 @@ public class LoadmeCc extends PluginForHost {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        br.setCookie(getHost(), "adb", "0");
         return br;
     }
 
@@ -58,7 +63,7 @@ public class LoadmeCc extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "loadme.cc" });
+        ret.add(new String[] { "zincdrive.com", "zdrive.to" });
         return ret;
     }
 
@@ -71,7 +76,7 @@ public class LoadmeCc extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL = Pattern.compile("/file/([a-f0-9]{20})/?");
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/([a-zA-Z0-9]{12})");
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
@@ -116,8 +121,11 @@ public class LoadmeCc extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("File name:?\\s*</strong>([^<]+)</p>").getMatch(0);
-        String filesize = br.getRegex("Size:?\\s*</strong>([^<]+)</p>").getMatch(0);
+        String filename = br.getRegex("<title>Download File: ([^<]+) — ZincDrive\\s*</title>").getMatch(0);
+        if (StringUtils.isEmpty(filename)) {
+            filename = br.getRegex("\"name\":\\s*'([^\"']+)'").getMatch(0);
+        }
+        String filesize = br.getRegex("\"contentSize\":\\s*'(\\d+[^\"']+)'").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -135,24 +143,47 @@ public class LoadmeCc extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        String dllink = br.getRegex("(/download/[a-f0-9]{20})").getMatch(0);
+        String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
+        if (csrftoken == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String fid = this.getFID(link);
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
+        brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
+        brc.getHeaders().put("Origin", "https://www." + br.getHost());
+        brc.getHeaders().put("x-csrf-token", csrftoken);
+        /* This request gains us two cookies which are needed for the subsequent "/file" GET request. */
+        brc.postPageRaw("/" + fid + "/gateway/proceed", "");
+        br.getPage("/" + fid + "/file");
+        final Form continueform = br.getFormbyProperty("id", "down_1Form");
+        if (continueform == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        br.submitForm(continueform);
+        final Form dlform2 = br.getFormbyProperty("id", "down_2");
+        if (dlform2 == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
+        if (csrftoken == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        brc.setCookie(br.getHost(), "rqf", fid);
+        brc.postPageRaw("/" + fid + "/file/generate", "");
+        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String dllink = (String) entries.get("download_link");
         if (StringUtils.isEmpty(dllink)) {
-            String filePrice = br.getRegex("File price:\\s*<b>(\\d+) USD</b>").getMatch(0);
-            if (filePrice == null) {
-                filePrice = br.getRegex("Get access to this file for only\\s*<b>(\\d+) USD").getMatch(0);
-                if (filePrice == null) {
-                    filePrice = br.getRegex("Price:\\s*</strong>\\s*(\\d+) USD").getMatch(0);
-                }
+            logger.warning("Failed to find final downloadurl");
+            String msg = (String) entries.get("message");
+            if (msg == null) {
+                msg = (String) entries.get("error");
             }
-            if (filePrice != null) {
-                throw new AccountRequiredException("Buy this file for " + filePrice + " USD");
+            if (msg != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            if (br.containsHTML(">\\s*This file is available only for")) {
-                throw new AccountRequiredException();
-            } else if (br.containsHTML(">[^<]*This file is a part of a bundle")) {
-                throw new AccountRequiredException("Extra required to download this file");
-            }
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
@@ -167,5 +198,10 @@ public class LoadmeCc extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public SiteTemplate siteTemplateType() {
+        return SiteTemplate.UnknownNewFilehosterScript2026;
     }
 }

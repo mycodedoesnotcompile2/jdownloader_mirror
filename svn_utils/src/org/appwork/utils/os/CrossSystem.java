@@ -60,12 +60,9 @@ import java.util.regex.Pattern;
 
 import javax.swing.KeyStroke;
 
-import org.appwork.JNAHelper;
-import org.appwork.builddecision.BuildDecisions;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.StorableDoc;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -224,7 +221,7 @@ public class CrossSystem {
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         *
+         * 
          * Debian: List must be sorted by release Date!!
          */
         @StorableDoc("Debian Linux distribution")
@@ -253,7 +250,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         *
+         * 
          * RASPBIAN: List must be sorted by release Date!!
          */
         @StorableDoc("Raspbian Linux distribution (Raspberry Pi OS)")
@@ -274,9 +271,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         *
+         * 
          * https://wiki.ubuntu.com/Releases
-         *
+         * 
          * Ubuntu: List must be sorted by release Date!!
          */
         @StorableDoc("Ubuntu Linux distribution")
@@ -602,11 +599,12 @@ public class CrossSystem {
         ARCH = CrossSystem.getARCHByString(CrossSystem.ARCH_STRING);
     }
 
-    public static void setDesktopSupportInstance(final DesktopSupport desktopSupport) {
+    public static DesktopSupport setDesktopSupportInstance(final DesktopSupport desktopSupport) {
         if (desktopSupport == null) {
             throw new IllegalArgumentException();
         }
         DESKTOP_SUPPORT.set(desktopSupport);
+        return desktopSupport;
     }
 
     public static String getDefaultDownloadDirectory() {
@@ -736,7 +734,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         *
+         * 
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -920,30 +918,7 @@ public class CrossSystem {
         synchronized (DESKTOP_SUPPORT) {
             ret = CrossSystem.DESKTOP_SUPPORT.get();
             if (ret == null) {
-                switch (getOSFamily()) {
-                case WINDOWS:
-                    try {
-                        if (JNAHelper.isJNAAvailable() && !BuildDecisions.contains(DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO)) {
-                            ret = new org.appwork.utils.os.DesktopSupportWindowsViaJNA();
-                        } else {
-                            ret = new DesktopSupportWindows();
-                        }
-                    } catch (final Exception e) {
-                        DebugMode.debugger(e);
-                        ret = new DesktopSupportWindows();
-                    }
-                    break;
-                case LINUX:
-                    ret = new DesktopSupportLinux();
-                    break;
-                case MAC:
-                    ret = new DesktopSupportMac();
-                    break;
-                default:
-                    ret = new DesktopSupportJavaDesktop();
-                    break;
-                }
-                setDesktopSupportInstance(ret);
+                ret = setDesktopSupportInstance(DesktopSupportProvider.getDesktopSupport(getOSFamily()));
             }
         }
         return ret;
@@ -2234,17 +2209,9 @@ public class CrossSystem {
     public static void showInExplorer(final File saveTo, boolean useExitingWindow) {
         if (saveTo.exists()) {
             if (CrossSystem.isWindows()) {
-                if (useExitingWindow) {
-                    File openFolder = saveTo.getParentFile();
-                    // TODO: move to DesktopSupport
-                    if (WindowsUtils.explorerToFront(openFolder)) {
-                        return;
-                    }
-                }
                 try {
-                    // we need to go this cmd /c way, because explorer.exe seems to
-                    // do some strange parameter parsing.
-                    new ProcessBuilder("cmd", "/c", "explorer /select,\"" + saveTo.getAbsolutePath() + "\"").start();
+                    final File parentFolderToShowSelection = saveTo.getParentFile();
+                    getDesktopSupport().openFile(parentFolderToShowSelection, useExitingWindow);
                     return;
                 } catch (final IOException e) {
                     e.printStackTrace();
@@ -2252,6 +2219,7 @@ public class CrossSystem {
             } else if (CrossSystem.isMac()) {
                 try {
                     ProcessBuilderFactory.create("open", "-R", saveTo.getAbsolutePath()).start();
+                    return;
                 } catch (final IOException e) {
                     e.printStackTrace();
                 }

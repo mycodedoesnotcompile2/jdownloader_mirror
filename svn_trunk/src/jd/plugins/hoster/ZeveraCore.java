@@ -480,21 +480,22 @@ abstract public class ZeveraCore extends UseNet {
             /* Premium account */
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
-            final boolean boosterPointsAvailable;
-            if (booster_points != null && booster_points.intValue() > 0) {
-                boosterPointsAvailable = true;
-            } else {
-                boosterPointsAvailable = isBoosterPointsUnlimitedTrafficWorkaroundActive(account);
-            }
             final double fair_use_used_double = fair_use_usedO.doubleValue();
             final int fairUsagePercentUsed = (int) (fair_use_used_double * 100.0);
             final int fairUsagePercentLeft = 100 - fairUsagePercentUsed;
-            if (fairUsagePercentUsed >= 100 && !boosterPointsAvailable) {
-                throw new AccountUnavailableException("Fair use limit reached", 5 * 60 * 1000l);
+            if (fairUsagePercentUsed >= 100) {
+                if (booster_points == null || booster_points.intValue() == 0) {
+                    final String reason = booster_points == null ? "Fair use limit reached" : "Fair use limit reached, wait or buy booster points";
+                    throw new AccountUnavailableException(reason, 5 * 60 * 1000l);
+                }
             }
             String statustext = String.format(Locale.ROOT, "Premium | Fair-Use Status: %d%% left", fairUsagePercentLeft);
-            if (boosterPointsAvailable) {
-                statustext += " | Unlimited Traffic Booster workaround enabled";
+            if (booster_points != null) {
+                /*
+                 * Booster point information is only relevant if API returns that field. That field is e.g. not available for zevera.com but
+                 * is available for premiumize.me.
+                 */
+                statustext += " | Booster points: " + booster_points;
             }
             ai.setStatus(statustext);
             ai.setValidUntil(((Number) premium_untilO).longValue() * 1000, br);
@@ -789,19 +790,6 @@ abstract public class ZeveraCore extends UseNet {
      */
     @Deprecated
     public boolean usePairingLogin(final Account account) {
-        return false;
-    }
-
-    /**
-     * 2019-08-21: Premiumize.me has so called 'booster points' which basically means that users with booster points can download more than
-     * normal users can with their fair use limit: https://www.premiumize.me/booster </br>
-     * Premiumize has not yet integrated this in their API which means accounts with booster points will run into the fair-use-limit in
-     * JDownloader and will not be able to download any more files then. </br>
-     * This workaround can set accounts to unlimited traffic so that users will still be able to download.</br>
-     * Remove this workaround once Premiumize has integrated their booster points into their API.
-     */
-    @Deprecated
-    public boolean isBoosterPointsUnlimitedTrafficWorkaroundActive(final Account account) {
         return false;
     }
 
