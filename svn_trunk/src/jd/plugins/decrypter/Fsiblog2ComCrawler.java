@@ -29,8 +29,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49584 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52768 $", interfaceVersion = 3, names = {}, urls = {})
 public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public Fsiblog2ComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +41,7 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fsiblog.club", "fsiblog2.com", "fsiblog3.club" });
+        ret.add(new String[] { "fsiblogx.com", "fsiblog.club", "fsiblog2.com", "fsiblog3.club" });
         return ret;
     }
 
@@ -60,40 +61,39 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!category|tag|wp-content|page)([a-z0-9\\-]+)/([a-z0-9\\-]+)/");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!category|tag|wp-content|page)([a-z0-9\\-]+)/([a-z0-9\\-]+)/?");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         br.setFollowRedirects(true);
-        final String addedlink = param.getCryptedUrl().replaceFirst("(?i)^http://", "https://");
-        br.getPage(addedlink);
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)^http://", "https://");
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String titleFromURL = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1).replace("-", " ").trim();
+        final String titleFromURL = new Regex(contenturl, this.getSupportedLinks()).getMatch(1).replace("-", " ").trim();
         final String videoURL = br.getRegex("\"(https?://[^\"]+\\.mp4)").getMatch(0);
         if (videoURL != null) {
-            final DownloadLink video = this.createDownloadlink(videoURL);
+            final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videoURL));
             video.setFinalFileName(titleFromURL + ".mp4");
-            video.setAvailable(true);
             ret.add(video);
         } else {
             final String[] photos = br.getRegex("class=\"e-gallery-item elementor-gallery-item elementor-animated-content\" href=\"(https?://[^\"]+)\"").getColumn(0);
             if (photos == null || photos.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            for (final String singleLink : photos) {
-                final DownloadLink link = createDownloadlink(singleLink);
-                link.setAvailable(true);
+            for (final String url : photos) {
+                final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
                 ret.add(link);
             }
         }
         for (final DownloadLink result : ret) {
+            result.setAvailable(true);
             /* Direct link cannot be used without correct referer so let's set a contentURL which the user can actually open in browser. */
-            result.setContentUrl(addedlink);
+            result.setContentUrl(contenturl);
             /*
              * Direct-URL cannot be used without correct referer -> Set that here so that DirectHTTP plugin is able to download the file
              * later on.

@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49953 $", interfaceVersion = 2, names = { "free-loops.com" }, urls = { "https?://(www\\.)?free\\-loops\\.com/\\d+[a-z0-9\\-]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 52764 $", interfaceVersion = 2, names = { "free-loops.com" }, urls = { "https?://(www\\.)?free\\-loops\\.com/\\d+[a-z0-9\\-]+\\.html" })
 public class FreeLoopsCom extends PluginForDecrypt {
     public FreeLoopsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,9 @@ public class FreeLoopsCom extends PluginForDecrypt {
             con = br.openGetConnection(finallink);
             if (!looksLikeDownloadableContent(con)) {
                 br.followConnection(true);
-                if (br.containsHTML("The file doesn't seem to be here") || br.containsHTML("Go back and try another file")) {
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br.containsHTML("The file doesn't seem to be here") || br.containsHTML("Go back and try another file")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

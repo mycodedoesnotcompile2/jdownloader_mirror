@@ -188,9 +188,9 @@ public class ScriptThread extends Thread implements JSShutterDelegate, StateMach
     }
 
     protected void initContext(Context context) {
-        cx.setOptimizationLevel(-1);
-        cx.setLanguageVersion(Context.VERSION_ES6);
-        cx.getWrapFactory().setJavaPrimitiveWrap(false);// old default
+        context.setOptimizationLevel(-1);
+        context.setLanguageVersion(Context.VERSION_ES6);
+        context.getWrapFactory().setJavaPrimitiveWrap(false);// old default
     }
 
     private synchronized void executeScipt() {

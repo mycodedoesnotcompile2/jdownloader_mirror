@@ -501,7 +501,8 @@ public class ExtensionController implements MenuExtenderHandler {
         List<LazyExtension> llist = list;
         for (LazyExtension l : llist) {
             if (class1.getName().equals(l.getClassname())) {
-                if (l._getExtension() != null && l._getExtension().isEnabled()) {
+                final AbstractExtension<?, ?> extension = l._getExtension();
+                if (extension != null && extension.isEnabled()) {
                     return true;
                 }
             }
@@ -522,8 +523,9 @@ public class ExtensionController implements MenuExtenderHandler {
         final List<AbstractExtension<?, ?>> ret = new ArrayList<AbstractExtension<?, ?>>();
         final List<LazyExtension> list = getExtensions();
         for (final LazyExtension aew : list) {
-            if (aew._getExtension() != null && aew._getExtension().isEnabled()) {
-                ret.add(aew._getExtension());
+            final AbstractExtension<?, ?> extension = aew._getExtension();
+            if (extension != null && extension.isEnabled()) {
+                ret.add(extension);
             }
         }
         return ret;

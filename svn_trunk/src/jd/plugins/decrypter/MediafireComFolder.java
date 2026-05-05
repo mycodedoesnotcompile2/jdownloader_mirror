@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -40,18 +43,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediafireCom;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 52756 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52758 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    public static final Pattern TYPE_DIRECT                       = Pattern.compile("https?://download\\d+.mediafire(?:cdn)?\\.com/[^/]+/([a-z0-9]+)/([^/\"']+)", Pattern.CASE_INSENSITIVE);
-    private static final String PATTERN_CONTENT_ID                = "[a-z0-9]+";
-    public static final Pattern MEDIAFIRE_PROTOCOL_AND_SUBDOMAINS = Pattern.compile("https?://(?:(?:www|app)\\.)?");
+    public static final Pattern  TYPE_DIRECT                       = Pattern.compile("https?://download\\d+.mediafire(?:cdn)?\\.com/[^/]+/([a-z0-9]+)/([^/\"']+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_CONTENT_ID                = Pattern.compile("[a-z0-9]+");
+    public static final Pattern  MEDIAFIRE_PROTOCOL_AND_SUBDOMAINS = Pattern.compile("https?://(?:(?:www|app)\\.)?");
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -88,16 +88,38 @@ public class MediafireComFolder extends PluginForDecrypt {
         }
     }
 
+    /** Returnes fileID if given URL is any supported single file download URL. */
+    public static String getFileIDFRomURL(final String url) throws MalformedURLException {
+        final UrlQuery query = UrlQuery.parse(url);
+        String fid = query.get("quickkey");
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)/(?:download|file|file_premium|listen|watch|view)/(" + PATTERN_CONTENT_ID.pattern() + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)/download\\.php\\?(" + PATTERN_CONTENT_ID.pattern() + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)/i\\?(" + PATTERN_CONTENT_ID.pattern() + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, "(?i)https?://[^/]+/\\?(" + PATTERN_CONTENT_ID.pattern() + ")").getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, TYPE_DIRECT).getMatch(0);
+        return fid;
+    }
+
     // https://www.mediafire.com/developers/core_api/1.5/getting_started/#error_codes
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
-        String directurl = null;
         final String fid = getFileIDFRomURL(contenturl);
-        final Regex direct = new Regex(contenturl, TYPE_DIRECT);
-        if (direct.patternFind()) {
-            directurl = contenturl;
-        }
         String multipleContentIDsCommaSeparated = new Regex(contenturl, "https?://[^/]+/\\?([a-z0-9,]+)").getMatch(0);
         if (multipleContentIDsCommaSeparated == null) {
             multipleContentIDsCommaSeparated = new Regex(contenturl, "/folder/([a-z0-9,]+)(/shared)?").getMatch(0);
@@ -109,7 +131,8 @@ public class MediafireComFolder extends PluginForDecrypt {
              */
             final String[] contentIDs = multipleContentIDsCommaSeparated.split(",");
             if (contentIDs.length == 1 && isFolderID(contentIDs[0])) {
-                return crawlFolder(param);
+                /* Catch edge case to prevent endless loop */
+                return crawlFolder(param, contentIDs[0]);
             }
             for (final String contentID : contentIDs) {
                 final DownloadLink link;
@@ -123,79 +146,62 @@ public class MediafireComFolder extends PluginForDecrypt {
             return ret;
         } else if (fid != null) {
             /* Single file */
-            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(param.getCryptedUrl()));
+            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(contenturl));
             final DownloadLink file = createSingleFileDownloadlink(fid, filenameFromURL);
-            ret.add(file);
-            if (directurl != null) {
-                MediafireCom.storeDirecturl(file, null, directurl);
+            final Regex direct = new Regex(contenturl, TYPE_DIRECT);
+            if (direct.patternFind()) {
+                /*
+                 * Added URL is direct url -> Store as property so if we're lucky we can use that direct-url to start downloading right
+                 * away, skipping potential limitations for free users.
+                 */
+                MediafireCom.storeDirecturl(file, null, contenturl);
             }
+            ret.add(file);
             return ret;
         } else {
+            /* Assume that we got a folder */
             return crawlFolder(param);
         }
     }
 
-    /** Returnes fileID if given URL is any supported single file download URL. */
-    public static String getFileIDFRomURL(final String url) throws MalformedURLException {
-        final UrlQuery query = UrlQuery.parse(url);
-        String fid = query.get("quickkey");
-        if (fid != null) {
-            return fid;
+    private ArrayList<DownloadLink> crawlFolder(final CryptedLink param) throws Exception {
+        this.setBrowserExclusive();
+        final String folderurl = param.getCryptedUrl();
+        String newSharekey = new Regex(folderurl, "(?i)/folder/(" + PATTERN_CONTENT_ID.pattern() + ")").getMatch(0);
+        if (newSharekey == null) {
+            logger.info("Detected old sharekey --> Trying to get corresponding new sharekey");
+            br.setFollowRedirects(true);
+            br.getPage(folderurl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            newSharekey = br.getRegex("sharekey=(" + PATTERN_CONTENT_ID.pattern() + ")").getMatch(0);
+            if (newSharekey == null) {
+                newSharekey = br.getRegex("afI\\s*=\\s*\"(" + PATTERN_CONTENT_ID.pattern() + ")\"").getMatch(0);
+            }
+            if (newSharekey == null) {
+                logger.warning("Unable to find new sharekey --> URL must be offline or unsupported format");
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            logger.info("Found new sharekey: " + newSharekey);
         }
-        fid = new Regex(url, "(?i)https?://[^/]+/(?:download|file|file_premium|listen|watch|view)/(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-        if (fid != null) {
-            return fid;
-        }
-        fid = new Regex(url, "(?i)https?://[^/]+/download\\.php\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-        if (fid != null) {
-            return fid;
-        }
-        fid = new Regex(url, "(?i)https?://[^/]+/i\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-        if (fid != null) {
-            return fid;
-        }
-        fid = new Regex(url, "(?i)https?://[^/]+/\\?(" + PATTERN_CONTENT_ID + ")").getMatch(0);
-        if (fid != null) {
-            return fid;
-        }
-        fid = new Regex(url, TYPE_DIRECT).getMatch(0);
-        if (fid != null) {
-            return fid;
-        }
-        return null;
+        return crawlFolder(param, newSharekey);
     }
 
-    private ArrayList<DownloadLink> crawlFolder(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlFolder(final CryptedLink param, final String folder_key) throws Exception {
+        if (StringUtils.isEmpty(folder_key)) {
+            throw new IllegalArgumentException();
+        } else if (!isFolderID(folder_key)) {
+            throw new IllegalArgumentException();
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        final MediafireCom hosterplugin = (MediafireCom) this.getNewPluginForHostInstance(this.getHost());
+        if (account != null) {
+            hosterplugin.login(br, account, false);
+        }
+        final UrlQuery fileFolderQuery = new UrlQuery().add("folder_key", folder_key);
         try {
-            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-            this.setBrowserExclusive();
-            final String folderurl = param.getCryptedUrl();
-            final String sharekeyPattern = "[a-z0-9]+";
-            final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-            final MediafireCom hosterplugin = (MediafireCom) this.getNewPluginForHostInstance(this.getHost());
-            if (account != null) {
-                hosterplugin.login(br, account, false);
-            }
-            String newSharekey = new Regex(folderurl, "(?i)/folder/(" + sharekeyPattern + ")").getMatch(0);
-            if (newSharekey == null) {
-                logger.info("Detected old sharekey --> Trying to get corresponding new sharekey");
-                br.setFollowRedirects(true);
-                br.getPage(folderurl);
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                newSharekey = br.getRegex("sharekey=(" + sharekeyPattern + ")").getMatch(0);
-                if (newSharekey == null) {
-                    newSharekey = br.getRegex("afI\\s*=\\s*\"(" + sharekeyPattern + ")\"").getMatch(0);
-                }
-                if (newSharekey == null) {
-                    logger.warning("Unable to find new 'quick_key' --> URL must be offline");
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    logger.info("Found new 'sharekey': " + newSharekey);
-                }
-            }
-            final UrlQuery fileFolderQuery = new UrlQuery().add("folder_key", Encoding.urlEncode(newSharekey));
             // apiRequest(this.br, "https://www.mediafire.com/api/folder/get_info.php", fquery);
             final Map<String, Object> foldermap = hosterplugin.apiCommand(param.getDownloadLink(), account, "folder/get_info.php", fileFolderQuery);
             final Map<String, Object> folder_info = (Map<String, Object>) foldermap.get("folder_info");
@@ -242,9 +248,9 @@ public class MediafireComFolder extends PluginForDecrypt {
                     } else if (!"yes".equalsIgnoreCase(folder_content.get("more_chunks").toString())) {
                         logger.info("Stopping file pagination because: Reached last page");
                         break filePagination;
-                    } else {
-                        page++;
                     }
+                    /* Continue to next page */
+                    page++;
                 } while (true);
                 ret.addAll(filearray);
             }
@@ -271,9 +277,9 @@ public class MediafireComFolder extends PluginForDecrypt {
                     } else if (!"yes".equalsIgnoreCase(folder_content.get("more_chunks").toString())) {
                         logger.info("Stopping folder pagination because: Reached last page");
                         break folderPagination;
-                    } else {
-                        page++;
                     }
+                    /* Continue to next page */
+                    page++;
                 } while (true);
                 ret.addAll(folderarray);
             }

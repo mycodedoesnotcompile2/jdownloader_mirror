@@ -1,13 +1,14 @@
 package org.jdownloader.plugins.components.realDebridCom.api;
 
 public enum Error {
+    /* See docs: https://api.real-debrid.com/ */
     INTERNAL(-1, "Internal error"),
     MISSING_PARAMETER(1, "Missing parameter"),
     BAD_PARAMETER_VALUE(2, "Bad parameter value"),
     UNKNOWN_METHOD(3, "Unknown method"),
     METHOD_NOT_ALLOWED(4, "Method not allowed"),
     SLOW_DOWN(5, "Slow down"),
-    RESOURCE_UNREACHABLE(6, "Ressource unreachable"),
+    RESOURCE_UNREACHABLE(6, "Resource unreachable"),
     RESOURCE_NOT_FOUND(7, "Resource not found"),
     BAD_TOKEN(8, "Bad token"),
     PERMISSION_DENIED(9, "Permission denied"),
@@ -55,5 +56,9 @@ public enum Error {
     Error(int code, String msg) {
         this.code = code;
         this.msg = msg;
+    }
+
+    public String getMsg() {
+        return this.msg;
     }
 }

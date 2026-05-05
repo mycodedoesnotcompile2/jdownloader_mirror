@@ -18,16 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -42,7 +32,16 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.Order;
 
-@HostPlugin(revision = "$Revision: 51552 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+
+@HostPlugin(revision = "$Revision: 52757 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
 public class HighWayMe2 extends HighWayCore {
     protected static MultiHosterManagement mhm                      = new MultiHosterManagement("high-way.me");
     private static final String            urlWebsiteAPICredentials = "high-way.me/pages/cred/";
@@ -185,14 +184,6 @@ public class HighWayMe2 extends HighWayCore {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

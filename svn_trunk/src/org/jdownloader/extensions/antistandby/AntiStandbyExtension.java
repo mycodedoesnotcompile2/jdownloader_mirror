@@ -41,8 +41,6 @@ import org.jdownloader.extensions.ExtensionController;
 import org.jdownloader.extensions.StartException;
 import org.jdownloader.extensions.StopException;
 import org.jdownloader.extensions.antistandby.translate.AntistandbyTranslation;
-import org.jdownloader.extensions.extraction.ExtractionExtension;
-import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 
@@ -131,7 +129,7 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
     }
 
     protected Set<Condition> requiresAntiStandby(final Set<Condition> condition) {
-        Set<Condition> ret = new HashSet<Condition>();
+        final Set<Condition> ret = new HashSet<Condition>();
         if (condition == null || condition.size() == 0) {
             return ret;
         }
@@ -145,18 +143,26 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
             ret.add(Condition.DOWNLOADING);
         }
         if (condition.contains(Condition.EXTRACTING)) {
-            final ExtractionExtension extension = ArchiveValidator.EXTENSION;
-            if (extension != null && !extension.getJobQueue().isEmpty()) {
-                ret.add(Condition.EXTRACTING);
+            for (AbstractExtension<?, ?> extension : ExtensionController.getInstance().getEnabledExtensions()) {
+                try {
+                    if (!"ExtractionExtension".equals(extension.getName())) {
+                        continue;
+                    } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
+                        ret.add(Condition.EXTRACTING);
+                        break;
+                    }
+                } catch (Throwable e) {
+                }
             }
         }
         if (condition.contains(Condition.EXTENSION)) {
             for (AbstractExtension<?, ?> extension : ExtensionController.getInstance().getEnabledExtensions()) {
                 try {
-                    if (extension instanceof AntiStandbyExtension) {
+                    if ("AntiStandbyExtension".equals(extension.getName())) {
                         continue;
                     } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
                         ret.add(Condition.EXTENSION);
+                        break;
                     }
                 } catch (Throwable e) {
                 }

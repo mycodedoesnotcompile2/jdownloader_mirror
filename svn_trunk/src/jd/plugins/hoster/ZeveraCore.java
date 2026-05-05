@@ -838,6 +838,36 @@ abstract public class ZeveraCore extends UseNet {
             /* Ignore this particular error message for now. */
             return;
         }
+        final String error_code_enum = (String) entries.get("code");
+        if (error_code_enum != null) {
+            /* 2026-05-04: New ENUM style errors available via "code" field. */
+            if ("authentication_failed".equals(error_code_enum)) {
+                /* Permanent auth/config errors -> account invalid */
+                throw new AccountInvalidException(message);
+            } else if ("permission_denied".equals(error_code_enum)) {
+                /* Authenticated but not allowed: account restricted, unconfirmed, or accessing someone else's resource. */
+                throw new AccountInvalidException(message);
+            } else if ("account_limit_reached".equals(error_code_enum) || "rate_limit_reached".equals(error_code_enum)) {
+                /* Fair-use / booster / rate limit exhausted -> account temporarily unavailable */
+                throw new AccountUnavailableException(message, retryInMilliseconds);
+            } else if ("service_unsupported".equals(error_code_enum)) {
+                /* Host not supported -> put host on error */
+                getMultiHosterManagement().putError(account, link, 60 * 60 * 1000l, message);
+            } else if ("service_down".equals(error_code_enum) || "service_limit_reached".equals(error_code_enum)) {
+                /* Semi-permanent host-side error -> put host on error */
+                getMultiHosterManagement().putError(account, link, retryInMilliseconds, message);
+            } else if ("not_found".equals(error_code_enum)) {
+                /* File/transfer/resource does not exist -> offline */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
+            } else {
+                /* link_generation_failed, transient_error, permanent_error, unknown_error and any future codes */
+                if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
+                    throw new AccountInvalidException(message);
+                } else {
+                    getMultiHosterManagement().handleErrorGeneric(account, link, message, 2, retryInMilliseconds);
+                }
+            }
+        }
         if ("error".equalsIgnoreCase(status) && !StringUtils.isEmpty(message)) {
             /* This field is not always given! */
             final String errortype = (String) entries.get("error");

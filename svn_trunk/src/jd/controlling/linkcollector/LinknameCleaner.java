@@ -1,5 +1,6 @@
 package jd.controlling.linkcollector;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,20 +26,25 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilte
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
 public class LinknameCleaner {
-    public static final Pattern   pat0       = Pattern.compile("(.*)(\\.|_|-)pa?r?t?\\.?[0-9]+.(rar|rev|exe)($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat1       = Pattern.compile("(.*)(\\.|_|-)part\\.?[0]*[1].(rar|rev|exe)($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat3       = Pattern.compile("(.*)\\.(?:rar|rev)($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat4       = Pattern.compile("(.*)\\.r\\d+($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat5       = Pattern.compile("(.*)(\\.|_|-)\\d+($|\\.html?)", Pattern.CASE_INSENSITIVE);
+    public static final String    end        = "($|\\.html?)";
+    public static final Pattern   par        = Pattern.compile("(.*?)(\\.p\\d+$|\\.par$)" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   par2       = Pattern.compile("(.*?)(\\.vol\\d+\\.par2$|\\.vol\\d+(?:\\+|-)\\d+\\.par2$|\\.par2$)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   par        = Pattern.compile("(.*?)(\\.p\\d+$|\\.par$)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern[] rarPats    = new Pattern[] { pat0, pat1, pat3, pat4, pat5, par2, par };
-    public static final Pattern   pat6       = Pattern.compile("(.*)\\.zip($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat6_split = Pattern.compile("(.*)[a-z]\\.zip($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat7       = Pattern.compile("(.*)\\.z\\d+($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat8       = Pattern.compile("(?is).*\\.7z\\.[\\d]+($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat9       = Pattern.compile("(.*)\\.a.($|\\.html?)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern[] parPats    = new Pattern[] { par2, par };
+
+    public static final Pattern   pat0       = Pattern.compile("(.*)(\\.|_|-)pa?r?t?\\.?[0-9]+.(rar|rev|exe)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat1       = Pattern.compile("(.*)(\\.|_|-)part\\.?[0]*[1].(rar|rev|exe)" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat3       = Pattern.compile("(.*)\\.(?:rar|rev)" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat4       = Pattern.compile("(.*)\\.r\\d+" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat5       = Pattern.compile("(.*)(\\.|_|-)\\d+" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern[] rarPats    = new Pattern[] { pat0, pat1, pat3, pat4, pat5 };
+
+    public static final Pattern   pat6       = Pattern.compile("(.*)\\.zip" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat6_split = Pattern.compile("(.*)[a-z]\\.zip" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat7       = Pattern.compile("(.*)\\.z\\d+" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat8       = Pattern.compile("(?is).*\\.7z\\.[\\d]+" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat9       = Pattern.compile("(.*)\\.a." + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern[] zipPats    = new Pattern[] { pat6_split, pat6, pat7, pat8, pat9 };
+
     public static final Pattern   pat10      = Pattern.compile("(.*)\\._((_[a-z]{1})|([a-z]{2}))(\\.|$)");
     public static Pattern         pat11      = null;
     public static Pattern[]       ffsjPats   = null;
@@ -52,8 +58,8 @@ public class LinknameCleaner {
         }
     }
     public static final Pattern   pat13      = Pattern.compile("(part\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat17      = Pattern.compile("(.+)\\.\\d+\\.xtm($|\\.html?)");
-    public static final Pattern   pat18      = Pattern.compile("(.*)\\.isz($|\\.html?)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat17      = Pattern.compile("(.+)\\.\\d+\\.xtm" + end);
+    public static final Pattern   pat18      = Pattern.compile("(.*)\\.isz" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat19      = Pattern.compile("(.*)\\.i\\d{2}$", Pattern.CASE_INSENSITIVE);
     public static final Pattern[] iszPats    = new Pattern[] { pat18, pat19 };
 
@@ -295,14 +301,17 @@ public class LinknameCleaner {
         }
         String name = filename;
         boolean hasKnownExtension = false;
+        final Set<Pattern> skip = new HashSet<Pattern>();
         // Step 1: Remove known archive file extensions
         while (true) {
-            final ExtensionRemovalResult result = removeKnownArchiveExtensions(name);
+            final ExtensionRemovalResult result = removeKnownArchiveExtensions(name, skip);
             name = result.processedName;
-            hasKnownExtension = hasKnownExtension || result.extensionFound;
-            if (result.extensionFound == false) {
+            hasKnownExtension = hasKnownExtension || result.extensionFound != null;
+            System.out.println(result.extensionFound);
+            if (result.extensionFound == null) {
                 break;
             }
+            skip.addAll(Arrays.asList(result.extensionFound));
         }
         // Step 2: Remove "part" patterns
         String tmpName = cutNameMatch(name, pat13);
@@ -320,10 +329,10 @@ public class LinknameCleaner {
      * Helper class to return multiple values from extension removal operations
      */
     private static class ExtensionRemovalResult {
-        public final String  processedName;
-        public final boolean extensionFound;
+        public final String    processedName;
+        public final Pattern[] extensionFound;
 
-        public ExtensionRemovalResult(String processedName, boolean extensionFound) {
+        public ExtensionRemovalResult(String processedName, Pattern... extensionFound) {
             this.processedName = processedName;
             this.extensionFound = extensionFound;
         }
@@ -336,37 +345,37 @@ public class LinknameCleaner {
      *            The filename to process
      * @return Result containing the processed name and whether an extension was found
      */
-    private static ExtensionRemovalResult removeKnownArchiveExtensions(String name) {
+    private static ExtensionRemovalResult removeKnownArchiveExtensions(String name, final Set<Pattern> skip) {
         // Check RAR extensions
-        ExtensionRemovalResult result = checkPatternList(name, rarPats);
-        if (result.extensionFound) {
+        ExtensionRemovalResult result = checkPatternList(skip, name, rarPats);
+        if (result.extensionFound != null) {
             return result;
         }
         // Check ZIP extensions
-        result = checkPatternList(name, zipPats);
-        if (result.extensionFound) {
+        result = checkPatternList(skip, name, zipPats);
+        if (result.extensionFound != null) {
             return result;
         }
         // Check ISZ extensions
-        result = checkPatternList(name, iszPats);
-        if (result.extensionFound) {
+        result = checkPatternList(skip, name, iszPats);
+        if (result.extensionFound != null) {
             return result;
         }
         // Check XtremSplit extension
-        String processed = getNameMatch(name, pat17);
+        String processed = getNameMatch(skip, name, pat17);
         if (!name.equals(processed)) {
-            return new ExtensionRemovalResult(processed, true);
+            return new ExtensionRemovalResult(processed, pat17);
         }
         // Check FFSJ extensions
         if (ffsjPats != null) {
             for (Pattern pattern : ffsjPats) {
-                processed = getNameMatch(name, pattern);
+                processed = getNameMatch(skip, name, pattern);
                 if (!name.equalsIgnoreCase(processed)) {
-                    return new ExtensionRemovalResult(processed, true);
+                    return new ExtensionRemovalResult(processed, ffsjPats);
                 }
             }
         }
-        return new ExtensionRemovalResult(name, false);
+        return new ExtensionRemovalResult(name, null);
     }
 
     /**
@@ -378,14 +387,14 @@ public class LinknameCleaner {
      *            Array of patterns to check against
      * @return Result containing the processed name and whether a match was found
      */
-    private static ExtensionRemovalResult checkPatternList(String name, Pattern[] patterns) {
-        for (Pattern pattern : patterns) {
-            String processed = getNameMatch(name, pattern);
+    private static ExtensionRemovalResult checkPatternList(final Set<Pattern> skip, String name, Pattern[] patterns) {
+        for (final Pattern pattern : patterns) {
+            final String processed = getNameMatch(skip, name, pattern);
             if (!name.equals(processed)) {
-                return new ExtensionRemovalResult(processed, true);
+                return new ExtensionRemovalResult(processed, patterns);
             }
         }
-        return new ExtensionRemovalResult(name, false);
+        return new ExtensionRemovalResult(name, null);
     }
 
     /**
@@ -454,8 +463,11 @@ public class LinknameCleaner {
         return name;
     }
 
-    private static String getNameMatch(final String name, final Pattern pattern) {
-        String match = new Regex(name, pattern).getMatch(0);
+    private static String getNameMatch(final Set<Pattern> skip, final String name, final Pattern pattern) {
+        if (skip != null && skip.contains(pattern)) {
+            return name;
+        }
+        final String match = new Regex(name, pattern).getMatch(0);
         if (match != null) {
             return match;
         }

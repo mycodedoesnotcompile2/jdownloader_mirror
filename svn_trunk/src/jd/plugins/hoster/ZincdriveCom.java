@@ -19,15 +19,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -40,11 +37,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52749 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 52767 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZincdriveCom extends PluginForHost {
     public ZincdriveCom(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
@@ -117,6 +118,7 @@ public class ZincdriveCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
+        br = createNewBrowserInstance();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -125,7 +127,7 @@ public class ZincdriveCom extends PluginForHost {
         if (StringUtils.isEmpty(filename)) {
             filename = br.getRegex("\"name\":\\s*'([^\"']+)'").getMatch(0);
         }
-        String filesize = br.getRegex("\"contentSize\":\\s*'(\\d+[^\"']+)'").getMatch(0);
+        final String filesize = br.getRegex("\"contentSize\":\\s*'(\\d+[^\"']+)'").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -148,37 +150,61 @@ public class ZincdriveCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String fid = this.getFID(link);
-        final Browser brc = br.cloneBrowser();
-        brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
-        brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
-        brc.getHeaders().put("Origin", "https://www." + br.getHost());
-        brc.getHeaders().put("x-csrf-token", csrftoken);
-        /* This request gains us two cookies which are needed for the subsequent "/file" GET request. */
-        brc.postPageRaw("/" + fid + "/gateway/proceed", "");
+        Browser brc = br.cloneBrowser();
+        {
+            final Form form0 = br.getFormbyProperty("id", "zdForm");
+            if (form0 == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            form0.put("blocked", "1");
+            form0.put("_token", Encoding.urlEncode(csrftoken));
+            brc.submitForm(form0);
+        }
+        Map<String, Object> entries = null;
+        gateway: {
+            brc = br.cloneBrowser();
+            final PostRequest post = brc.createPostRequest("/" + fid + "/gateway/proceed", "");
+            /* This request gains us two cookies which are needed for the subsequent "/file" GET request. */
+            post.setContentType("application/json");
+            post.getHeaders().put("Accept", "*/*");
+            post.getHeaders().put("Origin", "https://" + br.getHost());
+            post.getHeaders().put("X-CSRF-TOKEN", csrftoken);
+            brc.getPage(post);
+            entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (!("/" + fid + "/file").equals(entries.get("redirect_url"))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
         br.getPage("/" + fid + "/file");
-        final Form continueform = br.getFormbyProperty("id", "down_1Form");
-        if (continueform == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        down_1Form: {
+            final Form down_1Form = br.getFormbyProperty("id", "down_1Form");
+            if (down_1Form == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            sleep(TimeUnit.SECONDS.toMillis(10), link);
+            br.submitForm(down_1Form);
         }
-        br.submitForm(continueform);
-        final Form dlform2 = br.getFormbyProperty("id", "down_2");
-        if (dlform2 == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final Form down_2Form;
+        down_2Form: {
+            down_2Form = br.getFormbyProperty("id", "down_2Form");
+            if (down_2Form == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            sleep(TimeUnit.SECONDS.toMillis(10), link);
+            br.submitForm(down_2Form);
         }
-        csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
-        if (csrftoken == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        generate: {
+            sleep(TimeUnit.SECONDS.toMillis(24), link);
+            final PostRequest post = brc.createPostRequest("/" + fid + "/file/generate", "_dlt=" + down_2Form.getInputFieldByName("_dlt").getValue());
+            post.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            post.getHeaders().put("X-CSRF-TOKEN", csrftoken);
+            br.getPage(post);
+            entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         }
-        brc.setCookie(br.getHost(), "rqf", fid);
-        brc.postPageRaw("/" + fid + "/file/generate", "");
-        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String dllink = (String) entries.get("download_link");
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find final downloadurl");
-            String msg = (String) entries.get("message");
-            if (msg == null) {
-                msg = (String) entries.get("error");
-            }
+            final String msg = StringUtils.firstNotEmpty((String) entries.get("message"), (String) entries.get("error"));
             if (msg != null) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg);
             } else {

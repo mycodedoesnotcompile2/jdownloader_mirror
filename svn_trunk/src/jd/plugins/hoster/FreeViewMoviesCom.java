@@ -19,9 +19,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -31,9 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FreeViewMoviesComCrawler;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52764 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.FreeViewMoviesComCrawler.class })
 public class FreeViewMoviesCom extends PluginForHost {
     private String              dllink      = null;
@@ -170,7 +171,7 @@ public class FreeViewMoviesCom extends PluginForHost {
     public static boolean isOffline(final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 404) {
             return true;
-        } else if (br.containsHTML("(?i)>\\s*404 Error Page")) {
+        } else if (br.containsHTML(">\\s*404 Error Page")) {
             return true;
         } else {
             return false;
@@ -181,25 +182,13 @@ public class FreeViewMoviesCom extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
         if (this.dllink == null) {
-            if (br.containsHTML("id=\"reportabuse\"")) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken video content");
+            if (br.containsHTML("class=\"sponsor\"") && br.containsHTML(">\\s*VISIT OFFICIAL SITE")) {
+                throw new AccountRequiredException();
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

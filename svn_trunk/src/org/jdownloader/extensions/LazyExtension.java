@@ -76,6 +76,7 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
     }
 
     public String getConfigInterface() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? configInterface : extension.getConfigClass().getName();
     }
 
@@ -84,6 +85,7 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
     }
 
     public boolean isSettings() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? settings : extension.hasConfigPanel();
     }
 
@@ -133,6 +135,7 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
      * @return
      */
     public Icon _getIcon(int size) {
+        final AbstractExtension<?, ?> extension = this.extension;
         if (extension == null) {
             return NewTheme.I().getIcon(iconPath, size);
         } else {
@@ -141,6 +144,7 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
     }
 
     public String getDescription() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? description : extension.getDescription();
     }
 
@@ -149,22 +153,27 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
     }
 
     public String getName() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? name : extension.getName();
     }
 
     public int getVersion() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? version : extension.getVersion();
     }
 
     public boolean isLinuxRunnable() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? linuxRunnable : extension.isLinuxRunnable();
     }
 
     public boolean isMacRunnable() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? macRunnable : extension.isMacRunnable();
     }
 
     public boolean isWindowsRunnable() {
+        final AbstractExtension<?, ?> extension = this.extension;
         return extension == null ? windowsRunnable : extension.isWindowsRunnable();
     }
 
@@ -219,6 +228,7 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
      * @return
      */
     public boolean _isEnabled() {
+        final AbstractExtension<?, ?> extension = this.extension;
         if (extension == null) {
             // not init yet. check storage to return if we have to init it
             ExtensionConfigInterface ret = _getSettings();
@@ -242,6 +252,7 @@ public class LazyExtension implements Storable, CheckBoxedEntry {
      * @throws InstantiationException
      */
     public void _setEnabled(boolean b) throws StartException, StopException {
+        final AbstractExtension<?, ?> extension = this.extension;
         if (extension == null) {
             ExtensionConfigInterface ret = _getSettings();
             if (ret == null) {

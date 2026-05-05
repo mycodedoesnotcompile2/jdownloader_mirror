@@ -2,6 +2,7 @@ package org.jdownloader.extensions.eventscripter;
 
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
+import org.mozilla.javascript.tools.shell.Global;
 
 public class ScriptReferenceThread extends Thread {
 
@@ -18,11 +19,11 @@ public class ScriptReferenceThread extends Thread {
     public void executeCallback(Function callback, Object... params) {
         final Context cx = Context.enter();
         try {
+            final Global scope = getScriptThread().getScope();
             scriptThread.initContext(cx);
-            callback.call(cx, getScriptThread().getScope(), getScriptThread().getScope(), params);
+            callback.call(cx, scope, scope, params);
         } finally {
             Context.exit();
         }
-
     }
 }

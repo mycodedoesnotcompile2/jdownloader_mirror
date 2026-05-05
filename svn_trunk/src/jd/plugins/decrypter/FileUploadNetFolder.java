@@ -24,6 +24,8 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -31,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48301 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52759 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileUploadNetFolder extends PluginForDecrypt {
     public FileUploadNetFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +68,6 @@ public class FileUploadNetFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
         final String folderSlug = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
@@ -80,10 +81,15 @@ public class FileUploadNetFolder extends PluginForDecrypt {
             /* Fallback */
             title = folderSlug.replace("-", " ");
         }
+        final String numberofFilesStr = br.getRegex("\\((\\d+) (Dateien|Files)\\)\\s*</h1>").getMatch(0);
+        if ("0".equals(numberofFilesStr)) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, title);
+        }
         final String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         if (links == null || links.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (final String singleLink : links) {
             if (plg.canHandle(singleLink)) {
                 ret.add(createDownloadlink(singleLink));

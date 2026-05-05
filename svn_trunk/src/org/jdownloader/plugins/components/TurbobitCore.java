@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
@@ -61,7 +62,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52747 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52763 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -467,17 +468,18 @@ public abstract class TurbobitCore extends PluginForHost {
         if (ai == null) {
             ai = new AccountInfo();
         }
+        final Browser brc = br.cloneBrowser();
         final Map<String, Object> entries;
         if (userinfo != null && userinfo.get("premium") != null) {
             /* Use result that has already been parsed */
             entries = userinfo;
-        } else if (userinfo != null && StringUtils.endsWithCaseInsensitive(br.getURL(), "/api/user/info")) {
+        } else if (userinfo != null && StringUtils.endsWithCaseInsensitive(brc.getURL(), "/api/user/info")) {
             /* Use result that has already been parsed */
             entries = userinfo;
         } else {
-            entries = getUserInformationWebsiteV2(br.cloneBrowser(), account);
+            entries = getUserInformationWebsiteV2(brc, account);
             if (entries == null) {
-                throw new AccountInvalidException();
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         synchronized (account) {
@@ -491,7 +493,7 @@ public abstract class TurbobitCore extends PluginForHost {
                     account.setType(AccountType.PREMIUM);
                     // for example:Status: Banned. You have reached the limit of your daily traffic quota
                     try {
-                        getAndSetPremiumInformationWebsiteV2(br, account, ai);
+                        getAndSetPremiumInformationWebsiteV2(brc, account, ai);
                         throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
                     } catch (PluginException e) {
                         throw e;
@@ -501,11 +503,11 @@ public abstract class TurbobitCore extends PluginForHost {
                 } else if (status.equalsIgnoreCase("active")) {
                     account.setType(AccountType.PREMIUM);
                     final String expiredateStr = entries_premium.get("expiredAt").toString();
-                    ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
+                    ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), brc);
                     if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
                         // only check/update for normal account check
                         try {
-                            getAndSetPremiumInformationWebsiteV2(br, account, ai);
+                            getAndSetPremiumInformationWebsiteV2(brc, account, ai);
                         } catch (PluginException e) {
                             throw e;
                         } catch (Exception e) {
@@ -550,6 +552,13 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         final Browser brc = br.cloneBrowser();
         brc.getPage(getWebsiteV2Base() + "/api/premium/info");
+        if (StringUtils.containsIgnoreCase(brc.getURL(), "login=true")) {
+            logger.info("Not logged in because: URL contains 'login=true'");
+            throw new AccountUnavailableException("Fresh login required, please wait a moment", TimeUnit.SECONDS.toMillis(15));
+        } else if (!brc.getRequest().getHtmlCode().startsWith("{")) {
+            logger.info("Not logged in because: Got html instead of json");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final Map<String, Object> entries = this.checkErrorsWebsiteV2(brc, null, account);
         dayTraffic: if (entries.get("dayTrafficLeft") != null && entries.get("dayTrafficLimit") != null) {
             final String dayTrafficLimit = entries.get("dayTrafficLimit").toString().replace(",", ".");// GB
@@ -592,22 +601,26 @@ public abstract class TurbobitCore extends PluginForHost {
      * \/abuse","help2Url":"https:\/\/help2.turbobit.net\/hc\/en-us"},"correctUrl":null,"siteV2Available":true,"shortDomain":"trbt.cc"}
      */
     private Map<String, Object> getUserInformationWebsiteV2(final Browser br, final Account account) throws IOException, PluginException {
-        br.getPage(getWebsiteV2Base() + "/api/user/info");
+        final Browser brc = br.cloneBrowser();
+        brc.getPage(getWebsiteV2Base() + "/api/user/info");
         /**
          * 2025-07-07: Redirects to this page when we are not logged in: <br>
          * https://app.turbobit.net?login=true <br>
          * This will also return html code and not json.
          */
-        if (StringUtils.containsIgnoreCase(br.getURL(), "login=true")) {
+        if (StringUtils.containsIgnoreCase(brc.getURL(), "login=true")) {
             logger.info("Not logged in because: URL contains 'login=true'");
-            return null;
-        } else if (!br.getRequest().getHtmlCode().startsWith("{")) {
+            synchronized (account) {
+                account.clearCookies("");
+            }
+            throw new AccountUnavailableException("Fresh login required, please wait a moment", TimeUnit.SECONDS.toMillis(15));
+        } else if (!brc.getRequest().getHtmlCode().startsWith("{")) {
             logger.info("Not logged in because: Got html instead of json");
-            return null;
-        } else {
-            final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
-            return entries;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final Map<String, Object> entries = this.checkErrorsWebsiteV2(brc, null, account);
+        return entries;
+
     }
 
     protected static long getBlockingEndTime(final Browser br, final Account account) {
@@ -881,6 +894,10 @@ public abstract class TurbobitCore extends PluginForHost {
                 final Map<String, Object> downloadmap = this.checkErrorsWebsiteV2(brc, link, account);
                 final String directlink = downloadmap.get("downloadUrl").toString();
                 mirrors = new String[] { directlink };
+            }
+            // fix broken encoding, raw/not encoded % in json response, resulting in 400 Bad Request
+            for (int i = 0; i < mirrors.length; i++) {
+                mirrors[i] = mirrors[i].replace("%", "%25");
             }
         } else {
             if (true) {

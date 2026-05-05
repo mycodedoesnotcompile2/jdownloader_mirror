@@ -68,7 +68,6 @@ import org.jdownloader.plugins.components.realDebridCom.api.json.UserResponse;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.translate._JDT;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -99,7 +98,7 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 52145 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 52758 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String          CLIENT_SECRET_KEY        = "client_secret";
     private static final String          CLIENT_ID_KEY            = "client_id";
@@ -328,11 +327,11 @@ public class RealDebridCom extends PluginForHost {
             if (json.trim().startsWith("{")) {
                 final ErrorResponse errorResponse = restoreFromString(json, new TypeRef<ErrorResponse>(ErrorResponse.class) {
                 });
-                Error errorCode = Error.getByCode(errorResponse.getError_code());
-                if (Error.UNKNOWN.equals(errorCode) && request.getHttpConnection().getResponseCode() == 403) {
-                    errorCode = Error.BAD_TOKEN;
+                Error error = Error.getByCode(errorResponse.getError_code());
+                if (Error.UNKNOWN.equals(error) && request.getHttpConnection().getResponseCode() == 403) {
+                    error = Error.BAD_TOKEN;
                 }
-                throw new APIException(request.getHttpConnection(), errorCode, errorResponse.getError());
+                throw new APIException(request.getHttpConnection(), error, error.getMsg());
             } else {
                 throw new IOException("Unexpected Response: " + json);
             }
@@ -652,19 +651,19 @@ public class RealDebridCom extends PluginForHost {
                 link.setProperty(PROPERTY_INFRINGING_FILE, Time.timestamp());
                 throw new PluginException(LinkStatus.ERROR_RETRY, getInfringingFileErrorMessage(), e);
             case FILE_UNAVAILABLE:
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, _JDT.T.downloadlink_status_error_hoster_temp_unavailable(), 10 * 60 * 1000l, e);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, e.getMessage(), 10 * 60 * 1000l, e);
             case UNSUPPORTED_HOSTER:
-                mhm.putError(account, link, 5 * 60 * 1000l, "Hoster not supported");
+                mhm.putError(account, link, 5 * 60 * 1000l, e.getMessage());
             case HOSTER_TEMP_UNAVAILABLE:
-                mhm.putError(account, link, 5 * 60 * 1000l, "Hoster temporarily not supported");
+                mhm.putError(account, link, 5 * 60 * 1000l, e.getMessage());
             case HOSTER_IN_MAINTENANCE:
-                mhm.putError(account, link, 5 * 60 * 1000l, "Hoster under maintenance");
+                mhm.putError(account, link, 5 * 60 * 1000l, e.getMessage());
             case HOSTER_LIMIT_REACHED:
             case HOSTER_PREMIUM_ONLY:
             case TRAFFIC_EXHAUSTED:
-                mhm.putError(account, link, 5 * 60 * 1000l, "Traffic exhausted");
+                mhm.putError(account, link, 5 * 60 * 1000l, e.getMessage());
             case FAIR_USAGE_LIMIT_REACHED:
-                mhm.putError(account, link, 30 * 60 * 1000l, "Fair usage limit reached");
+                mhm.putError(account, link, 30 * 60 * 1000l, e.getMessage());
             default:
                 mhm.handleErrorGeneric(account, link, e.getMessage(), 50, 1 * 60 * 1000l);
             }

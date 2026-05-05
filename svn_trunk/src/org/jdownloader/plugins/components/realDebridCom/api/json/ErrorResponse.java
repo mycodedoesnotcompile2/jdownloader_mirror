@@ -6,8 +6,7 @@ public class ErrorResponse implements Storable {
     public static final org.appwork.storage.TypeRef<ErrorResponse> TYPE = new org.appwork.storage.TypeRef<ErrorResponse>(ErrorResponse.class) {
                                                                         };
     String                                                         error;
-
-    long                                                           error_code;
+    int                                                            error_code;
 
     public ErrorResponse(/* Storable */) {
     }
@@ -16,7 +15,7 @@ public class ErrorResponse implements Storable {
         return error;
     }
 
-    public long getError_code() {
+    public int getError_code() {
         return error_code;
     }
 
@@ -24,7 +23,7 @@ public class ErrorResponse implements Storable {
         this.error = error;
     }
 
-    public void setError_code(long error_code) {
+    public void setError_code(int error_code) {
         this.error_code = error_code;
     }
 }
