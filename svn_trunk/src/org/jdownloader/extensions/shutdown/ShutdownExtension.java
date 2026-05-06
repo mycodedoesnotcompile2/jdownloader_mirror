@@ -149,7 +149,10 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
             final Mode mode = settings.getShutdownMode();
             boolean requiresAntiStandby = !Mode.STANDBY.equals(mode);// we don't need anti standby when standby is requested mode
             requiresAntiStandby = requiresAntiStandby && (shutdownInterface != null && shutdownInterface.isSupported(mode));
-            requiresAntiStandby = requiresAntiStandby && settings.isShutdownActive();
+            synchronized (this) {
+                final ShutdownThread thread = this.thread;
+                requiresAntiStandby = requiresAntiStandby && (thread != null && thread.isAlive()) || settings.isShutdownActive();
+            }
             requiresAntiStandby = requiresAntiStandby && DownloadWatchDog.getInstance().getStateMachine().containsListener(this);
             return returnType.cast(requiresAntiStandby);
         }

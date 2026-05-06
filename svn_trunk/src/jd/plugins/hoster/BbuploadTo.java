@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -36,7 +37,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 52754 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52776 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbuploadTo extends PluginForHost {
     public BbuploadTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -149,6 +150,28 @@ public class BbuploadTo extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    @Override
+    protected boolean looksLikeDownloadableContent(URLConnectionAdapter urlConnection) {
+        if (super.looksLikeDownloadableContent(urlConnection)) {
+            return true;
+        }
+        if ((urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206) && StringUtils.containsIgnoreCase(urlConnection.getContentType(), "text/html") && urlConnection.getContentLength() == -1 && urlConnection.isConnected()) {
+            try {
+                // special handling for
+                // Content-Type: text/html; charset=utf-8
+                // Transfer-Encoding: chunked
+                final byte[] peekBytes = urlConnection.peek(32);
+                return peekBytes.length > 0;
+            } catch (IOException e) {
+                logger.log(e);
+            } catch (IllegalStateException ignore) {
+                // java.lang.IllegalStateException: not connected!
+                return false;
+            }
+        }
+        return false;
     }
 
     @Override

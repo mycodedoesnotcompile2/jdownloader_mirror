@@ -27,6 +27,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
@@ -38,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50759 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/(gallery|scraps|user)/([^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 52778 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/(gallery|scraps|user)/([^/]+)" })
 public class FuraffinityNetCrawler extends PluginForDecrypt {
     public FuraffinityNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,9 +58,9 @@ public class FuraffinityNetCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
-        final String type = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
-        final String username = new Regex(parameter, this.getSupportedLinks()).getMatch(1);
+        final String contenturl = param.getCryptedUrl();
+        final String type = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        final String username = new Regex(contenturl, this.getSupportedLinks()).getMatch(1);
         if (type.equalsIgnoreCase("user")) {
             /* These will go back into this crawler! */
             ret.add(this.createDownloadlink("https://www." + this.getHost() + "/gallery/" + username));
@@ -77,7 +78,7 @@ public class FuraffinityNetCrawler extends PluginForDecrypt {
             }
             br.setFollowRedirects(true);
             do {
-                br.getPage(parameter + "/" + page);
+                br.getPage(contenturl + "/" + page);
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else if (br.containsHTML(">\\s*System Message")) {
@@ -97,6 +98,7 @@ public class FuraffinityNetCrawler extends PluginForDecrypt {
                         /* Fallback */
                         title = itemID;
                     }
+                    title = Encoding.htmlDecode(title).trim();
                     final DownloadLink dl = this.createDownloadlink("https://www.furaffinity.net/view/" + itemID);
                     dl.setName(title + ".jpg");
                     if (!StringUtils.isEmpty(description)) {
@@ -107,11 +109,16 @@ public class FuraffinityNetCrawler extends PluginForDecrypt {
                     distribute(dl);
                     itemsCounter += 1;
                 }
-                logger.info("Crawled page + " + page + " | Number of items on current page: " + itemsCounter + " | Results so far: " + ret.size());
+                logger.info("Crawled page " + page + " | Number of items on current page: " + itemsCounter + " | Results so far: " + ret.size());
                 page++;
                 hasNextPage = br.containsHTML("/" + username + "/" + page);
             } while (!this.isAbort() && hasNextPage);
         }
         return ret;
+    }
+
+    @Override
+    public boolean hasCaptcha(CryptedLink link, Account acc) {
+        return false;
     }
 }

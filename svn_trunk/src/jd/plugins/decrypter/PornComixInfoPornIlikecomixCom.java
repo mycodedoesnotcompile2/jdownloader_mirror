@@ -20,7 +20,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52764 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52772 $", interfaceVersion = 3, names = {}, urls = {})
 /** Formerly known as: porncomix.one / porncomixone.net */
 public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
     @Override
@@ -79,14 +79,14 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
         final String urltitle;
         String[] images;
         String extra_image = null;
-        String postTitle;
+        String postTitle = null;
         if (pattern1.patternFind()) {
             urltitle = pattern1.getMatch(1);
             postTitle = br.getRegex("\"headline\": \"([^\"]+)").getMatch(0);
             images = br.getRegex("img id=\"image-\\d+\" src=\"([^\"]+)").getColumn(0);
         } else if (pattern2.patternFind()) {
             urltitle = pattern2.getMatch(1);
-            postTitle = br.getRegex("\"headline\": \"([^\"]+)").getMatch(0);
+            postTitle = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
             images = br.getRegex("id=\"image-\\d+\" data-src=\"([^\"]+)").getColumn(0);
             /* 2026-05-04: First image is different */
             extra_image = br.getRegex("src=\"(https?://[^\"]+)\" id=\"image-0\"").getMatch(0);
@@ -98,11 +98,13 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
                 images = br.getRegex("data-pswp-src=\"(https[^\"]+)").getColumn(0);
             }
         }
-        if (StringUtils.isEmpty(postTitle)) {
+        if (!StringUtils.isEmpty(postTitle)) {
+            postTitle = Encoding.htmlDecode(postTitle).trim();
+            /* Correct title */
+            postTitle = postTitle.replaceFirst(" - Porn Comics \\| Ilike Comix$", "");
+        } else {
             /* Fallback */
             postTitle = urltitle.replace("-", " ").trim();
-        } else {
-            postTitle = Encoding.htmlDecode(postTitle).trim();
         }
         if (images == null || images.length == 0) {
             /* Only allow one level of crawling here otherwise this one may result in endless crawling. */

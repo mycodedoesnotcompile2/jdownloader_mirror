@@ -27,6 +27,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.SimpleMapper;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.ArchiveOrgType;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.BookCrawlMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.DeselectedTypesMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.NonDownloadableBookPagesMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFileAdoptFolderStructureMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -49,27 +69,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.storage.SimpleMapper;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.ArchiveOrgType;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.BookCrawlMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.DeselectedTypesMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.NonDownloadableBookPagesMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFileAdoptFolderStructureMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52607 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 52769 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,8 +116,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Returns identifier from given URL. </br> The definition of how an identifier is supposed to look is vague so in this case we're also
-     * including username strings a la "@<username>" as possible return values.
+     * Returns identifier from given URL. </br>
+     * The definition of how an identifier is supposed to look is vague so in this case we're also including username strings a la
+     * "@<username>" as possible return values.
      */
     public static String getIdentifierFromURL(final String url) {
         /* htmldecode because "@" of "@username" could be url-encoded. */
@@ -169,10 +170,13 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Uses search APIv1 </br> API: Docs: https://archive.org/help/aboutsearch.htm </br> 2024-07-17: This API is limited in functionality
-     * which is why we are moving away from it and use {@link #crawlBetaSearchAPI(String, String)}. </br> Example of things which are NOT
-     * possible via this API: </br> - Find all uploads of a user </br> - New style search queries such as:
-     * query=test&and%5B%5D=lending%3A"is_readable"&and%5B%5D=year%3A%5B1765+TO+1780%5D
+     * Uses search APIv1 </br>
+     * API: Docs: https://archive.org/help/aboutsearch.htm </br>
+     * 2024-07-17: This API is limited in functionality which is why we are moving away from it and use
+     * {@link #crawlBetaSearchAPI(String, String)}. </br>
+     * Example of things which are NOT possible via this API: </br>
+     * - Find all uploads of a user </br>
+     * - New style search queries such as: query=test&and%5B%5D=lending%3A"is_readable"&and%5B%5D=year%3A%5B1765+TO+1780%5D
      */
     @Deprecated
     private ArrayList<DownloadLink> crawlViaScrapeAPI(final String searchTerm, final int maxResultsLimit) throws Exception {
@@ -238,11 +242,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             final String lastCursor = cursor;
             cursor = (String) entries.get("cursor");
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + totalNumberofItems + " | maxResultsLimit: " + maxResultsLimit + " | Cursor: " + lastCursor + " | Next cursor: " + cursor);
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
             if (stopDueToCrawlLimitReached) {
                 logger.info("Stopping because: Reached max allowed results: " + maxResultsLimit);
-                break;
-            } else if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
                 break;
             } else if (StringUtils.isEmpty(cursor)) {
                 logger.info("Stopping because: Reached last page: " + lastCursor);
@@ -255,11 +259,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 /* Additional fail-safe */
                 logger.info("Stopping because: Current page contains less items than max allowed per page for this run: " + maxNumberofItemsPerPageForThisRun);
                 break;
-            } else {
-                /* Continue to next page */
-                query.add("cursor", Encoding.urlEncode(cursor));
-                page++;
             }
+            /* Continue to next page */
+            query.add("cursor", Encoding.urlEncode(cursor));
+            page++;
         } while (true);
         if (ret.isEmpty()) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "NO_SEARCH_RESULTS_FOR_QUERY_" + searchTerm);
@@ -416,9 +419,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
             logger.info("Crawled page " + page + " | Crawled new items this page: " + numberofNewItemsThisPage + " | Crawled items so far: " + ret.size() + "/" + totalNumberofItems + " | Max result limit: " + maxResults);
             if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break pagination;
-            } else if (totalNumberofItems == 0) {
+                throw new InterruptedException();
+            }
+            if (totalNumberofItems == 0) {
                 if (isUserProfile) {
                     throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "EMPTY_PROFILE_" + identifier);
                 } else {
@@ -439,10 +442,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 /* Fail-safe 2 */
                 logger.info("Stopping because: Failed to find any new items on current page");
                 break pagination;
-            } else {
-                /* Continue to next page */
-                page++;
             }
+            /* Continue to next page */
+            page++;
         } while (!this.isAbort());
         if (ret.isEmpty() && !filter_map.isEmpty()) {
             logger.info("Got zero results which might be the case because the user has supplied filters which are too restrictive: " + filter_map);
@@ -659,8 +661,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         int internalPageIndex = 0;
         for (final Object imageO : imagesO) {
             /**
-             * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br> Exception = First page
-             * --> Cover
+             * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br>
+             * Exception = First page --> Cover
              */
             final List<Map<String, Object>> bookpages = (List<Map<String, Object>>) imageO;
             for (final Map<String, Object> bookpage : bookpages) {
@@ -689,8 +691,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     link.setProperty(ArchiveOrg.PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP, System.currentTimeMillis() + loanedSecondsLeft * 1000);
                 }
                 /**
-                 * Mark pages that are not viewable in browser as offline. </br> If we have borrowed this book, this field will not exist at
-                 * all.
+                 * Mark pages that are not viewable in browser as offline. </br>
+                 * If we have borrowed this book, this field will not exist at all.
                  */
                 final Object viewable = bookpage.get("viewable");
                 if (Boolean.FALSE.equals(viewable)) {
@@ -795,18 +797,18 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         String desiredSubpath = null;
         boolean allowCrawlArchiveContents = false;
         String desiredSubpathDecoded = null;
+        /* Path for archive crawl handling */
         String desiredSubpathDecoded2 = null;
         find_desired_subpath: {
             /*
-             * In this case we only want to get all files in a specific subfolder or even only a single file.
+             * In this case we only want to get all files in a specific subfolder or only a single file.
              */
-            if (!isDownloadPage) {
-                /* Sourceurl is not a "/download/..." URL -> Do not look for a subpath */
-                break find_desired_subpath;
-            }
             desiredSubpath = new Regex(sourceurlForThisHandling, ".*/(" + Pattern.quote(identifier) + "/.+)").getMatch(0);
             if (desiredSubpath == null) {
-                /* No subpath available */
+                /**
+                 * No subpath available <br>
+                 * -> We will crawl all files of this item meaning user added something like "/details/<identifier>"
+                 */
                 break find_desired_subpath;
             }
             desiredSubpathDecoded = Encoding.htmlDecode(desiredSubpath);
@@ -818,10 +820,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                  * but the contents inside that file.
                  */
                 allowCrawlArchiveContents = true;
-            }
-            final String[] pathSegments = desiredSubpathDecoded.split("/");
-            if (pathSegments.length >= 3) {
-                desiredSubpathDecoded2 = pathSegments[pathSegments.length - 2];
+                final String[] pathSegments = desiredSubpathDecoded.split("/");
+                if (pathSegments.length >= 3) {
+                    desiredSubpathDecoded2 = pathSegments[pathSegments.length - 2];
+                }
             }
         }
         final String server = root.get("server").toString();
@@ -1020,11 +1022,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             if (!userWantsItem && skipDeselectedItems) {
                 skippedItemsFilepaths.add(pathWithFilename);
                 continue;
-            } else {
-                selectedItems.add(file);
             }
+            selectedItems.add(file);
         }
-        if (desiredSubpathDecoded != null) {
+        if (isDownloadPage && desiredSubpathDecoded != null) {
             if (singleDesiredFile != null) {
                 if (allowCrawlArchiveContents && desiredFileArchiveFileCount != null && Integer.parseInt(desiredFileArchiveFileCount.toString()) > 1) {
                     /* Single archive file which user wants but user wants to have the content of that archive (rare case). */
@@ -1155,11 +1156,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     /* Make resulting items appear in linkgrabber now already. */
                     distribute(thisBookResults);
                     if (this.isAbort()) {
-                        logger.info("Stopping because: Aborted by user");
-                        break;
-                    } else {
-                        position++;
+                        throw new InterruptedException();
                     }
+                    position++;
                 }
                 /**
                  * Return loose pages only <br>
@@ -1218,6 +1217,29 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 videoPlaylistItems.add(video);
                 /* Increment counters */
                 offsetSeconds += secondsPerSegment;
+            }
+            if (singleDesiredFile != null) {
+                /* User wants single specific file -> Disable all other playlist items if that single file is contained in our playlist. */
+                boolean singleDesiredFileFoundInPlaylist = false;
+                for (final DownloadLink item : videoPlaylistItems) {
+                    if (item.getPluginPatternMatcher().equals(singleDesiredFile.getPluginPatternMatcher())) {
+                        singleDesiredFileFoundInPlaylist = true;
+                        break;
+                    }
+                }
+                if (singleDesiredFileFoundInPlaylist) {
+                    for (final DownloadLink item : videoPlaylistItems) {
+                        if (!item.getPluginPatternMatcher().equals(singleDesiredFile.getPluginPatternMatcher())) {
+                            item.setEnabled(false);
+                        }
+                    }
+                } else {
+                    /**
+                     * This shouldn't happen but it can happen e.g. if the original file is not downloadable, example: <br>
+                     * /details/irelandthemakingofarepublic/irelandthemakingofarepublicreel1_02.mov
+                     */
+                    logger.info("User desired single file was not found in playlist");
+                }
             }
             if (isAccessRestricted && playlistCrawlMode == PlaylistCrawlMode.AUTO) {
                 /*
@@ -1288,6 +1310,26 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     ArchiveOrg.setFinalFilename(audioPlaylistLink, item.getName());
                     /* Collect results */
                     audioPlaylistFinalResults.add(audioPlaylistLink);
+                }
+            }
+            if (singleDesiredFile != null) {
+                /* User wants single specific file -> Disable all other playlist items if that single file is contained in our playlist. */
+                boolean singleDesiredFileFoundInPlaylist = false;
+                for (final DownloadLink item : audioPlaylistFinalResults) {
+                    if (item.getPluginPatternMatcher().equals(singleDesiredFile.getPluginPatternMatcher())) {
+                        singleDesiredFileFoundInPlaylist = true;
+                        break;
+                    }
+                }
+                if (singleDesiredFileFoundInPlaylist) {
+                    for (final DownloadLink item : audioPlaylistFinalResults) {
+                        if (!item.getPluginPatternMatcher().equals(singleDesiredFile.getPluginPatternMatcher())) {
+                            item.setEnabled(false);
+                        }
+                    }
+                } else {
+                    /* This shouldn't happen */
+                    logger.warning("User desired single file was not found in playlist");
                 }
             }
             if (playlistCrawlMode == PlaylistCrawlMode.PLAYLIST_ONLY) {

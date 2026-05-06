@@ -338,6 +338,7 @@ public interface GeneralSettings extends ConfigInterface {
     void setCopySingleRealURL(boolean b);
 
     @AboutConfig
+    @DescriptionForConfigEntry("If enabled, downloaded or downloaded and extracted supported container formats will be opened automatically.")
     @DefaultBooleanValue(true)
     boolean isAutoOpenContainerAfterDownload();
 

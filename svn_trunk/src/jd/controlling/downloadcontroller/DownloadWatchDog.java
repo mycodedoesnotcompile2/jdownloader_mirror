@@ -3383,37 +3383,37 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     unSkipAllSkipped();
                     ProxyController.getInstance().getEventSender().addListener(proxyListener = new DefaultEventListener<ProxyEvent<AbstractProxySelectorImpl>>() {
                         final DelayedRunnable delayer = new DelayedRunnable(1000, 5000) {
-                                                          @Override
-                                                          public void delayedrun() {
-                                                              enqueueJob(new DownloadWatchDogJob() {
-                                                                  @Override
-                                                                  public void interrupt() {
-                                                                  }
+                            @Override
+                            public void delayedrun() {
+                                enqueueJob(new DownloadWatchDogJob() {
+                                    @Override
+                                    public void interrupt() {
+                                    }
 
-                                                                  @Override
-                                                                  public void execute(DownloadSession currentSession) {
-                                                                      /* reset CONNECTION_UNAVAILABLE */
-                                                                      final List<DownloadLink> unSkip = DownloadController.getInstance().getChildrenByFilter(new AbstractPackageChildrenNodeFilter<DownloadLink>() {
-                                                                          @Override
-                                                                          public int returnMaxResults() {
-                                                                              return 0;
-                                                                          }
+                                    @Override
+                                    public void execute(DownloadSession currentSession) {
+                                        /* reset CONNECTION_UNAVAILABLE */
+                                        final List<DownloadLink> unSkip = DownloadController.getInstance().getChildrenByFilter(new AbstractPackageChildrenNodeFilter<DownloadLink>() {
+                                            @Override
+                                            public int returnMaxResults() {
+                                                return 0;
+                                            }
 
-                                                                          @Override
-                                                                          public boolean acceptNode(DownloadLink node) {
-                                                                              return SkipReason.CONNECTION_UNAVAILABLE.equals(node.getSkipReason());
-                                                                          }
-                                                                      });
-                                                                      unSkip(unSkip);
-                                                                  }
+                                            @Override
+                                            public boolean acceptNode(DownloadLink node) {
+                                                return SkipReason.CONNECTION_UNAVAILABLE.equals(node.getSkipReason());
+                                            }
+                                        });
+                                        unSkip(unSkip);
+                                    }
 
-                                                                  @Override
-                                                                  public boolean isHighPriority() {
-                                                                      return false;
-                                                                  }
-                                                              });
-                                                          }
-                                                      };
+                                    @Override
+                                    public boolean isHighPriority() {
+                                        return false;
+                                    }
+                                });
+                            }
+                        };
 
                         @Override
                         public void onEvent(ProxyEvent<AbstractProxySelectorImpl> event) {
@@ -3915,17 +3915,23 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         return this.stateMachine;
     }
 
-    public void onNewFile(Object obj, final File[] list) {
+    public void onNewFile(Object obj, final File[] fileList) {
         if (!JsonConfig.create(GeneralSettings.class).isAutoOpenContainerAfterDownload()) {
             /* Do nothing */
             return;
-        } else if (list == null || list.length <= 0) {
+        } else if (fileList == null || fileList.length <= 0) {
             return;
         }
         /* check if extracted files are container files */
-        final ArrayList<String> files = new ArrayList<String>();
-        for (final File file : list) {
+        final List<String> files = new LinkedList<String>();
+        for (final File file : fileList) {
+            if (!file.isFile()) {
+                continue;
+            }
             files.add(file.toURI().toString());
+        }
+        if (files.size() == 0) {
+            return;
         }
         final String source;
         if (obj instanceof SingleDownloadController) {
@@ -3937,33 +3943,39 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         } else {
             source = null;
         }
-        final HashSet<String> handled = new HashSet<String>();
-        for (final PluginsC pCon : ContainerPluginController.getInstance().list()) {
-            for (String file : files) {
-                if (!pCon.canHandle(file) || !handled.add(file)) {
-                    continue;
+        final List<PluginsC> containerPlugins = ContainerPluginController.getInstance().list();
+        final Iterator<String> it = files.iterator();
+        nextFile: while (it.hasNext()) {
+            final String file = it.next();
+            for (final PluginsC pCon : containerPlugins) {
+                if (pCon.canHandle(file)) {
+                    continue nextFile;
                 }
-                TaskQueue.getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
-                    @Override
-                    protected Void run() throws RuntimeException {
-                        StringBuilder sb = new StringBuilder();
-                        for (final String file : files) {
-                            if (sb.length() > 0) {
-                                sb.append("\r\n");
-                            }
-                            sb.append(file);
-                        }
-                        LinkCollector.getInstance().addCrawlerJob(new LinkCollectingJob(LinkOriginDetails.getInstance(LinkOrigin.DOWNLOADED_CONTAINER, source), sb.toString()));
-                        return null;
-                    }
-
-                    @Override
-                    protected boolean allowAsync() {
-                        return true;
-                    }
-                });
             }
+            it.remove();
         }
+        if (files.size() == 0) {
+            return;
+        }
+        TaskQueue.getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                final StringBuilder sb = new StringBuilder();
+                for (final String file : files) {
+                    if (sb.length() > 0) {
+                        sb.append("\r\n");
+                    }
+                    sb.append(file);
+                }
+                LinkCollector.getInstance().addCrawlerJob(new LinkCollectingJob(LinkOriginDetails.getInstance(LinkOrigin.DOWNLOADED_CONTAINER, source), sb.toString()));
+                return null;
+            }
+
+            @Override
+            protected boolean allowAsync() {
+                return true;
+            }
+        });
     }
 
     /** Contains list of file-paths we got permission to write in. */

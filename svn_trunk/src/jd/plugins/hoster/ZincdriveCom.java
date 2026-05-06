@@ -42,7 +42,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 52767 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52775 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZincdriveCom extends PluginForHost {
     public ZincdriveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,17 +123,30 @@ public class ZincdriveCom extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("<title>Download File: ([^<]+) — ZincDrive\\s*</title>").getMatch(0);
-        if (StringUtils.isEmpty(filename)) {
-            filename = br.getRegex("\"name\":\\s*'([^\"']+)'").getMatch(0);
+
+        final boolean isFolder;
+        if (br.containsHTML("<title>\\s*Download Folder:")) {
+            isFolder = true;
+        } else {
+            isFolder = false;
+            String filenameWithoutExtension = br.getRegex("<title>\\s*Download File:\\s*([^<]+)\\s*—\\s*ZincDrive\\s*</title>").getMatch(0);
+            if (StringUtils.isEmpty(filenameWithoutExtension)) {
+                filenameWithoutExtension = br.getRegex("\"name\":\\s*'([^\"']+)'").getMatch(0);
+            }
+            if (filenameWithoutExtension != null) {
+                filenameWithoutExtension = Encoding.htmlDecode(filenameWithoutExtension).trim();
+                link.setName(filenameWithoutExtension);
+            }
         }
         final String filesize = br.getRegex("\"contentSize\":\\s*'(\\d+[^\"']+)'").getMatch(0);
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
-        }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
+        }
+        if (isFolder) {
+            link.setFinalFileName("FOLDERS_NOT_YET_SUPPORTED_" + this.getFID(link));
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
     }
@@ -156,6 +169,7 @@ public class ZincdriveCom extends PluginForHost {
             if (form0 == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            /* Very important, needs to be "1" ! */
             form0.put("blocked", "1");
             form0.put("_token", Encoding.urlEncode(csrftoken));
             brc.submitForm(form0);
@@ -176,12 +190,36 @@ public class ZincdriveCom extends PluginForHost {
             }
         }
         br.getPage("/" + fid + "/file");
+        /*
+         * We might not have found/parsed filename with extension as this website is hiding it on the file overview page -> Grab it here
+         * whenever possible.
+         */
+        String filenameWithExtension = br.getRegex(">\\s*Download File\\s*</span><[^>]*>\\s*([^<]+)\\s*</span>").getMatch(0);
+        if (filenameWithExtension != null && link.getFinalFileName() == null) {
+            filenameWithExtension = Encoding.htmlDecode(filenameWithExtension);
+            final String currentFilename = link.getName();
+            if (currentFilename == null || filenameWithExtension.length() > currentFilename.length()) {
+                link.setFinalFileName(filenameWithExtension);
+            }
+        } else {
+            logger.warning("Failed to find filename with file extension during free download steps");
+        }
+        final Pattern wait_pattern = Pattern.compile("Please wait <span[^>]*>(\\d{1,3})</span>", Pattern.CASE_INSENSITIVE);
         down_1Form: {
             final Form down_1Form = br.getFormbyProperty("id", "down_1Form");
             if (down_1Form == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            sleep(TimeUnit.SECONDS.toMillis(10), link);
+            final long waitMillis;
+            final String waitSecondsStr = br.getRegex(wait_pattern).getMatch(0);
+            if (waitSecondsStr != null) {
+                waitMillis = TimeUnit.SECONDS.toMillis(Integer.parseInt(waitSecondsStr));
+            } else {
+                logger.warning("Failed to find wait before down_1Form");
+                /* Use hardcoded default value as fallback */
+                waitMillis = TimeUnit.SECONDS.toMillis(10);
+            }
+            sleep(waitMillis, link);
             br.submitForm(down_1Form);
         }
         final Form down_2Form;
@@ -190,11 +228,29 @@ public class ZincdriveCom extends PluginForHost {
             if (down_2Form == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            sleep(TimeUnit.SECONDS.toMillis(10), link);
+            final long waitMillis;
+            final String waitSecondsStr = br.getRegex(wait_pattern).getMatch(0);
+            if (waitSecondsStr != null) {
+                waitMillis = TimeUnit.SECONDS.toMillis(Integer.parseInt(waitSecondsStr));
+            } else {
+                logger.warning("Failed to find wait before down_2Form");
+                /* Use hardcoded default value as fallback */
+                waitMillis = TimeUnit.SECONDS.toMillis(10);
+            }
+            sleep(waitMillis, link);
             br.submitForm(down_2Form);
         }
         generate: {
-            sleep(TimeUnit.SECONDS.toMillis(24), link);
+            final long waitMillis;
+            final String waitSecondsStr = br.getRegex(wait_pattern).getMatch(0);
+            if (waitSecondsStr != null) {
+                waitMillis = TimeUnit.SECONDS.toMillis(Integer.parseInt(waitSecondsStr));
+            } else {
+                logger.warning("Failed to find wait before generate request");
+                /* Use hardcoded default value as fallback */
+                waitMillis = TimeUnit.SECONDS.toMillis(27);
+            }
+            sleep(waitMillis, link);
             final PostRequest post = brc.createPostRequest("/" + fid + "/file/generate", "_dlt=" + down_2Form.getInputFieldByName("_dlt").getValue());
             post.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             post.getHeaders().put("X-CSRF-TOKEN", csrftoken);

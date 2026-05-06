@@ -15,13 +15,16 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -31,10 +34,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52768 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52772 $", interfaceVersion = 3, names = {}, urls = {})
 public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public Fsiblog2ComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     /** Old domain: freesexyindians.com */
@@ -61,14 +71,20 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!category|tag|wp-content|page)([a-z0-9\\-]+)/([a-z0-9\\-]+)/?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9\\-]+)/([a-z0-9\\-]+)/?");
         }
         return ret.toArray(new String[0]);
     }
 
+    static final Pattern PATTERN_IGNORE = Pattern.compile("/(?:page|category|tag|wp-admin|wp-content|wp-includes)(?:/|$)", Pattern.CASE_INSENSITIVE);
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br.setFollowRedirects(true);
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)^http://", "https://");
+        final String path = new URL(contenturl).getPath();
+        if (new Regex(path, PATTERN_IGNORE).patternFind()) {
+            logger.info("Ignoring invalid/unsupported url");
+            return new ArrayList<DownloadLink>();
+        }
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -81,14 +97,21 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
             video.setFinalFileName(titleFromURL + ".mp4");
             ret.add(video);
         } else {
+            /* Maybe photo content */
             final String[] photos = br.getRegex("class=\"e-gallery-item elementor-gallery-item elementor-animated-content\" href=\"(https?://[^\"]+)\"").getColumn(0);
-            if (photos == null || photos.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (photos != null && photos.length > 0) {
+                for (final String url : photos) {
+                    final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                    ret.add(link);
+                }
             }
-            for (final String url : photos) {
-                final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
-                ret.add(link);
+        }
+        if (ret.isEmpty()) {
+            if (br.containsHTML("class=\"elementor-post__text\"")) {
+                logger.info("Looks like text-content only -> Nothing for us to download");
+                return ret;
             }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (final DownloadLink result : ret) {
             result.setAvailable(true);

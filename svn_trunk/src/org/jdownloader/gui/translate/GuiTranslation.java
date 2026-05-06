@@ -162,7 +162,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Restart Download when SFV/CRC check fails" })
     String gui_config_restart_crc();
 
-    @Default(lngs = { "en" }, values = { "Auto open Link Containers (dlc,ccf,nzb,...)" })
+    @Default(lngs = { "en" }, values = { "Auto open downloaded containers (dlc,nzb,ejs,...)" })
     String gui_config_simple_container();
 
     @Default(lngs = { "en" }, values = { "Miscellaneous" })

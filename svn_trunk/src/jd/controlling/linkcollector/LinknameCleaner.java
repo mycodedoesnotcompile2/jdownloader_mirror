@@ -35,8 +35,7 @@ public class LinknameCleaner {
     public static final Pattern   pat1       = Pattern.compile("(.*)(\\.|_|-)part\\.?[0]*[1].(rar|rev|exe)" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat3       = Pattern.compile("(.*)\\.(?:rar|rev)" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat4       = Pattern.compile("(.*)\\.r\\d+" + end, Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat5       = Pattern.compile("(.*)(\\.|_|-)\\d+" + end, Pattern.CASE_INSENSITIVE);
-    public static final Pattern[] rarPats    = new Pattern[] { pat0, pat1, pat3, pat4, pat5 };
+    public static final Pattern[] rarPats    = new Pattern[] { pat0, pat1, pat3, pat4 };
 
     public static final Pattern   pat6       = Pattern.compile("(.*)\\.zip" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat6_split = Pattern.compile("(.*)[a-z]\\.zip" + end, Pattern.CASE_INSENSITIVE);
@@ -307,7 +306,6 @@ public class LinknameCleaner {
             final ExtensionRemovalResult result = removeKnownArchiveExtensions(name, skip);
             name = result.processedName;
             hasKnownExtension = hasKnownExtension || result.extensionFound != null;
-            System.out.println(result.extensionFound);
             if (result.extensionFound == null) {
                 break;
             }
@@ -331,6 +329,11 @@ public class LinknameCleaner {
     private static class ExtensionRemovalResult {
         public final String    processedName;
         public final Pattern[] extensionFound;
+
+        public ExtensionRemovalResult(String processedName) {
+            this.processedName = processedName;
+            this.extensionFound = null;
+        }
 
         public ExtensionRemovalResult(String processedName, Pattern... extensionFound) {
             this.processedName = processedName;
@@ -375,7 +378,7 @@ public class LinknameCleaner {
                 }
             }
         }
-        return new ExtensionRemovalResult(name, null);
+        return new ExtensionRemovalResult(name);
     }
 
     /**
@@ -394,7 +397,7 @@ public class LinknameCleaner {
                 return new ExtensionRemovalResult(processed, patterns);
             }
         }
-        return new ExtensionRemovalResult(name, null);
+        return new ExtensionRemovalResult(name);
     }
 
     /**

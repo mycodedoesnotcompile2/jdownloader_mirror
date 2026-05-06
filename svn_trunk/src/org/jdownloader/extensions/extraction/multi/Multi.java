@@ -175,13 +175,10 @@ public class Multi extends IExtraction {
                 if (date != null && date.getTime() >= 0) {
                     modified = date.getTime();
                 } else {
-                    modified = -1;
+                    return;
                 }
             } else {
                 modified = System.currentTimeMillis();
-            }
-            if (modified == 0) {
-                return;
             }
             if (!extractTo.setLastModified(modified)) {
                 logger.warning("Could not set last write/modified time(" + modified + "/" + new Date(modified) + ") for " + item.getPath());

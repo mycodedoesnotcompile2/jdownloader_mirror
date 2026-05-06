@@ -249,13 +249,13 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         PREFER_ORIGINAL {
             @Override
             public String getLabel() {
-                return "Selected files if possible else loose book pages";
+                return "Selected file types if possible, otherwise loose book pages";
             }
         },
         ORIGINAL_AND_LOOSE_PAGES {
             @Override
             public String getLabel() {
-                return "Selected files if possible and loose book pages";
+                return "Selected file types and loose book pages";
             }
         },
         LOOSE_PAGES {
@@ -307,13 +307,13 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         PLAYLIST_AND_FILES {
             @Override
             public String getLabel() {
-                return "Playlist and selected files";
+                return "Playlist and selected file types";
             }
         },
         FILES_ONLY {
             @Override
             public String getLabel() {
-                return "Selected files only";
+                return "Selected file types only";
             }
         },
         AUTO {

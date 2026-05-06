@@ -145,7 +145,7 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
         if (condition.contains(Condition.EXTRACTING)) {
             for (AbstractExtension<?, ?> extension : ExtensionController.getInstance().getEnabledExtensions()) {
                 try {
-                    if (!"ExtractionExtension".equals(extension.getName())) {
+                    if (!"ExtractionExtension".equals(extension.getClass().getSimpleName())) {
                         continue;
                     } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
                         ret.add(Condition.EXTRACTING);
@@ -158,7 +158,7 @@ public class AntiStandbyExtension extends AbstractExtension<AntiStandbyConfig, A
         if (condition.contains(Condition.EXTENSION)) {
             for (AbstractExtension<?, ?> extension : ExtensionController.getInstance().getEnabledExtensions()) {
                 try {
-                    if ("AntiStandbyExtension".equals(extension.getName())) {
+                    if ("AntiStandbyExtension".equals(extension.getClass().getSimpleName())) {
                         continue;
                     } else if (Boolean.TRUE.equals(extension.invoke("requiresAntiStandby", Boolean.class))) {
                         ret.add(Condition.EXTENSION);
