@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50769 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52780 $", interfaceVersion = 3, names = {}, urls = {})
 public class Ez4shortCom extends PluginForDecrypt {
     public Ez4shortCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,19 +68,28 @@ public class Ez4shortCom extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Redirect to the first fake blog/ads page */
         final String firstRedirect = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)\"").getMatch(0);
         if (firstRedirect != null) {
-            br.getPage(firstRedirect);
+            /* Check for redirect to the next fake blog page via google.com to collect clicks/ranking (wtf) */
+            final String realTarget = UrlQuery.parse(firstRedirect).get("url");
+            if (realTarget != null) {
+                br.getHeaders().put("Referer", firstRedirect);
+                br.getPage(realTarget);
+            } else {
+                br.getPage(firstRedirect);
+            }
         }
         oldHandling: if (true) {
             /* Old handling */
             final String adSessionInitLink = br.getRegex("fetch\\('(https?://[^']+\\?sessionId=[a-f0-9]+)'").getMatch(0);
             if (adSessionInitLink == null) {
+                logger.info("Failed to find adSessionInitLink");
                 break oldHandling;
             }
             final Browser brc = br.cloneBrowser();
@@ -89,64 +98,66 @@ public class Ez4shortCom extends PluginForDecrypt {
             final String htmlRefresh = br.getRegex("<meta http-equiv=\"refresh\" content=\"\\d+;url=(https?://[^\"]+)").getMatch(0);
             br.getPage(htmlRefresh);
             final String validatorName = br.getRegex("el\\.name = \"(validator\\d+)\";").getMatch(0);
-            if (validatorName != null) {
-                String finalresult = null;
-                steploop: for (int stepExpected = 1; stepExpected <= 10; stepExpected++) {
-                    logger.info("Processing step loop: " + stepExpected);
-                    final Regex stepRegex = br.getRegex(">\\s*Step: (\\d+)/(\\d+)");
-                    if (!stepRegex.patternFind()) {
-                        logger.warning("Failed to find step pattern");
-                        break;
-                    }
-                    final int stepCurrent = Integer.parseInt(stepRegex.getMatch(0));
-                    final int stepMax = Integer.parseInt(stepRegex.getMatch(1));
-                    logger.info("Processing: expected step: " + stepExpected + " | Real: " + stepCurrent + "/" + stepMax);
-                    if (stepCurrent >= stepMax) {
-                        logger.info("Stopping because: Reached stepMax: " + stepCurrent + "/" + stepMax);
-                        break steploop;
-                    } else if (stepCurrent != stepExpected) {
-                        logger.info("Stopping because: Step mismatch: Expected: " + stepExpected + " | Got: " + stepCurrent);
-                        break steploop;
-                    }
-                    final Form continueform = new Form();
-                    continueform.setMethod(MethodType.POST);
-                    continueform.setAction(br.getURL());
-                    continueform.put(Encoding.urlEncode(validatorName), "true");
-                    if (stepExpected == 1 && CaptchaHelperCrawlerPluginHCaptcha.containsHCaptcha(br)) {
-                        final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
-                        continueform.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
-                        continueform.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
-                    } else {
-                        continueform.put("no-recaptcha-noresponse", "true");
-                    }
-                    final String secondsWaitStr = br.getRegex("startingSeconds = (\\d+)").getMatch(0);
-                    if (secondsWaitStr != null) {
-                        final int secondsWait = (int) ((Integer.parseInt(secondsWaitStr) * 0.33) + 5);
-                        logger.info("Found wait time: " + secondsWaitStr + " -> Final wait: " + secondsWait);
-                        this.sleep(secondsWait * 1000l, param);
-                    } else {
-                        logger.info("Did not find wait time");
-                    }
-                    br.submitForm(continueform);
-                    finalresult = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)\"").getMatch(0);
-                    if (finalresult != null) {
-                        logger.info("Stopping because: Found final result");
-                        break steploop;
-                    } else if (this.isAbort()) {
-                        break steploop;
-                    }
+            if (validatorName == null) {
+                logger.info("Failed to find validatorName");
+                break oldHandling;
+            }
+            String finalresult = null;
+            steploop: for (int stepExpected = 1; stepExpected <= 10; stepExpected++) {
+                logger.info("Processing step loop: " + stepExpected);
+                final Regex stepRegex = br.getRegex(">\\s*Step: (\\d+)/(\\d+)");
+                if (!stepRegex.patternFind()) {
+                    logger.warning("Failed to find step pattern");
+                    break;
                 }
+                final int stepCurrent = Integer.parseInt(stepRegex.getMatch(0));
+                final int stepMax = Integer.parseInt(stepRegex.getMatch(1));
+                logger.info("Processing: expected step: " + stepExpected + " | Real: " + stepCurrent + "/" + stepMax);
+                if (stepCurrent >= stepMax) {
+                    logger.info("Stopping because: Reached stepMax: " + stepCurrent + "/" + stepMax);
+                    break steploop;
+                } else if (stepCurrent != stepExpected) {
+                    logger.info("Stopping because: Step mismatch: Expected: " + stepExpected + " | Got: " + stepCurrent);
+                    break steploop;
+                }
+                final Form continueform = new Form();
+                continueform.setMethod(MethodType.POST);
+                continueform.setAction(br.getURL());
+                continueform.put(Encoding.urlEncode(validatorName), "true");
+                if (stepExpected == 1 && CaptchaHelperCrawlerPluginHCaptcha.containsHCaptcha(br)) {
+                    final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
+                    continueform.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
+                    continueform.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
+                } else {
+                    continueform.put("no-recaptcha-noresponse", "true");
+                }
+                final String secondsWaitStr = br.getRegex("startingSeconds = (\\d+)").getMatch(0);
+                if (secondsWaitStr != null) {
+                    final int secondsWait = (int) ((Integer.parseInt(secondsWaitStr) * 0.33) + 5);
+                    logger.info("Found wait time: " + secondsWaitStr + " -> Final wait: " + secondsWait);
+                    this.sleep(secondsWait * 1000l, param);
+                } else {
+                    logger.info("Did not find wait time");
+                }
+                br.submitForm(continueform);
+                finalresult = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)\"").getMatch(0);
                 if (finalresult != null) {
-                    /*
-                     * This should get us back to psa.btcut.io but now with a "token" parameter inside the URL which allows us to get to the
-                     * final URL.
-                     */
-                    br.getPage(finalresult);
-                    /* TODO: Final step back to btcut.io URL with token is missing. */
-                    /* This btcut.io link can be offline */
-                    if (br.getHttpConnection().getResponseCode() == 404) {
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    }
+                    logger.info("Stopping because: Found final result");
+                    break steploop;
+                } else if (this.isAbort()) {
+                    break steploop;
+                }
+            }
+            if (finalresult != null) {
+                /*
+                 * This should get us back to psa.btcut.io but now with a "token" parameter inside the URL which allows us to get to the
+                 * final URL.
+                 */
+                br.getPage(finalresult);
+                /* TODO: Final step back to btcut.io URL with token is missing. */
+                /* This btcut.io link can be offline */
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             }
         }

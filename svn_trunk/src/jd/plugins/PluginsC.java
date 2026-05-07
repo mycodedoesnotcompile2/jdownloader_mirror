@@ -26,10 +26,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
-import jd.controlling.linkcollector.LinkOriginDetails;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.nutils.Formatter;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.uio.CloseReason;
@@ -59,6 +55,10 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.utils.JDFileUtils;
+
+import jd.controlling.linkcollector.LinkOriginDetails;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.nutils.Formatter;
 
 /**
  * Dies ist die Oberklasse für alle Plugins, die Containerdateien nutzen können
@@ -93,7 +93,6 @@ public abstract class PluginsC {
     }
 
     public static class PluginsCBubbleSupport extends AbstractBubbleSupport {
-
         private PluginsCBubbleSupport() {
             super(_GUI.T.plugins_optional_JDLightTray_ballon_container(), CFG_BUBBLE.BUBBLE_NOTIFY_CONTAINER_LOADED_ENABLED);
         }
@@ -106,7 +105,6 @@ public abstract class PluginsC {
         protected void show(final AbstractNotifyWindowFactory factory) {
             super.show(factory);
         }
-
     }
 
     public PluginsC(String name, String pattern, String rev) {
@@ -132,18 +130,17 @@ public abstract class PluginsC {
 
     public abstract ContainerStatus callDecryption(File file) throws Exception;
 
-    // @Override
     public synchronized boolean canHandle(final String data) {
-        if (data != null) {
-            synchronized (matcher) {
-                try {
-                    return matcher.reset(data).find();
-                } finally {
-                    matcher.reset("");
-                }
+        if (data == null) {
+            return false;
+        }
+        synchronized (matcher) {
+            try {
+                return matcher.reset(data).find();
+            } finally {
+                matcher.reset("");
             }
         }
-        return false;
     }
 
     public String createContainerString(ArrayList<DownloadLink> downloadLinks) {
@@ -162,7 +159,7 @@ public abstract class PluginsC {
         return version;
     }
 
-    /* hide links by default */
+    /* If true, user will be prohibited to obtain crawled links in GUI, they will be "protected". */
     public boolean hideLinks() {
         return true;
     }
@@ -182,29 +179,31 @@ public abstract class PluginsC {
     }
 
     public synchronized void initContainer(final CrawledLink source, final File file, final byte[] key) throws IOException {
-        if (cls == null || cls.size() == 0) {
-            logger.info("Init Container");
-            if (key != null) {
-                k = key;
+        if (cls != null && cls.size() > 0) {
+            return;
+        }
+        logger.info("Init Container");
+        if (key != null) {
+            k = key;
+        }
+        try {
+            final ContainerStatus cs = callDecryption(file);
+            if (cs == null) {
+                logger.warning("WTF ContainerStatus null was returned");
+                return;
             }
-            try {
-                final ContainerStatus cs = callDecryption(file);
-                if (cs == null) {
-                    logger.warning("WTF ContainerStatus null was returned");
+            if (cs.isStatus(ContainerStatus.STATUS_FAILED)) {
+                this.displayBubbleNotification("Invalid container", "Processing the following container failed for unknown reasons:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+            } else if (cs.isStatus(ContainerStatus.STATUS_INVALID_PASSWORD)) {
+                this.displayBubbleNotification("Invalid container password", "Processing the following container failed because the supplied passwords were incorrect:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+            } else if (cs.isStatus(ContainerStatus.STATUS_FINISHED)) {
+                if (getContainedDownloadlinks().size() > 0) {
+                    this.displayBubbleNotification("Successfully crawled container", "The following container has been processed successfully:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
                 }
-                if (cs.isStatus(ContainerStatus.STATUS_FAILED)) {
-                    this.displayBubbleNotification("Invalid container", "Processing the following container failed for unknown reasons:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
-                } else if (cs.isStatus(ContainerStatus.STATUS_INVALID_PASSWORD)) {
-                    this.displayBubbleNotification("Invalid container password", "Processing the following container failed because the supplied passwords were incorrect:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
-                } else if (cs.isStatus(ContainerStatus.STATUS_FINISHED)) {
-                    if (getContainedDownloadlinks().size() > 0) {
-                        this.displayBubbleNotification("Successfully crawled container", "The following container has been processed successfully:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
-                    }
-                    deleteContainer(source, file);
-                }
-            } catch (Throwable e) {
-                logger.log(e);
+                deleteContainer(source, file);
             }
+        } catch (Throwable e) {
+            logger.log(e);
         }
     }
 
@@ -377,8 +376,8 @@ public abstract class PluginsC {
     }
 
     /**
-     * Returns true if a user interaction in the form of a password-prompt can happen when processing this container. </br> Example: SFDL
-     * containers.
+     * Returns true if a user interaction in the form of a password-prompt can happen when processing this container. </br>
+     * Example: SFDL containers.
      */
     protected boolean canBePasswordProtected() {
         return false;

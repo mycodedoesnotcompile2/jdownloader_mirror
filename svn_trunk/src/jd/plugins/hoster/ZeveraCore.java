@@ -34,6 +34,7 @@ import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
@@ -70,6 +71,8 @@ abstract public class ZeveraCore extends UseNet {
     private static HashSet<String>         global_cache_hosts                     = new HashSet<String>();
     /* Map of timestamps of cache only items that are not in cache and thus shouldn't be retried. */
     private static Map<DownloadLink, Long> cache_unavailable_timestamps           = new WeakHashMap<DownloadLink, Long>();
+    private final boolean                  USE_SLOT_BLOCKING_QUEUE_HANDLING       = true;
+    private final Pattern                  PATTERN_SELFHOSTED                     = Pattern.compile("/file\\?id=.+", Pattern.CASE_INSENSITIVE);
 
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -119,14 +122,11 @@ abstract public class ZeveraCore extends UseNet {
         }
     }
 
+    /** Only call this for selfhosted links!! */
     private String getFID(final DownloadLink link) {
-        if (this.isSelfhostedContent(link)) {
-            try {
-                return UrlQuery.parse(link.getPluginPatternMatcher()).get("id");
-            } catch (final Throwable e) {
-                return null;
-            }
-        } else {
+        try {
+            return UrlQuery.parse(link.getPluginPatternMatcher()).get("id");
+        } catch (final Throwable e) {
             return null;
         }
     }
@@ -178,6 +178,11 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         if (isUsenetLink(link)) {
             return super.requestFileInformation(link);
@@ -193,10 +198,6 @@ abstract public class ZeveraCore extends UseNet {
         if (fileID == null) {
             /* This should never happen. */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        if (!link.isNameSet()) {
-            /* Set meaningful names in case content is offline */
-            link.setName(fileID);
         }
         if (account == null) {
             /* Cannot check without account */
@@ -239,8 +240,6 @@ abstract public class ZeveraCore extends UseNet {
             return super.canHandle(link, account);
         }
     }
-
-    private final Pattern PATTERN_SELFHOSTED = Pattern.compile("https?://[^/]+/file\\?id=.+", Pattern.CASE_INSENSITIVE);
 
     private boolean isSelfhostedContent(final DownloadLink link) {
         if (link == null) {
@@ -332,43 +331,41 @@ abstract public class ZeveraCore extends UseNet {
                     req.addFormData(new FormData("hash_sha256", hash_sha256));
                 }
                 br.getPage(req);
-                final boolean useSlotBlockingQueueHandling = true;
                 Map<String, Object> entries;
-                if (useSlotBlockingQueueHandling) {
+                if (USE_SLOT_BLOCKING_QUEUE_HANDLING) {
                     /* 2023-07-17 */
-                    entries = this.handleAPIErrors(this, br, link, account, API_STATUS_FOR_QUEUE_DEFERRED_HANDLING);
-                    String status = (String) entries.get("status");
-                    if (API_STATUS_FOR_QUEUE_DEFERRED_HANDLING.equalsIgnoreCase(status)) {
+                    entries = this.handleAPIErrors(this, br, link, account);
+                    if (API_STATUS_FOR_QUEUE_DEFERRED_HANDLING.equalsIgnoreCase(entries.get("status").toString())) {
                         logger.info("Executing slot-blocking queue handling");
-                        final Number delay = (Number) entries.get("delay");
-                        final boolean allowUnlimitedRetries = false; // 2023-08-03
-                        // final int maxWaitSeconds = delay != null ? Math.min(delay.intValue() * 480, 2400) : 120;
-                        /* TODO: Remove this long slot blocking wait handling as soon as new general account handling is released. */
                         final int maxWaitSeconds = 16 * 60 * 60;
                         int passedSeconds = 0;
                         final int waitSecondsPerLoop = 10;
-                        final String maxWaitHumanReadable;
-                        if (allowUnlimitedRetries) {
-                            maxWaitHumanReadable = "Unlimited";
-                        } else {
-                            maxWaitHumanReadable = Integer.toString(maxWaitSeconds);
-                        }
+                        boolean success = false;
+                        final String maxTimeFormatted = TimeFormatter.formatMilliSeconds(maxWaitSeconds * 1000, 0);
                         do {
-                            this.sleep(waitSecondsPerLoop * 1000l, link, "deferred queue handling: Waiting sec " + passedSeconds + "/" + maxWaitHumanReadable);
+                            final String passedTimeFormatted = TimeFormatter.formatMilliSeconds(passedSeconds * 1000, 0);
+                            this.sleep(waitSecondsPerLoop * 1000l, link, "deferred queue handling: Waited time " + passedTimeFormatted + "/" + maxTimeFormatted);
                             passedSeconds += waitSecondsPerLoop;
                             br.getPage(req.cloneRequest());
-                            entries = this.handleAPIErrors(this, br, link, account, API_STATUS_FOR_QUEUE_DEFERRED_HANDLING);
-                            status = (String) entries.get("status");
-                            logger.info("Waited seconds: " + passedSeconds + "/" + maxWaitHumanReadable + " | Serverside 'delay' value: " + delay);
-                            if (!StringUtils.equals(status, "deferred")) {
+                            entries = this.handleAPIErrors(this, br, link, account);
+                            final String status = (String) entries.get("status");
+                            logger.info("Waited seconds: " + TimeFormatter.formatMilliSeconds(passedSeconds * 1000, 0) + "/" + maxTimeFormatted + " | Serverside 'delay' value: " + entries.get("delay"));
+                            if (StringUtils.equals(status, "success")) {
+                                success = true;
+                                break;
+                            } else if (!StringUtils.equals(status, "deferred")) {
                                 logger.info("Stopping because: Status != deferred");
                                 break;
-                            } else if (!allowUnlimitedRetries && passedSeconds >= maxWaitSeconds) {
-                                logger.info("Stopping because: Timeout -> Could not find final downloadurl");
+                            } else if (passedSeconds >= maxWaitSeconds) {
+                                logger.info("Stopping because: Timeout -> Could not find final downloadurl in time");
                                 break;
                             }
                         } while (!this.isAbort());
-                        this.handleAPIErrors(this, entries, br, link, account, null);
+                        if (!success) {
+                            getMultiHosterManagement().handleErrorGeneric(account, link, "Wait for serverside download until you can download this file", 50, 10 * 60 * 1000);
+                            /* Unreachable code */
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
                     }
                 } else {
                     /* Old handling: No special handling for queue-downloads. */
@@ -435,21 +432,10 @@ abstract public class ZeveraCore extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content", 3 * 60 * 1000l);
             }
         }
-        // TODO: 2024-04-26: Work in progress: Make use of this
-        // final int maxChunks;
-        // final String cacheStatus = dl.getConnection().getRequest().getResponseHeader("X-Cached");
-        // if (StringUtils.equalsIgnoreCase(cacheStatus, "hit")) {
-        // maxChunks = getMaxChunks(account);
-        // } else {
-        // maxChunks = 1;
-        // }
     }
 
+    /** This is for file links that are hosted by this multihoster e.g. "/file?id=..." */
     private void handleDLSelfhosted(final DownloadLink link, final Account account) throws Exception {
-        if (!this.isSelfhostedContent(link)) {
-            /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final Map<String, Object> details = requestFileInformationSelfhosted(link, account);
         final String dllink = details.get("link").toString();
         if (StringUtils.isEmpty(dllink)) {
@@ -489,13 +475,13 @@ abstract public class ZeveraCore extends UseNet {
                     throw new AccountUnavailableException(reason, 5 * 60 * 1000l);
                 }
             }
-            String statustext = String.format(Locale.ROOT, "Premium | Fair-Use Status: %d%% left", fairUsagePercentLeft);
+            String statustext = String.format(Locale.ROOT, "Premium | Fair-Use: %d%% left", fairUsagePercentLeft);
             if (booster_points != null) {
                 /*
                  * Booster point information is only relevant if API returns that field. That field is e.g. not available for zevera.com but
                  * is available for premiumize.me.
                  */
-                statustext += " | Booster points: " + booster_points;
+                statustext += " | Booster Points: " + booster_points;
             }
             ai.setStatus(statustext);
             ai.setValidUntil(((Number) premium_untilO).longValue() * 1000, br);
@@ -803,10 +789,6 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     public Map<String, Object> handleAPIErrors(final Plugin plugin, final Browser br, final DownloadLink link, final Account account) throws Exception {
-        return handleAPIErrors(plugin, br, link, account, null);
-    }
-
-    public Map<String, Object> handleAPIErrors(final Plugin plugin, final Browser br, final DownloadLink link, final Account account, final String errorStrIgnore) throws Exception {
         /* E.g. {"status":"error","error":"topup_required","message":"Please purchase premium membership or activate free mode."} */
         Map<String, Object> entries = null;
         try {
@@ -819,25 +801,17 @@ abstract public class ZeveraCore extends UseNet {
                 throw new AccountUnavailableException("Invalid API response", 60 * 1000);
             }
         }
-        handleAPIErrors(plugin, entries, br, link, account, errorStrIgnore);
+        handleAPIErrors(plugin, entries, br, link, account);
         return entries;
     }
 
     public void handleAPIErrors(final Plugin plugin, final Map<String, Object> entries, final Browser br, final DownloadLink link, final Account account) throws Exception {
-        handleAPIErrors(plugin, entries, br, link, account, null);
-    }
-
-    public void handleAPIErrors(final Plugin plugin, final Map<String, Object> entries, final Browser br, final DownloadLink link, final Account account, final String errorStrIgnore) throws Exception {
         final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
         final String status = (String) entries.get("status");
         final String message = (String) entries.get("message");
         /* API can control how long we should wait until next retry. */
         final Number delaySecondsO = (Number) entries.get("delay");
         final long retryInMilliseconds = delaySecondsO != null ? delaySecondsO.longValue() * 1000 : 1 * 60 * 1000;
-        if (errorStrIgnore != null && (StringUtils.equalsIgnoreCase(status, errorStrIgnore) || StringUtils.equalsIgnoreCase(message, errorStrIgnore))) {
-            /* Ignore this particular error message for now. */
-            return;
-        }
         final String error_code_enum = (String) entries.get("code");
         if (error_code_enum != null) {
             /* 2026-05-04: New ENUM style errors available via "code" field. */
@@ -922,10 +896,14 @@ abstract public class ZeveraCore extends UseNet {
                 }
             }
         } else if (API_STATUS_FOR_QUEUE_DEFERRED_HANDLING.equalsIgnoreCase(status)) {
-            /*
-             * Most likely user tried to download a file of a host which is in the "queue" list of supported host. Such files first need to
-             * be downloaded 100% serverside until the user can download them.
+            /**
+             * Most likely user tried to download a file of a host which is in the "queue" list of supported host. <br>
+             * Such files first need to be downloaded 100% serverside until the user can download them.
              */
+            if (USE_SLOT_BLOCKING_QUEUE_HANDLING) {
+                /* Do not throw exception since that happens outside of this function in this case. */
+                return;
+            }
             getMultiHosterManagement().handleErrorGeneric(account, link, message != null ? message : "Wait for serverside download until you can download this file", 50, retryInMilliseconds);
         } else if (errormap != null) {
             /* 2023-05-20: new json zevera.com(?) */
@@ -937,6 +915,7 @@ abstract public class ZeveraCore extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
             } else {
                 if (plugin instanceof PluginForDecrypt) {
+                    /* Unknown error happened during crawl process -> Treat as offline item */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
                 } else if (link == null) {
                     /* Account/login related error */

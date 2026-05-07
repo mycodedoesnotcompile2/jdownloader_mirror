@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52781 $", interfaceVersion = 3, names = {}, urls = {})
 public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
     public MulherespeladasvipCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -112,10 +112,10 @@ public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
 
     @Override
     protected boolean isPrivateVideoWebsite(final Browser br) {
-        if (br.containsHTML("(?i)class=\"message\">\\s*Você excedeu o numero admissivel de vizualizacoes")) {
+        if (br.containsHTML("class=\"message\">\\s*Você excedeu o numero admissivel de vizualizacoes")) {
             /* 2022-09-05: Video reached max number of views and can only be downloaded via account? */
             return true;
-        } else if (br.containsHTML("(?i)class=\"message\">\\s*So os usuarios registados no sitio podem ter acesso aos videos")) {
+        } else if (br.containsHTML("class=\"message\">\\s*So os usuarios registados no sitio podem ter acesso aos videos")) {
             /* 2022-09-08: Video is only available for registered users */
             return true;
         } else {

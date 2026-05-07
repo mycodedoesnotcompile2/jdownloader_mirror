@@ -19,10 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48144 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52781 $", interfaceVersion = 3, names = {}, urls = {})
 public class KvsDemoCom extends KernelVideoSharingComV2 {
     public KvsDemoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,16 +50,6 @@ public class KvsDemoCom extends KernelVideoSharingComV2 {
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
-    }
-
-    @Override
-    protected boolean isPrivateVideoWebsite(final Browser br) {
-        /* 2020-10-09: Tested for pornyeah.com, anyporn.com, camwhoreshd.com */
-        if (br.containsHTML("(?i)>\\s*This video is a premium video uploaded by")) {
-            return true;
-        } else {
-            return super.isPrivateVideoWebsite(br);
-        }
     }
 
     @Override
