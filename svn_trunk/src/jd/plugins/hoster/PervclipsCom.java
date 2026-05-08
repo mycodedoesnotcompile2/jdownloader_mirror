@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51176 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class PervclipsCom extends KernelVideoSharingComV2 {
     public PervclipsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class PervclipsCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         /* No ID in filename --> Use URL title */
         return getURLTitle(url);
     }

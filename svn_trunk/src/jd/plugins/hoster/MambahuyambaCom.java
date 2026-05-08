@@ -24,7 +24,7 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLSearch;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51120 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class MambahuyambaCom extends KernelVideoSharingComV2 {
     public MambahuyambaCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -111,18 +111,13 @@ public class MambahuyambaCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected boolean hasFUIDInsideURLAtTheEnd(final String url) {
-        return true;
-    }
-
-    @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         final String fuid = new Regex(url, "https?://[^/]+/video/(\\d+)/?$").getMatch(0);
         if (fuid != null) {
             return fuid;
         } else {
             /* Fallback to upper handling */
-            return super.getFUIDFromURL(url);
+            return super.getFUID(url);
         }
     }
 

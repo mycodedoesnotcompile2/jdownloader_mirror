@@ -24,6 +24,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.FreeDiscPlConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -42,13 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FreeDiscPl;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.FreeDiscPlConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 50337 $", interfaceVersion = 3, names = { "freedisc.pl" }, urls = { "https?://(?:(?:www|m)\\.)?freedisc\\.pl/([A-Za-z0-9_\\-]+),d-(\\d+)(,([\\w\\-]+))?" })
+@DecrypterPlugin(revision = "$Revision: 52785 $", interfaceVersion = 3, names = { "freedisc.pl" }, urls = { "https?://(?:(?:www|m)\\.)?freedisc\\.pl/([A-Za-z0-9_\\-]+),d-(\\d+)(,([\\w\\-]+))?" })
 public class FreeDiscPlFolder extends PluginForDecrypt {
     public FreeDiscPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,6 +103,13 @@ public class FreeDiscPlFolder extends PluginForDecrypt {
         FreeDiscPl.prepBRAjax(this.br);
         /* First let's find the absolute path to the folder we want. If we fail to do so we can assume that it is offline. */
         getPage("https://" + this.getHost() + "/directory/directory_data/get_tree/" + user, param, account);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            /**
+             * 2026-05-07: GEO-block + VPN block <br>
+             * Legit polish IP needed or polish residential IP!
+             */
+            throw new DecrypterRetryException(RetryReason.GEO);
+        }
         final Map<String, Object> responseFolderTree = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Map<String, Object>> folderTreeData = (Map<String, Map<String, Object>>) JavaScriptEngineFactory.walkJson(responseFolderTree, "response/data");
         final Map<String, Object> subfolderMap = folderTreeData.get(folderID); // Contains all subfolder items

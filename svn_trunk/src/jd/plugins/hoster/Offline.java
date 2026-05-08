@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 52750 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -329,6 +329,9 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "watch-jav-english.live", "dutrag.com", "nekolink.site", "pornhole.club", "javip.pro", "javlove.club", "javguru.tk", "diasfem.com", "cloudrls.com", "embedaio.com", "fakyutube.com", "javhdfree.icu", "fembed-hd.com", "suzihaza.com", "mambast.tk", "javpoll.com", "fembed9hd.com", "faurl.ga", "i18n.pw", "zojav.com", "imfb.xyz", "javenglish.me" });
         /* 2026-04-29: All domains from FEmbedDecrypter END */
         ret.add(new String[] { "fileconvoy.com" });
+        ret.add(new String[] { "drop.download", "dropapk.to", "dropapk.com", "fastclick.to", "mixloads.com", "upstream.to" });
+        ret.add(new String[] { "embedy.cc" });
+        ret.add(new String[] { "emulatorgames.net" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

@@ -36,7 +36,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 47663 $", interfaceVersion = 2, names = { "gloria.tv" }, urls = { "https?://(www\\.)?gloria\\.tv/(?:media|video|post|share)/[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52785 $", interfaceVersion = 2, names = { "gloria.tv" }, urls = { "https?://(www\\.)?gloria\\.tv/(?:media|video|post|share)/[A-Za-z0-9]+" })
 public class GloriaTvDecrypt extends PluginForDecrypt {
     public GloriaTvDecrypt(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,24 +45,29 @@ public class GloriaTvDecrypt extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        br.getPage(parameter);
+        br.getPage(contenturl);
         /* Article offline | no video (only text) */
-        if (br.containsHTML("class=\"missing\"") || this.br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("class=\"missing\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (!this.canHandle(br.getURL())) {
+            logger.info("Got redirect to external/unsupported url: " + br.getURL());
+            ret.add(this.createDownloadlink(br.getURL()));
+            return ret;
         }
         String videotitle = br.getRegex("property=\"og:title\" content=\"([^<>\"]*?)\"").getMatch(0);
         if (videotitle == null) {
             videotitle = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
         }
         if (videotitle == null) {
-            logger.warning("Decrypter broken for link: " + parameter);
-            return null;
+            logger.warning("Decrypter broken for link: " + contenturl);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         videotitle = Encoding.htmlDecode(videotitle).trim();
         String[][] finfo = null;
-        final String fid = new Regex(parameter, "([A-Za-z0-9]+)$").getMatch(0);
+        final String fid = new Regex(contenturl, "([A-Za-z0-9]+)$").getMatch(0);
         if (getUserLogin(false)) {
             br.getPage("http://gloria.tv/?media=" + fid + "&mission=download&language=KiaLEJq2fBR&particular=&_=" + System.currentTimeMillis());
             final String[] temp = br.getRegex("(<li><a href=\".*?</a></li>)").getColumn(0);
@@ -160,7 +165,7 @@ public class GloriaTvDecrypt extends PluginForDecrypt {
             }
         }
         if (finfo == null || finfo.length == 0) {
-            logger.warning("Decrypter broken for link: " + parameter);
+            logger.warning("Decrypter broken for link: " + contenturl);
             return null;
         }
         for (final String sinfo[] : finfo) {
@@ -178,7 +183,7 @@ public class GloriaTvDecrypt extends PluginForDecrypt {
             final String filename = videotitle + "_" + type + "_" + lengtscale + "." + type;
             final DownloadLink dl = createDownloadlink("http://gloriadecrypted.tv/" + System.currentTimeMillis() + new Random().nextInt(100000));
             dl.setProperty("free_directlink", finallink);
-            dl.setProperty("mainlink", parameter);
+            dl.setProperty("mainlink", contenturl);
             dl.setFinalFileName(filename);
             if (!fsize.equals("-1")) {
                 dl.setDownloadSize(SizeFormatter.getSize(fsize));
@@ -186,7 +191,7 @@ public class GloriaTvDecrypt extends PluginForDecrypt {
             dl.setProperty("decryptedfilesize", fsize);
             dl.setProperty("decryptedfilename", filename);
             dl.setLinkID("gloriatv_" + fid + "_" + filename);
-            dl.setContentUrl(parameter);
+            dl.setContentUrl(contenturl);
             dl.setAvailable(true);
             ret.add(dl);
         }

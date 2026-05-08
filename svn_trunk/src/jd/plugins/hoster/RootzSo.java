@@ -20,11 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -34,7 +32,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52080 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 52783 $", interfaceVersion = 3, names = {}, urls = {})
 public class RootzSo extends PluginForHost {
     public RootzSo(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,9 +111,16 @@ public class RootzSo extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
         final String fid = this.getFID(link);
-        br.getHeaders().put("Referer", link.getPluginPatternMatcher());
+        br.getPage(link.getPluginPatternMatcher());
+        final String token = br.getRegex("pageToken\\\\\"\\s*:\\s*\\\\\"([^\\\\]+)").getMatch(0);
+        if (token == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        br.getHeaders().put("X-Page-Token", token);// required by all api requests
         /* API Docs: https://www.rootz.so/docs */
-        br.getPage("https://www." + getHost() + "/api/files/download-by-short/" + fid);
+        Request request = br.createGetRequest("/api/files/download-by-short/" + fid);
+        // request.getHeaders().put("X-Page-Token", token);
+        br.getPage(request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* e.g. {"success":false,"error":"File not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

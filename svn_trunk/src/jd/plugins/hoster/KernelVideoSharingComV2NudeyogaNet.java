@@ -24,7 +24,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51575 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2NudeyogaNet extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2NudeyogaNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -86,5 +86,10 @@ public class KernelVideoSharingComV2NudeyogaNet extends KernelVideoSharingComV2 
         } else {
             return super.getPrivateVideoWebsiteMessage(br);
         }
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.SLUG_NO_FUID;
     }
 }

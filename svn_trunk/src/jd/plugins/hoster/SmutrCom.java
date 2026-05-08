@@ -27,7 +27,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.decrypter.SmutrComCrawler;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SmutrComCrawler.class })
 public class SmutrCom extends KernelVideoSharingComV2 {
     public SmutrCom(final PluginWrapper wrapper) {
@@ -72,12 +72,11 @@ public class SmutrCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
-        } else {
-            return new Regex(url, "(\\d+)/?$").getMatch(0);
         }
+        return new Regex(url, "(\\d+)/?$").getMatch(0);
     }
 
     @Override

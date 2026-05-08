@@ -26,7 +26,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49352 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class XxxsexzooCom extends KernelVideoSharingComV2 {
     public XxxsexzooCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,7 @@ public class XxxsexzooCom extends KernelVideoSharingComV2 {
         return this.getProtocol() + appendWWWIfRequired(host) + "/video/" + fuid + "/" + urlSlug + "/";
     }
 
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         } else {

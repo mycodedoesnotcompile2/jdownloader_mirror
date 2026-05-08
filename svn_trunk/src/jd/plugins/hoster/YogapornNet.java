@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51564 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class YogapornNet extends KernelVideoSharingComV2 {
     public YogapornNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -67,5 +67,10 @@ public class YogapornNet extends KernelVideoSharingComV2 {
         } else {
             return super.isOfflineWebsite(br);
         }
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.SLUG_NO_FUID;
     }
 }

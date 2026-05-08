@@ -25,7 +25,7 @@ import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48387 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class AdultdeepfakesCom extends KernelVideoSharingComV2 {
     public AdultdeepfakesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,7 @@ public class AdultdeepfakesCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         } else {
@@ -70,7 +70,7 @@ public class AdultdeepfakesCom extends KernelVideoSharingComV2 {
             if (fuidFromUrlTypeNormal != null) {
                 return fuidFromUrlTypeNormal;
             } else {
-                return super.getFUIDFromURL(url);
+                return super.getFUID(url);
             }
         }
     }

@@ -22,7 +22,7 @@ import java.util.Random;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48698 $", interfaceVersion = 3, names = { "hotpornfile.org" }, urls = { "https?://(?:www\\.)?hotpornfile\\.org/(?!page)([^/]+)/(\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = { "hotpornfile.org" }, urls = { "https?://(?:www\\.)?hotpornfile\\.org/(?!page)([^/]+)/(\\d+)" })
 public class HotpornfileOrg extends PluginForDecrypt {
     public HotpornfileOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,25 +56,34 @@ public class HotpornfileOrg extends PluginForDecrypt {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
-    private final String PROPERTY_recaptcha_response = "recaptcha_response";
-    private final String PROPERTY_cid                = "cid";
+    private final String PROPERTY_captcha_response = "captcha_response";
+    private final String PROPERTY_cid              = "cid";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
-        br.getPage(parameter);
-        String fpName = br.getRegex("(?i)<title>\\s*(.*?)\\s*(\\s*-\\s*Hotpornfile\\s*)?</title>").getMatch(0);
-        if (fpName == null) {
-            fpName = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
-        }
-        final String postID = new Regex(parameter, this.getSupportedLinks()).getMatch(1);
+        final String contenturl = param.getCryptedUrl();
+        final Regex urlinfo = new Regex(contenturl, this.getSupportedLinks());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String lastRecaptchaV2Response = this.getPluginConfig().getStringProperty(PROPERTY_recaptcha_response);
-        boolean allowReUseLastReCaptchaV2Response = true;
-        boolean hasEverReUsedFreshReCaptchaV2Token = false;
-        String freshReCaptchaV2Response = null;
+        String title = br.getRegex("<title>\\s*(.*?)\\s*(\\s*-\\s*Hotpornfile\\s*)?</title>").getMatch(0);
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            /* Fix title */
+            title = title.replace(" - Rapidgator and ddownload.com download / stream", "");
+        } else {
+            logger.info("Failed to find title -> Obtaining title from url");
+            title = urlinfo.getMatch(0);
+            /* Fix title */
+            title = Encoding.htmlDecode(title);
+            title = title.replace("-", " ").trim();
+        }
+        final String postID = urlinfo.getMatch(1);
+        final String lastCaptchaResponse = this.getPluginConfig().getStringProperty(PROPERTY_captcha_response);
+        boolean allowReUseLastCaptchaResponse = true;
+        boolean hasEverReUsedFreshCaptchaToken = false;
+        String freshCaptchaResponse = null;
         int attempt = 0;
         Map<String, Object> entries = null;
         String lastNext = null;
@@ -83,26 +92,34 @@ public class HotpornfileOrg extends PluginForDecrypt {
         String cid = this.getPluginConfig().getStringProperty(PROPERTY_cid);
         do {
             attempt++;
-            final String recaptchaV2Response;
-            if (lastRecaptchaV2Response != null && allowReUseLastReCaptchaV2Response) {
-                logger.info("Trying to re-use last reCaptchaV2Response: " + lastRecaptchaV2Response);
-                br.setCookie(this.getHost(), "cPass", lastRecaptchaV2Response);
-                recaptchaV2Response = lastRecaptchaV2Response;
-            } else if (freshReCaptchaV2Response != null) {
+            final String captchaResponse;
+            if (lastCaptchaResponse != null && allowReUseLastCaptchaResponse) {
+                logger.info("Trying to re-use last captchaResponse: " + lastCaptchaResponse);
+                br.setCookie(br.getHost(), "cPass", lastCaptchaResponse);
+                captchaResponse = lastCaptchaResponse;
+            } else if (freshCaptchaResponse != null) {
                 /* E.g. first attempt: cid is null -> Obtain freshReCaptchaV2Response -> Fresh cid is needed -> Try again with same */
-                if (hasEverReUsedFreshReCaptchaV2Token) {
+                if (hasEverReUsedFreshCaptchaToken) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                logger.info("Trying to re-use freshReCaptchaV2Response created in this session reCaptchaV2Response: " + freshReCaptchaV2Response);
-                recaptchaV2Response = freshReCaptchaV2Response;
-                hasEverReUsedFreshReCaptchaV2Token = true;
+                logger.info("Trying to re-use freshReCaptchaV2Response created in this session reCaptchaV2Response: " + freshCaptchaResponse);
+                captchaResponse = freshCaptchaResponse;
+                hasEverReUsedFreshCaptchaToken = true;
             } else {
-                br.getPage(parameter);
-                recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, "6Lf1jhYUAAAAAN8kNxOBBEUu3qBPcy4UNu4roO5K").getToken();
-                freshReCaptchaV2Response = recaptchaV2Response;
+                br.getPage(contenturl);
+                // captchaResponse = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br,
+                // "6Lf1jhYUAAAAAN8kNxOBBEUu3qBPcy4UNu4roO5K").getToken();
+                /**
+                 * 2026-05-07: They switched from reCaptcha to Turnstile <br>
+                 * Key see: https://www.hotpornfile.org/wp-content/cache/autoptimize/js/autoptimize_6a35a81dab693b5a2076c316a89d12ff.js
+                 */
+                captchaResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, "0x4AAAAAACGxJ80GkzeneMgr").getToken();
+                freshCaptchaResponse = captchaResponse;
             }
             final UrlQuery query = new UrlQuery();
-            query.add("action", "get_links");
+            /* 2026-05-07: value was changed from "get_links" to "unlock_links" */
+            query.add("action", "unlock_links");
+            query.add("type", "download");
             query.add("postId", postID);
             if (cid == null) {
                 /* E.g. first request */
@@ -111,7 +128,7 @@ public class HotpornfileOrg extends PluginForDecrypt {
                 query.add("cid", cid);
                 query.add("fb", "true");
             }
-            query.add("challenge", Encoding.urlEncode(recaptchaV2Response));
+            query.appendEncoded("challenge", captchaResponse);
             /*
              * Fallback value for when challenge fails. Website is also using this but only when a certain amount of time has passed (45
              * seconds in last test).
@@ -124,9 +141,16 @@ public class HotpornfileOrg extends PluginForDecrypt {
             final Object error = entries.get("error");
             links_text = (String) entries.get("links");
             if ("links".equalsIgnoreCase(next) && links_text != null) {
+                // old
                 logger.info("Stopping because: next=links and links not empty. error=" + error);
                 break;
-            } else if (attempt > 10) {
+            } else if ("completed".equalsIgnoreCase(next)) {
+                /* 2026-05-07: New */
+                links_text = entries.get("result").toString();
+                logger.info("Stopping because: next=completed");
+                break;
+            }
+            if (attempt > 10) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             } else if ("ash".equalsIgnoreCase(next)) {
                 /* [New] cid value is needed. */
@@ -141,7 +165,7 @@ public class HotpornfileOrg extends PluginForDecrypt {
             } else if ("challenge".equalsIgnoreCase(next)) {
                 /* Fresh captcha needs to be solved. */
                 logger.info("Continue because: lastNext=" + lastNext + "|next=challenge");
-                allowReUseLastReCaptchaV2Response = false;
+                allowReUseLastCaptchaResponse = false;
                 continue;
             } else if (Boolean.FALSE.equals(error)) {
                 logger.info("Stopping because error == FALSE | lastNext=" + lastNext + "|next=" + next + "|error=" + error + "|attempt=" + attempt);
@@ -161,15 +185,15 @@ public class HotpornfileOrg extends PluginForDecrypt {
         for (final String singleLink : links) {
             ret.add(createDownloadlink(singleLink));
         }
-        if (fpName != null) {
+        if (title != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName).trim());
+            fp.setName(title);
             fp.addLinks(ret);
         }
-        if (ret.size() > 0 && freshReCaptchaV2Response != null) {
+        if (ret.size() > 0 && freshCaptchaResponse != null) {
             /* Save reCaptchaV2 response and cid as we might be able to use it multiple times! */
-            logger.info("Saving reCaptchaV2Response for next time: " + freshReCaptchaV2Response);
-            this.getPluginConfig().setProperty(PROPERTY_recaptcha_response, freshReCaptchaV2Response);
+            logger.info("Saving reCaptchaV2Response for next time: " + freshCaptchaResponse);
+            this.getPluginConfig().setProperty(PROPERTY_captcha_response, freshCaptchaResponse);
             this.getPluginConfig().setProperty(PROPERTY_cid, cid);
         }
         return ret;

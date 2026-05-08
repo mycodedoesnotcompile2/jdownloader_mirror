@@ -3437,7 +3437,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     // <title>Fortinet Secure DNS Service Portal</title>
                     // <h2>Web Page Blocked!</h2>
                     // You have tried to access a web page which belongs to a category that is blocked.
-                    if (request.containsHTML("<title>\\s*Fortinet Secure DNS Service Portal\\s*</title>") && request.containsHTML(">\\s*Web Page Blocked!\\s*<")) {
+                    if (request.containsHTML("<title>\\s*Fortinet Secure DNS Service Portal\\s*</title>") && request.containsHTML(">\\s*Web Page Blocked!?\\s*<")) {
                         return this;
                     }
                 }
@@ -3447,6 +3447,44 @@ public class Browser implements HTTPConnectionFactoryInterface {
             @Override
             public BlockLevelType getBlockLevelType() {
                 return BlockLevelType.DNS;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
+        FORTINET_WEB_FILTER {
+            @Override
+            public String getLabel() {
+                return "DNS blocked by Fortinet Intrusion Prevention";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else if (con.getResponseCode() == 403) {
+                    // <title>Web Filter Violation</title>
+                    // <h1>FortiGuard Intrusion Prevention - Access Blocked</h1>
+                    // <h3>Web Page Blocked</h3>
+                    // <p>You have tried to access a web page that is in violation of your Internet usage policy.</p>
+                    if (request.containsHTML("<title>\\s*Web Filter Violation\\s*</title>") && request.containsHTML(">\\s*Web Page Blocked!?\\s*<")) {
+                        return this;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
             }
 
             @Override

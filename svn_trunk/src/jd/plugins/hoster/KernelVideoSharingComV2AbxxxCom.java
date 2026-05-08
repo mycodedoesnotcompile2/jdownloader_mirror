@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2AbxxxCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2AbxxxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -56,5 +56,10 @@ public class KernelVideoSharingComV2AbxxxCom extends KernelVideoSharingComV2 {
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideoPattern(host, fuid, urlTitle);
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.VIDEO_FUID_SLUG;
     }
 }

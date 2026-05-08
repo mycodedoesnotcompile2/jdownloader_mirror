@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49465 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingLove4pornCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingLove4pornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,7 @@ public class KernelVideoSharingLove4pornCom extends KernelVideoSharingComV2 {
             return true;
         }
         /* Looks to be online -> Check deeper */
-        final String fuid = this.getFUIDFromURL(br.getURL());
+        final String fuid = this.getFUID(br.getURL());
         if (fuid != null && !br.containsHTML("/embed/" + fuid)) {
             /* 2024-07-30 */
             /**

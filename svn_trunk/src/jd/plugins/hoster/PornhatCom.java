@@ -24,7 +24,7 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLSearch;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49475 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornhatCom extends KernelVideoSharingComV2 {
     public PornhatCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class PornhatCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         }

@@ -4,9 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -18,7 +15,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49016 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52783 $", interfaceVersion = 3, names = {}, urls = {})
 public class GermanTVChannelMediathek extends PluginForDecrypt {
     public GermanTVChannelMediathek(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public class GermanTVChannelMediathek extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             // final String annotationName = domains[0];
-            ret.add("https?://(?:[a-z0-9]+\\.)?" + buildHostsPatternPart(domains) + "/mediathek/video/[^/]*(-\\d{2}-\\d{2}-\\d{4}|-\\d+|$|/)");
+            ret.add("https?://(?:[a-z0-9]+\\.)?" + buildHostsPatternPart(domains) + "/mediathek/video/([^/]*-\\d{2}-\\d{2}-\\d{4}|[^/]*-\\d+|[^/]+$|[^/]+/)");
         }
         return ret.toArray(new String[0]);
     }

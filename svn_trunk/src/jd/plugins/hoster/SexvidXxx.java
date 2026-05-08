@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48381 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexvidXxx extends KernelVideoSharingComV2 {
     public SexvidXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +58,7 @@ public class SexvidXxx extends KernelVideoSharingComV2 {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
             /* Special: Also allow e.g. de.sexvid.xxx */
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9\\-]+\\.html|embed/\\d+/?)");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9\\-]+)\\.html");
         }
         return ret.toArray(new String[0]);
     }

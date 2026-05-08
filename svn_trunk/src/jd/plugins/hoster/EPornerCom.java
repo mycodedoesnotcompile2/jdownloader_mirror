@@ -58,7 +58,7 @@ import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideo
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52748 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52783 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -533,8 +533,12 @@ public class EPornerCom extends PluginForHost {
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
         final String storedDirecturl = link.getStringProperty(PROPERTY_DIRECTURL);
-        String directurl = null;
+        final String directurl;
         if (storedDirecturl != null) {
+            if (account != null) {
+                // required for higher quality downloads
+                this.login(account, false);
+            }
             directurl = storedDirecturl;
         } else {
             requestFileInformation(link, account, true);

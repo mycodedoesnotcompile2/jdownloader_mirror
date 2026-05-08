@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
+@HostPlugin(revision = "$Revision: 52785 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
 public class ScribdCom extends PluginForHost {
     private final String        formats       = "formats";
     /** The list of server values displayed to the user */
@@ -239,7 +239,7 @@ public class ScribdCom extends PluginForHost {
             brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
             brc.getPage("/account-settings/payment-transactions");
             try {
-                Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.toString());
+                Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Object> ressourcelist = (List<Object>) entries.get("payment_transactions");
                 for (final Object transactionO : ressourcelist) {
                     entries = (Map<String, Object>) transactionO;
@@ -301,7 +301,6 @@ public class ScribdCom extends PluginForHost {
             ai.setValidUntil(expireTimestamp, br);
         } else {
             account.setType(AccountType.FREE);
-            accountStatus = "Registered (Free) account";
         }
         ai.setStatus(accountStatus);
         ai.setUnlimitedTraffic();
@@ -461,7 +460,6 @@ public class ScribdCom extends PluginForHost {
                     return;
                 } else {
                     logger.info("Cookie login failed");
-                    br.clearCookies(null);
                     if (userCookies != null) {
                         /* Dead end */
                         logger.info("User Cookie login failed");
@@ -471,6 +469,7 @@ public class ScribdCom extends PluginForHost {
                             throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                         }
                     }
+                    br.clearCookies(null);
                 }
             }
             br.getPage("https://www." + this.getHost() + "/login");
@@ -529,6 +528,8 @@ public class ScribdCom extends PluginForHost {
 
     private boolean isLoggedIN(final Browser br) {
         if (br.containsHTML("/logout")) {
+            return true;
+        } else if (br.containsHTML("isLoggedIn\":true")) {
             return true;
         } else {
             return false;

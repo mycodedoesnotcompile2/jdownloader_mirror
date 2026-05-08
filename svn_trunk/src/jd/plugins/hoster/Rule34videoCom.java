@@ -32,7 +32,7 @@ import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigRule34videoCom;
 
-@HostPlugin(revision = "$Revision: 51622 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -110,7 +110,7 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
         if (uploaddate != null) {
             link.setProperty(PROPERTY_DATE, uploaddate);
         }
-        final String fuid = getFUIDFromURL(link.getPluginPatternMatcher());
+        final String fuid = getFUID(link.getPluginPatternMatcher());
         if (fuid != null && !link.hasProperty(PROPERTY_FUID)) {
             link.setProperty(PROPERTY_FUID, fuid);
         }

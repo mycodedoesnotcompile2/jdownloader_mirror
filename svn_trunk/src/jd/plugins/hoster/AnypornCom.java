@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnypornCom extends KernelVideoSharingComV2 {
     public AnypornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -71,5 +71,10 @@ public class AnypornCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean useEmbedWorkaround() {
         return false;
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.FUID_ONLY;
     }
 }

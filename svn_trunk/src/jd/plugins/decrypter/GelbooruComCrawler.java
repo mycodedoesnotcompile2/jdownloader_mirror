@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.GelbooruComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -35,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.GelbooruCom;
 
-@DecrypterPlugin(revision = "$Revision: 51811 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
+@DecrypterPlugin(revision = "$Revision: 52785 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
 public class GelbooruComCrawler extends PluginForDecrypt {
     public GelbooruComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +89,7 @@ public class GelbooruComCrawler extends PluginForDecrypt {
         if (singleResultOnFirstPage != null) {
             singleResultOnFirstPage = br.getURL(singleResultOnFirstPage).toExternalForm();
         }
-        do {
+        pagination: do {
             int numberofNewItemsOnThisPage = 0;
             String[] contentIDs = br.getRegex("id=\"(?:s|p)(\\d+)\"").getColumn(0);
             if (contentIDs == null || contentIDs.length == 0) {
@@ -127,27 +129,36 @@ public class GelbooruComCrawler extends PluginForDecrypt {
                 offset++;
             }
             logger.info("Crawled page " + pageCounter + " | Found items on this page: " + numberofNewItemsOnThisPage + " | Total: " + ret.size());
-            pageCounter++;
             if (br.containsHTML(">\\s*Unable to go this deep in pagination")) {
                 logger.info("Stopping because: Account required to continue pagination");
-                break;
+                break pagination;
             } else if (numberofNewItemsOnThisPage == 0) {
                 /* Fail-safe */
                 logger.info("Stoping because: Failed to find any items on current page");
-                break;
+                break pagination;
             } else if (entries_per_page_current < max_entries_per_page) {
                 logger.info("Stopping because: Reached end");
-                break;
-            } else {
-                this.br.getPage(url_part + "&pid=" + offset);
-                if (br.containsHTML("You are viewing an advertisement")) {
-                    logger.info("Skipping ad " + number_of_adPagesSkipped);
-                    br.getPage(url_part + "&pid=" + offset);
-                    number_of_adPagesSkipped++;
-                }
+                break pagination;
+            }
+            /* Continue to next page */
+            pageCounter++;
+            final int waitSeconds = PluginJsonConfig.get(this.getConfigInterface()).getPaginationWaitSeconds();
+            if (waitSeconds > 0) {
+                this.sleep(waitSeconds * 1000l, param);
+            }
+            br.getPage(url_part + "&pid=" + offset);
+            if (br.containsHTML("You are viewing an advertisement")) {
+                logger.info("Skipping ad " + number_of_adPagesSkipped);
+                br.getPage(url_part + "&pid=" + offset);
+                number_of_adPagesSkipped++;
             }
         } while (!this.isAbort());
         return ret;
+    }
+
+    @Override
+    public Class<? extends GelbooruComConfig> getConfigInterface() {
+        return GelbooruComConfig.class;
     }
 
     @Override

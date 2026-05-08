@@ -2,8 +2,10 @@ package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -16,6 +18,10 @@ public interface GelbooruComConfig extends PluginConfigInterface {
     public static class TRANSLATION {
         public String getPreferredFilenameScheme_label() {
             return "Preferred filename scheme";
+        }
+
+        public String getPaginationWaitSeconds_label() {
+            return "Crawler: Wait time between pagination requests in seconds";
         }
     }
 
@@ -49,4 +55,12 @@ public interface GelbooruComConfig extends PluginConfigInterface {
     FilenameScheme getPreferredFilenameScheme();
 
     void setPreferredFilenameScheme(final FilenameScheme scheme);
+
+    @AboutConfig
+    @SpinnerValidator(min = 1, max = 30, step = 1)
+    @DefaultIntValue(1)
+    @Order(20)
+    int getPaginationWaitSeconds();
+
+    void setPaginationWaitSeconds(int seconds);
 }

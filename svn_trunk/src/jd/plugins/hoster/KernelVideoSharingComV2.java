@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52781 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,53 +109,162 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
         }
     }
-
     /* DEV NOTES */
     /* Porn_plugin */
-    // Version 2.0
     // other: URL to a live demo: http://www.kvs-demo.com/
-    /***
-     * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPattern(List)} AND
-     * {@link #buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(List)} (excluding "embed" URLs). </br>
-     * Examples: example.com/videos/1234/title/ </br>
-     * example.com/videos/1234-title.html </br>
-     * example.com/videos/
-     */
-    private static final Pattern   type_normal                    = Pattern.compile("^https?://[^/]+/(?:[a-z]{2}/)?(?:videos?/)?(\\d+)(?:/|-)([^/\\?#]+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE);
+
+    public enum KVSUrlType {
+        EMBED(Pattern.compile("/embed/(\\d+)/?", Pattern.CASE_INSENSITIVE), true),
+        VIDEOS_FUID_SLUG(Pattern.compile("/(?:[a-z]{2}/)?videos?/(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
+        VIDEO_FUID_SLUG(Pattern.compile("/(?:[a-z]{2}/)?video/(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
+        VIDEOS_SLUG_FUID_AT_END(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)-(\\d+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE), true),
+        VIDEOS_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
+        FUID_SLUG_NO_VIDEOS(Pattern.compile("/(?:[a-z]{2}/)?(\\d+)/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), true),
+        FUID_ONLY(Pattern.compile("/(\\d+)/?$", Pattern.CASE_INSENSITIVE), true),
+        SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
+        SLUG_NO_FUID_HTML(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)\\.html$", Pattern.CASE_INSENSITIVE), false);
+
+        private final Pattern pattern;
+        private final boolean hasFUID;
+
+        KVSUrlType(final Pattern pattern, final boolean hasFUID) {
+            this.pattern = pattern;
+            this.hasFUID = hasFUID;
+        }
+
+        public Pattern getPattern() {
+            return pattern;
+        }
+
+        public boolean hasFUID() {
+            return hasFUID;
+        }
+
+        public boolean matches(final String url) {
+            if (url == null) {
+                return false;
+            }
+            return new Regex(url, pattern).patternFind();
+        }
+
+        public String getFUID(final String url) {
+            if (url == null) {
+                return null;
+            } else if (!hasFUID) {
+                return null;
+            }
+            switch (this) {
+            case EMBED:
+            case FUID_ONLY:
+            case VIDEOS_FUID_SLUG:
+            case VIDEO_FUID_SLUG:
+            case FUID_SLUG_NO_VIDEOS:
+                return new Regex(url, pattern).getMatch(0);
+            case VIDEOS_SLUG_FUID_AT_END:
+                return new Regex(url, pattern).getMatch(1);
+            default:
+                return null;
+            }
+        }
+
+        public String getSlug(final String url) {
+            if (url == null) {
+                return null;
+            }
+            switch (this) {
+            case VIDEOS_FUID_SLUG:
+            case VIDEO_FUID_SLUG:
+            case FUID_SLUG_NO_VIDEOS:
+                return new Regex(url, pattern).getMatch(1);
+            case VIDEOS_SLUG_FUID_AT_END:
+            case VIDEOS_SLUG_NO_FUID:
+            case SLUG_NO_FUID:
+            case SLUG_NO_FUID_HTML:
+                return new Regex(url, pattern).getMatch(0);
+            default:
+                return null;
+            }
+        }
+    }
+
+    protected String generateContentURLFromEmbedURLVideoID(final DownloadLink link) {
+        final String url = link.getPluginPatternMatcher();
+        final KVSUrlType urlType = this.getExpectedURLType();
+        if (urlType == null) {
+            return this.generateContentURL(this.getWorkingDomain(link), this.getFUID(link), this.getURLTitle(url));
+        }
+        if (!urlType.hasFUID()) {
+            return null;
+        }
+        final String host = this.getWorkingDomain(link);
+        final String fuid = this.getFUID(link);
+        final String urlSlug = urlType.getSlug(url);
+        switch (urlType) {
+        case VIDEOS_FUID_SLUG:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/videos/" + fuid + "/" + (urlSlug != null ? urlSlug : "dummystring") + "/";
+        case VIDEO_FUID_SLUG:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/video/" + fuid + "/" + (urlSlug != null ? urlSlug : "dummystring") + "/";
+        case VIDEOS_SLUG_FUID_AT_END:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/videos/" + (urlSlug != null ? urlSlug : "dummystring") + "-" + fuid;
+        case VIDEOS_SLUG_NO_FUID:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/videos/" + (urlSlug != null ? urlSlug : "dummystring") + "/";
+        case FUID_SLUG_NO_VIDEOS:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/" + fuid + "/" + (urlSlug != null ? urlSlug : "dummystring") + "/";
+        case FUID_ONLY:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/" + fuid + "/";
+        case SLUG_NO_FUID:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/" + (urlSlug != null ? urlSlug : "dummystring") + "/";
+        case SLUG_NO_FUID_HTML:
+            return this.getProtocol() + appendWWWIfRequired(host) + "/" + (urlSlug != null ? urlSlug : "dummystring") + ".html";
+        default:
+            return null;
+        }
+    }
+
+    protected static final String PROPERTY_FUID             = "fuid";
+    protected static final String PROPERTY_USERNAME         = "user";
+    protected static final String PROPERTY_USERID           = "userid";
+    protected static final String PROPERTY_CHANNELNAME      = "channel";
+    protected static final String PROPERTY_CHANNELID        = "channelid";
+    protected static final String PROPERTY_TITLE            = "title";
+    protected static final String PROPERTY_DATE             = "date";
+    protected static final String PROPERTY_IS_PRIVATE_VIDEO = "privatevideo";
+    protected static final String PROPERTY_CHOSEN_QUALITY   = "chosen_quality";
+    protected static final String PROPERTY_DIRECTURL        = "directurl";
+    private static final String   extDefault                = ".mp4";
+    private String                dllink                    = null;
+    public static final String    FIXNAME                   = "fixName";
+
     /**
-     * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(List)} (excluding
-     * "embed" URLs). </br>
-     * You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return true when using such a pattern! </br>
-     * TODO: Consider removing support for this from this main class.
+     * Returns expected URL type of this plugin. <br>
+     * If this is null, embed fallback handling will fail. </br>
+     * This is to help with an edge case so it is okay to only override this if necessary.
      */
-    private static final Pattern   type_normal_videos_fuid_at_end = Pattern.compile("/(?:[a-z]{2}/)?videos?/([^/\\?#]+)-(\\d+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE);
-    /***
-     * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPatternWithoutFileID(List)} and
-     * {@link #buildAnnotationUrlsDefaultVideosPatternWithoutFileIDWithHTMLEnding(List)} (excluding "embed" URLs). </br>
-     * You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return false when using such a pattern!
-     */
-    private static final Pattern   type_normal_without_fuid       = Pattern.compile("^https?://[^/]+/(?:videos?/)?([^/\\?#]*?)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern   type_fuid_with_videos          = Pattern.compile("/(?:[a-z]{2}/)?videos?/(\\d+)(?:/([\\w\\-]+)/?)?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern   type_fuid_without_videos       = Pattern.compile("/(?:[a-z]{2}/)?(\\d+)(?:/([\\w\\-]+)/?)?", Pattern.CASE_INSENSITIVE);
-    /**
-     * Matches for Strings that match patterns returned by {@link #buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(List)} (excluding
-     * "embed" URLs).
-     */
-    protected static final Pattern pattern_only_numbers           = Pattern.compile("/(\\d+)/?$", Pattern.CASE_INSENSITIVE);
-    protected static final Pattern pattern_embedded               = Pattern.compile("/embed/(\\d+)/?", Pattern.CASE_INSENSITIVE);
-    protected static final String  PROPERTY_FUID                  = "fuid";
-    protected static final String  PROPERTY_USERNAME              = "user";
-    protected static final String  PROPERTY_USERID                = "userid";
-    protected static final String  PROPERTY_CHANNELNAME           = "channel";
-    protected static final String  PROPERTY_CHANNELID             = "channelid";
-    protected static final String  PROPERTY_TITLE                 = "title";
-    protected static final String  PROPERTY_DATE                  = "date";
-    protected static final String  PROPERTY_IS_PRIVATE_VIDEO      = "privatevideo";
-    protected static final String  PROPERTY_CHOSEN_QUALITY        = "chosen_quality";
-    protected static final String  PROPERTY_DIRECTURL             = "directurl";
-    private static final String    extDefault                     = ".mp4";
-    private String                 dllink                         = null;
-    public static final String     FIXNAME                        = "fixName";
+    protected KVSUrlType getExpectedURLType() {
+        return null;
+    }
+
+    private static String buildPathPattern(final KVSUrlType... types) {
+        final StringBuilder sb = new StringBuilder("(?:");
+        for (int i = 0; i < types.length; i++) {
+            if (i > 0) {
+                sb.append("|");
+            }
+            sb.append(types[i].getPattern().pattern());
+        }
+        sb.append(")");
+        return sb.toString();
+    }
+
+    /** Accepts all URL patterns defined by {@link KVSUrlType}. */
+    public static String[] buildAnnotationUrlsAll(final List<String[]> pluginDomains) {
+        final String pathPattern = buildPathPattern(KVSUrlType.values());
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + pathPattern);
+        }
+        return ret.toArray(new String[0]);
+    }
 
     /**
      * Use this e.g. for: </br>
@@ -167,9 +276,10 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
      * {@link #KernelVideoSharingComV2HostsDefault}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPattern(final List<String[]> pluginDomains) {
+        final String pathPattern = buildPathPattern(KVSUrlType.EMBED, KVSUrlType.VIDEOS_FUID_SLUG, KVSUrlType.VIDEO_FUID_SLUG, KVSUrlType.VIDEOS_SLUG_NO_FUID);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/((?:[a-z]{2}/)?videos?/(?:\\d+/)?[^/\\?#]+/?|embed/\\d+/?)");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }
@@ -281,14 +391,10 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
      * More example hosts in generic class: {@link #KernelVideoSharingComV2HostsDefault2}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(final List<String[]> pluginDomains) {
+        final String pathPattern = buildPathPattern(KVSUrlType.EMBED, KVSUrlType.FUID_SLUG_NO_VIDEOS);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            /**
-             * 2026-04-14: So far this regex isn't used by many websites <br>
-             * With "/video": alotporn.com Without "/video": camvideos.tv <br>
-             * Both alotporn.com and camvideos.tv allow both url-formats (with- and without "/video").
-             */
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:/[a-z]{2})?(?:/video)?/(\\d+/[^/\\?#]+/?|embed/\\d+/?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }
@@ -306,13 +412,13 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
      * OR:</br>
      * example.com/embed/1234 </br>
      * Example: <a href="https://alphaporno.com/">alphaporno.com</a> </br>
-     * Special: You need to override {@link #hasFUIDInsideURLAtTheEnd(String)} to return false when using this pattern! </br>
      * More example hosts in generic class: {@link #KernelVideoSharingComV2HostsDefault3}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternWithoutFileID(final List<String[]> pluginDomains) {
+        final String pathPattern = buildPathPattern(KVSUrlType.EMBED, KVSUrlType.VIDEOS_SLUG_NO_FUID);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:[a-z]{2}/)?(videos?/[^/\\?#]+/?|embed/\\d+/?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }
@@ -333,28 +439,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
 
     /**
      * Use this e.g. for:</br>
-     * example.com/videos/title-inside-url-1234 OR:</br>
-     * example.com/embed/1234 </br>
-     * Example: <a href="https://uiporn.com/">uiporn.com</a> </br>
-     * Example classses: {@link #UipornCom}, {@link #PorngemCom}
-     */
-    public static String[] buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(final List<String[]> pluginDomains) {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(videos?/[^/\\?#]+-\\d+/|embed/\\d+/?)");
-        }
-        return ret.toArray(new String[0]);
-    }
-
-    protected String generateContentURLDefaultVideosPatternWithFUIDAtEnd(final String host, final String fuid, final String urlSlug) {
-        if (host == null || fuid == null || urlSlug == null) {
-            return null;
-        }
-        return this.getProtocol() + appendWWWIfRequired(host) + "/videos/" + urlSlug + "-" + fuid;
-    }
-
-    /**
-     * Use this e.g. for:</br>
      * example.com/title-inside-url OR:</br>
      * example.com/embed/1234 </br>
      * Example: <a href="https://yogaporn.net/">yogaporn.net</a> </br>
@@ -362,26 +446,27 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
      * Very rarely used pattern!
      */
     public static String[] buildAnnotationUrlsDefaultNoVideosNoFUID(final List<String[]> pluginDomains) {
+        final String pathPattern = buildPathPattern(KVSUrlType.EMBED, KVSUrlType.SLUG_NO_FUID);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(embed/\\d+/?|[^/\\?#]+/?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }
 
+    /** Does not remove "www." if already present! */
     protected String appendWWWIfRequired(final String host) {
         if (!isRequiresWWW() || StringUtils.startsWithCaseInsensitive(host, "www.")) {
             // do not modify host
             return host;
+        }
+        final String hostTld = Browser.getHost(host, false);
+        if (!StringUtils.equalsIgnoreCase(host, hostTld)) {
+            // keep subdomain
+            return host;
         } else {
-            final String hostTld = Browser.getHost(host, false);
-            if (!StringUtils.equalsIgnoreCase(host, hostTld)) {
-                // keep subdomain
-                return host;
-            } else {
-                // add www.
-                return "www." + host;
-            }
+            // add www.
+            return "www." + host;
         }
     }
 
@@ -408,9 +493,10 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
      * Example class: {@link #AnypornCom}
      */
     public static String[] buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(final List<String[]> pluginDomains) {
+        final String pathPattern = buildPathPattern(KVSUrlType.EMBED, KVSUrlType.FUID_ONLY);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:embed/)?\\d+/?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }
@@ -423,21 +509,14 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Override this if URLs can end with digits but these are not your FUID! </br>
-     * E.g. override this when adding host plugins with patterns that match {@link #type_normal_videos_fuid_at_end} . </br>
-     * Example: example.com/url-title.html</br>
-     * Override {@link #type_normal_without_fuid} if the expected URLs do not contain any FUID at all (well, other than e.g. embed URLs - in
-     * this case, FUID will always get detected).
-     */
-    protected boolean hasFUIDInsideURLAtTheEnd(final String url) {
-        return false;
-    }
-
-    /**
      * Set this to false if URLs do not contain a FUID at all! </br>
      * Especially important for e.g.: example.com/1random-title/ or example.com/random-title-version10/ ('1' != FUID!)
      */
     protected boolean hasFUIDInsideURL(final String url) {
+        final KVSUrlType urlType = findURLType(url);
+        if (urlType != null) {
+            return urlType.hasFUID();
+        }
         return true;
     }
 
@@ -530,7 +609,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return getWorkingDomain(link.getPluginPatternMatcher());
     }
 
-    /** Returns working domain if domain in given URL is known to be a dead domain. */
+    /** Returns working domain if domain in given URL is known to be a dead domain, otherwise domain of given url. */
     protected String getWorkingDomain(final String url) {
         final String addedLinkDomain = Browser.getHost(url, true);
         final List<String> deadDomains = this.getDeadDomains();
@@ -547,7 +626,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Returns URL to content with a hopefully working domain. </br>
+     * Returns URL to content with an assummed-to-be-working domain. </br>
      */
     protected String getContentURL(final DownloadLink link) {
         final String domain = getWorkingDomain(link);
@@ -570,9 +649,22 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         }
     }
 
+    protected KVSUrlType findURLType(final String url) {
+        if (url == null) {
+            return null;
+        }
+        for (final KVSUrlType type : KVSUrlType.values()) {
+            if (type.matches(url)) {
+                return type;
+            }
+        }
+        return null;
+    }
+
     /**
      * Returns non-embed URL of this website e.g.: https://www.camwhoreshd.com/videos/1234567/blablub-blablub-slug/ </br>
      */
+    @Deprecated
     abstract String generateContentURL(final String host, final String fuid, final String urlSlug);
 
     @Override
@@ -647,10 +739,11 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         final String fuid = this.getFUID(link);
         final String contenturl = this.getContentURL(link);
         boolean useEmbedWorkaround = false;
-        if (this.useEmbedWorkaround() && isEmbedURL(contenturl)) {
+        final boolean isEmbedURL = isEmbedURL(contenturl);
+        if (this.useEmbedWorkaround() && isEmbedURL) {
             useEmbedWorkaround = true;
         } else {
-            embedHandling: if (isEmbedURL(contenturl)) {
+            embedHandling: if (isEmbedURL) {
                 /* Embed URL */
                 br.getPage(contenturl);
                 /* in case there is http<->https or url format redirect */
@@ -669,72 +762,35 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                  * typically stored in "video_alt_url" labeled as "720p" and html will also contain: "video_alt_url_redirect: '1'" (=
                  * "safe place") </br>
                  */
-                String realURL = null;
-                if (br.containsHTML("video_alt_url_redirect\\s*:\\s*'1'")) {
-                    /* Examples which would fail without this extra check: frprn.com */
-                    realURL = br.getRegex("video_alt_url\\s*:\\s*'(https?://[^<>\"\\']+)'").getMatch(0);
-                }
-                /*
-                 * Tries to find original URL based on different default patterns --> "Unsafe attempt". Examples: porngem.com, nudogram.com
-                 */
-                if (realURL == null) {
-                    /** {@link #buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(List) } */
-                    realURL = br.getRegex("(https?://[^/\"\\']+/videos?/[^/\\?#<>\"]+-" + fuid + ")").getMatch(0);
-                }
-                if (realURL == null) {
-                    /** {@link #buildAnnotationUrlsDefaultVideosPattern(List)} */
-                    realURL = br.getRegex("(https?://[^/\"\\']+/videos?/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
-                }
-                if (realURL == null) {
-                    /** {@link #buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(List)} */
-                    realURL = br.getRegex("(https?://[^/\"\\']+/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
-                }
-                if (realURL == null) {
-                    /** {@link #buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(List)} */
-                    realURL = br.getRegex("(https?://[^/\"\\']+/" + fuid + "/?)").getMatch(0);
-                }
+                String realURL = this.findRealVideoURLOnEmbedPage(br);
                 if (realURL == null) {
                     /* 2020-11-10: Experimental feature: This can fix "broken" embed URLs: https://svn.jdownloader.org/issues/89009 */
-                    final String embedTitle = regexEmbedTitleWebsite(br);
-                    if (!StringUtils.isEmpty(embedTitle)) {
-                        /*
-                         * "Convert" embed title to URL-title (slug). Unsafe attempt but this can make "embed" URLs downloadable that
-                         * wouldn't be downloadable otherwise.
-                         */
-                        String urlTitle = Encoding.htmlDecode(embedTitle).trim().toLowerCase();
-                        urlTitle = urlTitle.replaceAll("[^a-z0-9]", "-");
-                        /* Make sure that that string doesn't start- or end with "-". */
-                        urlTitle = new Regex(urlTitle, "^(\\-*)(.*?)(\\-*)$").getMatch(1);
-                        realURL = this.generateContentURL(this.getHost(), fuid, urlTitle);
-                        logger.info("Generated real URL corresponding to embed URL: " + realURL);
-                    } else {
-                        logger.info("Failed to find- and generate real URL corresponding to embed URL");
-                    }
+                    realURL = this.generateContentURLFromEmbedURLVideoID(link);
                 } else {
                     logger.info("Found real URL corresponding to embed URL: " + realURL);
                 }
-                if (!StringUtils.isEmpty(realURL)) {
-                    logger.info("Found real URL corresponding to embed URL: " + realURL);
-                    try {
-                        realURL = br.getURL(realURL).toExternalForm();
-                        final Browser brc = this.createNewBrowserInstance();
-                        brc.getPage(realURL);
-                        /* Fail-safe: Only set this URL as PluginPatternMatcher if it contains our expected videoID! */
-                        if ((!this.hasFUIDInsideURL(null) || (this.hasFUIDInsideURL(null) && brc.getURL().contains(fuid))) && new Regex(brc.getURL(), this.getSupportedLinks()).patternFind() && !this.isOfflineWebsite(brc)) {
-                            logger.info("Successfully found real URL: " + realURL);
-                            link.setPluginPatternMatcher(brc.getURL());
-                            br.setRequest(brc.getRequest());
-                        } else {
-                            /* This should never happen */
-                            logger.warning("Cannot trust 'real' URL: " + realURL);
-                        }
-                    } catch (final MalformedURLException ignore) {
-                        logger.log(ignore);
-                        logger.info("URL parsing failure");
-                    }
-                } else {
+                if (StringUtils.isEmpty(realURL)) {
                     logger.info("Unable to convert embedded URL --> Real URL");
                     checkYouAreNotAllowedToWatchThisVideo(br, link, account);
+                    break embedHandling;
+                }
+                logger.info("Found real URL corresponding to embed URL: " + realURL);
+                try {
+                    realURL = br.getURL(realURL).toExternalForm();
+                    final Browser brc = this.createNewBrowserInstance();
+                    brc.getPage(realURL);
+                    /* Fail-safe: Only set this URL as PluginPatternMatcher if it contains our expected videoID! */
+                    if ((!this.hasFUIDInsideURL(null) || brc.getURL().contains(fuid)) && this.canHandle(brc.getURL()) && !this.isOfflineWebsite(brc)) {
+                        logger.info("Successfully found real URL: " + realURL);
+                        link.setPluginPatternMatcher(brc.getURL());
+                        br.setRequest(brc.getRequest());
+                    } else {
+                        /* This should never happen */
+                        logger.warning("Cannot trust possible 'real' URL: " + realURL);
+                    }
+                } catch (final MalformedURLException ignore) {
+                    logger.log(ignore);
+                    logger.info("URL parsing failure");
                 }
             } else {
                 /* Normal URL */
@@ -775,7 +831,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         }
         if (useEmbedWorkaround) {
             /* Embed URL --> Build fake real URL and just go for it */
-            final String fakeContentURL = this.generateContentURL(this.getWorkingDomain(link), fuid, "dummystring");
+            final String fakeContentURL = this.generateContentURLFromEmbedURLVideoID(link);
             br.getPage(fakeContentURL);
             this.checkErrorsWebsite(br, link, account);
             logger.info("Embed workaround result: Presumed real ContentURL: " + br.getURL());
@@ -866,6 +922,66 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    protected String findRealVideoURLOnEmbedPage(final Browser br) {
+        final String fuid = this.getFUID(br.getURL());
+        if (br.containsHTML("video_alt_url_redirect\\s*:\\s*'1'")) {
+            /* Examples which would fail without this extra check: frprn.com */
+            final String realURL = br.getRegex("video_alt_url\\s*:\\s*'(https?://[^<>\"\\']+)'").getMatch(0);
+            if (realURL != null) {
+                return realURL;
+            }
+        }
+        /* Tries to find original URL based on different default patterns --> "Unsafe attempt". Examples: porngem.com, nudogram.com */
+        final KVSUrlType expectedType = this.getExpectedURLType();
+        if (fuid != null && expectedType != null && expectedType != KVSUrlType.EMBED && expectedType.hasFUID()) {
+            final String realURL;
+            switch (expectedType) {
+            case VIDEOS_FUID_SLUG:
+                realURL = br.getRegex("(https?://[^/\"\\']+/videos?/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
+                break;
+            case VIDEO_FUID_SLUG:
+                realURL = br.getRegex("(https?://[^/\"\\']+/video/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
+                break;
+            case VIDEOS_SLUG_FUID_AT_END:
+                realURL = br.getRegex("(https?://[^/\"\\']+/videos?/[^/\\?#<>\"]+-" + fuid + ")").getMatch(0);
+                break;
+            case FUID_SLUG_NO_VIDEOS:
+                realURL = br.getRegex("(https?://[^/\"\\']+/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
+                break;
+            case FUID_ONLY:
+                realURL = br.getRegex("(https?://[^/\"\\']+/" + fuid + "/?)").getMatch(0);
+                break;
+            default:
+                realURL = null;
+                break;
+            }
+            if (realURL != null) {
+                return realURL;
+            }
+        }
+        /* All further regexes require us to know the fuid. */
+        if (fuid == null) {
+            return null;
+        }
+        /** {@link #buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(List) } */
+        String realURL = br.getRegex("(https?://[^/\"\\']+/videos?/[^/\\?#<>\"]+-" + fuid + ")").getMatch(0);
+        if (realURL != null) {
+            return realURL;
+        }
+        /** {@link #buildAnnotationUrlsDefaultVideosPattern(List)} */
+        realURL = br.getRegex("(https?://[^/\"\\']+/videos?/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
+        if (realURL != null) {
+            return realURL;
+        }
+        /** {@link #buildAnnotationUrlsDefaultVideosPatternWithoutSlashVideos(List)} */
+        realURL = br.getRegex("(https?://[^/\"\\']+/" + fuid + "/[^/\\?#<>\"]+/?)").getMatch(0);
+        if (realURL != null) {
+            return realURL;
+        }
+        /** {@link #buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(List)} */
+        return br.getRegex("(https?://[^/\"\\']+/" + fuid + "/?)").getMatch(0);
+    }
+
     protected boolean youAreNotAllowedToWatchThisVideo(Browser br) {
         return br.containsHTML(">\\s*You are not allowed to watch this video") || br.containsHTML(">\\s*O Senhor nao tem acesso a este video") || br.containsHTML(">\\s*Sie haben keinen Zugang zu diesem Video") || br.containsHTML(">\\s*Vous ne disposez pas de l'accès à cette vidéo") || br.containsHTML(">\\s*Non hai l'accesso a questo file") || br.containsHTML(">\\s*No tiene acceso a este video") || br.containsHTML(">\\s*Вы не имеете доступа к этому видео") || br.containsHTML(">\\s*Bu videoya erişim izniniz yoktur") || br.containsHTML(">\\s*このビデオを見るために許可されていません") || br.containsHTML(">\\s*您没有获得该视频");
     }
@@ -881,7 +997,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     protected boolean isEmbedURL(final String url) {
         if (url == null) {
             return false;
-        } else if (new Regex(url, pattern_embedded).patternFind()) {
+        } else if (this.findURLType(url) == KVSUrlType.EMBED) {
             return true;
         } else {
             return false;
@@ -921,7 +1037,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             sleep(500, link);
             request = request.cloneRequest();
             br.getPage(request);
-            if (br.getHttpConnection().getResponseCode() == 403) {
+            if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }
@@ -1137,7 +1253,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         String titleFromHtml = null;
         final String url = link.getPluginPatternMatcher();
         /* For embed URLs the title might be in a different part of the html -> Check for this first */
-        if (new Regex(url, pattern_embedded).patternFind()) {
+        if (this.isEmbedURL(url)) {
             titleFromHtml = regexEmbedTitleWebsite(br);
         }
         if (StringUtils.isEmpty(titleFromHtml)) {
@@ -2190,33 +2306,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return m.toString();
     }
 
-    /** Removes unwanted stuff from url-title/slug. */
-    protected String removeUnwantedURLTitleStuff(String urltitle) {
-        if (urltitle == null) {
-            return null;
-        }
-        if (StringUtils.isEmpty(urltitle)) {
-            return null;
-        }
-        if (removeHashSegmentsFromURLTitles()) {
-            /* E.g. camhub.cc, pornado.xxx, camwhoreshd.com, */
-            final String removeMe = new Regex(urltitle, "(-[a-f0-9]{16}-?)$").getMatch(0);
-            if (removeMe != null) {
-                /* Special 2024-02-05 */
-                urltitle = urltitle.replace(removeMe, "");
-            }
-        }
-        /* Make the url-filenames look better by using spaces instead of '-'. */
-        urltitle = urltitle.replace("-", " ");
-        /* Remove eventually existing spaces at the end. */
-        urltitle = urltitle.trim();
-        return urltitle;
-    }
-
-    protected boolean removeHashSegmentsFromURLTitles() {
-        return true;
-    }
-
     /** Returns "better human readable" file-title from URL. */
     protected String getURLTitleCorrected(final String url) {
         String urltitle = getURLTitle(url);
@@ -2225,27 +2314,29 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     }
 
     /**
-     * Finds title inside given URL. <br />
+     * Finds title inside given URL. <br>
      */
     protected String getURLTitle(final String url) {
         if (url == null) {
             return null;
         }
-        String ret = new Regex(url, type_normal).getMatch(1);
-        if (ret == null && hasFUIDInsideURLAtTheEnd(url)) {
-            ret = new Regex(url, type_normal_videos_fuid_at_end).getMatch(0);
+        final KVSUrlType urlType = findURLType(url);
+        if (urlType == null) {
+            return null;
         }
+        String ret = urlType.getSlug(url);
         if (ret == null) {
-            ret = new Regex(url, type_normal_without_fuid).getMatch(0);
+            return null;
         }
-        if (ret != null && ret.contains("%")) {
+        if (ret.contains("%")) {
             ret = URLEncode.decodeURIComponent(ret);
         }
         return ret;
     }
 
     /**
-     * This is supposed to return a numeric ID. Rather return null than anything else here! </br>
+     * This is supposed to return a numeric ID representing the unique file_id of a video. <br>
+     * Rather return null than anything else here! </br>
      * Override {@link #hasFUIDInsideURL(String)} to return false if you know that your URLs do not contain a FUID for sure.
      */
     protected String getFUID(final DownloadLink link) {
@@ -2254,7 +2345,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (storedFuid != null) {
             return storedFuid;
         } else {
-            return this.getFUIDFromURL(link.getPluginPatternMatcher());
+            return this.getFUID(link.getPluginPatternMatcher());
         }
     }
 
@@ -2262,35 +2353,17 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
      * Tries to return unique contentID found inside URL. It is not guaranteed to return anything (depends on source URL/website) but it
      * should in most of all cases!
      */
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         }
-        String fuid = new Regex(url, pattern_embedded).getMatch(0);
-        if (fuid != null) {
-            return fuid;
-        }
-        fuid = new Regex(url, pattern_only_numbers).getMatch(0);
-        if (fuid != null) {
-            return fuid;
-        }
-        if (hasFUIDInsideURL(url) && hasFUIDInsideURLAtTheEnd(url)) {
-            fuid = new Regex(url, type_normal_videos_fuid_at_end).getMatch(1);
-            if (fuid != null) {
-                return fuid;
-            }
-        }
-        if (hasFUIDInsideURL(url)) {
-            fuid = new Regex(url, type_normal).getMatch(0);
+        for (final KVSUrlType type : KVSUrlType.values()) {
+            final String fuid = type.getFUID(url);
             if (fuid != null) {
                 return fuid;
             }
         }
         return null;
-    }
-
-    public <T extends PluginConfigInterface> T get(Class<T> configInterface) {
-        return PluginJsonConfig.get(getLazyP(), configInterface);
     }
 
     /**
@@ -2352,9 +2425,40 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return filename_normal;
     }
 
+    /** Removes unwanted stuff from url-title/slug. */
+    protected String removeUnwantedURLTitleStuff(String urltitle) {
+        if (urltitle == null) {
+            return null;
+        }
+        if (StringUtils.isEmpty(urltitle)) {
+            return null;
+        }
+        if (removeHashSegmentsFromURLTitles()) {
+            /* E.g. camhub.cc, pornado.xxx, camwhoreshd.com, */
+            final String removeMe = new Regex(urltitle, "(-[a-f0-9]{16}-?)$").getMatch(0);
+            if (removeMe != null) {
+                /* Special 2024-02-05 */
+                urltitle = urltitle.replace(removeMe, "");
+            }
+        }
+        /* Make the url-filenames look better by using spaces instead of '-'. */
+        urltitle = urltitle.replace("-", " ");
+        /* Remove eventually existing spaces at the end. */
+        urltitle = urltitle.trim();
+        return urltitle;
+    }
+
+    protected boolean removeHashSegmentsFromURLTitles() {
+        return true;
+    }
+
     @Override
     public Class<? extends KVSConfig> getConfigInterface() {
         return null;
+    }
+
+    public <T extends PluginConfigInterface> T get(Class<T> configInterface) {
+        return PluginJsonConfig.get(getLazyP(), configInterface);
     }
 
     @Override

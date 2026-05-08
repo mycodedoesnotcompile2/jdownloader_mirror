@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class VxxxCom extends KernelVideoSharingComV2 {
     public VxxxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +58,7 @@ public class VxxxCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         } else {

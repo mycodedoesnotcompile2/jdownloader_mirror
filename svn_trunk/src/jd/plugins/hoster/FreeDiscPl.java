@@ -67,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52669 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52785 $", interfaceVersion = 2, names = {}, urls = {})
 public class FreeDiscPl extends PluginForHost {
     public FreeDiscPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -315,6 +315,13 @@ public class FreeDiscPl extends PluginForHost {
         if (isBotBlocked(this.br)) {
             logger.info("Cannot do linkcheck due to antiBot captcha");
             return AvailableStatus.UNCHECKABLE;
+        }
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            /**
+             * 2026-05-07: GEO-block + VPN block <br>
+             * Legit polish IP needed or polish residential IP!
+             */
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Geo blocked");
         }
         final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /* TODO: Make use of field "current_file_description" */

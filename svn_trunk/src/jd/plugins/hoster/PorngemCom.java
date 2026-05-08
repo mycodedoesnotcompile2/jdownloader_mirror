@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorngemCom extends KernelVideoSharingComV2 {
     public PorngemCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,16 +45,16 @@ public class PorngemCom extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithFUIDAtEnd(getPluginDomains());
+        return KernelVideoSharingComV2.buildAnnotationUrlsAll(getPluginDomains());
     }
 
     @Override
-    protected boolean hasFUIDInsideURLAtTheEnd(final String url) {
-        return true;
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.VIDEOS_SLUG_FUID_AT_END;
     }
 
     @Override
-    protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
-        return generateContentURLDefaultVideosPatternWithFUIDAtEnd(host, fuid, urlSlug);
+    String generateContentURL(String host, String fuid, String urlSlug) {
+        return null;
     }
 }

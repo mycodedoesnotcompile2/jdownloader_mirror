@@ -24,7 +24,7 @@ import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class SunPornoCom extends KernelVideoSharingComV2 {
     public SunPornoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,7 @@ public class SunPornoCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         }
@@ -79,7 +79,7 @@ public class SunPornoCom extends KernelVideoSharingComV2 {
         if (fid != null) {
             return fid;
         }
-        return super.getFUIDFromURL(url);
+        return super.getFUID(url);
     }
 
     @Override
@@ -97,8 +97,8 @@ public class SunPornoCom extends KernelVideoSharingComV2 {
     protected String getContentURL(final DownloadLink link) {
         /**
          * Special override to be able to offer support for older types of URLs e.g.: <br>
-         * https://www.sunporno.com/videos/22128 <br>
-         * --> https://www.sunporno.com/v/22128/null -> https://www.sunporno.com/v/22128/pretty-felicia-kiss-fucked-in-the-car/
+         * /videos/22128 <br>
+         * --> /v/22128/null -> /v/22128/pretty-felicia-kiss-fucked-in-the-car/
          */
         final String fuid = this.getFUID(link);
         final String urlSlug = this.getURLTitle(link.getPluginPatternMatcher());

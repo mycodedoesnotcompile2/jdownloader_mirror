@@ -24,7 +24,7 @@ import jd.plugins.HostPlugin;
 
 import org.appwork.utils.Regex;
 
-@HostPlugin(revision = "$Revision: 51169 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class OkXxx extends KernelVideoSharingComV2 {
     public OkXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,12 +55,12 @@ public class OkXxx extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(String url) {
+    protected String getFUID(String url) {
         final String ret = new Regex(url, "/(?:video|embed)/(\\d+)").getMatch(0);
         if (ret != null) {
             return ret;
         }
-        return super.getFUIDFromURL(url);
+        return super.getFUID(url);
     }
 
     @Override

@@ -23,7 +23,7 @@ import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class XcafeCom extends KernelVideoSharingComV2 {
     public XcafeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -75,5 +75,10 @@ public class XcafeCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean useEmbedWorkaround() {
         return true;
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.FUID_ONLY;
     }
 }

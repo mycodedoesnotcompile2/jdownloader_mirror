@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52781 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
     public MulherespeladasvipCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -92,7 +92,7 @@ public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected String getFUIDFromURL(final String url) {
+    protected String getFUID(final String url) {
         if (url == null) {
             return null;
         }

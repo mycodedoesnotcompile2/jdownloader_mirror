@@ -19,10 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubewolfCom extends KernelVideoSharingComV2 {
     public TubewolfCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -79,5 +80,14 @@ public class TubewolfCom extends KernelVideoSharingComV2 {
             return null;
         }
         return this.getProtocol() + "www." + host + "/movies/" + urlSlug + "/";
+    }
+
+    @Override
+    protected String findRealVideoURLOnEmbedPage(final Browser br) {
+        final String url = br.getRegex("id=\"video-textblock\">\\s*<a href=\"(https?://[^/]+/movies/[a-z0-9\\-]+/?)").getMatch(0);
+        if (url != null) {
+            return url;
+        }
+        return super.findRealVideoURLOnEmbedPage(br);
     }
 }

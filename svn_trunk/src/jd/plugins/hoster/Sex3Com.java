@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class Sex3Com extends KernelVideoSharingComV2 {
     public Sex3Com(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,10 +54,9 @@ public class Sex3Com extends KernelVideoSharingComV2 {
         String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
         if (title != null) {
             return title;
-        } else {
-            /* Fallback to upper handling */
-            return super.regexNormalTitleWebsite(br);
         }
+        /* Fallback to upper handling */
+        return super.regexNormalTitleWebsite(br);
     }
 
     @Override
@@ -68,5 +67,10 @@ public class Sex3Com extends KernelVideoSharingComV2 {
     @Override
     protected boolean useEmbedWorkaround() {
         return true;
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.FUID_ONLY;
     }
 }

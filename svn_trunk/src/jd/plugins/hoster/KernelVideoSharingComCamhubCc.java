@@ -25,7 +25,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50749 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
     public KernelVideoSharingComCamhubCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,7 @@ public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
          * Example: /de/videos/738936/videotitle/
          */
         if (!isEmbedURL(br.getURL())) {
-            final String fid = this.getFUIDFromURL(br.getURL());
+            final String fid = this.getFUID(br.getURL());
             String continueLink = br.getRegex("(/([a-z0-9]{2}/)?embed/" + fid + ")").getMatch(0);
             if (continueLink != null) {
                 br.getPage(continueLink);
