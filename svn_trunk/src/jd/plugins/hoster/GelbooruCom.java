@@ -20,12 +20,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.GelbooruComConfig;
-import org.jdownloader.plugins.components.config.GelbooruComConfig.FilenameScheme;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -44,7 +38,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51053 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.GelbooruComConfig;
+import org.jdownloader.plugins.components.config.GelbooruComConfig.FilenameScheme;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52790 $", interfaceVersion = 3, names = {}, urls = {})
 public class GelbooruCom extends PluginForHost {
     public GelbooruCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -165,7 +164,7 @@ public class GelbooruCom extends PluginForHost {
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
         }
-        final GelbooruComConfig cfg = PluginJsonConfig.get(GelbooruComConfig.class);
+        final GelbooruComConfig cfg = get(GelbooruComConfig.class);
         final FilenameScheme scheme = cfg.getPreferredFilenameScheme();
         final String originalFilename = dllink != null ? getFileNameFromURL(new URL(dllink)) : null;
         String ext = extDefault;

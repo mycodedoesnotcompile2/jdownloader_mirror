@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,15 +38,22 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48321 $", interfaceVersion = 3, names = { "hentai2read.com" }, urls = { "https?://(?:www\\.)?hentai2read.com/[a-z0-9]+(-|_)[a-z0-9\\-_]+(/\\d+)?" })
+@DecrypterPlugin(revision = "$Revision: 52789 $", interfaceVersion = 3, names = { "hentai2read.com" }, urls = { "https?://(?:www\\.)?hentai2read.com/[a-z0-9]+(-|_)[a-z0-9\\-_]+(/\\d+)?" })
 public class Hentai2ReadCom extends PluginForDecrypt {
     public Hentai2ReadCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    private static final Pattern PATTERN_IGNORE = Pattern.compile("/(?:hentai-list|wp-content|hentai-search|tag-doujnshi)(?:/|$)", Pattern.CASE_INSENSITIVE);
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http:", "https:");
+        final String path = new URL(contenturl).getPath();
+        if (new Regex(path, PATTERN_IGNORE).patternFind()) {
+            logger.info("Ignoring invalid/unsupported url");
+            return new ArrayList<DownloadLink>();
+        }
         final Regex urlRegex = new Regex(contenturl, "(?i)https?://[^/]+/(?!latest)([a-z0-9\\-_]+)(/(\\d+))?$");
         if (!urlRegex.patternFind()) {
             /* Developer mistake */

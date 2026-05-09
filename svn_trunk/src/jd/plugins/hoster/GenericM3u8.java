@@ -44,7 +44,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52391 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+@HostPlugin(revision = "$Revision: 52788 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
     public static final String  PRESET_NAME_PROPERTY               = "preSetName";
     private static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
@@ -97,7 +97,7 @@ public class GenericM3u8 extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -318,10 +318,9 @@ public class GenericM3u8 extends PluginForHost {
         requestFileInformation(link, true);
         if (this.dl == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else {
-            checkFFmpeg(link, "Download a HLS Stream");
-            dl.startDownload();
         }
+        checkFFmpeg(link, "Download a HLS Stream");
+        dl.startDownload();
     }
 
     /** Converts given URL into an URL which this plugin can handle. */

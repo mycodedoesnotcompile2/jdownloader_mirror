@@ -45,7 +45,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49390 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52786 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadhavenCom extends PluginForHost {
     public UploadhavenCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,15 +125,17 @@ public class UploadhavenCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, null);
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        if (!link.isNameSet()) {
-            link.setName(this.getFID(link));
-        }
         if (account != null) {
             this.login(account, false);
         }
@@ -164,17 +166,21 @@ public class UploadhavenCom extends PluginForHost {
         } else if (br.getHttpConnection().getResponseCode() == 404 || !br.getURL().contains(this.getFID(link))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("(?i)File\\s*:\\s*([^<>\"]+)<br>").getMatch(0);
+        String filename = br.getRegex("File\\s*:\\s*([^<>\"]+)<br>").getMatch(0);
         if (StringUtils.isEmpty(filename)) {
-            filename = br.getRegex("(?i)>\\s*Download file \\- ([^<>\"]+)\\s*?<").getMatch(0);
+            filename = br.getRegex(">\\s*Download file \\- ([^<>\"]+)\\s*?<").getMatch(0);
         }
-        String filesize = br.getRegex("(?i)Size\\s*:\\s+(.*?) +\\s+").getMatch(0);
+        String filesize = br.getRegex("Size\\s*:\\s+(.*?) +\\s+").getMatch(0);
         if (!StringUtils.isEmpty(filename)) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -182,6 +188,11 @@ public class UploadhavenCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         handleDownload(link, null);
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        this.handleDownload(link, account);
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
@@ -207,6 +218,9 @@ public class UploadhavenCom extends PluginForHost {
                     } catch (final PluginException abortException) {
                         throw new PluginException(LinkStatus.ERROR_FATAL, "Enter referer as password to be able to download this item");
                     }
+                    if (!StringUtils.startsWithCaseInsensitive(userReferer, "http")) {
+                        userReferer = "https://" + userReferer;
+                    }
                     try {
                         new URL(userReferer);
                     } catch (final MalformedURLException e) {
@@ -218,10 +232,9 @@ public class UploadhavenCom extends PluginForHost {
                     if (!this.isRefererProtected(br)) {
                         success = true;
                         break;
-                    } else {
-                        /* Try again */
-                        br.clearCookies(null);
                     }
+                    /* Try again */
+                    br.clearCookies(null);
                 }
                 if (!success) {
                     link.setDownloadPassword(null);
@@ -230,9 +243,6 @@ public class UploadhavenCom extends PluginForHost {
                 logger.info("Valid referer == " + userReferer);
                 /* Is already set in the above loop! */
                 // link.setDownloadPassword(userReferer);
-                if (StringUtils.isEmpty(link.getComment())) {
-                    link.setComment("DownloadPassword == Referer");
-                }
             }
             Form dlform = br.getFormbyProperty("id", "form-join");
             if (dlform == null) {
@@ -253,7 +263,7 @@ public class UploadhavenCom extends PluginForHost {
                 if (waitStr != null) {
                     wait = Integer.parseInt(waitStr);
                 }
-                this.sleep((wait + 3) * 1001l, link);
+                this.sleep((wait + 3) * 1000l, link);
             }
             br.submitForm(dlform);
             dllink = br.getRegex("downloadFile\"\\)\\.attr\\(\"src\",\\s*?\"(https?[^\">]+)").getMatch(0);
@@ -316,18 +326,18 @@ public class UploadhavenCom extends PluginForHost {
         return null;
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    private boolean login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
                 logger.info("Attempting cookie login");
-                this.br.setCookies(this.getHost(), cookies);
-                if (!force) {
+                br.setCookies(getHost(), cookies);
+                if (!validateCookies) {
                     /* Don't validate cookies */
                     return false;
                 }
-                br.getPage("https://" + this.getHost() + "/");
+                br.getPage("https://" + this.getHost() + "/account");
                 if (this.isLoggedin(br)) {
                     logger.info("Cookie login successful");
                     /* Refresh cookie timestamp */
@@ -342,8 +352,7 @@ public class UploadhavenCom extends PluginForHost {
             br.getPage("https://" + this.getHost() + "/account/login");
             final Form loginform = br.getFormbyActionRegex(".*/account/login");
             if (loginform == null) {
-                logger.warning("Failed to find loginform");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
             }
             loginform.put("email", Encoding.urlEncode(account.getUser()));
             loginform.put("password", Encoding.urlEncode(account.getPass()));
@@ -357,24 +366,41 @@ public class UploadhavenCom extends PluginForHost {
     }
 
     private boolean isLoggedin(final Browser br) {
-        return br.containsHTML("/logout");
+        return br.containsHTML("/account/logout");
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        final String registerDate = br.getRegex("Registered\\s*:\\s*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})").getMatch(0);
+        final String registerDate = br.getRegex("class=\"uh-detail-label\">\\s*Registered\\s*</div>\\s*<div class=\"uh-detail-value\">([A-Za-z]+ \\d+, \\d{4})</div>").getMatch(0);
         if (registerDate != null) {
-            ai.setCreateTime(TimeFormatter.getMilliSeconds(registerDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH));
+            ai.setCreateTime(TimeFormatter.getMilliSeconds(registerDate, "MMM dd, yyyy", Locale.ENGLISH));
         } else {
-            logger.warning("Failed to find register date");
+            logger.info("Failed to find register date");
         }
         /* Find premium status */
-        br.getPage("/account/subscription");
-        final String premiumValidUntil = br.getRegex("Ends on (\\d{2}/\\d{2}/\\d{4})").getMatch(0);
+        final boolean isFreeBadge = br.containsHTML("class=\"uh-badge-free\">\\s*Free\\s*<");
+        final boolean isPremiumBadge = br.containsHTML("class=\"uh-badge-pro\">\\s*Premium\\s*<");
+        String premiumValidUntil = br.getRegex("class=\"uh-detail-label\">\\s*Next Billing Cycle\\s*</span>\\s*<span class=\"uh-detail-value\">([A-Za-z]+ \\d+, \\d{4})</span>").getMatch(0);
+        String premiumValidUntilFormat = "MMM dd, yyyy";
+        if (premiumValidUntil == null && !isFreeBadge) {
+            logger.info("Failed to find premium expire date on first page, trying 2nd page");
+            br.getPage("/account/subscription");
+            premiumValidUntil = br.getRegex("Ends on (\\d{2}/\\d{2}/\\d{4})").getMatch(0);
+            if (premiumValidUntil == null) {
+                /* 2026-05-08 */
+                premiumValidUntil = br.getRegex("Next billing cycle (\\d{2}/\\d{2}/\\d{4})").getMatch(0);
+            }
+            premiumValidUntilFormat = "MM/dd/yyyy";
+        }
         if (premiumValidUntil != null) {
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(premiumValidUntil, "MM/dd/yyyy", Locale.ENGLISH), br);
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(premiumValidUntil, premiumValidUntilFormat, Locale.ENGLISH), br);
+            account.setType(AccountType.PREMIUM);
+            account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
+        } else if (isPremiumBadge) {
+            /* Set premium status without expire date since we still know that this is a premium account */
+            logger.warning("Failed to find premium expire date");
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
         } else {
@@ -386,11 +412,6 @@ public class UploadhavenCom extends PluginForHost {
     }
 
     @Override
-    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        this.handleDownload(link, account);
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return 1;
     }
@@ -398,13 +419,5 @@ public class UploadhavenCom extends PluginForHost {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

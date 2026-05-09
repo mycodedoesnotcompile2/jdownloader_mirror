@@ -22,13 +22,16 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50250 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
+@DecrypterPlugin(revision = "$Revision: 52789 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
 public class HdPorn92Com extends antiDDoSForDecrypt {
     public HdPorn92Com(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,9 +48,20 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         String encodedTitle = br.getRegex("<meta[^>]+property\\s*=\\s*\"og:title\"[^>]+content\\s*=\\s*\"([^\"]*)").getMatch(0);
         FilePackage fp = FilePackage.getInstance();
         fp.setName(Encoding.htmlOnlyDecode(encodedTitle));
@@ -63,8 +77,20 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
                 ret.add(createDownloadlink(server));
             }
         }
+        /* 2026-05-08: Iframes */
+        additionalServers = br.getRegex("<IFRAME SRC=\"(https?://[^\"]+)\"").getColumn(0);
+        if (additionalServers != null) {
+            for (String server : additionalServers) {
+                ret.add(createDownloadlink(server));
+            }
+        }
         String url = br.getRegex("<meta[^>]+itemprop\\s*=\\s*\"embedURL\"[^>]+content\\s*=\\s*\"([^\"]*)").getMatch(0);
-        ret.add(createDownloadlink(url));
+        if (url != null) {
+            ret.add(createDownloadlink(url));
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         fp.addLinks(ret);
         fp.setAllowInheritance(true);
         return ret;

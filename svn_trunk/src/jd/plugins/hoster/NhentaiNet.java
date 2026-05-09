@@ -35,7 +35,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52057 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52786 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -54,8 +54,6 @@ public class NhentaiNet extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST };
     }
 
-    /* DEV NOTES */
-    // other:
     public static final String EXT_DEFAULT = ".jpg";
 
     public static String[] getAnnotationNames() {
@@ -98,27 +96,27 @@ public class NhentaiNet extends PluginForHost {
     private String getFID(final DownloadLink link) {
         if (link == null || link.getPluginPatternMatcher() == null) {
             return null;
-        } else {
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-            return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(1);
         }
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(1);
     }
 
     private final String CACHED_URL = "CACHED_URL";
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + EXT_DEFAULT;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + EXT_DEFAULT);
-        }
         this.setBrowserExclusive();
         String dllink = getDirecturl(link, br);
         if (dllink != null) {
             if (checkDownloadableRequest(link, br, br.createHeadRequest(dllink), 10, true) != null) {
                 return AvailableStatus.TRUE;
-            } else {
-                link.removeProperty(CACHED_URL);
             }
+            link.removeProperty(CACHED_URL);
         }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -134,12 +132,11 @@ public class NhentaiNet extends PluginForHost {
             final String fixExtension = link.getName().replaceFirst(fileExtension + "$", urlExtension);
             link.setFinalFileName(fixExtension);
         }
-        if (checkDownloadableRequest(link, br, br.createHeadRequest(dllink), 10, true) != null) {
-            link.setProperty(CACHED_URL, dllink);
-            return AvailableStatus.TRUE;
-        } else {
+        if (checkDownloadableRequest(link, br, br.createHeadRequest(dllink), 10, true) == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        link.setProperty(CACHED_URL, dllink);
+        return AvailableStatus.TRUE;
     }
 
     private String getDirecturl(final DownloadLink link, final Browser br) throws IOException {

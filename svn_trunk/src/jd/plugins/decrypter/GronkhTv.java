@@ -3,6 +3,10 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -13,11 +17,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
-@DecrypterPlugin(revision = "$Revision: 47149 $", interfaceVersion = 3, names = { "gronkh.tv" }, urls = { "https?://(www\\.)?gronkh\\.tv/(watch/stream|streams)/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 52788 $", interfaceVersion = 3, names = { "gronkh.tv" }, urls = { "https?://(www\\.)?gronkh\\.tv/(watch/stream|streams)/\\d+" })
 public class GronkhTv extends PluginForDecrypt {
     public GronkhTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -25,7 +25,9 @@ public class GronkhTv extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
-        final String episode = new Regex(parameter.getCryptedUrl(), "/(\\d+)").getMatch(0);
+        br.setFollowRedirects(true);
+        final String contenturl = parameter.getCryptedUrl();
+        final String episode = new Regex(contenturl, "/(\\d+)").getMatch(0);
         final GetRequest info = br.createGetRequest("https://api.gronkh.tv/v1/video/info?episode=" + episode);
         info.getHeaders().put("Origin", "https://www.gronkh.tv");
         info.getHeaders().put("Referer", "https://www.gronkh.tv");
@@ -41,19 +43,18 @@ public class GronkhTv extends PluginForDecrypt {
         // TODO: chat_replay support, multiple json requests
         if (StringUtils.isEmpty(title) || StringUtils.isEmpty(m3u8)) {
             return new ArrayList<DownloadLink>();
-        } else {
-            final Browser brc = br.cloneBrowser();
-            brc.getPage(m3u8);
-            final ArrayList<DownloadLink> ret = GenericM3u8Decrypter.parseM3U8(this, m3u8, brc, null, null, title);
-            if (ret.size() > 1) {
-                for (DownloadLink link : ret) {
-                    link.setContentUrl(parameter.getCryptedUrl());
-                }
-                final FilePackage fp = FilePackage.getInstance();
-                fp.setName(title);
-                fp.addLinks(ret);
-            }
-            return ret;
         }
+        final Browser brc = br.cloneBrowser();
+        brc.getPage(m3u8);
+        final ArrayList<DownloadLink> ret = GenericM3u8Decrypter.parseM3U8(this, m3u8, brc, null, null, title);
+        if (ret.size() > 1) {
+            for (DownloadLink link : ret) {
+                link.setContentUrl(contenturl);
+            }
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(title);
+            fp.addLinks(ret);
+        }
+        return ret;
     }
 }

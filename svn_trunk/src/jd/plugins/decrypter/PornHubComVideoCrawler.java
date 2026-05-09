@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 52352 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52787 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -106,9 +106,11 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     public static final Pattern PATTERN_PORNSTAR_VIDEOS        = Pattern.compile("/(pornstar)/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PORNSTAR_GIFS          = Pattern.compile("/(pornstar)/([^/]+)/gifs(?:/video|/public)?", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PORNSTAR_PHOTOS        = Pattern.compile("/(pornstar)/([^/]+)/photos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PORNSTAR               = Pattern.compile("/(pornstar)/([^/]+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_MODEL_VIDEOS           = Pattern.compile("/(model)/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_MODEL_GIFS             = Pattern.compile("/(model)/([^/]+)/gifs(?:/video|/public)?", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_MODEL_PHOTOS           = Pattern.compile("/(model)/([^/]+)/photos", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_MODEL                  = Pattern.compile("/(model)/([^/]+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_USER_VIDEOS            = Pattern.compile("/users/([^/]+)/videos/?$", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_USER_VIDEOS_PUBLIC     = Pattern.compile("/users/([^/]+)/videos/public$", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_USER_GIFS              = Pattern.compile("/users/([^/]+)/gifs(?:/video|/public|/from_videos)?", Pattern.CASE_INSENSITIVE);
@@ -130,9 +132,11 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             sb.append("|" + PATTERN_PORNSTAR_VIDEOS.pattern().substring(1));
             sb.append("|" + PATTERN_PORNSTAR_GIFS.pattern().substring(1));
             sb.append("|" + PATTERN_PORNSTAR_PHOTOS.pattern().substring(1));
+            sb.append("|" + PATTERN_PORNSTAR.pattern().substring(1));
             sb.append("|" + PATTERN_MODEL_VIDEOS.pattern().substring(1));
             sb.append("|" + PATTERN_MODEL_GIFS.pattern().substring(1));
             sb.append("|" + PATTERN_MODEL_PHOTOS.pattern().substring(1));
+            sb.append("|" + PATTERN_MODEL.pattern().substring(1));
             sb.append("|" + PATTERN_USER_VIDEOS.pattern().substring(1));
             sb.append("|" + PATTERN_USER_VIDEOS_PUBLIC.pattern().substring(1));
             sb.append("|" + PATTERN_USER_GIFS.pattern().substring(1));
@@ -756,13 +760,19 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String[] photoAlbumURLs = br.getRegex("(/album/\\d+)").getColumn(0);
-        if (photoAlbumURLs == null || photoAlbumURLs.length == 0) {
+        final String[] album_ids = br.getRegex("id=\"albumphoto(\\d+)\"").getColumn(0);
+        if (album_ids == null || album_ids.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        for (final String photoAlbumURL : photoAlbumURLs) {
-            ret.add(this.createDownloadlink(br.getURL(photoAlbumURL).toString()));
+        final HashSet<String> dupes = new HashSet<String>();
+        for (final String album_id : album_ids) {
+            if (!dupes.add(album_id)) {
+                continue;
+            }
+            final String url = br.getURL("/album/" + album_id).toExternalForm();
+            ret.add(this.createDownloadlink(url));
         }
+        logger.info("Found photo albums: " + ret.size());
         return ret;
     }
 
