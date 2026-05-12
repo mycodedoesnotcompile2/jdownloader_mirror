@@ -15,11 +15,14 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.MalformedURLException;
+
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -27,7 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50949 $", interfaceVersion = 2, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?.*#hentai\\.animestigma\\.com-direct" })
+@HostPlugin(revision = "$Revision: 52796 $", interfaceVersion = 2, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?.*#hentai\\.animestigma\\.com-direct" })
 public class HentaiAnimestigmaCom extends antiDDoSForHost {
     public HentaiAnimestigmaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,12 +56,24 @@ public class HentaiAnimestigmaCom extends antiDDoSForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
-        final String title = query.get("fn");
-        if (title != null) {
-            link.setName(this.applyFilenameExtension(title, ".mp4"));
+    protected String getDefaultFileName(DownloadLink link) {
+        UrlQuery query;
+        try {
+            query = UrlQuery.parse(link.getPluginPatternMatcher());
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+            return null;
         }
+        String title = query.get("fn");
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            return this.applyFilenameExtension(title, ".mp4");
+        }
+        return null;
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
     }
 
@@ -92,6 +107,8 @@ public class HentaiAnimestigmaCom extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
             } else if (dl.getConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+            } else if (dl.getConnection().getResponseCode() == 503) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 503 rate limit reached", 60 * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -102,17 +119,5 @@ public class HentaiAnimestigmaCom extends antiDDoSForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return 5;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

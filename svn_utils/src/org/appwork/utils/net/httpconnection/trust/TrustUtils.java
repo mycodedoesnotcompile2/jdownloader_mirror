@@ -131,6 +131,10 @@ public class TrustUtils {
         ret.add(getOSProvider());
         try {
             ret.add(new CCADBTrustProvider());
+        } catch (IllegalArgumentException ignore) {
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                LogV3.log(ignore);
+            }
         } catch (Exception e) {
             LogV3.log(e);
         }

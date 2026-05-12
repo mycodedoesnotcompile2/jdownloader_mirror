@@ -24,7 +24,7 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLSearch;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52796 $", interfaceVersion = 3, names = {}, urls = {})
 public class MambahuyambaCom extends KernelVideoSharingComV2 {
     public MambahuyambaCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -34,7 +34,7 @@ public class MambahuyambaCom extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "caramba.huyamba.mobi", "mobi.huyamba.mobi", "rt.huyamba.mobi", "x.huyamba.mobi", "lx.mambahuyamba.com", "web.mambahuyamba.com", "sx.mambahuyamba.com", "deep.mambahuyamba.com", "most.mambahuyamba.com", "huyamba.info", "pornogovno.me" });
+        ret.add(new String[] { "vip.huyamba.mobi", "caramba.huyamba.mobi", "mobi.huyamba.mobi", "rt.huyamba.mobi", "x.huyamba.mobi", "lx.mambahuyamba.com", "web.mambahuyamba.com", "sx.mambahuyamba.com", "deep.mambahuyamba.com", "most.mambahuyamba.com", "huyamba.info", "pornogovno.me" });
         return ret;
     }
 
@@ -79,6 +79,8 @@ public class MambahuyambaCom extends KernelVideoSharingComV2 {
         deadDomains.add("web.mambahuyamba.com");
         /* 2025-06-05 */
         deadDomains.add("mobi.huyamba.mobi");
+        /* 2026-05-11 */
+        deadDomains.add("caramba.huyamba.mobi");
         return deadDomains;
     }
 
@@ -112,7 +114,7 @@ public class MambahuyambaCom extends KernelVideoSharingComV2 {
 
     @Override
     protected String getFUID(final String url) {
-        final String fuid = new Regex(url, "https?://[^/]+/video/(\\d+)/?$").getMatch(0);
+        final String fuid = new Regex(url, "(?i)https?://[^/]+/video/(\\d+)/?$").getMatch(0);
         if (fuid != null) {
             return fuid;
         } else {

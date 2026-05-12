@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52025 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52794 $", interfaceVersion = 3, names = {}, urls = {})
 public class DownupSpace extends XFileSharingProBasic {
     public DownupSpace(final PluginWrapper wrapper) {
         super(wrapper);
@@ -116,5 +116,11 @@ public class DownupSpace extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public ArrayList<String> getCleanupHTMLRegexes() {
+        /** 2026-05-11: Important because default handling will remove Cloudflare Turnstile captcha html as that is "display:none"! */
+        return null;
     }
 }

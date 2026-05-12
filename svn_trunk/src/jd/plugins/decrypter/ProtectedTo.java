@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -33,10 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52793 $", interfaceVersion = 3, names = {}, urls = {})
 public class ProtectedTo extends PluginForDecrypt {
     public ProtectedTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,63 +127,75 @@ public class ProtectedTo extends PluginForDecrypt {
                 captchaNeeded = false;
             }
             br.submitForm(continueform);
-            String html = br.getRegex("<div class=\"well Encrypted-box[^\"]+\">(.*?)</div>\\s+</div>").getMatch(0);
+            boolean found_html_section = true;
+            String html = br.getRegex("<div class=\"well Encrypted-box[^\"]*\">(.*?)</div>\\s+</div>").getMatch(0);
             if (html == null) {
                 /* Fallback */
+                logger.warning("Failed to find specific html code -> Using full html as fallback");
                 html = br.getRequest().getHtmlCode();
+                found_html_section = false;
             }
             if (captchaNeeded && getCaptchaform(br) != null) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             final String[] ids = br.getRegex("data-slug=\"([a-f0-9]{16})").getColumn(0);
-            if (ids == null || ids.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String token = br.getRegex("var token = \"([^\"]+)\"").getMatch(0);
-            if (token == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            FilePackage fp = null;
+            final String[] urls = found_html_section ? new Regex(html, "a href='(https?://[^']+)'>").getColumn(0) : null;
+            final FilePackage fp = FilePackage.getInstance();
             String title = br.getRegex("<h3 class=\"Encrypted-folder\"[^>]*>([^<]+)</h3>").getMatch(0);
             if (title != null) {
                 title = Encoding.htmlDecode(title).trim();
                 /* Remove total filesize from end of title */
                 title = title.replaceFirst("\\s*\\[\\s*\\d+\\.\\d+[^\\[]+\\s*$", "");
-                fp = FilePackage.getInstance();
                 fp.setName(title);
             }
-
             final HashSet<String> dupes = new HashSet<String>();
-            int index = -1;
-            for (final String id : ids) {
-                index++;
-                logger.info("Crawling item " + index + "/" + ids.length);
-                if (!dupes.add(id)) {
-                    continue;
-                }
-                final boolean isLastItem = index == ids.length - 1;
-                logger.info("Crawling single link with ID: " + id);
-                final UrlQuery query = new UrlQuery();
-                query.add("token", Encoding.urlEncode(token));
-                query.add("folder", folderID);
-                query.add("link", id);
-                final Browser brc = br.cloneBrowser();
-                brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                brc.postPage("/admin/Main/GetInFo", query);
-                final String finallink = brc.getRegex("^redirect: (https?://.+)").getMatch(0);
-                if (finallink == null) {
+            if (ids != null && ids.length > 0) {
+                final String token = br.getRegex("var token = \"([^\"]+)\"").getMatch(0);
+                if (token == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final DownloadLink link = createDownloadlink(finallink);
-                if (fp != null) {
+                int index = -1;
+                for (final String id : ids) {
+                    index++;
+                    logger.info("Crawling item " + index + "/" + ids.length);
+                    if (!dupes.add(id)) {
+                        continue;
+                    }
+                    final boolean isLastItem = index == ids.length - 1;
+                    logger.info("Crawling single link with ID: " + id);
+                    final UrlQuery query = new UrlQuery();
+                    query.add("token", Encoding.urlEncode(token));
+                    query.add("folder", folderID);
+                    query.add("link", id);
+                    final Browser brc = br.cloneBrowser();
+                    brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                    brc.postPage("/admin/Main/GetInFo", query);
+                    final String finallink = brc.getRegex("^redirect: (https?://.+)").getMatch(0);
+                    if (finallink == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    final DownloadLink link = createDownloadlink(finallink);
                     link._setFilePackage(fp);
+                    ret.add(link);
+                    distribute(link);
+                    if (!isLastItem) {
+                        /* Important else we can only crawl the first item! */
+                        this.sleep(2500, param);
+                    }
                 }
-                ret.add(link);
-                distribute(link);
-                if (!isLastItem) {
-                    /* Important else we can only crawl the first item! */
-                    this.sleep(2500, param);
+            }
+            if (urls != null) {
+                for (final String url : urls) {
+                    if (!dupes.add(url)) {
+                        continue;
+                    }
+                    final DownloadLink link = createDownloadlink(url);
+                    link._setFilePackage(fp);
+                    ret.add(link);
                 }
+            }
+            if (ret.isEmpty()) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         } else {
             /* Developer mistake */

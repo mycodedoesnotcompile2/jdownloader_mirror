@@ -25,7 +25,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52796 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
     public KernelVideoSharingComCamhubCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -35,7 +35,7 @@ public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "camhub.cc", "camhub.world", "zzpornozz.xyz" });
+        ret.add(new String[] { "camhub.cc", "camhub.world", "camhub.one", "camhub.tv", "zzpornozz.xyz" });
         return ret;
     }
 

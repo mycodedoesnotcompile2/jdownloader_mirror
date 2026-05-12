@@ -64,6 +64,9 @@ public final class CCADBTrustProvider extends CustomTrustProvider {
         InputStream pemStream = null;
         try {
             pemStream = CCADBTrustProvider.class.getResourceAsStream(APPWORK_MERGED_PEM);
+            if (pemStream == null) {
+                return new X509Certificate[0];
+            }
             return TrustUtils.loadCertificatesFromPEM(pemStream);
         } finally {
             if (pemStream != null) {

@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52796 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornktuBe extends KernelVideoSharingComV2 {
     public PornktuBe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -172,13 +172,12 @@ public class PornktuBe extends KernelVideoSharingComV2 {
     protected String getFUID(final String url) {
         if (url == null) {
             return null;
+        }
+        final String fuid = new Regex(url, pattern_special).getMatch(0);
+        if (fuid != null) {
+            return fuid;
         } else {
-            final String fuid = new Regex(url, pattern_special).getMatch(0);
-            if (fuid != null) {
-                return fuid;
-            } else {
-                return super.getFUID(url);
-            }
+            return super.getFUID(url);
         }
     }
 

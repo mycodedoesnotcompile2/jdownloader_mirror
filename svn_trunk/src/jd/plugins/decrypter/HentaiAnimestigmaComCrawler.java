@@ -15,8 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
@@ -26,17 +28,22 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49594 $", interfaceVersion = 3, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?hentai\\.animestigma\\.com/([a-z0-9\\-]{2,})/?" })
+@DecrypterPlugin(revision = "$Revision: 52796 $", interfaceVersion = 3, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?hentai\\.animestigma\\.com/([a-z0-9\\-]{2,})/?" })
 public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
     public HentaiAnimestigmaComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private static final Pattern PATTERN_IGNORE = Pattern.compile("/(?:wp-includes|feed|wp-content|site-shutting-down)(?:/|$)", Pattern.CASE_INSENSITIVE);
 
     protected DownloadLink createDownloadlink(String url, String title) {
         final String ext = ".mp4";
@@ -49,6 +56,11 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final String contenturl = param.getCryptedUrl();
+        final String path = new URL(contenturl).getPath();
+        if (new Regex(path, PATTERN_IGNORE).patternFind()) {
+            logger.info("Ignoring invalid/unsupported url");
+            return new ArrayList<DownloadLink>();
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         getPage(contenturl);
@@ -81,6 +93,7 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
         try {
             final Browser brc = br.cloneBrowser();
             brc.setFollowRedirects(true);
+            boolean success = false;
             for (int i = 0; i <= 3; i++) {
                 con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(downloadlink));
                 if (con.getResponseCode() == 503) {
@@ -88,8 +101,12 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
                     continue;
                 } else {
                     /* Success */
+                    success = true;
                     break;
                 }
+            }
+            if (!success) {
+                throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
             }
             final String contentType = con.getContentType();
             if (con.isOK() && StringUtils.containsIgnoreCase(contentType, "text/html")) {

@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52431 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52797 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComThepornbangCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,25 +55,17 @@ public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComThepornbangCom.buildAnnotationThepornbang(getPluginDomains());
-    }
-
-    public static String[] buildAnnotationThepornbang(final List<String[]> pluginDomains) {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/([^/\\?#]+)/?");
-        }
-        return ret.toArray(new String[0]);
+        return KernelVideoSharingComV2.buildAnnotationUrlsAll(getPluginDomains());
     }
 
     @Override
-    protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
-        return generateContentURLDefaultVideoNoFUID(host, fuid);
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.VIDEO_SLUG_NO_FUID;
     }
 
     @Override
-    protected boolean hasFUIDInsideURL(final String url) {
-        return false;
+    protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
+        return generateContentURLDefaultVideoNoFUID(host, urlSlug);
     }
 
     @Override

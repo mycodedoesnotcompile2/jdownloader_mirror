@@ -527,10 +527,9 @@ abstract public class ZeveraCore extends UseNet {
                     supportsUsenetByDomainlist = true;
                     continue;
                 }
-                final boolean isCacheHost = domainsCache != null && domainsCache.contains(domain) && !domainsWithoutCache.contains(domain);
                 final MultiHostHost mhost = new MultiHostHost(domain);
                 final List<String> allDomains = aliasesmap.get(domain);
-                if (allDomains != null) {
+                if (allDomains != null && allDomains.size() > 0) {
                     mhost.addDomains(allDomains);
                 } else {
                     logger.info("Found entry without aliases values: " + domain);
@@ -540,7 +539,7 @@ abstract public class ZeveraCore extends UseNet {
                     /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
                     mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
                 }
-                if (isCacheHost) {
+                if (domainsCache != null && domainsCache.contains(domain) && !domainsWithoutCache.contains(domain)) {
                     mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
                     /* This text is visible to the user in GUI. */
                     mhost.setStatusText("Cache only");

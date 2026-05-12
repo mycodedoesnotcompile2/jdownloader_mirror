@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52784 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52797 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,6 +119,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         VIDEO_FUID_SLUG(Pattern.compile("/(?:[a-z]{2}/)?video/(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
         VIDEOS_SLUG_FUID_AT_END(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)-(\\d+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE), true),
         VIDEOS_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
+        VIDEO_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?video/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
         FUID_SLUG_NO_VIDEOS(Pattern.compile("/(?:[a-z]{2}/)?(\\d+)/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), true),
         FUID_ONLY(Pattern.compile("/(\\d+)/?$", Pattern.CASE_INSENSITIVE), true),
         SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
@@ -178,6 +179,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 return new Regex(url, pattern).getMatch(1);
             case VIDEOS_SLUG_FUID_AT_END:
             case VIDEOS_SLUG_NO_FUID:
+            case VIDEO_SLUG_NO_FUID:
             case SLUG_NO_FUID:
             case SLUG_NO_FUID_HTML:
                 return new Regex(url, pattern).getMatch(0);
@@ -694,7 +696,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         }
     }
 
-    protected void checkYouAreNotAllowedToWatchThisVideo(Browser br, final DownloadLink link, final Account account) throws PluginException {
+    protected void checkYouAreNotAllowedToWatchThisVideo(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         if (youAreNotAllowedToWatchThisVideo(br)) {
             /**
              * Some websites have embedding videos disabled but nevertheless it is possible to generate- and add such URLs. It may also
@@ -771,7 +773,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 }
                 if (StringUtils.isEmpty(realURL)) {
                     logger.info("Unable to convert embedded URL --> Real URL");
-                    checkYouAreNotAllowedToWatchThisVideo(br, link, account);
                     break embedHandling;
                 }
                 logger.info("Found real URL corresponding to embed URL: " + realURL);
@@ -823,9 +824,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                     } else {
                         /* Everything alright - FUID of inside URL equals FUID found in HTML! */
                     }
-                } else {
-                    /* This can happen but most of all times, a FUID should be present inside HTML. */
-                    logger.info("Failed to find fuid in html");
                 }
             }
         }
@@ -855,20 +853,11 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         link.removeProperty(PROPERTY_IS_PRIVATE_VIDEO);
         checkYouAreNotAllowedToWatchThisVideo(br, link, account);
         /* Only look for downloadurl if we need it! */
-        if (isDownload || !this.enableFastLinkcheck()) {
-            try {
-                dllink = getDllink(link, this.br);
-            } catch (final PluginException e) {
-                // TODO: Check if this check is still required - the "video is private" status should be known before here already.
-                if (this.isPrivateVideo(link) && e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
-                    logger.log(e);
-                    logger.info("ERROR_FILE_NOT_FOUND in getDllink but we have a private video so it is not offline ...");
-                } else {
-                    throw e;
-                }
-            }
+        final boolean setting_enable_fast_linkcheck = !enableFastLinkcheck();
+        if (isDownload || !setting_enable_fast_linkcheck) {
+            dllink = getDllink(link, this.br);
         }
-        if (!StringUtils.isEmpty(this.dllink) && !isDownload && !enableFastLinkcheck() && !link.isSizeSet() && !this.isHLS(this.dllink)) {
+        if (!StringUtils.isEmpty(this.dllink) && !isDownload && !setting_enable_fast_linkcheck && !link.isSizeSet() && !this.isHLS(this.dllink)) {
             URLConnectionAdapter con = null;
             try {
                 /* if you don't do this then referrer is fked for the download! -raztoki */
@@ -1143,17 +1132,10 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (isAgeVerificationBlockedWebsite(br)) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Age verification required: Change IP or use VPN/proxy");
         }
-        if (this.isPrivateVideo(link)) {
-            final String msg = this.getPrivateVideoWebsiteMessage(br);
-            if (msg != null) {
-                throw new AccountRequiredException(msg);
-            } else {
-                throw new AccountRequiredException("Private videos can only be watched by registered users or friends of the uploader");
-            }
-        }
         if (this.isOfflineWebsite(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        checkYouAreNotAllowedToWatchThisVideo(br, link, account);
     }
 
     protected boolean isOfflineWebsite(final Browser br) {

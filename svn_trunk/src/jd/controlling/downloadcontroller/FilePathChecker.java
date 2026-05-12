@@ -12,8 +12,6 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.jdownloader.controlling.UniqueAlltimeID;
 
-import jd.controlling.downloadcontroller.tests.FilePathCheckerTest;
-
 public class FilePathChecker {
     /**
      * The idea is that you can provide a list of flags to the folder create function so it knows to which extend it is allowed to perform
@@ -274,7 +272,4 @@ public class FilePathChecker {
         return str.length() > 255;
     }
 
-    public static void main(String[] args) throws IOException {
-        FilePathCheckerTest.main(args);
-    }
 }
