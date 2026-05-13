@@ -626,7 +626,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             }
             baseImageTargetFinal = scaleAndCache(key, context, cached, (int) Math.round(baseWidthFinal), (int) Math.round(baseHeightFinal), baseImage);
         }
-        if ((baseImageTargetFinal.getWidth(null) % 4 != 0) || (baseImageTargetFinal.getHeight(null) % 4 != 0)) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && (baseImageTargetFinal.getWidth(null) % 4 != 0 || baseImageTargetFinal.getHeight(null) % 4 != 0)) {
             LogV3.warning("Image warning: width and height should be dividable by 4 for proper highDPI display!: " + key + ": " + baseImageTargetFinal.getWidth(null) + "x" + baseImageTargetFinal.getHeight(null));
         }
         if (returnMultiResImage && baseImageHighDPIFinal != null && baseImageTargetFinal != null && baseImageHighDPIFinal != baseImageTargetFinal) {

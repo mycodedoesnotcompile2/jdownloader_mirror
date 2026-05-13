@@ -1,13 +1,13 @@
 <project default="standalone" basedir=".">
 	<!-- Dependencies -->
-	<available file="../AppWorkUtils" type="dir" property="dep.awu" value="../AppWorkUtils"/>
-	<available file="../utils" type="dir" property="dep.awu" value="../utils"/>
+	<available file="../AppWorkUtils" type="dir" property="dep.awu" value="../AppWorkUtils" />
+	<available file="../utils" type="dir" property="dep.awu" value="../utils" />
 
-	<available file="../JDBrowser" type="dir" property="dep.browser" value="../JDBrowser"/>
-        <available file="../browser" type="dir" property="dep.browser" value="../browser"/>
+	<available file="../JDBrowser" type="dir" property="dep.browser" value="../JDBrowser" />
+	<available file="../browser" type="dir" property="dep.browser" value="../browser" />
 
 	<property name="dep.myjd" value="../MyJDownloaderClient" />
-	
+
 	<property name="debug" value="true" />
 
 
@@ -37,7 +37,7 @@
 	</target>
 
 	<target name="cleanup">
-                <delete dir="${cls}" />
+		<delete dir="${cls}" />
 		<delete file="${working}/classpath" />
 	</target>
 
@@ -54,9 +54,8 @@
 
 		<!-- Build dependencies -->
 
-		<javac srcdir="${dep.awu}/src" excludes="**/test/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.awu}/src" excludes="**/test/**,**/tests/**,**/testframework/**,**/ide/**,org/appwork/utils/OracleWorkaroundJarHandler.java" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
-
 		</javac>
 
 		<javac srcdir="${dep.myjd}/src" excludes="**/test/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
@@ -72,7 +71,7 @@
 
 
 
-		<javac srcdir="src" debug="${debug}" verbose="false" excludes="jd/utils/dev/*,org/jdownloader/extensions/langfileeditor/**/*,org/jdownloader/extensions/remoteserv/**/*" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="src" debug="${debug}" verbose="false" excludes="jd/utils/dev/*,org/jdownloader/extensions/langfileeditor/**/*,org/jdownloader/extensions/remoteserv/**/*,**/test/**,**/tests/**,**/ide/**" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 			<compilerarg line="-proc:none" />
 
@@ -167,7 +166,7 @@
 		<mkdir dir="${dist}/libs" />
 		<manifest file="${dist}/Manifest.MF">
 			<attribute name="Created-By" value="Appwork GmbH and JDownloader Community" />
-		</manifest>		
+		</manifest>
 
 		<jar duplicate="fail" file="${dist}/libs/JDGUI.jar" manifest="${dist}/Manifest.MF">
 			<fileset dir="${cls}">
@@ -186,7 +185,7 @@
 			<fileset dir="${cls}">
 				<include name="jd/nutils/**" />
 			</fileset>
-		</jar>		
+		</jar>
 
 		<jar duplicate="fail" file="${dist}/libs/cons.jar" manifest="${dist}/Manifest.MF">
 			<fileset dir="${cls}">
@@ -299,7 +298,7 @@
 
 				<exclude name="jd/http/**" />
 				<include name="jd/nutils/**" />
-				<exclude name="jd/plugins/hoster/**" />			
+				<exclude name="jd/plugins/hoster/**" />
 				<exclude name="jd/plugins/decrypter/**" />
 				<exclude name="org/jdownloader/extensions/*/**/*" />
 				<exclude name="jd/utils/dev/**" />
@@ -313,7 +312,7 @@
 				<include name="org/jdownloader/captcha/v2/challenge/recaptcha/v2/example/*.jpg" />
 				<include name="org/jdownloader/captcha/v2/solver/browser/html/**/*" />
 
-			</fileset>	
+			</fileset>
 
 
 
@@ -373,7 +372,7 @@
 		<mkdir dir="${dist}/jd/plugins/hoster/" />
 		<copy todir="${dist}/jd/plugins/hoster/">
 			<fileset dir="${cls}/jd/plugins/hoster/">
-				<include name="**/*" />				
+				<include name="**/*" />
 			</fileset>
 		</copy>
 		<mkdir dir="${dist}/jd/plugins/decrypter/" />
@@ -405,6 +404,19 @@
 			</jar>
 		</sequential>
 	</macrodef>
+
+	<target name="build-json">
+		<!-- 1. Zeitstempel im Format: Fri Sep 11 11:24:57 CEST 2015 -->
+		<tstamp>
+			<format property="custom.timestamp" pattern="EEE MMM dd HH:mm:ss zzz yyyy" locale="en,US" />
+		</tstamp>
+		<!-- 2. JSON-Datei schreiben -->
+		<echo file="${dist}/build.json">{
+	  "buildDate": "${custom.timestamp}"
+	}</echo>
+		<echo message="JSON erstellt: metadata.json" />
+	</target>
+
 
 	<!-- Build optional addon plugins -->
 	<target name="jarOptionals" description="Creates the Optional Plugins">
@@ -457,7 +469,7 @@
 
 
 
-	<target name="standalone" depends="clean,compile,copy_res,jarReconnectOptionals,jarOptionals,jarMain,copy_compiled,cleanup">
+	<target name="standalone" depends="clean,compile,build-json,copy_res,jarReconnectOptionals,jarOptionals,jarMain,copy_compiled,cleanup">
 		<echo message="Finished." />
 	</target>
 </project>

@@ -5,13 +5,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.security.DigestInputStream;
 import java.security.DigestOutputStream;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -43,6 +42,34 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+
+import jd.PluginWrapper;
+import jd.config.Property;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashResult;
 
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
@@ -87,34 +114,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.config.Property;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.HashResult;
-
-@HostPlugin(revision = "$Revision: 52583 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52799 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -303,8 +303,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         if (getMegaNzConfig().is5GBFreeLimitEnabled() && !isPremium && link.getView().getBytesTotal() > 5368709120l) {
             /**
              * 2024-07-02: Skip files over 5GB as we cannot download them in free mode and user has configured plugin to skip them
-             * immediately, see: </br>
-             * https://board.jdownloader.org/showthread.php?t=75268
+             * immediately, see: </br> https://board.jdownloader.org/showthread.php?t=75268
              */
             throw new AccountRequiredException("Free download of files >5GB is disabled in plugin settings");
         }
@@ -510,8 +509,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             final String sid = apiLogin(account);
-            final Map<String, Object> uq = apiRequest(account, sid, null, "uq"/* userQuota */, new Object[] { "xfer"/* xfer */, 1 },
-                    new Object[] { "pro"/* pro */, 1 });
+            final Map<String, Object> uq = apiRequest(account, sid, null, "uq"/* userQuota */, new Object[] { "xfer"/* xfer */, 1 }, new Object[] { "pro"/* pro */, 1 });
             if (uq == null || uq.size() == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -767,8 +765,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     try {
-                        response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail },
-                                new Object[] { "uh"/* emailHash */, uh });
+                        response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail }, new Object[] { "uh"/* emailHash */, uh });
                     } catch (PluginException e) {
                         if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM && e.getValue() == PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE && account.getBooleanProperty("mfa", Boolean.FALSE)) {
                             try {
@@ -776,8 +773,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                                 mfaDialog.setTimeout(5 * 60 * 1000);
                                 final InputDialogInterface handler = UIOManager.I().show(InputDialogInterface.class, mfaDialog);
                                 handler.throwCloseExceptions();
-                                response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail },
-                                        new Object[] { "uh"/* emailHash */, uh }, new Object[] { "mfa"/* ping */, handler.getText() });
+                                response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail }, new Object[] { "uh"/* emailHash */, uh }, new Object[] { "mfa"/* ping */, handler.getText() });
                             } catch (DialogNoAnswerException e2) {
                                 throw Exceptions.addSuppressed(e, e2);
                             }
@@ -1383,8 +1379,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     /**
      * MEGA limits can be tricky: They can sit on specific files, on IP ("global limit") or also quota based (also global) e.g. 5GB per day
      * per IP or per Free-Account. For these reasons the user can define the max wait time. The wait time given by MEGA must not be true.
-     * </br>
-     * 2021-01-21 TODO: Use this for ALL limit based errors?
+     * </br> 2021-01-21 TODO: Use this for ALL limit based errors?
      */
     private void fileOrIPDownloadlimitReached(final Account account, final String msg, final long waitMilliseconds) throws PluginException {
         final MegaNzConfig config = getMegaNzConfig();
@@ -1566,12 +1561,113 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private void decrypt(final String path, AtomicLong encryptionDone, AtomicBoolean successFulFlag, final DownloadLink link, String keyString) throws Exception {
         setDecryptingDownloadLink(link);
         try {
-            byte[] b64Dec = b64decode(keyString);
-            int[] intKey = aByte_to_aInt(b64Dec);
-            int[] keyNOnce = new int[] { intKey[0] ^ intKey[4], intKey[1] ^ intKey[5], intKey[2] ^ intKey[6], intKey[3] ^ intKey[7], intKey[4], intKey[5] };
-            byte[] key = aInt_to_aByte(keyNOnce[0], keyNOnce[1], keyNOnce[2], keyNOnce[3]);
-            int[] iiv = new int[] { keyNOnce[4], keyNOnce[5], 0, 0 };
-            byte[] iv = aInt_to_aByte(iiv);
+            final class MegaMacAutomated {
+                private final SecretKeySpec keySpec;
+                private final byte[]        nonceIv;
+                private byte[]              macState          = new byte[16]; // entspricht mac_str (globaler Zustand)
+
+                private long                totalProcessed    = 0;
+                private long                currentChunkLimit = 131072;      // Start 128KB
+                private long                nextBoundary      = 131072;
+
+                // Puffer für den aktuellen Chunk
+                private byte[]              chunkBuffer;
+                private int                 bufferPos         = 0;
+
+                private final Cipher        chunkEncryptor;
+                private final Cipher        macEncryptor;
+
+                public MegaMacAutomated(byte[] aesKey, byte[] nonce) throws Exception {
+                    keySpec = new SecretKeySpec(aesKey, "AES");
+                    chunkEncryptor = Cipher.getInstance("AES/CBC/NoPadding");
+                    macEncryptor = Cipher.getInstance("AES/CBC/NoPadding");
+                    this.nonceIv = new byte[16];
+                    System.arraycopy(nonce, 0, nonceIv, 0, 8);
+                    System.arraycopy(nonce, 0, nonceIv, 8, 8);
+                    Arrays.fill(macState, (byte) 0);
+                    // Initialer Puffer für den ersten 128KB Chunk
+                    this.chunkBuffer = new byte[(int) currentChunkLimit];
+                }
+
+                /**
+                 * Einfach Bytes hinzufügen. Die Klasse kümmert sich um die Chunks. WICHTIG: Hier müssen die DEKRYPTIERTEN Bytes (Klartext)
+                 * rein.
+                 */
+                public void addBytes(byte[] data, int offset, int len) throws Exception {
+                    int dataPos = 0;
+                    while (dataPos < len) {
+                        int remainingInChunk = (int) (nextBoundary - totalProcessed);
+                        int bytesToCopy = Math.min(len - dataPos, remainingInChunk);
+                        System.arraycopy(data, offset + dataPos, chunkBuffer, bufferPos, bytesToCopy);
+                        bufferPos += bytesToCopy;
+                        dataPos += bytesToCopy;
+                        totalProcessed += bytesToCopy;
+                        if (totalProcessed == nextBoundary) {
+                            processCompletedChunk(chunkBuffer, bufferPos);
+                            prepareNextChunk();
+                        }
+                    }
+                }
+
+                private void prepareNextChunk() {
+                    if (currentChunkLimit < 1048576) {
+                        currentChunkLimit += 131072;
+                    }
+                    nextBoundary += currentChunkLimit;
+                    // Puffer für die neue Größe vorbereiten (max 1MB)
+                    chunkBuffer = new byte[(int) currentChunkLimit];
+                    bufferPos = 0;
+                }
+
+                private final byte[] lastBlock = new byte[16];
+
+                private void processCompletedChunk(byte[] chunk, int length) throws Exception {
+                    // 1. Lokaler CBC Encryptor für diesen Chunk
+                    chunkEncryptor.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(nonceIv));
+                    int i = 0;
+                    // Alle vollen 16-Byte Blöcke (entspricht encryptor.encrypt(block) in der Schleife)
+                    if (length > 16) {
+                        while (i < length - 16) {
+                            chunkEncryptor.update(chunk, i, 16);
+                            i += 16;
+                        }
+                    }
+                    // 2. Letzten Block des Chunks inkl. Padding
+                    final int remaining = length - i;
+                    Arrays.fill(lastBlock, (byte) 0);
+                    System.arraycopy(chunk, i, lastBlock, 0, remaining);
+                    final byte[] encryptedBlock = chunkEncryptor.doFinal(lastBlock);
+                    // 3. Globalen MAC-Zustand aktualisieren
+                    macEncryptor.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(macState));
+                    macState = macEncryptor.doFinal(encryptedBlock);
+                }
+
+                public byte[] finish() throws Exception {
+                    // Falls noch Daten im Puffer sind (letzter Teil der Datei)
+                    if (bufferPos > 0) {
+                        processCompletedChunk(chunkBuffer, bufferPos);
+                    }
+                    // 8-Byte Meta-MAC Extraktion (wie Python file_mac[0]^file_mac[1]...)
+                    final int[] fileMac = new int[4];
+                    for (int i = 0; i < 4; i++) {
+                        fileMac[i] = ((macState[i * 4] & 0xFF) << 24) | ((macState[i * 4 + 1] & 0xFF) << 16) | ((macState[i * 4 + 2] & 0xFF) << 8) | (macState[i * 4 + 3] & 0xFF);
+                    }
+                    final byte[] result = new byte[8];
+                    final int m1 = fileMac[0] ^ fileMac[1];
+                    final int m2 = fileMac[2] ^ fileMac[3];
+                    for (int i = 0; i < 4; i++) {
+                        result[i] = (byte) (m1 >> (24 - i * 8));
+                        result[i + 4] = (byte) (m2 >> (24 - i * 8));
+                    }
+                    return result;
+                }
+            }
+            final byte[] b64Dec = b64decode(keyString);
+            final int[] intKey = aByte_to_aInt(b64Dec);
+            final int[] keyNOnce = new int[] { intKey[0] ^ intKey[4], intKey[1] ^ intKey[5], intKey[2] ^ intKey[6], intKey[3] ^ intKey[7], intKey[4], intKey[5] };
+            final byte[] key = aInt_to_aByte(keyNOnce[0], keyNOnce[1], keyNOnce[2], keyNOnce[3]);
+            final byte[] expMac = aInt_to_aByte(new int[] { intKey[6], intKey[7] });
+            final byte[] iv = aInt_to_aByte(new int[] { keyNOnce[4], keyNOnce[5], 0, 0 });
             final IvParameterSpec ivSpec = new IvParameterSpec(iv);
             final SecretKeySpec skeySpec = new SecretKeySpec(key, "AES");
             File dst = null;
@@ -1646,28 +1742,46 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                 try {
                     message.set("Queued for decryption");
                     link.addPluginProgress(progress);
+                    byte[] sha256 = null;
                     synchronized (getDecryptionLock(link)) {
                         message.set("Decrypting");
                         fis = new FileInputStream(src);
                         try {
                             FileStateManager.getInstance().requestFileState(outputFile, FILESTATE.WRITE_EXCLUSIVE, this);
                             fos = new FileOutputStream(outputFile);
-                            final InputStream is;
                             final OutputStream os;
-                            if (false) {
-                                is = new DigestInputStream(fis, MessageDigest.getInstance("SHA-256"));
+                            if (link.getHashInfo() == null) {
                                 os = new DigestOutputStream(fos, MessageDigest.getInstance("SHA-256"));
                             } else {
-                                is = fis;
                                 os = fos;
                             }
                             try {
+                                final MegaMacAutomated macCalc = new MegaMacAutomated(key, iv);
+                                final OutputStream macCalcOs = new FilterOutputStream(os) {
+                                    final byte[] single = new byte[1];
+
+                                    @Override
+                                    public void write(int b) throws IOException {
+                                        single[0] = (byte) (b & 0xff);
+                                        write(single, 0, 1);
+                                    }
+
+                                    @Override
+                                    public void write(byte[] b, int off, int len) throws IOException {
+                                        os.write(b, off, len);
+                                        try {
+                                            macCalc.addBytes(b, off, len);
+                                        } catch (Exception e) {
+                                            throw new IOException(e);
+                                        }
+                                    }
+                                };
                                 final Cipher cipher = Cipher.getInstance("AES/CTR/nopadding");
                                 cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivSpec);
-                                final CipherOutputStream cos = new CipherOutputStream(new BufferedOutputStream(os, 4096 * 1024), cipher);
+                                final CipherOutputStream cos = new CipherOutputStream(new BufferedOutputStream(macCalcOs, 4096 * 1024), cipher);
                                 int read = 0;
                                 final byte[] buffer = new byte[2048 * 1024];
-                                while ((read = is.read(buffer)) != -1) {
+                                while ((read = fis.read(buffer)) != -1) {
                                     if (read > 0) {
                                         progress.updateValues(progress.getCurrent() + read, total);
                                         cos.write(buffer, 0, read);
@@ -1675,9 +1789,14 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                                     }
                                 }
                                 cos.close();
-                                if (is instanceof DigestInputStream) {
-                                    logger.info("Decryption-Input-SHA256:" + HexFormatter.byteArrayToHex(((DigestInputStream) is).getMessageDigest().digest()));
-                                    logger.info("Decryption-Output-SHA256:" + HexFormatter.byteArrayToHex(((DigestOutputStream) os).getMessageDigest().digest()));
+                                final byte[] calcMac = macCalc.finish();
+                                if (!Arrays.equals(expMac, calcMac)) {
+                                    throw new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, "MAC check failed");
+                                }
+                                if (os instanceof DigestOutputStream) {
+                                    final DigestOutputStream dos = (DigestOutputStream) os;
+                                    sha256 = dos.getMessageDigest().digest();
+                                    link.setSha256Hash(HexFormatter.byteArrayToHex(sha256));
                                 }
                             } finally {
                                 fos.close();
@@ -1712,7 +1831,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                             /* set desired/original lastModified timestamp */
                             dst.setLastModified(lastModifiedDate * 1000);
                         }
-                        new MegaHashCheck(link, dst).finalHashResult();
+                        new MegaHashCheck(link, dst).finalHashResult(sha256);
                     }
                 } finally {
                     link.removePluginProgress(progress);
@@ -1766,8 +1885,14 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             this.finalFile = finalFile;
         }
 
-        private void finalHashResult() throws Exception {
-            final HashResult hashResult = getHashResult(downloadable, finalFile);
+        private void finalHashResult(byte[] sha256) throws Exception {
+            final HashResult hashResult;
+            if (sha256 != null) {
+                final HashInfo hashInfo = HashInfo.parse(HexFormatter.byteArrayToHex(sha256));
+                hashResult = new HashResult(hashInfo, hashInfo.getHash());
+            } else {
+                hashResult = getHashResult(downloadable, finalFile);
+            }
             if (hashResult != null) {
                 logger.info(hashResult.toString());
             }

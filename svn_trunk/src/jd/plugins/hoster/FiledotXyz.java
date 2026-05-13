@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52803 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledotXyz extends XFileSharingProBasic {
     public FiledotXyz(final PluginWrapper wrapper) {
         super(wrapper);
@@ -94,6 +95,15 @@ public class FiledotXyz extends XFileSharingProBasic {
             /* Free(anonymous) and unknown account type */
             return 1;
         }
+    }
+
+    @Override
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        if (br.containsHTML("file which is available for direct purchases only")) {
+            // You're attempting to download a <strong>VIP</strong> file which is available for direct purchases only.
+            return "This file is available for direct purchases only";
+        }
+        return super.getPremiumOnlyErrorMessage(br);
     }
 
     @Override

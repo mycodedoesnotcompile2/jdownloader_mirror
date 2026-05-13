@@ -26,7 +26,9 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.http.Browser;
+import jd.http.Browser.BrowserException;
 import jd.http.Cookies;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
@@ -58,7 +60,7 @@ import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideo
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52783 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52799 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,6 +82,12 @@ public class EPornerCom extends PluginForHost {
         br.setCookie(this.getHost(), "ageverif_accepted", "T");
         br.setCookie(this.getHost(), "epcolor", "black");
         return br;
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 250);
     }
 
     @Override
@@ -150,7 +158,8 @@ public class EPornerCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null, false);
+        final Account account = AccountController.getInstance().getValidAccount(this);
+        return requestFileInformation(link, account, false);
     }
 
     private Object[] getDownloadURL(final Browser br, final Account account, final DownloadLink link) throws Exception {
@@ -683,9 +692,22 @@ public class EPornerCom extends PluginForHost {
             br.getPage(request);
             // {"status":1,"url":"\/profile\/USERNAME\/","user_hash":"HASH","user_id":USERID,"user_verified":1,"user_agever":1}
             /* 2020-05-26: E.g. login failed: {"status":0,"msg_head":"Login failed.","msg_body":"Bad login\/password"} */
-            br.getPage("/");
-            if (!isLoggedin()) {
+            final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (((Number) response.get("status")).intValue() == 0) {
                 throw new AccountInvalidException();
+            } else if (response.get("user_id") == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            try {
+                br.getPage("/");
+                if (!isLoggedin()) {
+                    throw new AccountInvalidException();
+                }
+            } catch (BrowserException e) {
+                if (e.getRequest().getHttpConnection().getResponseCode() != 429) {
+                    throw e;
+                }
+                logger.log(e);
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
             return true;

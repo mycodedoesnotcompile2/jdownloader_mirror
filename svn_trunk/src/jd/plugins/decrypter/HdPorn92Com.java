@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -24,6 +26,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -31,11 +34,13 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 52789 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
+@DecrypterPlugin(revision = "$Revision: 52802 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
 public class HdPorn92Com extends antiDDoSForDecrypt {
     public HdPorn92Com(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private static final Pattern PATTERN_IGNORE = Pattern.compile("/(?:actors|categories|contact-us|dmca|feed|tags|wp-content|wp-includes|wp-json)(?:/|$)", Pattern.CASE_INSENSITIVE);
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -58,6 +63,11 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
+        final String path = new URL(contenturl).getPath();
+        if (new Regex(path, PATTERN_IGNORE).patternFind()) {
+            logger.info("Ignoring invalid/unsupported url");
+            return new ArrayList<DownloadLink>();
+        }
         getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

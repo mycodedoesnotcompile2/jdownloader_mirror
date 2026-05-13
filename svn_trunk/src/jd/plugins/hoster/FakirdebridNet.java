@@ -20,6 +20,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -39,22 +44,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52802 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
     // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
-    private static final String          API_BASE           = "https://fakirdebrid.net/api";
+    private static final String          API_BASE           = "https://api.fakirdebrid.net";
     private static MultiHosterManagement mhm                = new MultiHosterManagement("fakirdebrid.net");
     private static final boolean         defaultResume      = true;
     private static final int             defaultMaxchunks   = -10;
@@ -103,18 +96,11 @@ public class FakirdebridNet extends PluginForHost {
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         if (!attemptStoredDownloadurlDownload(link, this.getHost() + "directlink", link.getBooleanProperty(PROPERTY_RESUME, defaultResume), link.getIntegerProperty(PROPERTY_MAXCHUNKS, defaultMaxchunks))) {
-            this.login(account, false);
-            // br.setAllowedResponseCodes(new int[] { 503 });
             Map<String, Object> entries = null;
             int counter = 0;
             String passCode = link.getDownloadPassword();
             do {
                 String postData = "url=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this));
-                // if (link.getContainerUrl() != null) {
-                // /* 2022-01-04: TODO: Requested by admin (include referer as parameter if available) but unclear which parameter-name to
-                // use for this. */
-                // postData += "&reflink=" + Encoding.urlEncode(link.getContainerUrl());
-                // }
                 if (counter > 0) {
                     /* 2nd try: First provided password was invalid or no password has been tried on first attempt. */
                     passCode = getUserInput("Password?", link);
@@ -123,23 +109,22 @@ public class FakirdebridNet extends PluginForHost {
                     /* Append password like: "|<password>" */
                     postData += Encoding.urlEncode("|" + passCode);
                 }
-                br.postPage(API_BASE + "/generate.php?pin=" + Encoding.urlEncode(account.getPass()), postData);
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                br.postPage(API_BASE + "/generate/" + Encoding.urlEncode(account.getPass()), postData);
+                entries = parseAPIResponse(account, link);
                 final Object errorCodeO = entries.get("code");
                 if (errorCodeO != null && errorCodeO instanceof String && errorCodeO.toString().equalsIgnoreCase("Password_Required")) {
                     logger.info("Password required");
                     counter += 1;
-                    // continue;
                 } else if (errorCodeO != null && errorCodeO instanceof String && errorCodeO.toString().equalsIgnoreCase("Wrong_Password")) {
                     logger.info("Wrong password");
                     counter += 1;
-                    // continue;
                 } else {
                     /* No password required or correct password entered */
                     break;
                 }
             } while (counter <= 2);
-            this.handleErrorsAPI(this.br, link, account);
+            /* entries is already parsed above – pass directly to avoid re-parsing */
+            entries = handleAPIErrors(entries, account, link);
             if (passCode != null) {
                 /* Save password for the next time. */
                 link.setDownloadPassword(passCode);
@@ -150,57 +135,18 @@ public class FakirdebridNet extends PluginForHost {
             if (maxChunks > 1) {
                 maxChunks = -maxChunks;
             }
-            String dllink = null;
-            final boolean useNewHandling = true; /* 2021-06-21 */
-            if (useNewHandling) {
-                /* 2021-06-21: Testing */
-                final String apilink = (String) entries.get("apilink");
-                br.getPage(apilink);
-                this.handleErrorsAPI(this.br, link, account);
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                entries = (Map<String, Object>) entries.get("data");
-                final int files_done = ((Number) entries.get("files_done")).intValue();
-                if (files_done != 1) {
-                    final double percentageCompleted = Double.parseDouble(entries.get("completed").toString());
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is being transferred to fakirdebrid servers: " + percentageCompleted + "%", 5 * 1000l);
-                } else {
-                    dllink = (String) entries.get("link");
-                }
-            } else {
-                /* 2022-01-04: Deprecated */
-                final List<String> urls = (List<String>) entries.get("links");
-                if (urls.isEmpty()) {
-                    mhm.handleErrorGeneric(account, link, "Failed to generate transloadURL", 10, 5 * 60 * 1000l);
-                }
-                String transloadURL = null;
-                /*
-                 * Go through array of list containing the same URL with different domains as some are blocked. Typical domains include:
-                 * turkleech.com, fakirdebrid.xyz, fakirdebrid.info
-                 */
-                for (final String url : urls) {
-                    try {
-                        /**
-                         * E.g. server2.turkleech.com/TransLoad/?id=bla </br> Such URLs will also work fine without login cookies
-                         */
-                        br.getPage(url);
-                        transloadURL = url;
-                        break;
-                    } catch (final IOException ignore) {
-                        logger.log(ignore);
-                    }
-                }
-                if (StringUtils.isEmpty(transloadURL)) {
-                    mhm.handleErrorGeneric(account, link, "Failed to find working transloadURL", 10, 5 * 60 * 1000l);
-                }
-                logger.info("Selected transloadURL/domain: " + transloadURL);
-                final String transloadID = UrlQuery.parse(transloadURL).get("id");
-                final String continueURL = br.getRegex("(\\?id=" + Regex.escape(transloadID) + "[^<>\"\\']+\\&action=download)").getMatch(0);
-                if (continueURL == null) {
-                    mhm.handleErrorGeneric(account, link, "Failed to find continueURL", 10, 5 * 60 * 1000l);
-                }
-                br.getPage(continueURL);
-                dllink = br.getRegex("(files/[^\"\\']+)(?:\"|') class=.DOWNLOAD").getMatch(0);
+            final String apilink = (String) entries.get("link");
+            br.getPage(apilink);
+            entries = handleAPIErrors(account, link);
+            entries = (Map<String, Object>) entries.get("data");
+            final String state = (String) entries.get("state");
+            if ("processing".equalsIgnoreCase(state)) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is being transferred to fakirdebrid servers: " + entries.get("completed") + "%", 10 * 1000l);
+            } else if (!"completed".equals(state)) {
+                mhm.handleErrorGeneric(account, link, "Unknown state: " + state, 50);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            final String dllink = entries.get("link").toString();
             if (dllink == null) {
                 mhm.handleErrorGeneric(account, link, "Failed to find final downloadurl", 10, 5 * 60 * 1000l);
             }
@@ -209,7 +155,7 @@ public class FakirdebridNet extends PluginForHost {
                 br.followConnection(true);
                 mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to file", 10, 5 * 60 * 1000l);
             }
-            link.setProperty(this.getHost() + "directlink", dl.getConnection().getURL().toString());
+            link.setProperty(this.getHost() + "directlink", dl.getConnection().getURL().toExternalForm());
             link.setProperty(PROPERTY_RESUME, resumable);
             link.setProperty(PROPERTY_MAXCHUNKS, maxChunks);
         }
@@ -242,45 +188,44 @@ public class FakirdebridNet extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        login(account, true);
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (Boolean.TRUE.equals(entries.get("banned"))) {
-            throw new AccountInvalidException("Account banned");
-        }
+        final Map<String, Object> entries = login(account);
+        final Map<String, Object> accountData = (Map<String, Object>) entries.get("account");
+        final Map<String, Object> trafficData = (Map<String, Object>) accountData.get("traffic");
         final AccountInfo ai = new AccountInfo();
         ai.setTrafficRefill(false);
         /*
          * User only enters apikey as password and could enter anything into the username field --> Make sure it contains an unique value.
          */
-        final String username = (String) entries.get("username");
+        final String username = (String) accountData.get("username");
         if (!StringUtils.isEmpty(username)) {
             account.setUser(username);
         }
         account.setType(AccountType.PREMIUM);
         final String message = (String) entries.get("message");
-        final String accountTypeStr = (String) entries.get("type");
-        if (!StringUtils.isEmpty(message) && !StringUtils.isEmpty(accountTypeStr)) {
-            ai.setStatus(message + " - " + accountTypeStr);
-        } else if (!StringUtils.isEmpty(accountTypeStr)) {
-            ai.setStatus(accountTypeStr);
+        final String planStr = (String) accountData.get("plan");
+        if (!StringUtils.isEmpty(message) && !StringUtils.isEmpty(planStr)) {
+            ai.setStatus(message + " - Plan: " + planStr);
+        } else if (!StringUtils.isEmpty(planStr)) {
+            ai.setStatus("Plan: " + planStr);
         } else if (!StringUtils.isEmpty(message)) {
             ai.setStatus(message);
         }
-        ai.setTrafficLeft(((Number) entries.get("trafficleft")).longValue());
-        ai.setTrafficMax(((Number) entries.get("trafficlimit")).longValue());
-        ai.setValidUntil(JavaScriptEngineFactory.toLong(entries.get("premium_until"), 0) * 1000l, br);
-        br.getPage(API_BASE + "/supportedhosts.php?pin=" + Encoding.urlEncode(account.getPass()));
-        final Map<String, Object> supportedhosts_root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final List<Map<String, Object>> arrayHoster;
-        final Object arrayHosterO = supportedhosts_root.get("supportedhosts");
-        /* 2021-05-27: API can return Map instead of expected Array */
-        if (arrayHosterO instanceof Map) {
-            final Map<String, Object> mapHoster = (Map<String, Object>) arrayHosterO;
-            arrayHoster = new ArrayList(mapHoster.values());
-            // mapHoster.values();
+        ai.setTrafficLeft(((Number) trafficData.get("left")).longValue());
+        ai.setTrafficMax(((Number) trafficData.get("limit")).longValue());
+        final long premiumUntil = ((Number) accountData.get("premium_until")).longValue();
+        final long serverTime = ((Number) entries.get("server_time")).longValue();
+        if (premiumUntil > 0 && serverTime > 0) {
+            /* Use server_time to calculate remaining validity, then anchor to local clock */
+            final long validForMs = (premiumUntil - serverTime) * 1000L;
+            ai.setValidUntil(System.currentTimeMillis() + validForMs);
+            account.setType(AccountType.PREMIUM);
         } else {
-            arrayHoster = (List<Map<String, Object>>) arrayHosterO;
+            ai.setExpired(true);
+            account.setType(AccountType.FREE);
         }
+        br.getPage(API_BASE + "/hosts/" + Encoding.urlEncode(account.getPass()));
+        final Map<String, Object> supportedhosts_root = handleAPIErrors(account, null);
+        final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) supportedhosts_root.get("supportedhosts");
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostermap : arrayHoster) {
             final String domain = hostermap.get("host").toString();
@@ -300,140 +245,117 @@ public class FakirdebridNet extends PluginForHost {
         return ai;
     }
 
-    private void login(final Account account, final boolean validateToken) throws IOException, PluginException, InterruptedException {
+    private Map<String, Object> login(final Account account) throws Exception {
         synchronized (account) {
-            if (!validateToken) {
-                logger.info("Trust token without login");
-                return;
+            br.getPage(API_BASE + "/account/" + Encoding.urlEncode(account.getPass()));
+            return handleAPIErrors(account, null);
+        }
+    }
+
+    /** Parses the current br response into a Map. Throws on invalid JSON without inspecting the content. */
+    private Map<String, Object> parseAPIResponse(final Account account, final DownloadLink link) throws Exception {
+        try {
+            return restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            final String msg = "Invalid API response";
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, 1 * 60 * 1000l);
             } else {
-                br.getPage(API_BASE + "/info.php?pin=" + Encoding.urlEncode(account.getPass()));
-                handleErrorsAPI(br, null, account);
-                /* Assume successful login if no error has happened! */
+                throw new AccountUnavailableException(msg, 1 * 60 * 1000l);
             }
         }
+    }
+
+    /** Parses the current br response and delegates to {@link #handleAPIErrors(Map, Account, DownloadLink)}. */
+    private Map<String, Object> handleAPIErrors(final Account account, final DownloadLink link) throws Exception {
+        return handleAPIErrors(parseAPIResponse(account, link), account, link);
     }
 
     /**
-     * 'PIN_Required' => 'PIN Required', </br> 'URL_Required' => 'You did not add URL data', </br> 'PIN_Invalid' => 'Invalid PIN',</br>
-     * 'NOT_Supported' => 'This service is not supported or not supported by API.',</br> 'Limit_Error_Transfer' => 'You have exhausted all
-     * transfer limits of your account, You need to purchase a new package.',</br> 'Limit_Error_Premium' => 'You have filled the daily
-     * limits of your account. Please try again after the limits are reset.',</br> 'Link_Error_Browser' => 'This link can only be downloaded
-     * via the browser.',</br> 'Link_Error' => 'An unknown error occurred while creating the link.',</br> 'File_not_found' => 'File not
-     * found',</br> 'Password_Required' => 'This file is protected by password. Please add link Password.',</br> 'Wrong_Password' => 'Wrong
-     * Password, Please try again.',</br> 'File_Unavailable' => 'This link is currently unavailable. Please try again later.',</br>
-     * 'Price_File' => 'This link cannot be downloaded with premium account, You can download it by purchasing this link only.',</br>
-     * 'Download_Server_Error' => 'Download server with your file is temporarily unavailable.',</br> 'OVH_Yangin' => 'This file seems to
-     * have been affected by the fire in the OVH datacenter.',</br> 'Size_Error' => 'The premium download link for this file is not
-     * working.',</br> 'Banned_Account' => 'Banned Account',</br> 'Free_Account' => 'Not supported for free members.',
+     * CODE1: Unauthorized </br>
+     * CODE2: Unauthorized </br>
+     * CODE3: Unauthorized </br>
+     * CODE5: Account automatically suspended </br>
+     * CODE6: Transfer limit reached – upgrade required </br>
+     * CODE7: Transfer limit reached – upgrade required </br>
+     * CODE8: Daily download limit reached </br>
+     * CODE9: Daily link limit reached </br>
+     * CODE10: Account permanently banned </br>
+     * CODE11: Invalid link </br>
+     * CODE12: Invalid link format </br>
+     * CODE13: Daily download limit reached for hoster </br>
+     * CODE14: Daily link limit reached for hoster </br>
+     * CODE15: Weekly download limit reached for hoster </br>
+     * CODE16: Weekly link limit reached for hoster </br>
+     * CODE17-21/23/26-27/29: Link not supported or temporarily unavailable </br>
+     * CODE22/24-25/28: File download link removed or incorrect </br>
+     * CODE30: Host not supported </br>
+     * CODE31: Unknown error </br>
+     * CODE32: File removed by owner </br>
+     * CODE33: File ID does not exist </br>
+     * CODE34: Invalid PIN </br>
+     * CODE35: VIP account required
      */
-    private void handleErrorsAPI(final Browser br, final DownloadLink link, final Account account) throws PluginException, InterruptedException {
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Object errorO = entries.get("error");
-        if (!Boolean.TRUE.equals(errorO)) {
-            /* No error */
-            return;
+    private Map<String, Object> handleAPIErrors(final Map<String, Object> entries, final Account account, final DownloadLink link) throws Exception {
+        if (!Boolean.FALSE.equals(entries.get("success"))) {
+            return entries;
         }
         final String message = (String) entries.get("message");
         final Object errorCodeO = entries.get("code");
-        if (errorCodeO instanceof Number || errorCodeO.toString().matches("\\d+")) {
-            /* 2021-09-14: Seems like this is not required anymore because the "code" field is always a String. */
-            final int errorcode = Integer.parseInt(errorCodeO.toString());
-            switch (errorcode) {
-            case -1:
-                /* No error */
-                break;
-            case 1001:
-                /* Invalid PIN */
-                if (!account.hasEverBeenValid()) {
-                    showPINLoginInformation();
-                }
-                throw new AccountInvalidException(message);
-            default:
-                throw new AccountInvalidException(message);
-            }
-        } else {
-            /* Distinguish between temp. account errors, permanent account errors and downloadlink/host related errors. */
-            final String errorStr = errorCodeO.toString();
-            if (errorStr.equalsIgnoreCase("PIN_Invalid")) {
-                /* Only show this dialog if user has tried to add this account for the first time. */
-                if (!account.hasEverBeenValid()) {
-                    showPINLoginInformation();
-                }
-                throw new AccountInvalidException(message);
-            } else if (errorStr.equalsIgnoreCase("Banned_Account") || errorStr.equalsIgnoreCase("Free_Account")) {
-                /* Permanent account error */
-                throw new AccountInvalidException(message);
-            } else if (errorStr.equalsIgnoreCase("Limit_Error_Transfer") || errorStr.equalsIgnoreCase("Limit_Error_Premium")) {
-                /* Temp. account error */
-                throw new AccountUnavailableException(errorStr, 5 * 60 * 1000l);
-            } else if (errorStr.equalsIgnoreCase("Password_Required")) {
-                link.setPasswordProtected(true);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Password required");
-            } else if (errorStr.equalsIgnoreCase("Wrong_Password")) {
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-            } else if (errorStr.equalsIgnoreCase("File_not_found")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        final String errorStr = errorCodeO != null ? errorCodeO.toString() : "";
+        switch (errorStr) {
+        case "CODE1":
+        case "CODE2":
+        case "CODE3":
+        case "CODE34":
+            /* Invalid or missing PIN -> permanent account error */
+            throw new AccountInvalidException(message);
+        case "CODE5":
+        case "CODE10":
+            /* Account suspended or permanently banned -> permanent account error */
+            throw new AccountInvalidException(message);
+        case "CODE35":
+            /* VIP account required (free account) -> permanent account error */
+            throw new AccountInvalidException(message);
+        case "CODE6":
+        case "CODE7":
+            /* Transfer limit exhausted -> temporary account error */
+            throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+        case "CODE8":
+        case "CODE9":
+            /* Daily download/link limit reached -> temporary account error */
+            throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+        case "CODE32":
+        case "CODE33":
+            /* File not found or removed by owner */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        case "CODE30":
+            /* Host not supported -> put error for this specific hoster */
+            mhm.putError(account, link, 5 * 60 * 1000l, message);
+            /* Unreachable code */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        default:
+            logger.info("Unhandled API error: " + errorStr + " | " + message);
+            if (link == null) {
+                throw new AccountUnavailableException(message, 5 * 60 * 1000l);
             } else {
-                logger.info("Unknown error happened: " + errorStr);
-                if (link == null) {
-                    throw new AccountUnavailableException(errorStr, 5 * 60 * 1000l);
-                } else {
-                    mhm.handleErrorGeneric(account, link, errorStr, 10);
-                }
+                mhm.handleErrorGeneric(account, link, errorStr, 10);
             }
         }
-    }
-
-    private static final String pinURLWithoutProtocol = "fakirdebrid.net/api/login.php";
-
-    private Thread showPINLoginInformation() {
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = "Fakirdebrid.net - Login";
-                        message += "Hallo liebe(r) Fakirdebrid NutzerIn\r\n";
-                        message += "Um deinen Fakirdebrid Account in JDownloader verwenden zu können, musst du folgende Schritte beachten:\r\n";
-                        message += "1. Öffne den folgenden Link im Browser falls das nicht bereits automatisch passiert ist:\r\n\t'" + pinURLWithoutProtocol + "'\t\r\n";
-                        message += "2. Kopiere deine PIN, versuche erneut einen fakirdebrid Account hinzuzufügen und gib sie in JDownloader ein.\r\n";
-                        message += "Falls du myjdownloader verwendest, gib die PIN in das Benutzername- und in das Passwort Feld ein.\r\n";
-                    } else {
-                        title = "Fakirdebrid.net - Login";
-                        message += "Hello dear Fakirdebrid user\r\n";
-                        message += "In order to use this service in JDownloader, you need to follow these steps:\r\n";
-                        message += "1. Open this URL in your browser if it is not opened automatically:\r\n\t'" + pinURLWithoutProtocol + "'\t\r\n";
-                        message += "2. Copy your PIN, try to add your fakirdebrid account to JD again and enter the PIN into the PIN field.\r\n";
-                        message += "If you're using myjdownloader, enter the PIN in both the username- and password fields.\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(2 * 60 * 1000);
-                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                        CrossSystem.openURL("https://" + pinURLWithoutProtocol);
-                    }
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
+        return entries;
     }
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + pinURLWithoutProtocol;
+        return "https://" + getHost() + "Real-Debrid/api/login.php";
     }
 
     @Override
     protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
-        } else if (str.matches("[A-Za-z0-9]{10,}")) {
+        } else if (str.matches("[a-f0-9]{20,}")) {
+            /* Do not validate with fixed length as admin wants to change length in the future. */
             return true;
         } else {
             return false;

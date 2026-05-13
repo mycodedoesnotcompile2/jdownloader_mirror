@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -38,7 +35,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BuzzheavierComFolder;
 
-@HostPlugin(revision = "$Revision: 52743 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 52799 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BuzzheavierComFolder.class })
 public class BuzzheavierCom extends PluginForHost {
     public BuzzheavierCom(PluginWrapper wrapper) {
@@ -146,19 +146,22 @@ public class BuzzheavierCom extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String dllink = br.getURL() + "/download";
+        String dllink = br.getURL() + "/download";
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             /* Check for special redirect */
-            br.followConnection();
+            br.followConnection(true);
             dl = null;
-            final String hxRedirect = br.getRequest().getResponseHeader("Hx-Redirect");
-            if (hxRedirect == null) {
+            dllink = br.getRequest().getResponseHeader("Hx-Redirect");
+            if (dllink == null) {
+                dllink = br.getRegex("hx-get\\s*=\\s*\"([^\"]*download[^\"]*)\"").getMatch(0);
+            }
+            if (dllink == null) {
                 this.handleConnectionErrors(br, dl.getConnection());
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, hxRedirect, this.isResumeable(link, null), this.getMaxChunks(link, null));
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         }
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();

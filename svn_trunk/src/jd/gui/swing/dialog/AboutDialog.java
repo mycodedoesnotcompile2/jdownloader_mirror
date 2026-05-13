@@ -98,6 +98,7 @@ import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.updatev2.UpdateController;
 
 public class AboutDialog extends AbstractDialog<Integer> {
     private int labelHeight = 0;
@@ -201,6 +202,11 @@ public class AboutDialog extends AbstractDialog<Integer> {
         Map<String, Object> map = null;
         try {
             stats.add(createLink(_GUI.T.jd_gui_swing_components_AboutDialog_trademark(), "https://jdownloader.org/impressum"), "spanx,alignx center");
+            if (UpdateController.getInstance().getHandler() == null) {
+                final ExtButton link;
+                stats.add(link = createLink(_GUI.T.jd_gui_swing_components_AboutDialog_custom_build()), "spanx,alignx center");
+                link.setForeground(Color.RED);
+            }
             try {
                 final File buildJson = Application.getResource("build.json");
                 if (buildJson.isFile()) {

@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.GelbooruCom;
 
-@DecrypterPlugin(revision = "$Revision: 52785 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
+@DecrypterPlugin(revision = "$Revision: 52802 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
 public class GelbooruComCrawler extends PluginForDecrypt {
     public GelbooruComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,7 @@ public class GelbooruComCrawler extends PluginForDecrypt {
         int number_of_adPagesSkipped = 0;
         final ArrayList<String> dupes = new ArrayList<String>();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String singleResultOnFirstPage = br.getRegex("(/index\\.php\\?page=post&s=view&id=\\d+)").getMatch(0);
+        String singleResultOnFirstPage = br.getRegex("(/?index\\.php\\?page=post&s=view&id=\\d+)").getMatch(0);
         if (singleResultOnFirstPage != null) {
             singleResultOnFirstPage = br.getURL(singleResultOnFirstPage).toExternalForm();
         }

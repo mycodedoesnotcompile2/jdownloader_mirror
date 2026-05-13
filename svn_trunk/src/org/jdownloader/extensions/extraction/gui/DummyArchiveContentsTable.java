@@ -23,6 +23,7 @@ public class DummyArchiveContentsTable extends BasicJDTable<DummyArchiveFile> {
             }
         }
 
+        getModel().setColumnVisible(((DummyArchiveContentsTableModel) getModel()).getPackageName(), linkgrabber);
         getModel().setColumnVisible(((DummyArchiveContentsTableModel) getModel()).getLinkStatus(), linkgrabber);
         addRowHighlighter(new ExtOverlayRowHighlighter(null, ColorUtils.getAlphaInstance(Color.RED, 20)) {
 

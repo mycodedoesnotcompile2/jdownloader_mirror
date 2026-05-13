@@ -19,7 +19,11 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -27,6 +31,10 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -35,11 +43,15 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52786 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52803 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
         super(wrapper);
+        /* 2026-05-12: Account support not yet done, thus only enabled in IDE mode */
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.enablePremium("https://" + getHost() + "/register");
+        }
     }
 
     @Override
@@ -51,9 +63,10 @@ public class NhentaiNet extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
 
+    public static final String API_BASE    = "https://nhentai.net/api/v2";
     public static final String EXT_DEFAULT = ".jpg";
 
     public static String[] getAnnotationNames() {
@@ -192,6 +205,59 @@ public class NhentaiNet extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    protected String getAPILoginHelpURL() {
+        return "https://" + getHost() + "/user/settings#profile,apikeys";
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        return str != null && str.matches("nhk_[A-Za-z0-9]{40,}");
+    }
+
+    private void login(final Browser br, final Account account) {
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Key " + account.getPass());
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        login(br, account);
+        br.getPage(API_BASE + "/user");
+        if (br.getHttpConnection().getResponseCode() == 401) {
+            throw new AccountInvalidException("Invalid or expired API key");
+        }
+        final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String username = (String) user.get("username");
+        if (!StringUtils.isEmpty(username)) {
+            account.setUser(username);
+        }
+        final AccountInfo ai = new AccountInfo();
+        ai.setUnlimitedTraffic();
+        final Boolean isStaff = (Boolean) user.get("is_staff");
+        final Boolean isSuperuser = (Boolean) user.get("is_superuser");
+        if (Boolean.TRUE.equals(isSuperuser) || Boolean.TRUE.equals(isStaff)) {
+            account.setType(AccountType.PREMIUM);
+            ai.setStatus("Staff");
+        } else {
+            account.setType(AccountType.FREE);
+            ai.setStatus("Registered user");
+        }
+        account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
+        account.setConcurrentUsePossible(true);
+        return ai;
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        // TODO: Implement functionality
+        handleFree(link);
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
     }
 
     @Override

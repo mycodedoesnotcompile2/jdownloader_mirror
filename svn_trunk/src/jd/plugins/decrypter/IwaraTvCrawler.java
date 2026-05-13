@@ -44,7 +44,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.IwaraTvConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 52387 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52799 $", interfaceVersion = 3, names = {}, urls = {})
 public class IwaraTvCrawler extends PluginForDecrypt {
     public IwaraTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class IwaraTvCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "iwara.tv", "trollvids.com" });
+        ret.add(new String[] { "iwara.tv", "trollvids.com", "iwara.ai" });
         return ret;
     }
 

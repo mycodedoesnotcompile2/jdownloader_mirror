@@ -47,7 +47,6 @@ import org.appwork.testhelper.AWTestValidateClassReference;
  *
  */
 public class JarHandlerWorkaroundOracle {
-
     @AWTestValidateClassReference
     public static final String         CLASS_ORG_APPWORK_UTILS_ORACLE_WORKAROUND_JAR_HANDLER = "org.appwork.utils.OracleWorkaroundJarHandler";
     private static final AtomicBoolean INIT                                                  = new AtomicBoolean(false);
@@ -146,6 +145,10 @@ public class JarHandlerWorkaroundOracle {
                             }
                         }
                     }
+                }
+            } catch (final ClassNotFoundException ignore) {
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    ignore.printStackTrace();
                 }
             } catch (final Throwable e) {
                 e.printStackTrace();

@@ -2089,6 +2089,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Build Date:" })
     String jd_gui_swing_components_AboutDialog_builddate();
 
+    @Default(lngs = { "en" }, values = { "!!! Custom Build !!!" })
+    String jd_gui_swing_components_AboutDialog_custom_build();
+
     @Default(lngs = { "en" }, values = { "Runtime:" })
     String jd_gui_swing_components_AboutDialog_runtime();
 

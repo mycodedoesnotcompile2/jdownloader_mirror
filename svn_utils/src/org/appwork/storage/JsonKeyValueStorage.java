@@ -141,8 +141,6 @@ public class JsonKeyValueStorage extends Storage {
             getDefaultLogger().info("Prefer (merged) JSon Storage from File: " + file);
             final HashMap<String, Object> load = JSonStorage.restoreFrom(file, plain, key, TypeRef.HASHMAP, new HashMap<String, Object>());
             this.putAll(load);
-        } else {
-            getDefaultLogger().info("CFG File does not exist: " + file);
         }
     }
 
@@ -315,7 +313,7 @@ public class JsonKeyValueStorage extends Storage {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.storage.Storage#getID()
      */
     @Override
@@ -610,7 +608,7 @@ public class JsonKeyValueStorage extends Storage {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.storage.Storage#size()
      */
     @Override
@@ -634,5 +632,4 @@ public class JsonKeyValueStorage extends Storage {
             getLock().readUnlock(readL);
         }
     }
-
 }

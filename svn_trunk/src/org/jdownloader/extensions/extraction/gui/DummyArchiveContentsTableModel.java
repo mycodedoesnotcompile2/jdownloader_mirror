@@ -6,18 +6,28 @@ import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.jdownloader.extensions.extraction.DummyArchive;
 import org.jdownloader.extensions.extraction.DummyArchiveFile;
+import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.translate.T;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
 import jd.plugins.DownloadLink.AvailableStatus;
 
 public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFile> {
-
+    private ExtTextColumn<DummyArchiveFile> packageName;
     private ExtTextColumn<DummyArchiveFile> local;
     private ExtTextColumn<DummyArchiveFile> linkStatus;
     private ExtTextColumn<DummyArchiveFile> name;
+
+    /**
+     * All parts of a DummyArchive belong to the same linkgrabber package. We resolve the package name once at construction time from the
+     * first CrawledLinkArchiveFile found in the list, so that missing/placeholder entries (which carry no CrawledLink) can display the same
+     * name.
+     */
+    private final String                    resolvedPackageName;
 
     public ExtTextColumn<DummyArchiveFile> getLocal() {
         return local;
@@ -25,13 +35,31 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
 
     public DummyArchiveContentsTableModel(DummyArchive da) {
         super("DummyArchiveContentsTableModel");
+        String pkgName = "";
+        for (final DummyArchiveFile daf : da.getList()) {
+            if (daf.getArchiveFile() instanceof CrawledLinkArchiveFile) {
+                final CrawledLink link = ((CrawledLinkArchiveFile) daf.getArchiveFile()).getLinks().get(0);
+                final CrawledPackage pkg = link.getParentNode();
+                if (pkg != null) {
+                    pkgName = pkg.getName();
+                    break;
+                }
+            }
+        }
+        this.resolvedPackageName = pkgName;
         _fireTableStructureChanged(da.getList(), true);
     }
 
     @Override
     protected void initColumns() {
+        addColumn(packageName = new ExtTextColumn<DummyArchiveFile>(T.T.packagename()) {
+            @Override
+            public String getStringValue(DummyArchiveFile value) {
+                /* All parts of the same archive share the same package name, resolved once at model construction. */
+                return resolvedPackageName;
+            }
+        });
         addColumn(name = new ExtTextColumn<DummyArchiveFile>(T.T.filename()) {
-
             @Override
             public String getStringValue(DummyArchiveFile value) {
                 return value.getName();
@@ -62,20 +90,14 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
                     }
                 }
             }
-
         });
-
         addColumn(linkStatus = new ExtTextColumn<DummyArchiveFile>(T.T.exists()) {
             private Icon unknown;
             private Icon online;
-
             private Icon offline;
-
             {
-
                 unknown = new AbstractIcon(IconKey.ICON_HELP, 16);
                 online = new AbstractIcon(IconKey.ICON_TRUE, 16);
-
                 offline = new AbstractIcon(IconKey.ICON_ERROR, 16);
             }
 
@@ -111,18 +133,14 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
                 }
                 return T.T.unknown_tt();
             }
-
         });
-
         addColumn(local = new ExtTextColumn<DummyArchiveFile>(T.T.local()) {
-
             @Override
             protected Icon getIcon(DummyArchiveFile value) {
                 if (value.isLocalFileAvailable()) {
                     return new AbstractIcon(IconKey.ICON_TRUE, 16);
                 }
                 return new AbstractIcon(IconKey.ICON_FALSE, 16);
-
             }
 
             @Override
@@ -137,8 +155,11 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
             protected String getTooltipText(DummyArchiveFile value) {
                 return getStringValue(value);
             }
-
         });
+    }
+
+    public ExtTextColumn<DummyArchiveFile> getPackageName() {
+        return packageName;
     }
 
     public ExtTextColumn<DummyArchiveFile> getLinkStatus() {
@@ -148,5 +169,4 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
     public ExtTextColumn<DummyArchiveFile> getName() {
         return name;
     }
-
 }

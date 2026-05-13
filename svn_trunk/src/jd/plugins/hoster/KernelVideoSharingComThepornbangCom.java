@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52797 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52802 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComThepornbangCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +87,7 @@ public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2
 
     @Override
     protected boolean isOfflineWebsite(final Browser br) {
-        if (!this.canHandle(br.getURL()) && !br.containsHTML("video_id:") && !br.containsHTML("var flashvars")) {
+        if (this.findURLType(br.getURL()) != getExpectedURLType() && !br.containsHTML("video_id:") && !br.containsHTML("var flashvars")) {
             /* Redirect to unsupported link happened e.g. https://www.thepornbang.com/home15/ */
             return true;
         }

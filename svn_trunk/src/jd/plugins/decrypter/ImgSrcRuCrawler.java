@@ -46,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgSrcRu;
 
-@DecrypterPlugin(revision = "$Revision: 50648 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52802 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImgSrcRuCrawler extends PluginForDecrypt {
     // dev notes
     // &pwd= is a md5 hash id once you've provided password for that album.
@@ -215,16 +215,9 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
             } else if (br._getURL().getPath().equalsIgnoreCase("/main/search.php")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            username = br.getRegex(">\\s*more\\s*photos\\s*from\\s*(.*?)\\s*<").getMatch(0);
+            username = br.getRegex("rel=\"canonical\" href=\"https?://[^/]+/([^/\"]+)/").getMatch(0);
             if (username == null) {
-                username = br.getRegex(">\\s*Add\\s*(.*?)\\s*to\\s*your").getMatch(0);
-                if (username == null) {
-                    username = br.getRegex("/main/user\\.php\\?user=(.*?)'").getMatch(0);
-                }
-            }
-            if (username == null) {
-                /* 2024-03-19 */
-                username = br.getRegex("class='tomato'[^>]*>([^<]+)</a>").getMatch(0);
+                username = br.getRegex("rel=\"alternate\" href=\"https?://[^/]+/([^/\"]+)/").getMatch(0);
             }
             if (username == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -395,11 +388,10 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
     public static void handleIFrameContainer(Browser br) throws Exception {
         if (StringUtils.contains(br.getURL(), "dlp.imgsrc.ru")) {
             final String iframeContainer = br.getRegex("<div\\s*class\\s*=\\s*\"iframe-container\"\\s*>\\s*<iframe\\s*src\\s*=\\s*\"(https?://imgsrc.ru/.*?)\"").getMatch(0);
-            if (iframeContainer != null) {
-                br.getPage(iframeContainer);
-            } else {
+            if (iframeContainer == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            br.getPage(iframeContainer);
         }
     }
 
@@ -415,7 +407,7 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
         final int repeat = 4;
         for (int i = 0; i <= repeat; i++) {
             if (isAbort()) {
-                throw new DecrypterException("Task Aborted");
+                throw new InterruptedException();
             }
             if (failed) {
                 long meep = new Random().nextInt(4) * 1000;

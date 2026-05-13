@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52797 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52802 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -798,7 +798,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 br.getPage(contenturl);
                 /* in case there is http<->https or url format redirect */
                 br.followRedirect();
-                this.checkErrorsWebsite(br, link, account);
+                checkErrorsWebsite(br, link, account);
                 /* Look for real unique videoID just in case it is not present in our use-given URL. */
                 String fuidInsideHTML = br.getRegex("\"https?://" + Pattern.quote(br.getHost()) + "/embed/(\\d+)/?\"").getMatch(0);
                 if (fuidInsideHTML == null) {
@@ -831,7 +831,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             /* Embed URL --> Build fake real URL and just go for it */
             final String fakeContentURL = this.generateContentURLFromEmbedURLVideoID(link);
             br.getPage(fakeContentURL);
-            this.checkErrorsWebsite(br, link, account);
+            checkErrorsWebsite(br, link, account);
             logger.info("Embed workaround result: Presumed real ContentURL: " + br.getURL());
         }
         if (br.containsHTML("\"iab_extended\"")) {
@@ -851,7 +851,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         }
         /* Not a private video or we're currently logged in [and friends with the uploader] and are allowed to watch it. */
         link.removeProperty(PROPERTY_IS_PRIVATE_VIDEO);
-        checkYouAreNotAllowedToWatchThisVideo(br, link, account);
         /* Only look for downloadurl if we need it! */
         final boolean setting_enable_fast_linkcheck = !enableFastLinkcheck();
         if (isDownload || !setting_enable_fast_linkcheck) {
@@ -1033,7 +1032,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> video = (Map<String, Object>) entries.get("video");
         if (video == null) {
-            if ("video_not_found".equals(entries.get("code"))) {
+            if ("video_not_found".equalsIgnoreCase((String) entries.get("code"))) {
                 /**
                  * 2023-04-28 e.g.: https://txxx.com/embed/882346568220/ </br>
                  * Typically also comes with this json: "error":1,"code":"video_not_found"
