@@ -22,21 +22,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.TwitterConfigInterface;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -53,13 +38,29 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.TwitterComCrawler;
 
-@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.TwitterConfigInterface;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52810 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterCom extends PluginForHost {
     public TwitterCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,7 +70,15 @@ public class TwitterCom extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
+        final Browser br = new PluginBrowser<TwitterCom>(this) {
+            protected String getWaitForPageAccessHost(jd.http.Request request) {
+                final String ret = super.getWaitForPageAccessHost(request);
+                if ("x.com".equals(ret) && StringUtils.startsWithCaseInsensitive(request.getURL().getPath(), "/i/api")) {
+                    return "api.x.com";
+                }
+                return ret;
+            };
+        };
         br.setFollowRedirects(true);
         return br;
     }
@@ -169,7 +178,7 @@ public class TwitterCom extends PluginForHost {
     @Override
     public void init() {
         super.init();
-        TwitterComCrawler.setRequestIntervallLimits();
+        TwitterComCrawler.setRequestIntervallLimits(this);
     }
 
     @Override

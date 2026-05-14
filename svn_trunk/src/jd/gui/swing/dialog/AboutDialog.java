@@ -210,7 +210,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
             try {
                 final File buildJson = Application.getResource("build.json");
                 if (buildJson.isFile()) {
-                    map = JSonStorage.restoreFromString(IO.readFileToString(buildJson), TypeRef.HASHMAP);
+                    map = JSonStorage.restoreFromString(IO.readFileToString(buildJson), TypeRef.MAP);
                 }
             } catch (Exception e) {
                 org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);

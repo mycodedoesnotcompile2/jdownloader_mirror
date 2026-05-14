@@ -600,8 +600,12 @@ public class Browser implements HTTPConnectionFactoryInterface {
         return null;
     }
 
+    protected String getWaitForPageAccessHost(Request request) {
+        return request.getURL().getHost();
+    }
+
     private static void waitForPageAccess(final Browser browser, final Request request) throws InterruptedException {
-        final String host = request.getURL().getHost();
+        final String host = browser.getWaitForPageAccessHost(request);
         Set<List<Request>> requestQueues = null;
         try {
             AtomicLong lastRequest = null;
@@ -738,7 +742,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     *
+     * 
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -3742,8 +3746,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {

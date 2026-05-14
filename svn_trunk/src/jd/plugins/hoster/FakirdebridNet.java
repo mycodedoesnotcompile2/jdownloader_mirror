@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -44,7 +39,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52802 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52811 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
     // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
     private static final String          API_BASE           = "https://api.fakirdebrid.net";
@@ -272,29 +272,14 @@ public class FakirdebridNet extends PluginForHost {
     }
 
     /**
-     * CODE1: Unauthorized </br>
-     * CODE2: Unauthorized </br>
-     * CODE3: Unauthorized </br>
-     * CODE5: Account automatically suspended </br>
-     * CODE6: Transfer limit reached – upgrade required </br>
-     * CODE7: Transfer limit reached – upgrade required </br>
-     * CODE8: Daily download limit reached </br>
-     * CODE9: Daily link limit reached </br>
-     * CODE10: Account permanently banned </br>
-     * CODE11: Invalid link </br>
-     * CODE12: Invalid link format </br>
-     * CODE13: Daily download limit reached for hoster </br>
-     * CODE14: Daily link limit reached for hoster </br>
-     * CODE15: Weekly download limit reached for hoster </br>
-     * CODE16: Weekly link limit reached for hoster </br>
-     * CODE17-21/23/26-27/29: Link not supported or temporarily unavailable </br>
-     * CODE22/24-25/28: File download link removed or incorrect </br>
-     * CODE30: Host not supported </br>
-     * CODE31: Unknown error </br>
-     * CODE32: File removed by owner </br>
-     * CODE33: File ID does not exist </br>
-     * CODE34: Invalid PIN </br>
-     * CODE35: VIP account required
+     * CODE1: Unauthorized </br> CODE2: Unauthorized </br> CODE3: Unauthorized </br> CODE5: Account automatically suspended </br> CODE6:
+     * Transfer limit reached – upgrade required </br> CODE7: Transfer limit reached – upgrade required </br> CODE8: Daily download limit
+     * reached </br> CODE9: Daily link limit reached </br> CODE10: Account permanently banned </br> CODE11: Invalid link </br> CODE12:
+     * Invalid link format </br> CODE13: Daily download limit reached for hoster </br> CODE14: Daily link limit reached for hoster </br>
+     * CODE15: Weekly download limit reached for hoster </br> CODE16: Weekly link limit reached for hoster </br> CODE17-21/23/26-27/29: Link
+     * not supported or temporarily unavailable </br> CODE22/24-25/28: File download link removed or incorrect </br> CODE30: Host not
+     * supported </br> CODE31: Unknown error </br> CODE32: File removed by owner </br> CODE33: File ID does not exist </br> CODE34: Invalid
+     * PIN </br> CODE35: VIP account required
      */
     private Map<String, Object> handleAPIErrors(final Map<String, Object> entries, final Account account, final DownloadLink link) throws Exception {
         if (!Boolean.FALSE.equals(entries.get("success"))) {
@@ -303,41 +288,34 @@ public class FakirdebridNet extends PluginForHost {
         final String message = (String) entries.get("message");
         final Object errorCodeO = entries.get("code");
         final String errorStr = errorCodeO != null ? errorCodeO.toString() : "";
-        switch (errorStr) {
-        case "CODE1":
-        case "CODE2":
-        case "CODE3":
-        case "CODE34":
+        if ("CODE1".equals(errorStr) || "CODE2".equals(errorStr) || "CODE3".equals(errorStr) || "CODE34".equals(errorStr)) {
             /* Invalid or missing PIN -> permanent account error */
             throw new AccountInvalidException(message);
-        case "CODE5":
-        case "CODE10":
+        } else if ("CODE5".equals(errorStr) || "CODE10".equals(errorStr)) {
             /* Account suspended or permanently banned -> permanent account error */
             throw new AccountInvalidException(message);
-        case "CODE35":
+        } else if ("CODE35".equals(errorStr)) {
             /* VIP account required (free account) -> permanent account error */
             throw new AccountInvalidException(message);
-        case "CODE6":
-        case "CODE7":
+        } else if ("CODE6".equals(errorStr) || "CODE7".equals(errorStr)) {
             /* Transfer limit exhausted -> temporary account error */
-            throw new AccountUnavailableException(message, 5 * 60 * 1000l);
-        case "CODE8":
-        case "CODE9":
+            throw new AccountUnavailableException(message, 5 * 60 * 1000L);
+        } else if ("CODE8".equals(errorStr) || "CODE9".equals(errorStr)) {
             /* Daily download/link limit reached -> temporary account error */
-            throw new AccountUnavailableException(message, 5 * 60 * 1000l);
-        case "CODE32":
-        case "CODE33":
+            throw new AccountUnavailableException(message, 5 * 60 * 1000L);
+        } else if ("CODE32".equals(errorStr) || "CODE33".equals(errorStr)) {
             /* File not found or removed by owner */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        case "CODE30":
+        } else if ("CODE30".equals(errorStr)) {
             /* Host not supported -> put error for this specific hoster */
-            mhm.putError(account, link, 5 * 60 * 1000l, message);
+            mhm.putError(account, link, 5 * 60 * 1000L, message);
             /* Unreachable code */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        default:
+        } else {
+            /* Default case */
             logger.info("Unhandled API error: " + errorStr + " | " + message);
             if (link == null) {
-                throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+                throw new AccountUnavailableException(message, 5 * 60 * 1000L);
             } else {
                 mhm.handleErrorGeneric(account, link, errorStr, 10);
             }

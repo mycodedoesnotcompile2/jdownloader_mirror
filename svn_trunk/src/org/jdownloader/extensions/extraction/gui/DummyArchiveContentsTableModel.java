@@ -2,19 +2,23 @@ package org.jdownloader.extensions.extraction.gui;
 
 import javax.swing.Icon;
 
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.DummyArchive;
 import org.jdownloader.extensions.extraction.DummyArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArchiveFile;
+import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.translate.T;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
-
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.plugins.DownloadLink.AvailableStatus;
 
 public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFile> {
     private ExtTextColumn<DummyArchiveFile> packageName;
@@ -37,9 +41,17 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
         super("DummyArchiveContentsTableModel");
         String pkgName = "";
         for (final DummyArchiveFile daf : da.getList()) {
-            if (daf.getArchiveFile() instanceof CrawledLinkArchiveFile) {
-                final CrawledLink link = ((CrawledLinkArchiveFile) daf.getArchiveFile()).getLinks().get(0);
+            final ArchiveFile archiveFile = daf.getArchiveFile();
+            if (archiveFile instanceof CrawledLinkArchiveFile) {
+                final CrawledLink link = ((CrawledLinkArchiveFile) archiveFile).getLinks().get(0);
                 final CrawledPackage pkg = link.getParentNode();
+                if (pkg != null) {
+                    pkgName = pkg.getName();
+                    break;
+                }
+            } else if (archiveFile instanceof DownloadLinkArchiveFile) {
+                final DownloadLink link = ((DownloadLinkArchiveFile) archiveFile).getDownloadLinks().get(0);
+                final FilePackage pkg = link.getParentNode();
                 if (pkg != null) {
                     pkgName = pkg.getName();
                     break;
