@@ -19,6 +19,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.raf.FileBytesMap;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.resources.AWUTheme;
@@ -45,11 +50,6 @@ import org.jdownloader.controlling.ffmpeg.FFMpegException.ERROR;
 import org.jdownloader.downloader.hls.FFMpegBridgeServer;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
-
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.raf.FileBytesMap;
 
 public abstract class AbstractFFmpegBinary {
     public static enum FLAGTYPE {
@@ -986,8 +986,9 @@ public abstract class AbstractFFmpegBinary {
                     logger.info("ExitCode:" + exitCode);
                     final boolean okay = exitCode == 0;
                     if (!okay) {
-                        if (StringUtils.containsIgnoreCase(lastStderr, "No such file or directory") || StringUtils.containsIgnoreCase(lastStderr, "Invalid argument")) {
-                            throw new FFMpegException("FFmpeg Failed: path too long?", lastStdout, lastStderr, ERROR.PATH_LENGTH);
+                        if (StringUtils.containsIgnoreCase(lastStderr, "No such file or directory") || StringUtils.containsIgnoreCase(lastStderr, "Invalid argument") || StringUtils.containsIgnoreCase(lastStderr, "Illegal byte sequence")) {
+                            // /Users/XZY/...../Songs/... 😞😩😔🩷 .....m4a.part.part: Illegal byte sequence
+                            throw new FFMpegException("FFmpeg Failed: path too long or contains invalid chars?", lastStdout, lastStderr, ERROR.PATH_OR_LENGTH);
                         } else if (StringUtils.containsIgnoreCase(lastStderr, "Unrecognized option 'c:v'") || StringUtils.containsIgnoreCase(lastStderr, "Unrecognized option '-c:v'")) {
                             throw new FFMpegException("FFmpeg Failed: version too old", lastStdout, lastStderr, ERROR.TOO_OLD);
                         } else if (StringUtils.containsIgnoreCase(lastStderr, "No space left on device") && StringUtils.containsIgnoreCase(lastStderr, "Error writing")) {

@@ -847,7 +847,7 @@ public class HLSDownloader extends DownloadInterface {
                         deleteOutput = false;
                     } catch (FFMpegException e) {
                         // some systems have problems with special chars to find the in or out file.
-                        if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+                        if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                             final File tmpOut = new File(outputCompleteFile.getParent(), "ffmpeg_out" + UniqueAlltimeID.create());
                             logger.info("Try workaround:" + e.getError() + "|Tmp:" + tmpOut + "|Dest:" + outputCompleteFile);
                             boolean deleteTmp = true;
@@ -891,7 +891,7 @@ public class HLSDownloader extends DownloadInterface {
                 }
             }
         } catch (final FFMpegException e) {
-            if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+            if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                 throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
             } else if (FFMpegException.ERROR.DISK_FULL.equals(e.getError())) {
                 throw new SkipReasonException(SkipReason.DISK_FULL, e);
@@ -1049,7 +1049,7 @@ public class HLSDownloader extends DownloadInterface {
                         partFile.downloadFlag.set(true);
                     } catch (FFMpegException e) {
                         // some systems have problems with special chars to find the in or out file.
-                        if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+                        if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                             final File tmpOut = new File(destination.getParent(), "ffmpeg_out" + UniqueAlltimeID.create());
                             logger.info("Try workaround:" + e.getError() + "|Tmp:" + tmpOut + "|Dest:" + destination);
                             boolean deleteTmp = true;
@@ -1082,7 +1082,7 @@ public class HLSDownloader extends DownloadInterface {
                 }
             }
         } catch (final FFMpegException e) {
-            if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+            if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                 throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
             } else if (FFMpegException.ERROR.DISK_FULL.equals(e.getError())) {
                 throw new SkipReasonException(SkipReason.DISK_FULL, e);

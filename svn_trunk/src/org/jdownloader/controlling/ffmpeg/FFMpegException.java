@@ -4,7 +4,7 @@ public class FFMpegException extends Exception {
     public static enum ERROR {
         INCOMPATIBLE,
         TOO_OLD,
-        PATH_LENGTH,
+        PATH_OR_LENGTH,
         UNKNOWN,
         DISK_FULL
     }

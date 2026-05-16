@@ -108,7 +108,7 @@ public abstract class FFmpeg extends AbstractFFmpegBinary {
             } catch (FFMpegException e) {
                 throwFFMpegException(e);
                 // some systems have problems with special chars to find the in or out file.
-                if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+                if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                     final File tmpAudioIn = new File(outFile.getParent(), "ffmpeg_audio_in_" + UniqueAlltimeID.create());
                     final File tmpOut = new File(outFile.getParent(), "ffmpeg_out" + UniqueAlltimeID.create());
                     logger.info("Try special char workaround!");
@@ -172,7 +172,7 @@ public abstract class FFmpeg extends AbstractFFmpegBinary {
             } catch (FFMpegException e) {
                 throwFFMpegException(e);
                 // some systems have problems with special chars to find the in or out file.
-                if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+                if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                     final File tmpAudioIn = new File(outFile.getParent(), "ffmpeg_audio_in_" + UniqueAlltimeID.create());
                     final File tmpVideoIn = new File(outFile.getParent(), "ffmpeg_video_in_" + UniqueAlltimeID.create());
                     final File tmpOut = new File(outFile.getParent(), "ffmpeg_out" + UniqueAlltimeID.create());
@@ -245,7 +245,7 @@ public abstract class FFmpeg extends AbstractFFmpegBinary {
                     } catch (FFMpegException e1) {
                         throwFFMpegException(e1);
                         // some systems have problems with special chars to find the in or out file.
-                        if (FFMpegException.ERROR.PATH_LENGTH.equals(e.getError())) {
+                        if (FFMpegException.ERROR.PATH_OR_LENGTH.equals(e.getError())) {
                             File outFile = new File(tempout);
                             File tmpAudioIn = new File(outFile.getParent(), "ffmpeg_audio_in_" + UniqueAlltimeID.create());
                             File tmpOut = new File(outFile.getParent(), "ffmpeg_out" + UniqueAlltimeID.create());
