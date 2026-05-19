@@ -46,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgSrcRu;
 
-@DecrypterPlugin(revision = "$Revision: 52802 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52816 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImgSrcRuCrawler extends PluginForDecrypt {
     // dev notes
     // &pwd= is a md5 hash id once you've provided password for that album.
@@ -132,26 +132,27 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
     private boolean tryDefaultPassword = true;
 
     private void tryDefaultPassword(CryptedLink param, Browser br) {
-        if (tryDefaultPassword) {
-            tryDefaultPassword = false;
-            final String galleryName = getGalleryName(br);
-            if (StringUtils.containsIgnoreCase(galleryName, "EZZE")) {
-                this.passwords.add(0, "1234554321");
-            } else if (StringUtils.containsIgnoreCase(galleryName, "EZE")) {
-                this.passwords.add(0, "123454321");
-            } else if (StringUtils.containsIgnoreCase(galleryName, "ZEZ")) {
-                this.passwords.add(0, "543212345");
-            } else if (StringUtils.containsIgnoreCase(galleryName, "ZE")) {
-                this.passwords.add(0, "54321");
-            } else if (StringUtils.containsIgnoreCase(galleryName, "0EZ6")) {
-                this.passwords.add(0, "0123456");
-            } else if (StringUtils.contains(galleryName, "EZ6")) {
-                this.passwords.add(0, "123456");
-            } else if (StringUtils.containsIgnoreCase(galleryName, "0EZ")) {
-                this.passwords.add(0, "012345");
-            } else if (StringUtils.containsIgnoreCase(galleryName, "EZ") || StringUtils.containsIgnoreCase(galleryName, "12345")) {
-                this.passwords.add(0, "12345");
-            }
+        if (!tryDefaultPassword) {
+            return;
+        }
+        tryDefaultPassword = false;
+        final String galleryName = getGalleryName(br);
+        if (StringUtils.containsIgnoreCase(galleryName, "EZZE")) {
+            this.passwords.add(0, "1234554321");
+        } else if (StringUtils.containsIgnoreCase(galleryName, "EZE")) {
+            this.passwords.add(0, "123454321");
+        } else if (StringUtils.containsIgnoreCase(galleryName, "ZEZ")) {
+            this.passwords.add(0, "543212345");
+        } else if (StringUtils.containsIgnoreCase(galleryName, "ZE")) {
+            this.passwords.add(0, "54321");
+        } else if (StringUtils.containsIgnoreCase(galleryName, "0EZ6")) {
+            this.passwords.add(0, "0123456");
+        } else if (StringUtils.contains(galleryName, "EZ6")) {
+            this.passwords.add(0, "123456");
+        } else if (StringUtils.containsIgnoreCase(galleryName, "0EZ")) {
+            this.passwords.add(0, "012345");
+        } else if (StringUtils.containsIgnoreCase(galleryName, "EZ") || StringUtils.containsIgnoreCase(galleryName, "12345")) {
+            this.passwords.add(0, "12345");
         }
     }
 
@@ -179,15 +180,18 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlProfile(final CryptedLink param) throws Exception {
-        final String username = new Regex(param.getCryptedUrl(), PATTERN_USER).getMatch(0);
+        final String contenturl = param.getCryptedUrl();
+        final String username = new Regex(contenturl, PATTERN_USER).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String[] urls = br.getRegex("href=.(/" + username + "/[^<>\"\\']+\\.html)").getColumn(0);
@@ -213,6 +217,8 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
             if (!firstGetPageResult) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             } else if (br._getURL().getPath().equalsIgnoreCase("/main/search.php")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.getHttpConnection().getResponseCode() == 410) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             username = br.getRegex("rel=\"canonical\" href=\"https?://[^/]+/([^/\"]+)/").getMatch(0);
@@ -517,9 +523,9 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
                             // using 'i' is probably not a good idea, as we could have had connection errors!
                             logger.warning("Exausted Password try");
                             throw new DecrypterException(DecrypterException.PASSWORD);
-                        } else {
-                            continue;
                         }
+                        /* Try again */
+                        continue;
                     }
                     this.getPluginConfig().setProperty("lastusedpassword", password);
                     pwd = br.getRegex("\\?pwd=([a-z0-9]{32})").getMatch(0);

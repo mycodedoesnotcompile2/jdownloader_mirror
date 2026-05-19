@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52651 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52816 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class KatfileCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
+        ret.add(new String[] { "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com", "katfile.space" });
         return ret;
     }
 

@@ -20,6 +20,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -39,14 +44,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52811 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52815 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
-    // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
     private static final String          API_BASE           = "https://api.fakirdebrid.net";
     private static MultiHosterManagement mhm                = new MultiHosterManagement("fakirdebrid.net");
     private static final boolean         defaultResume      = true;
@@ -272,14 +271,29 @@ public class FakirdebridNet extends PluginForHost {
     }
 
     /**
-     * CODE1: Unauthorized </br> CODE2: Unauthorized </br> CODE3: Unauthorized </br> CODE5: Account automatically suspended </br> CODE6:
-     * Transfer limit reached – upgrade required </br> CODE7: Transfer limit reached – upgrade required </br> CODE8: Daily download limit
-     * reached </br> CODE9: Daily link limit reached </br> CODE10: Account permanently banned </br> CODE11: Invalid link </br> CODE12:
-     * Invalid link format </br> CODE13: Daily download limit reached for hoster </br> CODE14: Daily link limit reached for hoster </br>
-     * CODE15: Weekly download limit reached for hoster </br> CODE16: Weekly link limit reached for hoster </br> CODE17-21/23/26-27/29: Link
-     * not supported or temporarily unavailable </br> CODE22/24-25/28: File download link removed or incorrect </br> CODE30: Host not
-     * supported </br> CODE31: Unknown error </br> CODE32: File removed by owner </br> CODE33: File ID does not exist </br> CODE34: Invalid
-     * PIN </br> CODE35: VIP account required
+     * CODE1: Unauthorized </br>
+     * CODE2: Unauthorized </br>
+     * CODE3: Unauthorized </br>
+     * CODE5: Account automatically suspended </br>
+     * CODE6: Transfer limit reached – upgrade required </br>
+     * CODE7: Transfer limit reached – upgrade required </br>
+     * CODE8: Daily download limit reached </br>
+     * CODE9: Daily link limit reached </br>
+     * CODE10: Account permanently banned </br>
+     * CODE11: Invalid link </br>
+     * CODE12: Invalid link format </br>
+     * CODE13: Daily download limit reached for hoster </br>
+     * CODE14: Daily link limit reached for hoster </br>
+     * CODE15: Weekly download limit reached for hoster </br>
+     * CODE16: Weekly link limit reached for hoster </br>
+     * CODE17-21/23/26-27/29: Link not supported or temporarily unavailable </br>
+     * CODE22/24-25/28: File download link removed or incorrect </br>
+     * CODE30: Host not supported </br>
+     * CODE31: Unknown error </br>
+     * CODE32: File removed by owner </br>
+     * CODE33: File ID does not exist </br>
+     * CODE34: Invalid PIN </br>
+     * CODE35: VIP account required
      */
     private Map<String, Object> handleAPIErrors(final Map<String, Object> entries, final Account account, final DownloadLink link) throws Exception {
         if (!Boolean.FALSE.equals(entries.get("success"))) {
@@ -318,14 +332,15 @@ public class FakirdebridNet extends PluginForHost {
                 throw new AccountUnavailableException(message, 5 * 60 * 1000L);
             } else {
                 mhm.handleErrorGeneric(account, link, errorStr, 10);
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        return entries;
     }
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "Real-Debrid/api/login.php";
+        return "https://" + getHost() + "/api/login.php";
     }
 
     @Override
