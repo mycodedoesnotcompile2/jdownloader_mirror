@@ -37,7 +37,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49696 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImageVenueCom extends PluginForHost {
     public ImageVenueCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -162,10 +162,10 @@ public class ImageVenueCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 500) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)This image does not exist on this server|<title>404 Not Found</title>|>The requested URL /img\\.php was not found on this server\\.<")) {
+        } else if (br.containsHTML("This image does not exist on this server|<title>404 Not Found</title>|>The requested URL /img\\.php was not found on this server\\.<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (br.containsHTML("(?i)Continue to your image|Continue to ImageVenue")) {
+        if (br.containsHTML("Continue to your image|Continue to ImageVenue")) {
             /* Extra step */
             br.getPage(contentURL);
         }
@@ -193,6 +193,10 @@ public class ImageVenueCom extends PluginForHost {
             try {
                 final Browser brc = br.cloneBrowser();
                 con = brc.openHeadConnection(dllink);
+                if (brc._getURL().getPath().equalsIgnoreCase("/no_image.jpg")) {
+                    /* 2026-05-19: Redirect to https://cdno-data.imagevenue.com/no_image.jpg */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
                 final String etag = con.getRequest().getResponseHeader("etag");
                 if (!this.looksLikeDownloadableContent(con)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

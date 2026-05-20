@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -37,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51944 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class IcedriveNet extends PluginForHost {
     public IcedriveNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +77,7 @@ public class IcedriveNet extends PluginForHost {
     private static final String TYPE_NEW                    = "https?://[^/]+/file/(\\d+)";
     public static final String  PROPERTY_INTERNAL_FILE_ID   = "internal_file_id";
     public static final String  PROPERTY_INTERNAL_FOLDER_ID = "internal_folder_id";
-    public static final String  API_BASE_V2                 = "https://api.icedrive.net/API/Internal/V2";
+    public static final String  API_BASE_V2                 = "https://apis.icedrive.net/v3/webapp";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -175,9 +176,9 @@ public class IcedriveNet extends PluginForHost {
         }
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        brc.getPage(API_BASE_V2 + "/?request=download-multi&items=file-" + URLEncode.encodeURIComponent(internalFileID) + "&public=1");
+        brc.getPage(API_BASE_V2 + "/download-multi&items=file-" + URLEncode.encodeURIComponent(internalFileID) + "&public=1");
         /** 2024-01-26: Use JavaScriptEngineFactory vs this.restoreFromString because they aren't returning normal json. */
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final Boolean error = (Boolean) entries.get("error");
         if (error == Boolean.TRUE) {
             final String message = (String) entries.get("message");
@@ -186,7 +187,7 @@ public class IcedriveNet extends PluginForHost {
             } else if ("Error 5050".equals(message)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown download error");
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown download error: " + message);
             }
         }
         final List<Map<String, Object>> mirrors = (List<Map<String, Object>>) entries.get("urls");
@@ -271,6 +272,6 @@ public class IcedriveNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 }

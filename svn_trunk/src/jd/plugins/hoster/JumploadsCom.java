@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51956 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -298,6 +298,7 @@ public class JumploadsCom extends PluginForHost {
                     logger.warning("freetoken = " + freetoken + " | free_server = " + free_server);
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
+                handleErrors(br);
                 /* 2019-08-13: Captcha is skippable */
                 final boolean captchaSkippable = true;
                 if (!captchaSkippable) {

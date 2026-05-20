@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GoogleDrive;
 
-@DecrypterPlugin(revision = "$Revision: 51443 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52817 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { GoogleDrive.class })
 public class GoogleDriveCrawler extends PluginForDecrypt {
     /**
@@ -153,40 +153,45 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         try {
             if (new Regex(contenturl, PATTERN_REDIRECT).patternFind()) {
                 /**
-                 * Special case: This could either be a file or a folder. Other theoretically possible special cases which we will ignore
-                 * here: folderID in file URL --> Un-Downloadable item and can only be handled by API </br>
+                 * Special case: This could either be a file or a folder or an invalid (dead/404) link. <br>
+                 * We need to know this before we can proceed! <br>
                  *
                  */
                 logger.info("Checking if we have a file or folder");
                 br.setFollowRedirects(false);
                 br.getPage(contenturl);
-                String redirect = br.getRedirectLocation();
-                if (redirect == null) {
-                    /* No redirect -> Content must be offline */
+                String redirecturl = br.getRedirectLocation();
+                if (redirecturl == null) {
+                    /* No redirect on first attempt -> Content must be offline */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                int redirectCounter = -1;
+                int redirectCounter = 1;
                 final GoogleDrive hostPlg = (GoogleDrive) this.getNewPluginForHostInstance(this.getHost());
-                do {
-                    redirectCounter++;
-                    logger.info("Detected folder redirect: " + redirect);
-                    if (hostPlg.canHandle(redirect)) {
-                        logger.info("Redirect looks like single file URL --> Returning this as result for host plugin: " + redirect);
+                boolean success = false;
+                redirectLoop: do {
+                    logger.info("Handling folder redirect " + redirectCounter + " | " + redirecturl);
+                    if (hostPlg.canHandle(redirecturl)) {
+                        logger.info("Redirect is single file URL --> Returning this as result for host plugin: " + redirecturl);
                         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-                        ret.add(this.createDownloadlink(redirect));
+                        ret.add(this.createDownloadlink(redirecturl));
                         return ret;
-                    } else if (!new Regex(redirect, PATTERN_REDIRECT).patternFind()) {
-                        /* Must be folder */
-                        break;
-                    } else {
-                        /* E.g. possible http -> https redirect */
-                        logger.info("Redirect URL structure is undefined, following redirect...");
-                        br.followRedirect();
-                        redirect = br.getRedirectLocation();
+                    } else if (!new Regex(redirecturl, PATTERN_REDIRECT).patternFind() && this.canHandle(redirecturl)) {
+                        /* Pattern of redirect-url differs from pattern of initially added URL -> Must be folder */
+                        success = true;
+                        break redirectLoop;
+                    } else if (redirectCounter > 3) {
+                        break redirectLoop;
                     }
-                } while (redirect != null && redirectCounter <= 3);
+                    /* E.g. possible http -> https redirect */
+                    logger.info("Redirect URL structure is undefined, following redirect...");
+                    br.followRedirect();
+                    redirecturl = br.getRedirectLocation();
+                    redirectCounter++;
+                } while (!this.isAbort());
                 /* Too many redirects or content offline. */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                if (!success) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
             if (GoogleDrive.canUseAPI()) {
                 return this.crawlAPI(param);

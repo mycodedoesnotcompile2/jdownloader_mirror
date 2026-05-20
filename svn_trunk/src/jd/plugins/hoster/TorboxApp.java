@@ -55,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51543 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -363,6 +363,7 @@ public class TorboxApp extends UseNet {
         final Request req_hosters = br.createGetRequest(API_BASE + "/webdl/hosters");
         final List<Map<String, Object>> hosts = (List<Map<String, Object>>) this.callAPI(br, req_hosters, account, null);
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        boolean supports_usenet = false;
         hosterloop: for (final Map<String, Object> host : hosts) {
             List<String> domains = (List<String>) host.get("domains");
             final String name = host.get("name").toString();
@@ -381,6 +382,7 @@ public class TorboxApp extends UseNet {
             for (final String domain : domains) {
                 if (domain.equalsIgnoreCase("usenet") || name.equalsIgnoreCase("usenet")) {
                     /* Usenet is added/handled down below */
+                    supports_usenet = true;
                     continue hosterloop;
                 }
                 mhost.addDomain(domain);
@@ -402,42 +404,51 @@ public class TorboxApp extends UseNet {
             }
             supportedhosts.add(mhost);
         }
-        final MultiHostHost usenet = new MultiHostHost("usenet");
-        if (planID == 2) {
-            /* Obtain usenet login credentials if user owns a pro account */
-            try {
-                final Request req_usenet = br.createGetRequest(API_BASE + "/usenet/provider/account");
-                final Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
-                final int maxConnections = ((Number) usenet_data.get("connections")).intValue();
-                account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenet_data.get("username"));
-                account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenet_data.get("password"));
-                account.setProperty(PROPERTY_ACCOUNT_USENET_SERVER, usenet_data.get("host"));
-                account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, maxConnections); // default = 25
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    usenet.setStatusText("Connections: " + maxConnections);
+        if (supports_usenet) {
+            /**
+             * Looks like usenet is supported -> Obtain login credentials for usenet client <br>
+             * 2026-05-19: Looks like a longer time ago, direct-usenet support has been removed so the subsequent request will most likely
+             * fail. <br>
+             * I'm still leaving it in the code as technically they could re-enable it at any point of time.
+             */
+            final MultiHostHost usenet = new MultiHostHost("usenet");
+            if (planID == 2) {
+                /* Obtain usenet login credentials if user owns a pro account */
+                try {
+                    final Request req_usenet = br.createGetRequest(API_BASE + "/usenet/provider/account");
+                    final Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
+                    final int maxConnections = ((Number) usenet_data.get("connections")).intValue();
+                    account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenet_data.get("username"));
+                    account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenet_data.get("password"));
+                    account.setProperty(PROPERTY_ACCOUNT_USENET_SERVER, usenet_data.get("host"));
+                    account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, maxConnections); // default = 25
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        usenet.setStatusText("Connections: " + maxConnections);
+                    }
+                    usenet.setMaxDownloads(maxConnections);
+                } catch (final InterruptedException ie) {
+                    throw ie;
+                } catch (final Exception e) {
+                    logger.log(e);
+                    final String reason = e.getMessage();
+                    String msg = "Failed to obtain Usenet information from API";
+                    if (reason != null) {
+                        msg += " | API error: " + msg;
+                    }
+                    usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                    usenet.setStatusText(msg);
                 }
-                usenet.setMaxDownloads(maxConnections);
-            } catch (final InterruptedException ie) {
-                throw ie;
-            } catch (final Exception e) {
-                logger.log(e);
-                final String reason = e.getMessage();
-                String msg = "Failed to obtain Usenet information from API";
-                if (reason != null) {
-                    msg += " | API error: " + msg;
-                }
-                usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                usenet.setStatusText(msg);
+            } else {
+                /* Usenet not supported [anymore] */
+                removeUsenetProperties(account);
+                usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+                usenet.setStatusText("Not supported in your current plan");
             }
+            supportedhosts.add(usenet);
         } else {
             /* Usenet not supported [anymore] */
-            account.removeProperty(PROPERTY_ACCOUNT_USENET_USERNAME);
-            account.removeProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
-            account.removeProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET);
-            usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
-            usenet.setStatusText("Not supported in your current plan");
+            removeUsenetProperties(account);
         }
-        supportedhosts.add(usenet);
         ai.setMultiHostSupportV2(this, supportedhosts);
         /* Handle notifications */
         notificationHandling: if (true) {
@@ -496,6 +507,12 @@ public class TorboxApp extends UseNet {
         }
         account.setConcurrentUsePossible(true);
         return ai;
+    }
+
+    private void removeUsenetProperties(final Account account) {
+        account.removeProperty(PROPERTY_ACCOUNT_USENET_USERNAME);
+        account.removeProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
+        account.removeProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET);
     }
 
     @Override

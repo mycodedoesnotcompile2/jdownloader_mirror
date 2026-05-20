@@ -27,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.KamababaCom;
 
-@DecrypterPlugin(revision = "$Revision: 46534 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class KamababaComCrawler extends PornEmbedParser {
     public KamababaComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class KamababaComCrawler extends PornEmbedParser {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "kamababa.desi", "kamababa.com", "kamababa2.com" });
+        ret.add(new String[] { "kamababax.com", "kamababa.desi", "kamababa.com", "kamababa2.com" });
         return ret;
     }
 

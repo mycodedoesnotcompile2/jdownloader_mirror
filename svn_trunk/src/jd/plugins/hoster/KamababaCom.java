@@ -17,6 +17,9 @@ package jd.plugins.hoster;
 
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -30,10 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KamababaComCrawler;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 47483 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KamababaComCrawler.class })
 public class KamababaCom extends PluginForHost {
     public KamababaCom(PluginWrapper wrapper) {
@@ -52,6 +52,7 @@ public class KamababaCom extends PluginForHost {
     @Override
     public String rewriteHost(final String host) {
         /* 2022-04-12: Main domain has changed from kamababa.com to kamababa.desi */
+        /* 2026-05-19: Main domain has changed from kamababa.desi to kamababax.com */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
@@ -80,12 +81,11 @@ public class KamababaCom extends PluginForHost {
     /* Connection stuff */
     private static final boolean free_resume       = true;
     private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
     private String               dllink            = null;
 
     @Override
     public String getAGBLink() {
-        return "https://www.kamababa.com/";
+        return "https://www." + getHost();
     }
 
     @Override
@@ -203,18 +203,6 @@ public class KamababaCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

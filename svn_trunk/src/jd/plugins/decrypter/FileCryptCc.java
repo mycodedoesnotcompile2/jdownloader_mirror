@@ -22,6 +22,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FileCryptConfig;
+import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -41,22 +56,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FileCryptConfig;
-import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 51985 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,6 +106,21 @@ public class FileCryptCc extends PluginForDecrypt {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/Container/([A-Z0-9]{10,16})(\\.html)?(\\?mirror=\\d+)?");
         }
         return ret.toArray(new String[0]);
+    }
+
+    private static final Map<String, String> LOGO_PASSWORD_MAP = new HashMap<String, String>();
+    static {
+        final String pw_sfans = "serienfans.org";
+        LOGO_PASSWORD_MAP.put("53d1b", pw_sfans);
+        LOGO_PASSWORD_MAP.put("80d13", pw_sfans);
+        LOGO_PASSWORD_MAP.put("fde1d", pw_sfans);
+        LOGO_PASSWORD_MAP.put("8abe0", pw_sfans);
+        LOGO_PASSWORD_MAP.put("8f073", pw_sfans);
+        LOGO_PASSWORD_MAP.put("48544", pw_sfans);
+        LOGO_PASSWORD_MAP.put("975e4", "filmfans.org");
+        LOGO_PASSWORD_MAP.put("51967", "kellerratte");
+        LOGO_PASSWORD_MAP.put("aaf75", "cs.rin.ru");
+        LOGO_PASSWORD_MAP.put("f38ed", "funxd");
     }
 
     @Override
@@ -483,32 +498,20 @@ public class FileCryptCc extends PluginForDecrypt {
         return false;
     }
 
-    private static final Map<String, String> LOGO_PASSWORD_MAP = new HashMap<String, String>();
-    static {
-        final String pw_sfans = "serienfans.org";
-        LOGO_PASSWORD_MAP.put("53d1b", pw_sfans);
-        LOGO_PASSWORD_MAP.put("80d13", pw_sfans);
-        LOGO_PASSWORD_MAP.put("fde1d", pw_sfans);
-        LOGO_PASSWORD_MAP.put("8abe0", pw_sfans);
-        LOGO_PASSWORD_MAP.put("8f073", pw_sfans);
-        LOGO_PASSWORD_MAP.put("48544", pw_sfans);
-        LOGO_PASSWORD_MAP.put("975e4", "filmfans.org");
-        LOGO_PASSWORD_MAP.put("51967", "kellerratte");
-        LOGO_PASSWORD_MAP.put("aaf75", "cs.rin.ru");
-    }
-
     private String initializeLogoPassword() {
         if (logoPW != null) {
             return logoPW;
         }
         /**
-         * Search password based on folder-logo. </br> Only do this one time in the first run of this loop.
+         * Search password based on folder-logo. </br>
+         * Only do this one time in the first run of this loop.
          */
         final String customLogoID = br.getRegex("(?:logo|custom)/([a-z0-9]+)\\.png").getMatch(0);
         if (customLogoID != null) {
             /**
-             * Magic auto passwords: </br> Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try
-             * specific passwords first that are typically associated with folders published by those sources.
+             * Magic auto passwords: </br>
+             * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first that
+             * are typically associated with folders published by those sources.
              */
             final String password = getLogoPassword(customLogoID);
             if (password != null) {

@@ -27,12 +27,14 @@ import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47744 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52817 $", interfaceVersion = 3, names = {}, urls = {})
 public class In91vipWin extends PluginForDecrypt {
     public In91vipWin(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,6 +80,8 @@ public class In91vipWin extends PluginForDecrypt {
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 503) {
+            throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
         } else if (!br.getURL().contains(contentID)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

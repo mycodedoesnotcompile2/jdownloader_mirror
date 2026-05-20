@@ -30,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48342 $", interfaceVersion = 2, names = { "imagevenue.com" }, urls = { "https?://(www\\.)?(img\\d+\\.)?imagevenue\\.com/(galshow\\.php\\?gal=gallery_.+|GA[A-Za-z0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 2, names = { "imagevenue.com" }, urls = { "https?://(www\\.)?(img\\d+\\.)?imagevenue\\.com/(galshow\\.php\\?gal=gallery_.+|GA[A-Za-z0-9]+)" })
 public class ImageVenueComGallery extends PluginForDecrypt {
     public ImageVenueComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,7 @@ public class ImageVenueComGallery extends PluginForDecrypt {
         return ret;
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

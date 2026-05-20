@@ -17,9 +17,12 @@ package jd.plugins.hoster;
 
 import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -40,10 +43,51 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50858 $", interfaceVersion = 3, names = { "welt.de" }, urls = { "https?://(?:www\\.)?welt\\.de/.*?/(?:video|sendung)\\d+/[A-Za-z0-9\\-]+\\.html" })
+@HostPlugin(revision = "$Revision: 52817 $", interfaceVersion = 3, names = {}, urls = {})
 public class WeltDeMediathek extends PluginForHost {
     public WeltDeMediathek(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "welt.de" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        return this.rewriteHost(getPluginDomains(), host);
+    }
+
+    /* numeric ID e.g. /video123456/ */
+    private static final Pattern PATTERN_VIDEO_NUMERIC = Pattern.compile("/(?:video|sendung)(\\d+)/([A-Za-z0-9\\-]+)\\.html");
+    /* hex-24 ID e.g. /video68a54c377b99884fce7024f2/ */
+    private static final Pattern PATTERN_VIDEO_HEX     = Pattern.compile("/(?:video|sendung)([a-f0-9]{24})/([A-Za-z0-9\\-]+)\\.html");
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            String pattern = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/(";
+            pattern += PATTERN_VIDEO_NUMERIC.pattern().substring(1);
+            pattern += "|" + PATTERN_VIDEO_HEX.pattern().substring(1);
+            pattern += ")";
+            ret.add(pattern);
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -64,7 +108,7 @@ public class WeltDeMediathek extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.welt.de/services/article122129231/Nutzungsbedingungen-DIE-WELT-Digital.html";
+        return "https://www." + getHost() + "/services/article122129231/Nutzungsbedingungen-DIE-WELT-Digital.html";
     }
 
     @SuppressWarnings("deprecation")
@@ -79,7 +123,7 @@ public class WeltDeMediathek extends PluginForHost {
         }
         final String url_title = new Regex(link.getDownloadURL(), ".+/(.+)\\.html").getMatch(0);
         /* Tags: schema.org */
-        final String json_source_videoinfo = this.br.getRegex("<script[^>]*?type=\"application/ld\\+json[^>]*?\">(.*?)</script>").getMatch(0);
+        final String json_source_videoinfo = this.br.getRegex("<script[^>]*?type=\"application/ld\\+json[^>]*\">(.*?)</script>").getMatch(0);
         Map<String, Object> entries = restoreFromString(json_source_videoinfo, TypeRef.MAP);
         String filenameBase = "";
         String title = (String) entries.get("headline");
@@ -157,7 +201,7 @@ public class WeltDeMediathek extends PluginForHost {
         }
         if (br.containsHTML("\"DreifaltigkeitLiveMarker\"|\"isLive\":true")) {
             /* E.g. https://www.welt.de/tv-programm-live-stream/ */
-            link.setFinalFileName(this.applyFilenameExtension("LIVESTREAMS_ARE_NOT_SUPPORTED_" + filenameBase, ext));
+            link.setFinalFileName("LIVESTREAMS_ARE_NOT_SUPPORTED_" + filenameBase + ext);
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Livestreams are not supported");
         }
         link.setFinalFileName(this.applyFilenameExtension(filenameBase, ext));
@@ -199,7 +243,7 @@ public class WeltDeMediathek extends PluginForHost {
 
     private String formatDate(final String input) {
         /* 2016-07-25T15:29:07Z */
-        final long date = TimeFormatter.getMilliSeconds(input, "yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.GERMAN);
+        final long date = TimeFormatter.getMilliSeconds(input, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.GERMAN);
         String formattedDate = null;
         final String targetFormat = "yyyy-MM-dd";
         Date theDate = new Date(date);
@@ -216,17 +260,5 @@ public class WeltDeMediathek extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

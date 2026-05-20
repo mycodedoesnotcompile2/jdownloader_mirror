@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52280 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -812,7 +812,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 throw new InterruptedException("Aborted!");
             }
             videoidindex++;
-            logger.info("Processing item " + videoidindex + "/" + videoIdsToAdd.size() + " | VideoID: " + crawledvid);
+            logger.info("Processing item " + (videoidindex + 1) + "/" + videoIdsToAdd.size() + " | VideoID: " + crawledvid);
             String mainVideoDupeID = crawledvid.videoID;
             final String playlistID = (String) getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_ID);
             if (playlistID != null && YoutubeHelper.enablePlaylistSpecialDupeCheck() && !isChannelPlaylist) {

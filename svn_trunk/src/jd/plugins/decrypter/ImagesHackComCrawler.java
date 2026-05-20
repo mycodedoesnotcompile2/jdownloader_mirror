@@ -33,9 +33,11 @@ import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48966 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagesHackComCrawler extends PluginForDecrypt {
     public ImagesHackComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,6 +135,8 @@ public class ImagesHackComCrawler extends PluginForDecrypt {
                      */
                     break;
                 }
+            } else if (this.br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             json = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
             images_total = JavaScriptEngineFactory.toLong(JavaScriptEngineFactory.walkJson(json, "result/total"), 0);
@@ -146,8 +150,7 @@ public class ImagesHackComCrawler extends PluginForDecrypt {
         }
         do {
             if (this.isAbort()) {
-                logger.info("User aborted decryption");
-                return ret;
+                throw new InterruptedException();
             }
             /* Old: */
             // if (useAltHandling) {
@@ -166,10 +169,10 @@ public class ImagesHackComCrawler extends PluginForDecrypt {
                 final String owner = jd.plugins.hoster.ImagesHackCom.api_json_get_username(json);
                 final String album = jd.plugins.hoster.ImagesHackCom.api_json_get_album(json);
                 final String url_content = "https://imageshack.com/i/" + id;
-                final DownloadLink dl = createDownloadlink(url_content);
+                final DownloadLink img = createDownloadlink(url_content);
                 final FilePackage fp = FilePackage.getInstance();
-                dl.setAvailableStatus(jd.plugins.hoster.ImagesHackCom.apiImageGetAvailablestatus(this, dl, json));
-                dl.setContentUrl(url_content);
+                img.setAvailableStatus(jd.plugins.hoster.ImagesHackCom.apiImageGetAvailablestatus(this, img, json));
+                img.setContentUrl(url_content);
                 if (!inValidate(album) && !inValidate(owner)) {
                     fp.setName(owner + " - " + album);
                 } else {
@@ -177,12 +180,12 @@ public class ImagesHackComCrawler extends PluginForDecrypt {
                     fp.setName(id_main);
                 }
                 if (!inValidate(password)) {
-                    dl.setDownloadPassword(password, true);
-                    dl.setProperty("pwcookie", pwcookie);
+                    img.setDownloadPassword(password, true);
+                    img.setProperty("pwcookie", pwcookie);
                 }
-                dl._setFilePackage(fp);
-                ret.add(dl);
-                distribute(dl);
+                img._setFilePackage(fp);
+                ret.add(img);
+                distribute(img);
                 offset++;
             }
             logger.info("Decrypted page " + page_counter);

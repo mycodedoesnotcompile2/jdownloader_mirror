@@ -23,6 +23,7 @@ import java.util.Map;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.components.config.NhentaiNetCrawlerConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -46,7 +47,7 @@ import jd.plugins.hoster.NhentaiNet;
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 52786 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52819 $", interfaceVersion = 2, names = {}, urls = {})
 public class NhentaiNetCrawler extends PluginForDecrypt {
     public NhentaiNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -99,6 +100,7 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
         Browser.setRequestIntervalLimitGlobal(getHost(), 1000);
     }
 
+    @Override
     public int getMaxConcurrentProcessingInstances() {
         /* 2020-06-25: Too many requests can lead to failures */
         return 1;
@@ -106,69 +108,122 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
-        final String galleryID = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
-        br.getPage(parameter);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        antiDDoSForHost.replaceCloudFlareEmailProtection(br);
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        final String galleryID = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        final NhentaiNetCrawlerConfig.CrawlerAccessMode accessMode = get(NhentaiNetCrawlerConfig.class).getCrawlerAccessMode();
+        final boolean useAPI = accessMode == NhentaiNetCrawlerConfig.CrawlerAccessMode.AUTO || accessMode == NhentaiNetCrawlerConfig.CrawlerAccessMode.API;
+        String titleEN = null;
+        String titleJP = null;
         String title = null;
-        try {
-            String json = br.getRegex("JSON\\.parse\\(\"(\\{.*?)\"\\);").getMatch(0);
-            if (json == null) {
-                /* 2025-08-11, nhentai.xxx */
-                json = br.getRegex("parseJSON\\((\"|')(\\{.*?)(\"|')\\);").getMatch(1);
+        if (useAPI && getHost().equalsIgnoreCase("nhentai.to")) {
+            br.getPage(NhentaiNet.API_BASE + "/galleries/" + galleryID);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            json = PluginJSonUtils.unescape(json);
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> titles = (Map<String, Object>) entries.get("title");
-            if (titles != null) {
-                title = (String) titles.get("english");
-                if (StringUtils.isEmpty(title)) {
-                    title = (String) titles.get("japanese");
-                }
+            titleEN = titles.get("english").toString();
+            titleJP = titles.get("japanese").toString();
+            final String titlePretty = titles.get("pretty").toString();
+            final String uploadDate = entries.get("upload_date").toString();
+            title = StringUtils.firstNotEmpty(titleEN, titleJP);
+            if (StringUtils.isEmpty(title)) {
+                title = galleryID + " - nhentai gallery";
+            } else {
+                /**
+                 * 2021-02-08: Avoid merging of packages with the same name but different contents: Galleries can have the exact name but
+                 * different content!
+                 */
+                title = galleryID + "_" + title;
             }
-        } catch (final Throwable ignore) {
-            logger.log(ignore);
-        }
-        if (title == null) {
-            final String english = br.getRegex("(?:id|class)\\s*=\\s*\"info\"\\s*>\\s*<h1[^>]*>\\s*(.*?)\\s*</h1").getMatch(0);
-            final String japanese = br.getRegex("(?:id|class)\\s*=\\s*\"info\"\\s*>.*?<h2[^>]*>\\s*(.*?)\\s*</h2").getMatch(0);
-            title = StringUtils.firstNotEmpty(english, japanese);
-            if (title != null) {
-                title = title.replaceAll("<span[^>]*>", "").replaceAll("</span[^>]*>", "");
-                title = Encoding.htmlDecode(title);
+            final List<Map<String, Object>> pages = (List<Map<String, Object>>) entries.get("pages");
+            final int totalPages = pages.size();
+            final DecimalFormat df = totalPages > 999 ? new DecimalFormat("0000") : totalPages > 99 ? new DecimalFormat("000") : new DecimalFormat("00");
+            for (int i = 0; i < pages.size(); i++) {
+                final Map<String, Object> page = pages.get(i);
+                final int pageNumber = i + 1;
+                final String path = page.get("path").toString();
+                final String ext = getFileNameExtensionFromString(path, NhentaiNet.EXT_DEFAULT);
+                final DownloadLink img = createDownloadlink("https://nhentai.net/g/" + galleryID + "/" + pageNumber + "/");
+                img.setFinalFileName(df.format(pageNumber) + ext);
+                img.setAvailable(true);
+                img.setProperty(NhentaiNet.PROPERTY_CACHED_URL, "https://i.nhentai.net/" + path);
+                img.setProperty(NhentaiNet.PROPERTY_TITLE_EN, titleEN);
+                img.setProperty(NhentaiNet.PROPERTY_TITLE_JP, titleJP);
+                img.setProperty(NhentaiNet.PROPERTY_TITLE_PRETTY, titlePretty);
+                img.setProperty(NhentaiNet.PROPERTY_UPLOAD_DATE, uploadDate);
+                ret.add(img);
             }
-        }
-        if (StringUtils.isEmpty(title)) {
-            /* Fallback */
-            title = galleryID + " - nhentai gallery";
         } else {
-            /**
-             * 2021-02-08: Avoid merging of packages with the same name but different contents: Galleries can have the exact name but
-             * different content!
-             */
-            title = galleryID + "_" + title;
-        }
-        final String[] urls = br.getRegex("(/g/" + galleryID + "/\\d+/?)").getColumn(0);
-        if (urls == null || urls.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final int estimatedNumberOfPages = urls.length;
-        final DecimalFormat df = estimatedNumberOfPages > 999 ? new DecimalFormat("0000") : estimatedNumberOfPages > 99 ? new DecimalFormat("000") : new DecimalFormat("00");
-        for (final String url : urls) {
-            final int pageNumber = Integer.parseInt(new Regex(url, "(\\d+)/?$").getMatch(0));
-            String extensionGuess = br.getRegex("/\\d+/(?:[^/]*/)?" + pageNumber + "t(\\.(?:png|jpe?g|webp|gif))").getMatch(0);
-            if (extensionGuess == null) {
-                extensionGuess = NhentaiNet.EXT_DEFAULT;
+            br.getPage(contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final DownloadLink dl = createDownloadlink(Request.getLocation(url, br.getRequest()));
-            dl.setFinalFileName(df.format(pageNumber) + getFileNameExtensionFromString(url, extensionGuess));
-            dl.setAvailable(true);
-            ret.add(dl);
+            antiDDoSForHost.replaceCloudFlareEmailProtection(br);
+            try {
+                String json = br.getRegex("JSON\\.parse\\(\"(\\{.*?)\"\\);").getMatch(0);
+                if (json == null) {
+                    /* 2025-08-11, nhentai.xxx */
+                    json = br.getRegex("parseJSON\\((\"|')(\\{.*?)(\"|')\\);").getMatch(1);
+                }
+                json = PluginJSonUtils.unescape(json);
+                final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+                final Map<String, Object> titles = (Map<String, Object>) entries.get("title");
+                if (titles != null) {
+                    titleEN = (String) titles.get("english");
+                    titleJP = (String) titles.get("japanese");
+                    title = StringUtils.firstNotEmpty(titleEN, titleJP);
+                }
+            } catch (final Throwable ignore) {
+                logger.log(ignore);
+            }
+            if (title == null) {
+                final String title_english_raw = br.getRegex("(?:id|class)\\s*=\\s*\"info\"\\s*>\\s*<h1[^>]*>\\s*(.*?)\\s*</h1").getMatch(0);
+                final String title_japanese_raw = br.getRegex("(?:id|class)\\s*=\\s*\"info\"\\s*>.*?<h2[^>]*>\\s*(.*?)\\s*</h2").getMatch(0);
+                if (title_english_raw != null && titleEN == null) {
+                    titleEN = Encoding.htmlDecode(title_english_raw.replaceAll("<span[^>]*>", "").replaceAll("</span[^>]*>", ""));
+                }
+                if (title_japanese_raw != null && titleJP == null) {
+                    titleJP = Encoding.htmlDecode(title_japanese_raw.replaceAll("<span[^>]*>", "").replaceAll("</span[^>]*>", ""));
+                }
+                title = StringUtils.firstNotEmpty(titleEN, titleJP);
+            }
+            if (StringUtils.isEmpty(title)) {
+                /* Fallback */
+                title = galleryID + " - nhentai gallery";
+            } else {
+                /**
+                 * 2021-02-08: Avoid merging of packages with the same name but different contents: Galleries can have the exact name but
+                 * different content!
+                 */
+                title = galleryID + "_" + title;
+            }
+            final String[] urls = br.getRegex("(/g/" + galleryID + "/\\d+/?)").getColumn(0);
+            if (urls == null || urls.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final int estimatedNumberOfPages = urls.length;
+            final DecimalFormat df = estimatedNumberOfPages > 999 ? new DecimalFormat("0000") : estimatedNumberOfPages > 99 ? new DecimalFormat("000") : new DecimalFormat("00");
+            for (final String url : urls) {
+                final int pageNumber = Integer.parseInt(new Regex(url, "(\\d+)/?$").getMatch(0));
+                String extensionGuess = br.getRegex("/\\d+/(?:[^/]*/)?" + pageNumber + "t(\\.(?:png|jpe?g|webp|gif))").getMatch(0);
+                if (extensionGuess == null) {
+                    extensionGuess = NhentaiNet.EXT_DEFAULT;
+                }
+                final DownloadLink img = createDownloadlink(Request.getLocation(url, br.getRequest()));
+                img.setFinalFileName(df.format(pageNumber) + getFileNameExtensionFromString(url, extensionGuess));
+                img.setAvailable(true);
+                if (titleEN != null) {
+                    img.setProperty(NhentaiNet.PROPERTY_TITLE_EN, titleEN);
+                }
+                if (titleJP != null) {
+                    img.setProperty(NhentaiNet.PROPERTY_TITLE_JP, titleJP);
+                }
+                ret.add(img);
+            }
         }
         final FilePackage fp = FilePackage.getInstance();
+        fp.setPackageKey(getHost() + "://gallery/" + galleryID);
         fp.setName(title);
         fp.addLinks(ret);
         // fp.setProperty(LinkCrawler.PACKAGE_ALLOW_MERGE, false);
@@ -178,5 +233,10 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
     @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
+    }
+
+    @Override
+    public Class<? extends NhentaiNetCrawlerConfig> getConfigInterface() {
+        return NhentaiNetCrawlerConfig.class;
     }
 }

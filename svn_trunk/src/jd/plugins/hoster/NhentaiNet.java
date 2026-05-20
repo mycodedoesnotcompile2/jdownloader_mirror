@@ -43,7 +43,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52803 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52819 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -53,6 +53,12 @@ public class NhentaiNet extends PluginForHost {
             this.enablePremium("https://" + getHost() + "/register");
         }
     }
+
+    public static final String PROPERTY_CACHED_URL   = "CACHED_URL";
+    public static final String PROPERTY_TITLE_EN     = "title_en";
+    public static final String PROPERTY_TITLE_JP     = "title_jp";
+    public static final String PROPERTY_TITLE_PRETTY = "title_pretty";
+    public static final String PROPERTY_UPLOAD_DATE  = "upload_date";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -71,11 +77,6 @@ public class NhentaiNet extends PluginForHost {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(jd.plugins.decrypter.NhentaiNetCrawler.getPluginDomains());
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        return this.rewriteHost(jd.plugins.decrypter.NhentaiNetCrawler.getPluginDomains(), host);
     }
 
     @Override
@@ -114,8 +115,6 @@ public class NhentaiNet extends PluginForHost {
         return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(1);
     }
 
-    private final String CACHED_URL = "CACHED_URL";
-
     @Override
     protected String getDefaultFileName(DownloadLink link) {
         return this.getFID(link) + EXT_DEFAULT;
@@ -129,7 +128,7 @@ public class NhentaiNet extends PluginForHost {
             if (checkDownloadableRequest(link, br, br.createHeadRequest(dllink), 10, true) != null) {
                 return AvailableStatus.TRUE;
             }
-            link.removeProperty(CACHED_URL);
+            link.removeProperty(PROPERTY_CACHED_URL);
         }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -148,12 +147,12 @@ public class NhentaiNet extends PluginForHost {
         if (checkDownloadableRequest(link, br, br.createHeadRequest(dllink), 10, true) == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setProperty(CACHED_URL, dllink);
+        link.setProperty(PROPERTY_CACHED_URL, dllink);
         return AvailableStatus.TRUE;
     }
 
     private String getDirecturl(final DownloadLink link, final Browser br) throws IOException {
-        String dllink = link.getStringProperty(CACHED_URL);
+        String dllink = link.getStringProperty(PROPERTY_CACHED_URL);
         if (br.getRequest() != null && dllink == null) {
             final String ext_part = "+\\.(?:jpe?g|png|webp|gif)";
             dllink = br.getRegex("(https?://[^/]+/galleries/\\d+/\\d+" + ext_part + ")").getMatch(0);
@@ -189,7 +188,7 @@ public class NhentaiNet extends PluginForHost {
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            link.removeProperty(CACHED_URL);
+            link.removeProperty(PROPERTY_CACHED_URL);
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
@@ -262,6 +261,6 @@ public class NhentaiNet extends PluginForHost {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
-        link.removeProperty(CACHED_URL);
+        link.removeProperty(PROPERTY_CACHED_URL);
     }
 }

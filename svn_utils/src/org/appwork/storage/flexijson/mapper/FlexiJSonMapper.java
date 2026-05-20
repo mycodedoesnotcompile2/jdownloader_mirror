@@ -58,7 +58,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.exceptions.WTFException;
@@ -173,33 +172,33 @@ public class FlexiJSonMapper {
         return THREAD_MAPPERS.get().remove(newMapper);
     }
 
-    private boolean                                       ignorePrimitiveNullMapping    = false;
-    private boolean                                       ignoreIllegalArgumentMappings = false;
+    private boolean                          ignorePrimitiveNullMapping    = false;
+    private boolean                          ignoreIllegalArgumentMappings = false;
     /**
      * @param value
      * @param type
      * @return
      */
-    private boolean                                       ignoreIllegalEnumMappings     = false;
-    protected final CopyOnWriteArrayList<FlexiTypeMapper> typeMapper;
-    protected CompiledType                                autoMapFlexiJSonObjectClass   = CompiledType.create(new TypeRef<LinkedHashMap<String, Object>>() {
-                                                                                        });
-    protected CompiledType                                autoMapFlexiJSonArrayclass    = CompiledType.create(new TypeRef<ArrayList<Object>>() {
-                                                                                        });
-    protected CompiledType                                autoMapCollectionInterface    = this.autoMapFlexiJSonArrayclass;
-    protected CompiledType                                autoMapMapInterface           = this.autoMapFlexiJSonObjectClass;
-    protected CompiledType                                autoMapConcurrentMapClass     = CompiledType.create(new TypeRef<ConcurrentHashMap<String, Object>>() {
-                                                                                        });
-    protected CompiledType                                autoMapConcurrentMapInterface = this.autoMapConcurrentMapClass;
+    private boolean                          ignoreIllegalEnumMappings     = false;
+    protected volatile List<FlexiTypeMapper> typeMapper;
+    protected CompiledType                   autoMapFlexiJSonObjectClass   = CompiledType.create(new TypeRef<LinkedHashMap<String, Object>>() {
+                                                                           });
+    protected CompiledType                   autoMapFlexiJSonArrayclass    = CompiledType.create(new TypeRef<ArrayList<Object>>() {
+                                                                           });
+    protected CompiledType                   autoMapCollectionInterface    = this.autoMapFlexiJSonArrayclass;
+    protected CompiledType                   autoMapMapInterface           = this.autoMapFlexiJSonObjectClass;
+    protected CompiledType                   autoMapConcurrentMapClass     = CompiledType.create(new TypeRef<ConcurrentHashMap<String, Object>>() {
+                                                                           });
+    protected CompiledType                   autoMapConcurrentMapInterface = this.autoMapConcurrentMapClass;
     // more lightweight in memory consumption than LinkedHashSet
-    protected CompiledType                                autoMapSetInterface           = CompiledType.create(new TypeRef<CopyOnWriteArraySet<Object>>() {
-                                                                                        });                                 ;
-    private ArrayList<FlexiMapperException>               exceptions;
-    private boolean                                       ignoreDefaultValuesEnabled;
-    private boolean                                       tagDefaultValuesEnabled;
+    protected CompiledType                   autoMapSetInterface           = CompiledType.create(new TypeRef<CopyOnWriteArraySet<Object>>() {
+                                                                           });                                 ;
+    private ArrayList<FlexiMapperException>  exceptions;
+    private boolean                          ignoreDefaultValuesEnabled;
+    private boolean                          tagDefaultValuesEnabled;
 
     public FlexiJSonMapper() {
-        this.typeMapper = new CopyOnWriteArrayList<FlexiTypeMapper>(DEFAULTMAPPER);
+        this.typeMapper = new ArrayList<FlexiTypeMapper>(DEFAULTMAPPER);
     }
 
     /**
@@ -209,31 +208,50 @@ public class FlexiJSonMapper {
      * @param class1
      * @param fileMapper
      */
-    public void addMapper(final FlexiTypeMapper mapper) {
-        this.typeMapper.add(0, mapper);
+    public synchronized void addMapper(final FlexiTypeMapper mapper) {
+        final List<FlexiTypeMapper> typeMapper = this._getTypeMapper();
+        if (typeMapper.contains(mapper)) {
+            return;
+        }
+        final List<FlexiTypeMapper> newTypeMapper = new ArrayList<FlexiTypeMapper>(typeMapper);
+        newTypeMapper.add(0, mapper);
+        this.typeMapper = newTypeMapper;
     }
 
     /**
      * @param class1
      */
-    public void removeMapperByType(final Class<?> class1) {
+    public synchronized void removeMapperByType(final Class<?> class1) {
+        final List<FlexiTypeMapper> typeMapper = this._getTypeMapper();
         final List<FlexiTypeMapper> removeList = new ArrayList<FlexiTypeMapper>();
-        for (final Iterator<FlexiTypeMapper> it = this.typeMapper.iterator(); it.hasNext();) {
+        for (final Iterator<FlexiTypeMapper> it = typeMapper.iterator(); it.hasNext();) {
             final FlexiTypeMapper next = it.next();
             if (Clazz.isInstanceof(next.getClass(), class1)) {
                 removeList.add(next);
             }
         }
-        typeMapper.removeAll(removeList);
+        if (removeList.size() > 0) {
+            final List<FlexiTypeMapper> newTypeMapper = new ArrayList<FlexiTypeMapper>(typeMapper);
+            newTypeMapper.removeAll(removeList);
+            this.typeMapper = newTypeMapper;
+        }
     }
 
-    public void setTypeMapper(final List<FlexiTypeMapper> customs) {
-        this.typeMapper.addAllAbsent(customs);
-        this.typeMapper.retainAll(customs);
+    public synchronized void setTypeMapper(final List<FlexiTypeMapper> customs) {
+        if (customs == null) {
+            this.typeMapper = new ArrayList<FlexiTypeMapper>();
+        } else {
+            this.typeMapper = new ArrayList<FlexiTypeMapper>(customs);
+        }
+    }
+
+    protected List<FlexiTypeMapper> _getTypeMapper() {
+        return this.typeMapper;
     }
 
     public List<FlexiTypeMapper> getTypeMapper() {
-        return Collections.unmodifiableList(this.typeMapper);
+        final List<FlexiTypeMapper> typeMapper = this._getTypeMapper();
+        return Collections.unmodifiableList(typeMapper);
     }
 
     /**
@@ -827,7 +845,8 @@ public class FlexiJSonMapper {
     }
 
     protected FlexiJSonNode handleMapperObjectToJsonNode(final Getter getter, final Object obj, final DefaultObjectToJsonContext context) throws FlexiMapperException {
-        for (final FlexiTypeMapper mapper : this.typeMapper) {
+        final List<FlexiTypeMapper> typeMapper = this._getTypeMapper();
+        for (final FlexiTypeMapper mapper : typeMapper) {
             if (mapper.canConvert2Json(obj, getter)) {
                 return mapper.obj2JSon(this, obj, getter, context);
             }
@@ -878,7 +897,8 @@ public class FlexiJSonMapper {
         /**
          * give the type mappers a try
          */
-        for (final FlexiTypeMapper mapper : this.typeMapper) {
+        final List<FlexiTypeMapper> typeMapper = this._getTypeMapper();
+        for (final FlexiTypeMapper mapper : typeMapper) {
             FlexiJSonNode tryNode = this.createFlexiJSonValue((String) null);
             if (mapper.canConvert2Object(tryNode, cType, setter)) {
                 return mapper.json2Obj(this, tryNode, cType, setter);
@@ -1854,7 +1874,8 @@ public class FlexiJSonMapper {
 
     protected Object handleMapperJsonNodeToObject(final FlexiJSonNode json, final CompiledType type, final Setter setter) throws FlexiMapperException {
         boolean returnFallbackNull = false;
-        for (final FlexiTypeMapper mapper : this.typeMapper) {
+        final List<FlexiTypeMapper> typeMapper = this._getTypeMapper();
+        for (final FlexiTypeMapper mapper : typeMapper) {
             try {
                 if (mapper.canConvert2Object(json, type, setter)) {
                     return mapper.json2Obj(this, json, type, setter);
