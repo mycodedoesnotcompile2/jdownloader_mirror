@@ -27,11 +27,13 @@ import org.jdownloader.plugins.components.config.NhentaiNetCrawlerConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -47,7 +49,7 @@ import jd.plugins.hoster.NhentaiNet;
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 52819 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52820 $", interfaceVersion = 2, names = {}, urls = {})
 public class NhentaiNetCrawler extends PluginForDecrypt {
     public NhentaiNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,6 +118,11 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
         String titleJP = null;
         String title = null;
         if (useAPI && getHost().equalsIgnoreCase("nhentai.to")) {
+            final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+            if (account != null) {
+                final NhentaiNet hosterplugin = (NhentaiNet) this.getNewPluginForHostInstance(this.getHost());
+                hosterplugin.login(br, account);
+            }
             br.getPage(NhentaiNet.API_BASE + "/galleries/" + galleryID);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

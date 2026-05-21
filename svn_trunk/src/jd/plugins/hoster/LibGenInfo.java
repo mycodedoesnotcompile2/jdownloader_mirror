@@ -42,8 +42,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.LibGenCrawler;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 2, names = {}, urls = {})
-@PluginDependencies(dependencies = { PornportalCom.class })
+@HostPlugin(revision = "$Revision: 52820 $", interfaceVersion = 2, names = {}, urls = {})
+@PluginDependencies(dependencies = { LibGenCrawler.class })
 public class LibGenInfo extends PluginForHost {
     public LibGenInfo(PluginWrapper wrapper) {
         super(wrapper);
@@ -131,6 +131,7 @@ public class LibGenInfo extends PluginForHost {
         return contenturl;
     }
 
+    /** Returns internal bookID ("fileID" used as Synonym??) which can be used to obtain book information via API. */
     private String getBookID(final DownloadLink link) {
         return link.getStringProperty(PROPERTY_BOOK_ID);
     }
@@ -265,9 +266,8 @@ public class LibGenInfo extends PluginForHost {
                     /* Either redirect to supported pattern such as "/ads.php..." or offline. */
                     if (!this.canHandle(br.getURL())) {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else {
-                        parseFileInfoWebsite(link, this.br);
                     }
+                    parseFileInfoWebsite(link, this.br);
                 }
             } finally {
                 try {
@@ -277,7 +277,7 @@ public class LibGenInfo extends PluginForHost {
             }
         } else if (contenturl.matches(TYPE_ADS)) {
             br.getPage(contenturl);
-            if (br.containsHTML("(?i)>\\s*File not found in DB")) {
+            if (br.containsHTML(">\\s*File not found in DB")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             parseFileInfoWebsite(link, this.br);

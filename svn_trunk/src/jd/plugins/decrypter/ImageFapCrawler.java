@@ -19,7 +19,9 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
@@ -41,10 +43,54 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImageFap;
 
-@DecrypterPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap\\.com/(gallery\\.php\\?p?gid=.+|gallery/.+|pictures/\\d+/.*|photo/\\d+|organizer/\\d+|(usergallery|showfavorites)\\.php\\?userid=\\d+(&folderid=-?\\d+)?)" })
+@DecrypterPlugin(revision = "$Revision: 52822 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImageFapCrawler extends PluginForDecrypt {
     public ImageFapCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "imagefap.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_GALLERY_PHP   = Pattern.compile("/gallery\\.php\\?p?gid=.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_GALLERY       = Pattern.compile("/gallery/.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_PICTURES      = Pattern.compile("/pictures/(\\d+)/.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_PHOTO         = Pattern.compile("/photo/(\\d+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_ORGANIZER     = Pattern.compile("/organizer/(\\d+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USERGALLERY   = Pattern.compile("/usergallery\\.php\\?userid=\\d+(?:&folderid=-?\\d+)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SHOWFAVORITES = Pattern.compile("/showfavorites\\.php\\?userid=\\d+(?:&folderid=-?\\d+)?", Pattern.CASE_INSENSITIVE);
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("https?://(?:www\\.)?");
+            sb.append(buildHostsPatternPart(domains));
+            sb.append("(?:");
+            sb.append(PATTERN_GALLERY_PHP.pattern());
+            sb.append("|").append(PATTERN_GALLERY.pattern());
+            sb.append("|").append(PATTERN_PICTURES.pattern());
+            sb.append("|").append(PATTERN_PHOTO.pattern());
+            sb.append("|").append(PATTERN_ORGANIZER.pattern());
+            sb.append("|").append(PATTERN_USERGALLERY.pattern());
+            sb.append("|").append(PATTERN_SHOWFAVORITES.pattern());
+            sb.append(")");
+            ret.add(sb.toString());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -87,6 +133,12 @@ public class ImageFapCrawler extends PluginForDecrypt {
         final Map<String, String> dupes = new HashMap<String, String>();
         final PluginForHost hosterplugin = this.getNewPluginForHostInstance(getHost());
         final String oid = new Regex(contenturl, "(?:organizer)/(\\d+)").getMatch(0);
+        final UrlQuery query = UrlQuery.parse(contenturl);
+        String pgid = query.get("pgid");
+        String galleryIDStr = query.get("gid");
+        if (galleryIDStr == null) {
+            galleryIDStr = new Regex(contenturl, "(?:pictures|gallery)/(\\d+)/?").getMatch(0);
+        }
         if (oid != null) {
             /** organizerID link **/
             int pageIndex = 0;
@@ -112,14 +164,6 @@ public class ImageFapCrawler extends PluginForDecrypt {
             return ret;
         }
         final Regex singlephoto = new Regex(contenturl, "(?i)https?://[^/]+/photo/(\\d+)");
-        if (singlephoto.patternFind()) {
-            /* Single photo */
-            final String photoID = singlephoto.getMatch(0);
-            final DownloadLink link = new DownloadLink(hosterplugin, this.getHost(), contenturl + "/");
-            link.setProperty(ImageFap.PROPERTY_PHOTO_ID, photoID);
-            ret.add(link);
-            return ret;
-        }
         final String userID = new Regex(contenturl, "(?i)userid=(\\d+)").getMatch(0);
         final String folderID = new Regex(contenturl, "(?i)folderid=(-?\\d+)").getMatch(0);
         if (userID != null && folderID != null) {
@@ -175,36 +219,55 @@ public class ImageFapCrawler extends PluginForDecrypt {
         if (contenturl.matches(type_invalid)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* Gallery */
-        /* view=2 -> "One page" view -> More images on each page */
-        final UrlQuery query = UrlQuery.parse(contenturl);
-        String galleryIDStr = new Regex(contenturl, "(?:pictures|gallery)/(\\d+)/?").getMatch(0);
-        if (galleryIDStr == null) {
-            galleryIDStr = query.get("gid");
+        if (singlephoto.patternFind()) {
+            /* Single photo */
+            final String photoID = singlephoto.getMatch(0);
+            final DownloadLink link = new DownloadLink(hosterplugin, this.getHost(), contenturl + "/");
+            link.setProperty(ImageFap.PROPERTY_PHOTO_ID, photoID);
+            link.setProperty(ImageFap.PROPERTY_ALBUM_ID, galleryIDStr);
+            link.setProperty(ImageFap.PROPERTY_ALBUM_ID_2, pgid);
+            ret.add(link);
+            return ret;
         }
+        /* Gallery */
+        /* Remove parameters from contenturl and re-build it */
         contenturl = URLHelper.getUrlWithoutParams(contenturl);
-        /* Change to "One Page View" */
+        /* Change to "One Page View:  view=2 -> "One page" view -> More images on each page" */
         query.addAndReplace("view", "2");
         /* Overwrite possibly given page parameter. This is important! */
         query.addAndReplace("page", "0");
         /* Build new contenturl with changed/corrected parameters. */
         contenturl = contenturl + "?" + query.toString();
+        if (singlephoto.patternFind()) {
+            /* Single photo */
+            final String photoID = singlephoto.getMatch(0);
+            final DownloadLink link = new DownloadLink(hosterplugin, this.getHost(), contenturl + "/");
+            link.setProperty(ImageFap.PROPERTY_PHOTO_ID, photoID);
+            link.setProperty(ImageFap.PROPERTY_ALBUM_ID, galleryIDStr);
+            link.setProperty(ImageFap.PROPERTY_ALBUM_ID_2, pgid);
+            ret.add(link);
+            return ret;
+        }
         getPage(this.br, contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*This gallery has been flagged")) {
+        } else if (br.containsHTML(">\\s*This gallery has been flagged")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getURL().contains("/404.php")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Could not find gallery")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (pgid == null) {
+            /* Extract from html code */
+            pgid = br.getRegex("pgid=([a-f0-9]{32})").getMatch(0);
+        }
         // First find all the information we need (name of the gallery, name of
         // the galleries author)
         String authorsName = ImageFap.getUserName(br, null, false);
         authorsName = Encoding.htmlDecode(authorsName).trim();
         if (galleryIDStr == null) {
-            /* Look for galleryID in html code */
+            /* Extract galleryID from html code */
             galleryIDStr = br.getRegex("\"galleryid_input\"\\s*value\\s*=\\s*\"(\\d+)").getMatch(0);
         }
         if (galleryIDStr == null) {
@@ -262,6 +325,7 @@ public class ImageFapCrawler extends PluginForDecrypt {
                     link.setProperty(ImageFap.PROPERTY_ORDER_ID, orderID);
                     link.setProperty(ImageFap.PROPERTY_PHOTO_ID, photoID);
                     link.setProperty(ImageFap.PROPERTY_ALBUM_ID, galleryIDStr);
+                    link.setProperty(ImageFap.PROPERTY_ALBUM_ID_2, pgid);
                     link.setProperty(ImageFap.PROPERTY_PHOTO_PAGE_NUMBER, page);
                     link.setProperty(ImageFap.PROPERTY_PHOTO_GALLERY_TITLE, galleryName);
                     link.setProperty(ImageFap.PROPERTY_USERNAME, authorsName);
@@ -296,12 +360,11 @@ public class ImageFapCrawler extends PluginForDecrypt {
             } else if (isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
-            } else {
-                /* Continue to next page */
-                page++;
-                query.addAndReplace("page", Integer.toString(page));
-                getPage(this.br, baseURL + "?" + query.toString());
             }
+            /* Continue to next page */
+            page++;
+            query.addAndReplace("page", Integer.toString(page));
+            getPage(this.br, baseURL + "?" + query.toString());
         }
         return ret;
     }

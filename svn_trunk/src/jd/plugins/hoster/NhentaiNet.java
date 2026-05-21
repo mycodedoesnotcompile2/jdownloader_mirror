@@ -23,7 +23,6 @@ import java.util.Map;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -43,15 +42,13 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52819 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52822 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
         super(wrapper);
         /* 2026-05-12: Account support not yet done, thus only enabled in IDE mode */
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/register");
-        }
+        this.enablePremium("https://" + getHost() + "/register");
     }
 
     public static final String PROPERTY_CACHED_URL   = "CACHED_URL";
@@ -65,6 +62,10 @@ public class NhentaiNet extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
+    }
+
+    private void prepBRAPI(final Browser br) {
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader " + this.getVersion());
     }
 
     @Override
@@ -213,16 +214,21 @@ public class NhentaiNet extends PluginForHost {
 
     @Override
     protected boolean looksLikeValidAPIKey(final String str) {
-        return str != null && str.matches("nhk_[A-Za-z0-9]{40,}");
+        return str != null && str.matches("nhk_[A-Za-z0-9-]{40,}");
     }
 
-    private void login(final Browser br, final Account account) {
+    public void login(final Browser br, final Account account) {
+        prepBRAPI(br);
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Key " + account.getPass());
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(br, account);
+        /**
+         * Logging in grants the user higher API rate limits and maybe access to adult content. <br>
+         * Apart from that there are no more advantages (2026-05-20).
+         */
         br.getPage(API_BASE + "/user");
         if (br.getHttpConnection().getResponseCode() == 401) {
             throw new AccountInvalidException("Invalid or expired API key");
@@ -236,12 +242,15 @@ public class NhentaiNet extends PluginForHost {
         ai.setUnlimitedTraffic();
         final Boolean isStaff = (Boolean) user.get("is_staff");
         final Boolean isSuperuser = (Boolean) user.get("is_superuser");
-        if (Boolean.TRUE.equals(isSuperuser) || Boolean.TRUE.equals(isStaff)) {
+        if (Boolean.TRUE.equals(isSuperuser)) {
+            account.setType(AccountType.PREMIUM);
+            ai.setStatus("Superuser");
+        } else if (Boolean.TRUE.equals(isStaff)) {
             account.setType(AccountType.PREMIUM);
             ai.setStatus("Staff");
         } else {
+            /* Normal/Free user */
             account.setType(AccountType.FREE);
-            ai.setStatus("Registered user");
         }
         account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
         account.setConcurrentUsePossible(true);
@@ -250,7 +259,7 @@ public class NhentaiNet extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        // TODO: Implement functionality
+        /* Login is not required for downloading */
         handleFree(link);
     }
 

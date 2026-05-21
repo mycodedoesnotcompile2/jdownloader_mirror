@@ -27,6 +27,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -49,15 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap.com/video\\.php\\?vid=\\d+" })
+@HostPlugin(revision = "$Revision: 52822 $", interfaceVersion = 3, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap.com/video\\.php\\?vid=\\d+" })
 public class ImageFap extends PluginForHost {
     public ImageFap(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,6 +117,7 @@ public class ImageFap extends PluginForHost {
     private static final String               SETTING_ENABLE_START_DOWNLOADS_SEQUENTIALLY = "ENABLE_START_DOWNLOADS_SEQUENTIALLY";
     public static final String                PROPERTY_PHOTO_ID                           = "photoID";
     public static final String                PROPERTY_ALBUM_ID                           = "galleryID";
+    public static final String                PROPERTY_ALBUM_ID_2                         = "galleryID2";
     public static final String                PROPERTY_PHOTO_INDEX                        = "photo_index";
     public static final String                PROPERTY_PHOTO_PAGE_NUMBER                  = "photo_page_number";
     public static final String                PROPERTY_PHOTO_GALLERY_TITLE                = "photo_gallery_title";
@@ -153,23 +154,31 @@ public class ImageFap extends PluginForHost {
     private String getContentURL(final DownloadLink link) {
         if (link.getPluginPatternMatcher().matches(PATTERN_VIDEO)) {
             return link.getPluginPatternMatcher();
-        } else {
-            final String photoID = getContentID(link);
-            final String photoAlbumID = link.getStringProperty(PROPERTY_ALBUM_ID);
-            final int photoIndex = link.getIntegerProperty(PROPERTY_PHOTO_INDEX, -1);
-            final int photoPageNumber = link.getIntegerProperty(PROPERTY_PHOTO_PAGE_NUMBER, 0);
-            if (photoID != null) {
-                String url = "https://www." + STATIC_HOST + "/photo/" + photoID + "/";
-                if (photoAlbumID != null) {
-                    url += "?pgid=&gid=" + photoAlbumID + "&page=" + photoPageNumber;
-                }
-                if (photoIndex != -1) {
-                    url += "#" + photoIndex;
-                }
-                return url;
-            }
-            return link.getPluginPatternMatcher();
         }
+        final String photoID = getContentID(link);
+        final String photoAlbumID = link.getStringProperty(PROPERTY_ALBUM_ID);
+        final int photoIndex = link.getIntegerProperty(PROPERTY_PHOTO_INDEX, -1);
+        final int photoPageNumber = link.getIntegerProperty(PROPERTY_PHOTO_PAGE_NUMBER, 0);
+        if (photoID != null) {
+            String url = "https://www." + STATIC_HOST + "/photo/" + photoID + "/";
+            if (photoAlbumID != null) {
+                String pg_id = link.getStringProperty(PROPERTY_ALBUM_ID_2);
+                /**
+                 * 2026-05-20: This parameter is now required when accessing urls to images that are part of an album. <br>
+                 * They aren't validating the value though so it is possible to use random values.
+                 */
+                if (pg_id == null) {
+                    /* Falback: Use dummy value to make older image links work. */
+                    pg_id = "ffffffffffffffffffffffffffffffff";
+                }
+                url += "?pgid=" + pg_id + "&gid=" + photoAlbumID + "&page=" + photoPageNumber;
+            }
+            if (photoIndex != -1) {
+                url += "#" + photoIndex;
+            }
+            return url;
+        }
+        return link.getPluginPatternMatcher();
     }
 
     private String getContentID(final DownloadLink link) {
@@ -702,25 +711,25 @@ public class ImageFap extends PluginForHost {
     }
 
     private HashMap<String, String> phrasesEN = new HashMap<String, String>() {
-        {
-            put("SETTING_FORCE_RECONNECT_ON_RATELIMIT", "Reconnect or wait if rate limit is reached and captcha is required?");
-            put("LABEL_FILENAME", "Define custom filename for pictures:");
-            put("SETTING_TAGS", "Explanation of the available tags:\r\n*username* = Name of the user who posted the content\r\n*title* = Original title of the picture including file extension\r\n*galleryname* = Name of the gallery in which the picture is listed\r\n*orderid* = Position of the picture in a gallery e.g. '0001'\r\n*photoID* = id of the image\r\n*galleryID* = id of the gallery");
-            put("SETTING_LABEL_ADVANCED_SETTINGS", "Advanced Settings");
-            put("SETTING_REQUEST_LIMIT_MILLISECONDS", "[Requires JD restart] Request limit for 'imagefap.com' in milliseconds");
-            put("SETTING_ENABLE_START_DOWNLOADS_SEQUENTIALLY", "Start downloads sequentially?");
-        }
-    };
+                                                  {
+                                                      put("SETTING_FORCE_RECONNECT_ON_RATELIMIT", "Reconnect or wait if rate limit is reached and captcha is required?");
+                                                      put("LABEL_FILENAME", "Define custom filename for pictures:");
+                                                      put("SETTING_TAGS", "Explanation of the available tags:\r\n*username* = Name of the user who posted the content\r\n*title* = Original title of the picture including file extension\r\n*galleryname* = Name of the gallery in which the picture is listed\r\n*orderid* = Position of the picture in a gallery e.g. '0001'\r\n*photoID* = id of the image\r\n*galleryID* = id of the gallery");
+                                                      put("SETTING_LABEL_ADVANCED_SETTINGS", "Advanced Settings");
+                                                      put("SETTING_REQUEST_LIMIT_MILLISECONDS", "[Requires JD restart] Request limit for 'imagefap.com' in milliseconds");
+                                                      put("SETTING_ENABLE_START_DOWNLOADS_SEQUENTIALLY", "Start downloads sequentially?");
+                                                  }
+                                              };
     private HashMap<String, String> phrasesDE = new HashMap<String, String>() {
-        {
-            put("SETTING_FORCE_RECONNECT_ON_RATELIMIT", "Warte oder führe einen Reconnect durch, wenn das Rate-Limit erreicht ist und ein Captcha benötigt wird?");
-            put("LABEL_FILENAME", "Gib das Muster des benutzerdefinierten Dateinamens für Bilder an:");
-            put("SETTING_TAGS", "Erklärung der verfügbaren Tags:\r\n*username* = Name des Benutzers, der den Inhalt veröffentlicht hat \r\n*title* = Originaler Dateiname mitsamt Dateiendung\r\n*galleryname* = Name der Gallerie, in der sich das Bild befand\r\n*orderid* = Position des Bildes in einer Gallerie z.B. '0001'\r\n*photoID* = id des Bildes\r\n*galleryID* = id der Gallery");
-            put("SETTING_LABEL_ADVANCED_SETTINGS", "Erweiterte Einstellungen");
-            put("SETTING_REQUEST_LIMIT_MILLISECONDS", "[JD Neustart benötigt] Request Limit für 'imagefap.com' in Millisekunden");
-            put("SETTING_ENABLE_START_DOWNLOADS_SEQUENTIALLY", "Downloads nacheinander starten?");
-        }
-    };
+                                                  {
+                                                      put("SETTING_FORCE_RECONNECT_ON_RATELIMIT", "Warte oder führe einen Reconnect durch, wenn das Rate-Limit erreicht ist und ein Captcha benötigt wird?");
+                                                      put("LABEL_FILENAME", "Gib das Muster des benutzerdefinierten Dateinamens für Bilder an:");
+                                                      put("SETTING_TAGS", "Erklärung der verfügbaren Tags:\r\n*username* = Name des Benutzers, der den Inhalt veröffentlicht hat \r\n*title* = Originaler Dateiname mitsamt Dateiendung\r\n*galleryname* = Name der Gallerie, in der sich das Bild befand\r\n*orderid* = Position des Bildes in einer Gallerie z.B. '0001'\r\n*photoID* = id des Bildes\r\n*galleryID* = id der Gallery");
+                                                      put("SETTING_LABEL_ADVANCED_SETTINGS", "Erweiterte Einstellungen");
+                                                      put("SETTING_REQUEST_LIMIT_MILLISECONDS", "[JD Neustart benötigt] Request Limit für 'imagefap.com' in Millisekunden");
+                                                      put("SETTING_ENABLE_START_DOWNLOADS_SEQUENTIALLY", "Downloads nacheinander starten?");
+                                                  }
+                                              };
 
     /**
      * Returns a German/English translation of a phrase. We don't use the JDownloader translation framework since we need only German and

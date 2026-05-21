@@ -20,17 +20,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.Exceptions;
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Exceptions;
-import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
-
-@HostPlugin(revision = "$Revision: 52762 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52822 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         /* zbporn.com belongs to the same "porn network" as sexvid.xxx. */
         ret.add(new String[] { "zbporn.com" });
         ret.add(new String[] { "xozilla.com", "xozilla.xxx" });
-        ret.add(new String[] { "femdomtb.com" });
         ret.add(new String[] { "fetishshrine.com" });
         ret.add(new String[] { "sheshaft.com" });
         ret.add(new String[] { "yeswegays.com" });
@@ -158,7 +157,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "fapbox.com" });
         ret.add(new String[] { "nakedtube.com" });
         ret.add(new String[] { "txxx.porn" });
-
         return ret;
     }
 
