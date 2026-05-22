@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 52392 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52832 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -155,6 +155,17 @@ public class IwaraTv extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final String type = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final String fid = this.getFID(link);
+        if (type.startsWith("video")) {
+            return fid + ".mp4";
+        } else {
+            return fid + ".jpg";
+        }
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, false);
     }
@@ -168,26 +179,28 @@ public class IwaraTv extends PluginForHost {
         /* Set Packagizer property */
         final String fid = this.getFID(link);
         link.setProperty(PROPERTY_VIDEOID, fid);
-        final String type = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final String contenturl = link.getPluginPatternMatcher();
+        final String type = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         final boolean isVideo = type.startsWith("video");
-        if (!link.isNameSet()) {
-            /* Set fallback name */
-            if (isVideo) {
-                link.setName(fid + ".mp4");
-            } else {
-                link.setName(fid + ".jpg");
-            }
-        }
         this.setBrowserExclusive();
         prepBR(this.br);
         if (account != null) {
             /* Login if possible */
             login(account, false);
         }
+        // br.getHeaders().put("Origin", "https://www.iwara.ai");
+        // br.getHeaders().put("Referer", "https://www.iwara.ai/");
+        if (StringUtils.containsIgnoreCase(contenturl, "iwara.ai")) {
+            /**
+             * 2026-05-21: New and mandatory otherwise this response will happen: <br>
+             * {"message":"errors.differentSite","siteId":"iwara_ai"}
+             */
+            br.getHeaders().put("x-site", "www.iwara.ai");
+        }
         if (isVideo) {
-            br.getPage(WEBAPI_BASE + "/video/" + this.getFID(link));
+            br.getPage(WEBAPI_BASE + "/video/" + fid);
         } else {
-            br.getPage(WEBAPI_BASE + "/image/" + this.getFID(link));
+            br.getPage(WEBAPI_BASE + "/image/" + fid);
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             /*
@@ -544,18 +557,6 @@ public class IwaraTv extends PluginForHost {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

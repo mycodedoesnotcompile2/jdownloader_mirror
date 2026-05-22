@@ -21,11 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -42,7 +37,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.LibGenCrawler;
 
-@HostPlugin(revision = "$Revision: 52820 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+
+@HostPlugin(revision = "$Revision: 52828 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { LibGenCrawler.class })
 public class LibGenInfo extends PluginForHost {
     public LibGenInfo(PluginWrapper wrapper) {
@@ -63,7 +63,7 @@ public class LibGenInfo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://libgen.lc/";
+        return "https://libgen.lc/";
     }
 
     public static List<String[]> getPluginDomains() {

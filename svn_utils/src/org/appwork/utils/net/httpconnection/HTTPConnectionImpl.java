@@ -1283,16 +1283,14 @@ public class HTTPConnectionImpl implements HTTPConnection {
             ByteBuffer header = null;
             try {
                 header = HTTPConnectionUtils.readheader(new CountingInputStream(inputStream) {
-                    private boolean first = true;
+                    private boolean first = profiler != null;
 
                     @Override
                     protected void inc(int ret) throws IOException {
                         super.inc(ret);
                         if (first) {
                             first = false;
-                            if (profiler != null) {
-                                profiler.onFirstHeaderByteRead(HTTPConnectionImpl.this);
-                            }
+                            profiler.onFirstHeaderByteRead(HTTPConnectionImpl.this);
                         }
                     }
                 }, true);
@@ -1314,24 +1312,29 @@ public class HTTPConnectionImpl implements HTTPConnection {
                 this.httpHeader = new String(bytes, "ISO-8859-1").trim();
             }
             /* parse response code/message */
-            if (this.httpHeader.matches("^[a-zA-Z0-9/\\.]+\\s*\\d+.*?")) {
+            final Regex httpResponseHeader = new Regex(httpHeader, "^HTTP/(\\d+(?:\\.\\d+)?)\\s*(\\d+)\\s*(.+)?$");
+            final Regex icyResponseHeader = new Regex(httpHeader, "^ICY\\s*(\\d+)\\s*(.+)?$");
+            if (httpResponseHeader.getMatch(1) != null) {
                 /**
-                 * HTTP/1.0 or HTTP/1.1 or HTTP/1.0 compatible header
+                 * HTTP/0.9,HTTP/1.0 or HTTP/1.1 or HTTP/x compatible header
                  */
-                final String code = new Regex(this.httpHeader, "[a-zA-Z0-9/\\.]+\\s*(\\d+)").getMatch(0);
-                if (code != null) {
-                    this.httpResponseCode = Integer.parseInt(code);
-                }
-                this.httpResponseMessage = StringUtils.valueOrEmpty(new Regex(this.httpHeader, "[a-zA-Z0-9/\\.]+\\s*\\d+\\s*(.+)").getMatch(0));
+                this.httpResponseCode = Integer.parseInt(httpResponseHeader.getMatch(1));
+                this.httpResponseMessage = StringUtils.valueOrEmpty(httpResponseHeader.getMatch(2));
+            } else if (icyResponseHeader.getMatch(1) != null) {
+                /**
+                 * ICY HEADER, Shoutcast v1, Icecast and Shoutcast v2 now answer with HTTP/1.0
+                 */
+                this.httpResponseCode = Integer.parseInt(icyResponseHeader.getMatch(1));
+                this.httpResponseMessage = StringUtils.valueOrEmpty(icyResponseHeader.getMatch(2));
             } else {
-                if (connectionSocket instanceof KeepAliveSocketStream) {
-                    throw new KeepAliveSocketStreamException(new IOException("unknown HTTP response"), connectionSocket);
-                }
                 this.invalidHttpHeader = this.httpHeader;
                 this.httpHeader = HTTPConnectionImpl.UNKNOWN_HTTP_RESPONSE;
                 // Unknown HTTP Response: 999!
                 this.httpResponseCode = HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode();
                 this.httpResponseMessage = HTTPConnectionImpl.UNKNOWN_HTTP_RESPONSE;
+                if (connectionSocket instanceof KeepAliveSocketStream) {
+                    throw new KeepAliveSocketStreamException(new IOException("unknown HTTP response:" + invalidHttpHeader), connectionSocket);
+                }
                 if (header.limit() > 0) {
                     /*
                      * push back the data that got read because no http header exists

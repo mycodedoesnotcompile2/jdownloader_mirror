@@ -3,3 +3,6 @@ gui_config_antistandby_whilejd2=JDownloader en cours d'exécution
 jd_plugins_optional_antistandby_jdantistandby=Anti mise en veille
 jd_plugins_optional_antistandby_jdantistandby_description=Empêche la mise en veille ou l'hibernation de votre PC pour garder les téléchargements actifs.
 mode=Empêcher la mise en veille ou l'hibernation quand
+gui_config_antistandby_whilecrawl=Collecte de liens en cours
+gui_config_antistandby_whiledl2orcrawl=Téléchargement ou collecte de liens en cours
+prevent_screensaver=Empêcher l'écran de veille

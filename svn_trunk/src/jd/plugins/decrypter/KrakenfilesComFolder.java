@@ -30,13 +30,15 @@ import jd.nutils.encoding.Encoding;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48650 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52824 $", interfaceVersion = 3, names = {}, urls = {})
 public class KrakenfilesComFolder extends PluginForDecrypt {
     public KrakenfilesComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,44 +116,42 @@ public class KrakenfilesComFolder extends PluginForDecrypt {
             /* Fallback: Assume we are inside the root folder and set name of user/uploader as package-name. */
             fp.setName(profileName);
         }
-        fp.addLinks(ret);
         String next = null;
-        int page = 0;
+        int page = 1;
         final HashSet<String> dupes = new HashSet<String>();
         do {
-            page += 1;
             final String[] fileIDs = br.getRegex("/view/([a-z0-9]+)/file\\.html").getColumn(0);
-            final ArrayList<DownloadLink> newitems = new ArrayList<DownloadLink>();
+            final List<DownloadLink> newitems = new ArrayList<DownloadLink>();
             if (fileIDs != null && fileIDs.length > 0) {
-                final String[] filesizes = br.getRegex(">Size</div>\\s*<div class=\"nk-file-details-col\"[^>]*>([^<]+)</div>").getColumn(0);
+                final String[] filesizes = br.getRegex("class=\"nk-file-meta\">\\s*<div class=\"tb-sub\">([0-9\\.]+ [a-zA-Z]{1,5})</div>").getColumn(0);
                 int fileindex = 0;
                 for (final String fileID : fileIDs) {
                     if (!dupes.add(fileID)) {
                         /* Skip dupes */
                         continue;
                     }
-                    final DownloadLink dl = createDownloadlink("https://" + this.getHost() + "/view/" + fileID + "/file.html");
+                    final DownloadLink file = createDownloadlink("https://" + this.getHost() + "/view/" + fileID + "/file.html");
                     String filename = br.getRegex("/view/" + fileID + "/file\\.html\">\\s*<div class=\"sl-content\">\\s*<span[^>]*>([^>]+)<").getMatch(0);
                     if (filename == null) {
                         /* 2023-11-21 */
                         filename = br.getRegex("/view/" + fileID + "/file\\.html\" class=\"title\"[^>]*>([^<]+)</a>").getMatch(0);
                     }
                     if (filename != null) {
-                        dl.setName(filename);
+                        file.setName(filename);
                     } else {
                         /* Fallback */
-                        dl.setName(fileID);
+                        file.setName(fileID);
                     }
                     if (filesizes != null && fileindex < filesizes.length) {
                         final String filesizeStr = filesizes[fileindex];
-                        dl.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                        file.setDownloadSize(SizeFormatter.getSize(filesizeStr));
                     }
-                    dl.setAvailable(true);
-                    dl._setFilePackage(fp);
+                    file.setAvailable(true);
+                    file._setFilePackage(fp);
                     if (path != null) {
-                        dl.setRelativeDownloadFolderPath(path);
+                        file.setRelativeDownloadFolderPath(path);
                     }
-                    newitems.add(dl);
+                    newitems.add(file);
                     fileindex++;
                 }
             }
@@ -167,22 +167,20 @@ public class KrakenfilesComFolder extends PluginForDecrypt {
                     newitems.add(folder);
                 }
             }
-            next = br.getRegex("<a[^>]*rel=\"next\"[^>]*href=\"(/profiles/" + Pattern.quote(profileName) + "(/files/[A-Za-z0-9]+)?\\?page=" + (page + 1) + ")\"").getMatch(0);
             /* Make items appear live in linkgrabber */
             for (final DownloadLink result : newitems) {
                 distribute(result);
                 ret.add(result);
             }
+            next = br.getRegex("<a[^>]*rel=\"next\"[^>]*href=\"(/profiles/" + Pattern.quote(profileName) + "(/files/[A-Za-z0-9]+)?\\?page=" + (page + 1) + ")\"").getMatch(0);
             logger.info("Crawled page " + page + " | Found number of items so far: " + ret.size() + " | Nextpage: " + next);
-            if (newitems.isEmpty()) {
-                /* This should never happen. */
-                if (ret.isEmpty()) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    /* This should never happen! */
-                    logger.info("Stopping because: Current page doesn't contain any items");
-                    break;
-                }
+            if (page == 1 && ret.isEmpty() && pathSegments != null && pathSegments.length > 0) {
+                /* Very basic empty folder detection */
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            }
+            if (newitems.isEmpty() && ret.isEmpty()) {
+                /* Zero results and we don't know why */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
@@ -193,10 +191,10 @@ public class KrakenfilesComFolder extends PluginForDecrypt {
             } else if (next == null) {
                 logger.info("Stopping because: Reached end");
                 break;
-            } else {
-                /* Continue to next page */
-                br.getPage(next);
             }
+            /* Continue to next page */
+            br.getPage(next);
+            page += 1;
         } while (!this.isAbort());
         return ret;
     }

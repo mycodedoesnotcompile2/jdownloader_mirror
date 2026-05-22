@@ -79,7 +79,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 52494 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52825 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -575,10 +575,6 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         return null;
     }
 
-    private String getCachedUserName(final int userID) {
-        return getCachedUserName(Integer.toString(userID));
-    }
-
     private String getCachedUserName(final String userID) {
         if (userID == null) {
             return null;
@@ -882,9 +878,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         if (userSelectedCrawlTypes == 0) {
             logger.info("User has disabled all profile crawler functionality");
             return ret;
-        } else {
-            logger.info("crawlUser=crawlStory:" + crawlStory + "|crawlStoryHighlights:" + crawlStoryHighlights + "|crawlProfilePosts:" + crawlProfilePosts + "|crawlProfilePicture:" + crawlProfilePicture);
         }
+        logger.info("crawlUser=crawlStory:" + crawlStory + "|crawlStoryHighlights:" + crawlStoryHighlights + "|crawlProfilePosts:" + crawlProfilePosts + "|crawlProfilePicture:" + crawlProfilePicture);
         /* Now do the actual crawling. */
         if (crawlStory) {
             if (userSelectedCrawlTypes == 1) {
@@ -1152,34 +1147,62 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         InstaGramCom.prepBRAltAPI(this.br);
         Number total_media_items = null;
         boolean hasCrawledProfilePicture = false;
-        String profile_pic_url_hd = this.lazy_cache.get(userID + "_profile_pic_url_hd");
         if (crawlProfilePicture) {
+            /* First try to get a previously cached profile image url - HD preferred, then low-res. */
+            String cachedProfilePicURL = this.lazy_cache.get(userID + "_profile_pic_url_hd");
+            if (cachedProfilePicURL == null) {
+                cachedProfilePicURL = this.lazy_cache.get(userID + "_profile_pic_url");
+            }
+            if (cachedProfilePicURL != null) {
+                logger.info("Using cached profile image url");
+                final DownloadLink profilePic = this.createDownloadlink(cachedProfilePicURL);
+                final String ext = Plugin.getFileNameExtensionFromString(cachedProfilePicURL);
+                profilePic.setFinalFileName(username + ext);
+                profilePic.setAvailable(true);
+                profilePic._setFilePackage(metadata.getFilePackage());
+                ret.add(profilePic);
+                distribute(profilePic);
+                hasCrawledProfilePicture = true;
+                if (!crawlPosts) {
+                    logger.info("Stopping because: user wants to crawl profile image only (from cache)");
+                    return ret;
+                }
+            }
+        }
+        if (crawlProfilePicture && !hasCrawledProfilePicture) {
             /* Crawl HD profile image, thx to: https://github.com/Ademking/profile-picture-viewer/blob/master/instagram.js#L43 */
-            if (profile_pic_url_hd == null) {
-                logger.info("Crawling profile image");
+            try {
+                /**
+                 * 2026-05-21: This request looks to be broken or server side deprecated now. <br>
+                 * Returns this for me: {"user":{},"status":"ok"}
+                 */
+                logger.info("Crawling HD profile image");
                 InstaGramCom.getPageAltAPI(account, this.br, InstaGramCom.ALT_API_BASE + "/users/" + userID + "/info/");
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Map<String, Object> user = (Map<String, Object>) entries.get("user");
                 total_media_items = ((Number) user.get("media_count")).intValue();
                 final Map<String, Object> hd_profile_pic_url_info = (Map<String, Object>) user.get("hd_profile_pic_url_info");
-                profile_pic_url_hd = hd_profile_pic_url_info.get("url").toString();
+                final String profile_pic_url_hd = hd_profile_pic_url_info.get("url").toString();
                 lazy_cache.put(userID + "_profile_pic_url_hd", profile_pic_url_hd);
-            }
-            final DownloadLink profilePic = this.createDownloadlink(profile_pic_url_hd);
-            final String ext = Plugin.getFileNameExtensionFromString(profile_pic_url_hd);
-            profilePic.setFinalFileName(username + ext);
-            profilePic.setAvailable(true);
-            profilePic._setFilePackage(metadata.getFilePackage());
-            ret.add(profilePic);
-            distribute(profilePic);
-            hasCrawledProfilePicture = true;
-            if (total_media_items != null && total_media_items.intValue() == 0) {
-                /* User doesn't have anything else we can crawl */
-                logger.info("Stopping because: media_count==0");
-                return ret;
-            } else if (!crawlPosts) {
-                logger.info("Stopping because: do not crawl posts (profile image only)");
-                return ret;
+                final DownloadLink profilePic = this.createDownloadlink(profile_pic_url_hd);
+                final String ext = Plugin.getFileNameExtensionFromString(profile_pic_url_hd);
+                profilePic.setFinalFileName(username + ext);
+                profilePic.setAvailable(true);
+                profilePic._setFilePackage(metadata.getFilePackage());
+                ret.add(profilePic);
+                distribute(profilePic);
+                hasCrawledProfilePicture = true;
+                if (!crawlPosts) {
+                    logger.info("Stopping because: user wants to crawl profile image only");
+                    return ret;
+                } else if (total_media_items != null && total_media_items.intValue() == 0) {
+                    /* User doesn't have anything else we can crawl */
+                    logger.info("Stopping because: media_count==0 | User has zero posts for us to crawl");
+                    return ret;
+                }
+            } catch (final Exception e) {
+                logger.log(e);
+                logger.warning("Failed to crawl HD profile image -> Will try fallback");
             }
         }
         String nextid = null;
@@ -1196,19 +1219,26 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             if (crawlProfilePicture && !hasCrawledProfilePicture) {
-                /* Old way -> This will return a low resolution 150x150 profile image */
-                final Map<String, Object> user = (Map<String, Object>) entries.get("user");
-                final String profilePictureURL = user.get("profile_pic_url").toString();
-                final DownloadLink profilePic = this.createDownloadlink(profilePictureURL);
-                final String ext = Plugin.getFileNameExtensionFromString(profilePictureURL);
-                profilePic.setFinalFileName(username + ext);
-                profilePic.setAvailable(true);
-                profilePic._setFilePackage(metadata.getFilePackage());
-                ret.add(profilePic);
-                distribute(profilePic);
-                if (!crawlPosts) {
-                    logger.info("Stopping because: do not crawl posts (profile image only)");
-                    return ret;
+                /* Alternative/Old way -> This will return a low resolution 150x150 profile image */
+                try {
+                    final Map<String, Object> user = (Map<String, Object>) entries.get("user");
+                    final String profilePictureURL = user.get("profile_pic_url").toString();
+                    lazy_cache.put(userID + "_profile_pic_url", profilePictureURL);
+                    final DownloadLink profilePic = this.createDownloadlink(profilePictureURL);
+                    final String ext = Plugin.getFileNameExtensionFromString(profilePictureURL);
+                    profilePic.setFinalFileName(username + ext);
+                    profilePic.setAvailable(true);
+                    profilePic._setFilePackage(metadata.getFilePackage());
+                    ret.add(profilePic);
+                    distribute(profilePic);
+                    hasCrawledProfilePicture = true;
+                    if (!crawlPosts) {
+                        logger.info("Stopping because: do not crawl posts (profile image only)");
+                        return ret;
+                    }
+                } catch (final Exception e) {
+                    logger.log(e);
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to crawl profile picture (both HD and fallback failed)", e);
                 }
             }
             final int numberofItemsOnCurrentPage = (int) JavaScriptEngineFactory.toLong(entries.get("num_results"), 0);

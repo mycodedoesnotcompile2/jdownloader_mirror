@@ -37,3 +37,4 @@ popup_reconnecttoggle=Reconnexion automatique activée
 popup_update=Vérifier les mises à jour
 popup_update_install=Installer les dernières mises à jour
 popup_update_install_tt=Il y a des mises à jour en attente d'installation. Cliquez pour les installer maintenant !
+plugins_optional_JDLightTray_clipboardindicator=L'icône de la zone de notification indique que la surveillance du presse-papiers est désactivée

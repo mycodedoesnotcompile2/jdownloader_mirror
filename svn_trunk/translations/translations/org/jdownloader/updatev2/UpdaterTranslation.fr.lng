@@ -72,3 +72,5 @@ update_dialog_yes=Oui (recommandé)
 update_done_close_in_TIME=Installation réalisée avec succès. Sort dans %s1
 update_in_next_session=Annuler, et ne plus redemander jusqu'au prochain redemarrage
 updatedplugins=Les plugins ont été mis à jour.\nVous utilisez maintenant la dernière version de JDownloader.
+errordialog_not_enough_space_specify_incl_changed=Il n'y a pas assez d'espace libre sur votre disque %s1.\r\nAssurez-vous de disposer d'au moins %s2 d'espace libre (%s3 supplémentaires nécessaires), puis relancez la mise à jour.\r\nEspace libre sur %s1 après l'installation : %s4
+errordialog_not_enough_space_specify=Il n'y a pas assez d'espace libre sur votre disque %s1.\r\nAssurez-vous de disposer d'au moins %s2 d'espace libre (%s3 supplémentaires nécessaires), puis relancez la mise à jour.

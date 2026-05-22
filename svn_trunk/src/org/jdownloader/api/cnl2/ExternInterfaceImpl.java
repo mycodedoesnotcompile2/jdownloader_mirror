@@ -522,19 +522,24 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
             // valid
             return;
         }
-        HTTPHeader jdrandomNumber = request.getRequestHeaders().get("jd.randomnumber");
-        if (jdrandomNumber != null && jdrandomNumber.getValue() != null && jdrandomNumber.getValue().equalsIgnoreCase(System.getProperty("jd.randomNumber"))) {
-            /*
-             * request knows secret jd.randomnumber, it is okay to handle this request
-             */
-            return;
+        jdRandomNumber: {
+            final HTTPHeader jdrandomNumber = request.getRequestHeaders().get("jd.randomnumber");
+            if (jdrandomNumber != null && StringUtils.isNotEmpty(jdrandomNumber.getValue()) && StringUtils.equals(System.getProperty("jd.randomNumber"), jdrandomNumber.getValue())) {
+                /*
+                 * request knows secret jd.randomnumber, it is okay to handle this request
+                 */
+                return;
+            }
         }
-        final HTTPHeader referer = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_REFERER);
-        String check = null;
-        if (referer != null && (check = referer.getValue()) != null) {
+        String siteURL = null;
+        referer: {
+            final HTTPHeader referer = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_REFERER);
+            if (referer == null || (siteURL = referer.getValue()) == null) {
+                break referer;
+            }
             try {
-                final URL url = new URL(check);
-                if (StringUtils.startsWithCaseInsensitive(url.getPath(), "/flashgot") && InetAddress.getByName(url.getHost()).isLoopbackAddress()) {
+                final URL check = new URL(siteURL);
+                if (StringUtils.startsWithCaseInsensitive(check.getPath(), "/flashgot") && InetAddress.getByName(check.getHost()).isLoopbackAddress()) {
                     /*
                      * security check for flashgot referer, skip asking if we find valid flashgot referer
                      */
@@ -543,37 +548,40 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
             } catch (MalformedURLException ignore) {
             }
         }
-        String app = "unknown application";
-        final HTTPHeader agent = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_USER_AGENT);
-        if (agent != null && agent.getValue() != null) {
-            /* try to parse application name from user agent header */
-            app = agent.getValue().replaceAll("\\(.*\\)", "");
-        }
-        String url = null;
-        if (referer != null) {
-            /* lets use the referer as source of the request */
-            url = referer.getValue();
-        }
-        if (url == null) {
-            /* no referer available, maybe a source variable is? */
-            url = request.getParameterbyKey("source");
-            if (url != null && !url.matches("^([a-z0-9\\-]+\\.){1,}[a-z0-9]+$") && StringUtils.containsIgnoreCase(request.getParameterbyKey("passwords"), "filecrypt.cc")) {
-                // workaround for filecrypt sending package name in source
-                url = "filecrypt.cc";
+        origin: if (siteURL == null) {
+            final HTTPHeader origin = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_ORIGIN);
+            if (origin == null || (siteURL = origin.getValue()) == null) {
+                break origin;
             }
         }
-        if (url == null) {
-            url = fallbackSource;
+        sourceParam: if (siteURL == null && (siteURL = request.getParameterbyKey("source")) != null) {
+            /* no referer available, maybe a source variable is? */
+            if (!siteURL.matches("^([a-z0-9\\-]+\\.){1,}[a-z0-9]+$") && StringUtils.containsIgnoreCase(request.getParameterbyKey("passwords"), "filecrypt.cc")) {
+                // workaround for filecrypt sending package name in source
+                siteURL = "filecrypt.cc";
+            }
         }
-        if (url != null) {
-            url = Browser.getHost(url);
+        if (siteURL == null) {
+            siteURL = fallbackSource;
         }
-        ArrayList<String> allowed = JsonConfig.create(RemoteAPIConfig.class).getExternInterfaceAuth();
-        if (allowed != null && url != null && allowed.contains(url)) {
-            /* the url is already allowed to add links */
+        if (siteURL != null) {
+            siteURL = Browser.getHost(siteURL);
+        }
+        ArrayList<String> allowedSiteURLs = JsonConfig.create(RemoteAPIConfig.class).getExternInterfaceAuth();
+        if (allowedSiteURLs != null && siteURL != null && allowedSiteURLs.contains(siteURL)) {
+            /* the url/from is already allowed to add links */
             return;
         }
-        final String from = url != null ? url : app;
+        String from = siteURL;
+        userAgent: if (from == null) {
+            from = "unknown application";
+            final HTTPHeader agent = request.getRequestHeaders().get(HTTPConstants.HEADER_REQUEST_USER_AGENT);
+            if (agent == null || agent.getValue() == null) {
+                break userAgent;
+            }
+            /* try to parse application name from user agent header */
+            from = agent.getValue().replaceAll("\\(.*\\)", "");
+        }
         try {
             final ConfirmDialog d = new ConfirmDialog(0, ExternInterfaceTranslation.T.jd_plugins_optional_interfaces_jdflashgot_security_title(from), ExternInterfaceTranslation.T.jd_plugins_optional_interfaces_jdflashgot_security_message(), null, ExternInterfaceTranslation.T.jd_plugins_optional_interfaces_jdflashgot_security_btn_allow(), ExternInterfaceTranslation.T.jd_plugins_optional_interfaces_jdflashgot_security_btn_deny()) {
                 @Override
@@ -585,13 +593,18 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         } catch (DialogNoAnswerException e) {
             throw e;
         }
-        if (url != null) {
-            /* we can only save permission if an url is available */
-            if (allowed == null) {
-                allowed = new ArrayList<String>();
-            }
-            allowed.add(url);
-            JsonConfig.create(RemoteAPIConfig.class).setExternInterfaceAuth(allowed);
+        if (siteURL == null) {
+            /* we can only save permission if an siteURL is available */
+            return;
+        }
+        if (allowedSiteURLs == null) {
+            allowedSiteURLs = new ArrayList<String>();
+        } else {
+            allowedSiteURLs = new ArrayList<String>(allowedSiteURLs);
+        }
+        if (!allowedSiteURLs.contains(siteURL)) {
+            allowedSiteURLs.add(siteURL);
+            JsonConfig.create(RemoteAPIConfig.class).setExternInterfaceAuth(allowedSiteURLs);
         }
     }
 

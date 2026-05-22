@@ -259,21 +259,29 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                     header.get(bytes);
                     final String proxyResponseStatus = new String(bytes, "ISO-8859-1").trim();
                     this.proxyRequest.append(proxyResponseStatus + "\r\n");
-                    String proxyCode = null;
-                    if (proxyResponseStatus.startsWith("HTTP")) {
-                        /* parse response code */
-                        proxyCode = new Regex(proxyResponseStatus, "HTTP.*? (\\d+)").getMatch(0);
-                    }
-                    if (!"200".equals(proxyCode)) {
+                    final Regex proxHttpResponseHeader = new Regex(proxyResponseStatus, "^HTTP/(\\d+(?:\\.\\d+)?)\\s*(\\d+)\\s*(.+)?$");
+                    final String proxyResponseCode = proxHttpResponseHeader.getMatch(1);
+                    if (proxyResponseCode == null) {
+                        this.invalidHttpHeader = proxyResponseStatus;
+                        this.httpHeader = HTTPConnectionImpl.UNKNOWN_HTTP_RESPONSE;
+                        // Unknown HTTP Response: 999!
+                        this.httpResponseCode = HTTPConstants.ResponseCode.X_INVALID_HTTP_RESPONSE.getCode();
+                        this.httpResponseMessage = HTTPConnectionImpl.UNKNOWN_HTTP_RESPONSE;
+                        try {
+                            this.connectionSocket.close();
+                        } catch (final Throwable nothing) {
+                        }
+                        throw new ProxyConnectException(this.proxy);
+                    } else if (!"200".equals(proxyResponseCode)) {
                         // TODO: read/parse proxy response headers to make them available as response headers
-                        this.httpResponseCode = Integer.parseInt(proxyCode);
-                        this.httpResponseMessage = StringUtils.valueOrEmpty(new Regex(proxyResponseStatus, "[a-zA-Z0-9/\\.]+\\s*\\d+\\s*(.+)").getMatch(0));
+                        this.httpResponseCode = Integer.parseInt(proxyResponseCode);
+                        this.httpResponseMessage = StringUtils.valueOrEmpty(proxHttpResponseHeader.getMatch(2));
                         /* something went wrong */
                         try {
                             this.connectionSocket.close();
                         } catch (final Throwable nothing) {
                         }
-                        if ("407".equals(proxyCode)) {
+                        if ("407".equals(proxyResponseCode)) {
                             /* auth invalid/missing */
                             throw new ProxyAuthException(this.proxy);
                         } else {
@@ -373,7 +381,7 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.net.httpconnection.HTTPConnectionImpl#disconnect()
      */
     @Override

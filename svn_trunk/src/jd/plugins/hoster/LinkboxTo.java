@@ -50,7 +50,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51658 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52824 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkboxTo extends PluginForHost {
     public LinkboxTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -493,13 +493,17 @@ public class LinkboxTo extends PluginForHost {
         final String msg = (String) entries.get("error");
         final Number statusO = (Number) entries.get("status");
         final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-        if (statusO != null && statusO.intValue() == 1) {
-            return data;
-        }
-        if (msg == null || statusO == null) {
+        if (statusO == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final int status = statusO.intValue();
+        if (status == 1) {
+            return data;
+        }
+        if (status == 1403) {
+            /* {"msg":"itemId in need","status":1403} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final Number sizeDiff = data != null ? (Number) data.get("sizeDiff") : null;
         if (link != null && status == 50001 && sizeDiff != null) {
             errorInsufficientStorageSpaceAvailable(sizeDiff.longValue());

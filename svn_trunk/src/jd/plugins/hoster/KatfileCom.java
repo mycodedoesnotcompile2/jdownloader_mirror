@@ -15,24 +15,36 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jd.PluginWrapper;
+import jd.controlling.faviconcontroller.FavIcons;
 import jd.http.Browser;
 import jd.parser.html.Form;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52816 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@HostPlugin(revision = "$Revision: 52828 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,8 +61,72 @@ public class KatfileCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com", "katfile.space" });
+        ret.add(new String[] { "katfile.space", "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
         return ret;
+    }
+
+    @Override
+    public Object getFavIcon(String host) throws IOException {
+        if (getHost().equals(host)) {
+            try {
+                // workaround for missing favicon
+                final Browser br = this.createNewBrowserInstance();
+                final BufferedImage ret = FavIcons.download_FavIconTag(br, "https://katfile.space/images/logo.png", host);
+                return colorize(ret, Color.decode("#0459ab"));
+            } catch (Throwable ignore) {
+                ignore.printStackTrace();
+            }
+        }
+        return null;
+    }
+
+    private static BufferedImage colorize(BufferedImage original, Color color) {
+        final BufferedImage ret = new BufferedImage(original.getWidth(), original.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2d = ret.createGraphics();
+        g2d.setColor(color);
+        g2d.fillRect(0, 0, original.getWidth(), original.getHeight());
+        g2d.drawImage(original, 0, 0, null);
+        g2d.dispose();
+        return ret;
+    }
+
+    @Override
+    protected FEATURE[] customizeFeatures(Set<FEATURE> features) {
+        features.add(FEATURE.FAVICON);
+        return features.toArray(new LazyPlugin.FEATURE[0]);
+    }
+
+    private String getPremiumPackage(Browser br) {
+        return new Regex(getCorrectBR(br), "<TR>\\s*<TD>\\s*(Premium\\s*Package.*?)</TD>\\s*</TR>").getMatch(0);
+    }
+
+    @Override
+    protected void fetchAccountInfoWebsiteTraffic(final Browser br, final Account account, final AccountInfo ai) throws Exception {
+        super.fetchAccountInfoWebsiteTraffic(br, account, ai);
+        final String premiumPackage = getPremiumPackage(br);
+        final String trafficMax = new Regex(premiumPackage, "<b>\\s*([0-9\\.]+\\s*[TGMB]+)\\s*<").getMatch(0);
+        if (trafficMax != null) {
+            ai.setTrafficMax(parseSize(Size.TRAFFIC, trafficMax));
+        }
+    }
+
+    @Override
+    protected String[] supportsPreciseExpireDate() {
+        return null;
+    }
+
+    @Override
+    protected Long findExpireTimestamp(final Account account, final Browser br, AtomicBoolean isPreciseTimestampFlag) throws Exception {
+        final String premiumPackage = getPremiumPackage(br);
+        final String expireStr = new Regex(premiumPackage, "until\\s*(?:<b>)?([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
+        if (expireStr != null) {
+            final long ret = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+            if (ret > 0) {
+                isPreciseTimestampFlag.set(true);
+                return ret;
+            }
+        }
+        return super.findExpireTimestamp(account, br, isPreciseTimestampFlag);
     }
 
     @Override
@@ -58,6 +134,7 @@ public class KatfileCom extends XFileSharingProBasic {
         /* 2025-09-09: Main domain changed to katfile.cloud */
         /* 2025-12-08: Main domain changed to katfile.online */
         /* 2026-04-13: Main domain changed to katfile.ws */
+        /* 2026-05-xx: Main domain changed to katfile.space */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
@@ -178,6 +255,7 @@ public class KatfileCom extends XFileSharingProBasic {
             return super.isOffline(link, br);
         }
     }
+
     // @Override
     // protected boolean isPremiumOnlyURL(final Browser br) {
     // final String url = br != null ? br.getURL() : null;

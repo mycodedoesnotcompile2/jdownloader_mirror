@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49642 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52826 $", interfaceVersion = 3, names = {}, urls = {})
 public class InfidriveNetCrawler extends PluginForDecrypt {
     public InfidriveNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,11 +136,12 @@ public class InfidriveNetCrawler extends PluginForDecrypt {
             directurl = new Regex(htmlWithUnescapedJson2, directurlpattern).getMatch(0);
             if (StringUtils.isEmpty(googleDriveFileID)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else if (this.isAbort()) {
-                throw new InterruptedException();
             }
             final boolean additionalRequestNeeded = true;
             if (additionalRequestNeeded) {
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
                 final DownloadLink gdrivelink = createDownloadlink(GoogleDriveCrawler.generateFileURL(googleDriveFileID, null));
                 ret.add(gdrivelink);
                 distribute(gdrivelink);

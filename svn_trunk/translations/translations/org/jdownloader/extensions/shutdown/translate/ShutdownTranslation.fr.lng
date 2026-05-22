@@ -24,3 +24,8 @@ jd_plugins_optional_jdshutdown=JD Mise hors tension
 jd_plugins_optional_jdshutdown_description=Extinction, Mise en veille ou Hibernation automatique à la fin des téléchargements
 lit_shutdownn=Arrêt
 show_admin=Les droits Administrateur sont nécessaires pour modifier le mode Mise en veille de JDownloader
+gui_config_jdshutdown_logoff=Déconnexion
+interaction_shutdown_dialog_title_logoff=Se déconnecter ?
+interaction_shutdown_dialog_msg_logoff=<h2><font color="red">L'utilisateur va être déconnecté !</font></h2>
+shutdown_toggle_action_enable=Activer l'extension d'arrêt après les téléchargements
+shutdown_toggle_action_disable=Désactiver l'extension d'arrêt après les téléchargements

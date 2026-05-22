@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Currency;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -92,7 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52805 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52828 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -193,7 +194,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        final List<LazyPlugin.FEATURE> ret = new ArrayList<LazyPlugin.FEATURE>();
+        final Set<LazyPlugin.FEATURE> ret = new HashSet<LazyPlugin.FEATURE>();
         if (enableAccountApiOnlyMode()) {
             ret.add(LazyPlugin.FEATURE.API_KEY_LOGIN);
         } else {
@@ -209,7 +210,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (isVideohoster(null)) {
             ret.add(LazyPlugin.FEATURE.VIDEO_STREAMING);
         }
-        return ret.toArray(new LazyPlugin.FEATURE[0]);
+        return customizeFeatures(ret);
+    }
+
+    protected LazyPlugin.FEATURE[] customizeFeatures(Set<LazyPlugin.FEATURE> features) {
+        return features.toArray(new LazyPlugin.FEATURE[0]);
     }
 
     /**
@@ -4400,11 +4405,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected void fetchAccountInfoWebsiteStorage(final Browser br, final Account account, final AccountInfo ai) throws Exception {
-        final String space[] = new Regex(getCorrectBR(br), ">\\s*Used space:\\s*</td>.*?<td.*?b>([0-9\\.]+) ?(KB|MB|GB|TB)?</b>").getRow(0);
-        if ((space != null && space.length != 0) && (space[0] != null && space[1] != null)) {
+        final String space[] = new Regex(getCorrectBR(br), ">\\s*Used space:?\\s*</td>.*?<td.*?b>\\s*([0-9\\.]+)\\s*(?:of\\s*[0-9\\.]+)?\\s*(KB|MB|GB|TB)?\\s*</b>").getRow(0);
+        if (space == null || space.length == 0) {
+            return;
+        }
+        if (space[0] != null && space[1] != null) {
             /* free users it's provided by default */
             ai.setUsedSpace(parseSize(Size.STORAGE, space[0] + " " + space[1]));
-        } else if ((space != null && space.length != 0) && space[0] != null) {
+        } else if (space[0] != null) {
             /* premium users the Mb value isn't provided for some reason... */
             ai.setUsedSpace(parseSize(Size.STORAGE, space[0] + "Mb"));
         }
@@ -4938,18 +4946,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected String regExTrafficLeft(final Browser br) {
         /* 2020-30-09: progressbar with tooltip */
         final String src = this.getCorrectBR(br);
-        String availabletraffic = new Regex(src, "Traffic available(?:\\s*today)?\\s*[^<>]*:?(?:<[^>]*>)?</TD>\\s*<TD[^>]*>\\s*<div[^>]*title\\s*=\\s*\"\\s*([^<>\"']+)\\s*available").getMatch(0);
+        String availabletraffic = new Regex(src, "(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*[^<>]*:?(?:<[^>]*>)?</TD>\\s*<TD[^>]*>\\s*<div[^>]*title\\s*=\\s*\"\\s*([^<>\"']+)\\s*available").getMatch(0);
         if (StringUtils.isEmpty(availabletraffic)) {
             /* Traffic can also be negative! */
-            availabletraffic = new Regex(src, "Traffic available(?:\\s*today)?\\s*[^<>]*:?(?:<[^>]*>)?</TD>\\s*<TD[^>]*>\\s*(?:<b[^>]*>)?\\s*([^<>\"']+)").getMatch(0);
+            availabletraffic = new Regex(src, "(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*[^<>]*:?(?:<[^>]*>)?</TD>\\s*<TD[^>]*>\\s*(?:<b[^>]*>)?\\s*([^<>\"']+)").getMatch(0);
             if (StringUtils.isEmpty(availabletraffic)) {
                 /* 2019-02-11: For newer XFS versions */
-                availabletraffic = new Regex(src, ">\\s*Traffic available(?:\\s*today)?\\s*</div>\\s*<div class=\"txt\\d+\">\\s*([^<>\"]+)\\s*<").getMatch(0);
+                availabletraffic = new Regex(src, ">\\s*(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*</div>\\s*<div class=\"txt\\d+\">\\s*([^<>\"]+)\\s*<").getMatch(0);
             }
             if (StringUtils.isEmpty(availabletraffic)) {
                 // wrzucajpliki.pl
                 // <span>Traffic available</span><div class="price"><sup>MB</sup>102400</div>
-                final String trafficLeft = new Regex(src, ">\\s*Traffic available(?:\\s*today)?\\s*</[^>]*>\\s*<div class=\"(?:txt\\d+|price)\">\\s*(.*?)\\s*</div").getMatch(0);
+                final String trafficLeft = new Regex(src, ">\\s*(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*</[^>]*>\\s*<div class=\"(?:txt\\d+|price)\">\\s*(.*?)\\s*</div").getMatch(0);
                 final String unit = new Regex(trafficLeft, "<sup>\\s*([TGMKB]+)\\s*</sup>").getMatch(0);
                 final String left = new Regex(trafficLeft, "</sup>\\s*([\\-\\s*]*[0-9\\.]+)").getMatch(0);
                 if (unit != null && left != null) {
@@ -4959,7 +4967,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         if (StringUtils.isEmpty(availabletraffic)) {
             /* filejoker.net */
-            final String formGroup = new Regex(src, ">\\s*Traffic available(?:\\s*today)?\\s*:?\\s*</[^>]*>(.*?)<div\\s*class\\s*=\\s*\"form-group").getMatch(0);
+            final String formGroup = new Regex(src, ">\\s*(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*:?\\s*</[^>]*>(.*?)<div\\s*class\\s*=\\s*\"form-group").getMatch(0);
             String trafficDetails[] = new Regex(formGroup, "title\\s*=\\s*\"\\s*([0-9\\.]+\\s*[TGMB]+\\s*)/\\s*([0-9\\.]+\\s*[TGMB]+\\s*)\"").getRow(0);
             if (trafficDetails != null) {
                 /**

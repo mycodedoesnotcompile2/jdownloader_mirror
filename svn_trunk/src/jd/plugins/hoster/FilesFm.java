@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FilesFmFolder;
 
-@HostPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 52832 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
 public class FilesFm extends PluginForHost {
     public FilesFm(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,11 +100,23 @@ public class FilesFm extends PluginForHost {
         final String linkid = this.getLinkID(link);
         final String linkpart = new Regex(link.getPluginPatternMatcher(), "(\\?i=.+)").getMatch(0);
         final String filename_url = new Regex(linkpart, "\\&n=(.+)").getMatch(0);
+        String filename = br.getRegex("var arrNames = \\[\"([^\"]+)\"\\];").getMatch(0);
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename);
+        }
+        final String filesizeBytesStr = br.getRegex("arrSizesInBytes_Unordered = \\[(\\d+)\\];").getMatch(0);
+        if (filesizeBytesStr != null) {
+            link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+        }
+        dllink = "https://" + getHost() + "/down.php?i=" + getLinkID(link);
+        if (PluginEnvironment.LINK_CHECK.isCurrentPluginEnvironment() && filename != null && filesizeBytesStr != null) {
+            return AvailableStatus.TRUE;
+        }
         String filename_header = null;
         URLConnectionAdapter con = null;
         final Browser brc = br.cloneBrowser();
         try {
-            dllink = "https://files.fm/down.php?i=" + getLinkID(link);
             con = brc.openHeadConnection(dllink);
             if (con.getURL().toExternalForm().contains("/private")) {
                 // https://files.fm/thumb_show.php?i=wfslpuh&n=20140908_073035.jpg&refresh1
@@ -132,7 +144,6 @@ public class FilesFm extends PluginForHost {
                  */
                 logger.info("File is only available via torrent");
                 dllink = String.format("https://%s/torrent/get_torrent.php?file_hash=%s", getHost(), linkid);
-                String filename = null;
                 try {
                     final String jsonFileInfo = br.getRegex("objMainShareParams = (\\{.*?\\});").getMatch(0);
                     Map<String, Object> entries = restoreFromString(jsonFileInfo, TypeRef.MAP);
@@ -199,13 +210,5 @@ public class FilesFm extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

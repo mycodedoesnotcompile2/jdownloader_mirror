@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 52752 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52832 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
 public class FilesFmFolder extends PluginForDecrypt {
     public FilesFmFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,16 +77,18 @@ public class FilesFmFolder extends PluginForDecrypt {
         /* Add id of current folder to dupes to avoid re-adding link to current folder. */
         dupes.add(folderID);
         String[] folders = br.getRegex("files\\.fm/u/([a-z0-9]+)").getColumn(0);
+        int numberofFolders = 0;
         for (String folderIDTmp : folders) {
             if (!dupes.add(folderIDTmp)) {
                 continue;
             }
             final String contentUrl = br.getURL("/u/" + folderIDTmp).toExternalForm();
             ret.add(createDownloadlink(contentUrl));
+            numberofFolders++;
         }
         String[] htmls = br.getRegex("id=\"report_[^\"]+\".*?class=\"OrderID\"").getColumn(-1);
         if (htmls == null || htmls.length == 0) {
-            if (folders != null && folders.length > 0) {
+            if (numberofFolders > 0) {
                 /* Only subfolders and no single files */
                 logger.info("Found only subfolders and no single files");
                 return ret;

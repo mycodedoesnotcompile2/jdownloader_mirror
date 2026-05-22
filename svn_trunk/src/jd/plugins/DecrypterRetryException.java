@@ -20,6 +20,7 @@ public class DecrypterRetryException extends Exception {
         IP(_JDT.T.decrypter_unavailable_ip(), _JDT.T.decrypter_unavailable_ip_description()),
         UNSUPPORTED_LIVESTREAM(_JDT.T.decrypter_unavailable_unsupported_livestream(), _JDT.T.decrypter_unavailable_unsupported_livestream()),
         UNSUPPORTED_DRM("DRM", "Unsupported DRM protected content"),
+        UNSUPPORTED_CAPTCHA("Captcha unsupported", "Unsupported captcha type"),
         BLOCKED_BY(_JDT.T.decrypter_unavailable_blocked_by(), null);
 
         private final String exp;

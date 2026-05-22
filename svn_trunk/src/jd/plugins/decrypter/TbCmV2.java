@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52823 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1644,9 +1644,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 } else if (abortPaginationAfterFirstPage) {
                     logger.info("Stopping because: abortPaginationAfterFirstPage == true");
                     break pagination;
-                } else {
-                    /* Continue to next page */
                 }
+                /* Continue to next page */
             }
             /* Try to continue to next page */
             if (StringUtils.isEmpty(INNERTUBE_CLIENT_NAME) || StringUtils.isEmpty(INNERTUBE_API_KEY) || StringUtils.isEmpty(INNERTUBE_CLIENT_VERSION)) {
@@ -1753,12 +1752,12 @@ public class TbCmV2 extends PluginForDecrypt {
             return;
         }
         if (jsonObject instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) jsonObject;
+            final Map<String, Object> map = (Map<String, Object>) jsonObject;
             // Direct video ID extraction from various paths
             String videoId = extractVideoId(map);
             String playlistId = extractPlaylistId(map);
             if (playlistId != null) {
-                // TODO: Remove this. It looks to be not needed anymore.s
+                // TODO: Remove this. It looks to be not needed anymore.
                 // Handle playlist IDs
                 List<Map<String, Object>> playlistVideos = extractPlaylistVideos(map);
                 if (playlistVideos != null) {
@@ -1800,27 +1799,37 @@ public class TbCmV2 extends PluginForDecrypt {
      * Extracts a video ID from various possible paths in a JSON object
      */
     private String extractVideoId(Map<String, Object> map) {
-        // Try all the different paths where video IDs might be found
-        String videoId = (String) JavaScriptEngineFactory.walkJson(map, "playlistVideoRenderer/videoId");
-        if (videoId == null) {
-            videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/videoRenderer/videoId");
+        String videoId;
+        /* 2026-05-21: Along with "contentType" field with value "LOCKUP_CONTENT_TYPE_VIDEO" */
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/lockupViewModel/contentId");
+        if (videoId != null) {
+            return videoId;
         }
-        if (videoId == null) {
-            videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/reelItemRenderer/videoId");
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "playlistVideoRenderer/videoId");
+        if (videoId != null) {
+            return videoId;
         }
-        if (videoId == null) {
-            videoId = (String) JavaScriptEngineFactory.walkJson(map, "playlistPanelVideoRenderer/videoId");
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/videoRenderer/videoId");
+        if (videoId != null) {
+            return videoId;
         }
-        if (videoId == null) {
-            videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/shortsLockupViewModel/onTap/innertubeCommand/reelWatchEndpoint/videoId");
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/reelItemRenderer/videoId");
+        if (videoId != null) {
+            return videoId;
         }
-        if (videoId == null) {
-            videoId = (String) JavaScriptEngineFactory.walkJson(map, "videoRenderer/videoId");
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "playlistPanelVideoRenderer/videoId");
+        if (videoId != null) {
+            return videoId;
         }
-        if (videoId == null) {
-            videoId = (String) JavaScriptEngineFactory.walkJson(map, "reelItemRenderer/videoId");
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/shortsLockupViewModel/onTap/innertubeCommand/reelWatchEndpoint/videoId");
+        if (videoId != null) {
+            return videoId;
         }
-        return videoId;
+        videoId = (String) JavaScriptEngineFactory.walkJson(map, "videoRenderer/videoId");
+        if (videoId != null) {
+            return videoId;
+        }
+        return (String) JavaScriptEngineFactory.walkJson(map, "reelItemRenderer/videoId");
     }
 
     /**
