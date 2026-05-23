@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -29,11 +25,17 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51811 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+
+@HostPlugin(revision = "$Revision: 52833 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThisvidCom extends KernelVideoSharingComV2 {
     public ThisvidCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -136,6 +138,17 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
+    }
+
+    @Override
+    protected void checkErrorsWebsite(Browser br, DownloadLink link, Account account) throws PluginException {
+        if (br.containsHTML("Access to this content is limited to registered users only.") || br.containsHTML("This video belongs to a restricted category")) {
+            if (account != null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            throw new AccountRequiredException("Access to this content is limited to registered users only");
+        }
+        super.checkErrorsWebsite(br, link, account);
     }
 
     @Override

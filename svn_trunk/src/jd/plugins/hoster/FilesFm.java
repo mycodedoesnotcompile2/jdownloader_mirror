@@ -18,24 +18,23 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FilesFmFolder;
 
-@HostPlugin(revision = "$Revision: 52832 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52833 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
 public class FilesFm extends PluginForHost {
     public FilesFm(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,6 +43,7 @@ public class FilesFm extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        PornHubCom.setSSLSocketStreamOptions(br);
         FilesFmFolder.prepBR(br);
         return br;
     }
@@ -92,6 +92,7 @@ public class FilesFm extends PluginForHost {
             this.br.getPage(mainlink);
             // this.br.getHeaders().put("Referer", mainlink);
         } else {
+            br.getPage("https://files.fm");
             br.getPage(link.getPluginPatternMatcher());
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -100,12 +101,19 @@ public class FilesFm extends PluginForHost {
         final String linkid = this.getLinkID(link);
         final String linkpart = new Regex(link.getPluginPatternMatcher(), "(\\?i=.+)").getMatch(0);
         final String filename_url = new Regex(linkpart, "\\&n=(.+)").getMatch(0);
-        String filename = br.getRegex("var arrNames = \\[\"([^\"]+)\"\\];").getMatch(0);
+        // best source for filename
+        String filename = br.getRegex("var\\s*arrDisplayNames\\s*=\\s*\\[\"([^\"]+)\"\\];").getMatch(0);
         if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
+            link.setFinalFileName(filename);
+        } else {
+            // this can be truncated!
+            filename = br.getRegex("var\\s*arrNames\\s*=\\s*\\[\"([^\"]+)\"\\];").getMatch(0);
+            if (filename != null) {
+                filename = URLEncode.decodeURIComponent(filename.replace("+", " "));
+                link.setName(filename);
+            }
         }
-        final String filesizeBytesStr = br.getRegex("arrSizesInBytes_Unordered = \\[(\\d+)\\];").getMatch(0);
+        final String filesizeBytesStr = br.getRegex("arrSizesInBytes\\s*=\\s*\\[(\\d+)\\];").getMatch(0);
         if (filesizeBytesStr != null) {
             link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
         }
@@ -119,6 +127,7 @@ public class FilesFm extends PluginForHost {
         try {
             con = brc.openHeadConnection(dllink);
             if (con.getURL().toExternalForm().contains("/private")) {
+                brc.followConnection(true);
                 // https://files.fm/thumb_show.php?i=wfslpuh&n=20140908_073035.jpg&refresh1
                 /* Maybe we have a picture without official "Download" button ... */
                 logger.info("Checking for picture content without official download button");
@@ -126,6 +135,7 @@ public class FilesFm extends PluginForHost {
                 con = brc.openHeadConnection(dllink);
             }
             if (!this.looksLikeDownloadableContent(con)) {
+                brc.followConnection(true);
                 /*
                  * Browser will download file via built in torrent downloader. We can't do that. Instead we will deliver the .torrent file
                  * to the user so the user can download the file behind it using a torrent downloader.
@@ -138,9 +148,9 @@ public class FilesFm extends PluginForHost {
                 // br.postPage("/ajax/webtorrent_download_form.php?PHPSESSID=" + webdlTorrentID,
                 // "action=init_client&folder_hash=&file_hash=" + linkid + "&file_hashes=%5B%5D");
                 /**
-                 * Large files are only available via web-/torrent download </br>
-                 * 2021-05-17: Seems like all downloads are only available as P2P downloads --> In this case all we can do is to download
-                 * the .torrent file so the user can manually download it using a Torrent client.
+                 * Large files are only available via web-/torrent download </br> 2021-05-17: Seems like all downloads are only available as
+                 * P2P downloads --> In this case all we can do is to download the .torrent file so the user can manually download it using
+                 * a Torrent client.
                  */
                 logger.info("File is only available via torrent");
                 dllink = String.format("https://%s/torrent/get_torrent.php?file_hash=%s", getHost(), linkid);
@@ -150,6 +160,7 @@ public class FilesFm extends PluginForHost {
                     entries = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "one_file/item_info");
                     filename = (String) entries.get("file_name");
                 } catch (final Throwable e) {
+                    logger.log(e);
                 }
                 /*
                  * Website returns non meaningful filenames when downloading torrent files --> Try to use original filename and append
@@ -169,11 +180,13 @@ public class FilesFm extends PluginForHost {
                 link.setFinalFileName(torrentFilename);
                 // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                filename_header = Encoding.htmlDecode(Plugin.getFileNameFromDispositionHeader(con));
-                if (filename_url == null && filename_header != null) {
-                    link.setFinalFileName(filename_header);
-                } else if (filename_url != null && filename_header.length() > filename_url.length()) {
-                    link.setFinalFileName(filename_header);
+                filename_header = FILENAME_SOURCE.CONNECTION.getFilename(this, link, con);
+                if (filename_header != null) {
+                    if (filename_url == null) {
+                        link.setFinalFileName(filename_header);
+                    } else if (filename_url != null && filename_header.length() > filename_url.length()) {
+                        link.setFinalFileName(filename_header);
+                    }
                 } else if (filename_url != null) {
                     link.setFinalFileName(filename_url);
                 }
