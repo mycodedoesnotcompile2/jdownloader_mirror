@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52666 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault2(final PluginWrapper wrapper) {
         super(wrapper);
@@ -36,6 +36,12 @@ public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    protected KVSUrlType[] getKVSUrlType(String url) {
+        // wrong KVSUrlType can lead for false FUID
+        return new KVSUrlType[] { KVSUrlType.EMBED, KVSUrlType.FUID_SLUG_NO_VIDEOS };
     }
 
     @Override

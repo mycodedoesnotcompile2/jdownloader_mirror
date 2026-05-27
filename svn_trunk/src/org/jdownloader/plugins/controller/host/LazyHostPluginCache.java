@@ -52,6 +52,7 @@ public class LazyHostPluginCache {
     public static List<LazyHostPlugin> read(File file, final AtomicLong lastModification) throws IOException {
         final ArrayList<LazyHostPlugin> ret = new ArrayList<LazyHostPlugin>(4096);
         if (file.exists()) {
+            final FEATURE[] featuresList = LazyPlugin.FEATURE.values();
             final Map<List<FEATURE>, FEATURE[]> featureCache = new HashMap<List<FEATURE>, FEATURE[]>();
             final Map<Object, List<String>> dependenciesCache = new HashMap<Object, List<String>>();
             final ByteArrayOutputStream byteBuffer = readFile(file);
@@ -118,8 +119,8 @@ public class LazyHostPluginCache {
                             lazyHostPlugin.setSitesSupported(sitesSupportedNames.toArray(new String[0]));
                         }
                         if ((flags & (1 << 3)) != 0) {
-                            final ArrayList<LazyPlugin.FEATURE> features = new ArrayList<LazyPlugin.FEATURE>(LazyPlugin.FEATURE.values().length);
-                            for (final LazyPlugin.FEATURE feature : LazyPlugin.FEATURE.values()) {
+                            final ArrayList<LazyPlugin.FEATURE> features = new ArrayList<LazyPlugin.FEATURE>(featuresList.length);
+                            for (final LazyPlugin.FEATURE feature : featuresList) {
                                 if (is.readBoolean()) {
                                     features.add(feature);
                                 }
@@ -162,6 +163,7 @@ public class LazyHostPluginCache {
         }
         FileOutputStream fos = null;
         try {
+            final FEATURE[] featuresList = LazyPlugin.FEATURE.values();
             fos = new FileOutputStream(file);
             final BufferedOutputStream bos = new BufferedOutputStream(fos, 32767);
             final AWFCUtils os = new AWFCUtils(bos);
@@ -239,7 +241,7 @@ public class LazyHostPluginCache {
                         }
                     }
                     if (features != null && features.length > 0) {
-                        for (final LazyPlugin.FEATURE feature : LazyPlugin.FEATURE.values()) {
+                        for (final LazyPlugin.FEATURE feature : featuresList) {
                             os.writeBoolean(feature.isSet(features));
                         }
                     }

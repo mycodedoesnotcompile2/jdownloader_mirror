@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 50436 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 public class XbabeCom extends KernelVideoSharingComV2 {
     public XbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,6 +54,12 @@ public class XbabeCom extends KernelVideoSharingComV2 {
 
     public static String[] getAnnotationUrls() {
         return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
+    }
+
+    @Override
+    protected KVSUrlType[] getKVSUrlType(String url) {
+        // wrong KVSUrlType can lead for false FUID
+        return new KVSUrlType[] { KVSUrlType.EMBED, KVSUrlType.VIDEOS_SLUG_NO_FUID };
     }
 
     @Override

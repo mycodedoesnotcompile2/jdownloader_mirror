@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -46,13 +42,23 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.AdultempireComCrawler;
 
-@HostPlugin(revision = "$Revision: 51837 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AdultempireComCrawler.class })
 public class AdultempireCom extends PluginForHost {
     public AdultempireCom(PluginWrapper wrapper) {
         super(wrapper);
         /** 2023-11-14: Added account support and then realized that this website is using a light DRM for their HLS streams. */
         this.enablePremium("https://www." + getHost() + "/unlimited/account/join");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
     @Override

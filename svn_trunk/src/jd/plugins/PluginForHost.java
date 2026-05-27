@@ -2996,19 +2996,32 @@ public abstract class PluginForHost extends Plugin {
      * @return
      */
     public boolean isSpeedLimited(DownloadLink link, Account account) {
-        if (link == null) {
+        if (!isPremiumEnabled()) {
+            return false;
+        } else if (link == null) {
+            return false;
+        } else if (!StringUtils.equals(link.getHost(), getHost())) {
             return false;
         }
-        if (StringUtils.equals(link.getHost(), getHost())) {
-            if (hasFeature(LazyPlugin.FEATURE.MULTIHOST)) {
-                return false;
-            } else {
-                // link and plugin from same service
-                return isPremiumEnabled() && account == null;
+        final FEATURE[] features = getFeatures();
+        if (features != null) {
+            for (FEATURE feature : features) {
+                switch (feature) {
+                case VIDEO_STREAMING:
+                case AUDIO_STREAMING:
+                case XXX:
+                case MULTIHOST:
+                case IMAGE_HOST:
+                case IMAGE_GALLERY:
+                case GENERIC:
+                case PASTEBIN:
+                    return false;
+                default:
+                    break;
+                }
             }
-        } else {
-            return false;
         }
+        return account == null;
     }
 
     /**

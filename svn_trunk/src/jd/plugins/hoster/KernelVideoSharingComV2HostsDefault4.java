@@ -23,7 +23,7 @@ import jd.plugins.HostPlugin;
 
 import org.jdownloader.plugins.components.config.KVSConfig;
 
-@HostPlugin(revision = "$Revision: 52452 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault4 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault4(final PluginWrapper wrapper) {
         super(wrapper);
@@ -47,6 +47,12 @@ public class KernelVideoSharingComV2HostsDefault4 extends KernelVideoSharingComV
 
     public static String[] getAnnotationUrls() {
         return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
+    }
+
+    @Override
+    protected KVSUrlType[] getKVSUrlType(String url) {
+        // wrong KVSUrlType can lead for false FUID
+        return new KVSUrlType[] { KVSUrlType.EMBED, KVSUrlType.VIDEOS_SLUG_NO_FUID };
     }
 
     @Override

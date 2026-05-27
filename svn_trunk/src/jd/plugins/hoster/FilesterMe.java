@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -37,7 +36,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesterMe extends PluginForHost {
     public FilesterMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,13 +118,13 @@ public class FilesterMe extends PluginForHost {
         String filename = br.getRegex("window\\.fileName = \"([^\"]+)").getMatch(0);
         String filesize = br.getRegex("Size\\s*</span[^>]*>\\s*<span[^>]*>([^<]+)</span").getMatch(0);
         if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
+            filename = restoreFromString("\"" + filename + "\"", TypeRef.STRING);
+            link.setFinalFileName(filename);
         } else {
             logger.warning("Failed to find filename");
         }
         if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
+            link.setDownloadSize(SizeFormatter.getSize(null, filesize, false, false));
         } else {
             logger.warning("Failed to find filesize");
         }

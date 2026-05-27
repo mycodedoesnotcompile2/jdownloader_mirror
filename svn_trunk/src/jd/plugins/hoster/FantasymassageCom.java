@@ -36,8 +36,9 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "fantasymassage.com" }, urls = { "https?://fantasymassagedecrypted.+" })
-@Deprecated // 2021-09-01: TODO: Rewrite to use EvilangelCore!
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 2, names = { "fantasymassage.com" }, urls = { "https?://fantasymassagedecrypted.+" })
+@Deprecated
+// 2021-09-01: TODO: Rewrite to use EvilangelCore!
 public class FantasymassageCom extends PluginForHost {
     public FantasymassageCom(PluginWrapper wrapper) {
         super(wrapper);

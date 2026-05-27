@@ -26,6 +26,7 @@ public class LazyCrawlerPluginCache {
     public static List<LazyCrawlerPlugin> read(File file, final AtomicLong lastModification) throws IOException {
         final ArrayList<LazyCrawlerPlugin> ret = new ArrayList<LazyCrawlerPlugin>();
         if (file.exists()) {
+            final FEATURE[] featuresList = LazyPlugin.FEATURE.values();
             final Map<List<FEATURE>, FEATURE[]> featureCache = new HashMap<List<FEATURE>, FEATURE[]>();
             final Map<Object, List<String>> dependenciesCache = new HashMap<Object, List<String>>();
             final ByteArrayOutputStream byteBuffer = LazyHostPluginCache.readFile(file);
@@ -80,8 +81,8 @@ public class LazyCrawlerPluginCache {
                             lazyCrawlerPlugin.setSitesSupported(sitesSupportedNames.toArray(new String[0]));
                         }
                         if ((flags & (1 << 2)) != 0) {
-                            final ArrayList<FEATURE> features = new ArrayList<FEATURE>(FEATURE.values().length);
-                            for (final FEATURE feature : FEATURE.values()) {
+                            final ArrayList<FEATURE> features = new ArrayList<FEATURE>(featuresList.length);
+                            for (final FEATURE feature : featuresList) {
                                 if (is.readBoolean()) {
                                     features.add(feature);
                                 }
@@ -124,6 +125,7 @@ public class LazyCrawlerPluginCache {
         }
         FileOutputStream fos = null;
         try {
+            final FEATURE[] featuresList = LazyPlugin.FEATURE.values();
             fos = new FileOutputStream(file);
             final BufferedOutputStream bos = new BufferedOutputStream(fos, 32767);
             final AWFCUtils os = new AWFCUtils(bos);
@@ -184,7 +186,7 @@ public class LazyCrawlerPluginCache {
                         }
                     }
                     if (features != null && features.length > 0) {
-                        for (final FEATURE feature : FEATURE.values()) {
+                        for (final FEATURE feature : featuresList) {
                             os.writeBoolean(feature.isSet(features));
                         }
                     }

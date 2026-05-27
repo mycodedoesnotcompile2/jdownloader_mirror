@@ -62,7 +62,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,6 +75,11 @@ public class RedditCom extends PluginForHost {
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             this.enablePremium("https://www.reddit.com/register/");
         }
+    }
+
+    @Override
+    public boolean isSpeedLimited(DownloadLink link, Account account) {
+        return false;
     }
 
     public static final String PROPERTY_SUBREDDIT                      = "subreddit";

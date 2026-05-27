@@ -31,11 +31,13 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 
-@HostPlugin(revision = "$Revision: 52833 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52837 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThisvidCom extends KernelVideoSharingComV2 {
     public ThisvidCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -69,6 +71,12 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean hasFUIDInsideURL(final String url) {
         return false;
+    }
+
+    @Override
+    protected KVSUrlType[] getKVSUrlType(String url) {
+        // wrong KVSUrlType can lead for false FUID
+        return new KVSUrlType[] { KVSUrlType.EMBED, KVSUrlType.VIDEOS_SLUG_NO_FUID };
     }
 
     public static String[] getAnnotationUrls() {
@@ -123,12 +131,15 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
                 final String code = this.getCaptchaCode(captchaURL, this.getDownloadLink());
                 loginform.put("code", Encoding.urlEncode(code));
             } else if (AbstractRecaptchaV2.containsRecaptchaV2Class(loginform)) {
-                final String rcKey = br.getRegex("data-recaptcha-key=\"([^\"]+)\"").getMatch(0);
+                final String siteKey = br.getRegex("data-recaptcha-key=\"([^\"]+)\"").getMatch(0);
                 final String token;
-                if (rcKey != null) {
-                    token = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcKey).getToken();
+                if (AbstractRecaptchaV2.isValidSiteKey(siteKey)) {
+                    token = new CaptchaHelperHostPluginRecaptchaV2(this, br, siteKey).getToken();
+                } else if (AbstractHCaptcha.isValidSiteKey(siteKey)) {
+                    // untested
+                    token = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, siteKey).getToken();
                 } else {
-                    token = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 loginform.put("g-recaptcha-response", Encoding.urlEncode(token));
             }

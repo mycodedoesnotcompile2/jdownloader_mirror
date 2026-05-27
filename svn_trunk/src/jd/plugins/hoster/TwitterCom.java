@@ -60,7 +60,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52810 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterCom extends PluginForHost {
     public TwitterCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -238,6 +238,11 @@ public class TwitterCom extends PluginForHost {
             /* Backward compatibility */
             return getTweetIDFromURL(link.getPluginPatternMatcher());
         }
+    }
+
+    @Override
+    public boolean isSpeedLimited(DownloadLink link, Account account) {
+        return false;
     }
 
     private String getTweetIDFromURL(final String url) {

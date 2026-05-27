@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesterMe;
 
-@DecrypterPlugin(revision = "$Revision: 52685 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
@@ -128,13 +128,13 @@ public class FilesterMeFolder extends PluginForDecrypt {
                     final String url = "https://" + br.getHost() + "/d/" + file_id;
                     final DownloadLink link = this.createDownloadlink(url);
                     if (filenames != null && filenames.length == file_ids.length) {
-                        link.setName(Encoding.htmlDecode(filenames[i]).trim());
+                        link.setFinalFileName(Encoding.htmlDecode(filenames[i]).trim());
                     } else if (i == 0) {
                         /* Log only once */
                         logger.warning("Failed to find filename information");
                     }
                     if (filesizes != null && filesizes.length == file_ids.length) {
-                        link.setDownloadSize(Long.parseLong(filesizes[i]));
+                        link.setVerifiedFileSize(Long.parseLong(filesizes[i]));
                     } else if (i == 0) {
                         /* Log only once */
                         logger.warning("Failed to find filesize information");
