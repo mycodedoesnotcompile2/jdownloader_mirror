@@ -31,13 +31,13 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 
-@HostPlugin(revision = "$Revision: 52837 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52843 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThisvidCom extends KernelVideoSharingComV2 {
     public ThisvidCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +135,7 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
                 final String token;
                 if (AbstractRecaptchaV2.isValidSiteKey(siteKey)) {
                     token = new CaptchaHelperHostPluginRecaptchaV2(this, br, siteKey).getToken();
-                } else if (AbstractHCaptcha.isValidSiteKey(siteKey)) {
+                } else if (AbstractCloudflareTurnstileCaptcha.isValidSiteKey(siteKey)) {
                     // untested
                     token = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, siteKey).getToken();
                 } else {

@@ -34,6 +34,8 @@
 package org.appwork.net.protocol.http;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class HTTPConstants {
@@ -75,10 +77,12 @@ public class HTTPConstants {
          * frameworks still use the 302 status code as if it were the 303[6].
          */
         REDIRECT_FOUND(302, "Found"),
+        SEE_OTHER(303, "See Other"),
         /**
          * http://code.google.com/p/gears/wiki/ResumableHttpRequestsProposal
          */
         RESUME_INCOMPLETE(308, "Resume Incomplete"),
+        PERMANENT_REDIRECT(308, "Permanent Redirect"),
         /**
          * The request cannot be fulfilled due to bad syntax.[2
          */
@@ -89,21 +93,22 @@ public class HTTPConstants {
          * authenticating will make no difference.[2
          */
         ERROR_FORBIDDEN(403, "Forbidden"),
-        PROXY_AUTH_REQUIRED(407, "Forbidden"),
         /**
          * The requested resource could not be found but may be available again in the future.[2] Subsequent requests by the client are
          * permissible.
          */
         ERROR_NOT_FOUND(404, "Not Found"),
         METHOD_NOT_ALLOWED(405, "Method Not Allowed"),
+        PROXY_AUTH_REQUIRED(407, "Forbidden"),
+        REQUEST_TIMEOUT(408, "Request Timeout"),
         ERROR_CONFLICT(409, "Conflict"),
         ERROR_GONE(410, "Gone"),
         LENGTH_REQUIRED(411, "Length Required"),
         REQUEST_ENTITY_TOO_LARGE(413, "Request Entity Too Large"),
         REQUEST_URL_TOO_LONG(414, "Request-URL Too Long"),
-        REQUEST_HEADER_FIELDS_TOO_LARGE(431, "Request Header Fields Too Large"),
         ERROR_RANGE_NOT_SUPPORTED(416, "Range requests not supported"),
         TOO_MANY_REQUESTS(429, "Too Many Requests"),
+        REQUEST_HEADER_FIELDS_TOO_LARGE(431, "Request Header Fields Too Large"),
         UNAVAILABLE_FOR_LEGAL_REASONS(451, "Unavailable For Legal Reasons"),
         /**
          * A generic error message, given when no more specific message is suitable.[2
@@ -127,18 +132,29 @@ public class HTTPConstants {
          * seems like the server did not answer with valid HTTP(s)
          */
         X_INVALID_HTTP_RESPONSE(999, "INVALID HTTP Response");
-
         /**
          * @param responseCode
          * @return
          */
         public static ResponseCode get(final int responseCode) {
+            return get(responseCode, null);
+        }
+
+        public static ResponseCode get(final int responseCode, final String message) {
+            final List<ResponseCode> ret = new ArrayList<ResponseCode>();
             for (final ResponseCode rc : ResponseCode.values()) {
                 if (responseCode == rc.getCode()) {
-                    return rc;
+                    if (message == null || message.equalsIgnoreCase(rc.getDescription())) {
+                        return rc;
+                    } else {
+                        ret.add(rc);
+                    }
                 }
             }
-            return null;
+            if (ret.size() == 0) {
+                return null;
+            }
+            return ret.get(0);
         }
 
         private final int    code;
@@ -397,8 +413,7 @@ public class HTTPConstants {
      * <ul>
      * <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection">MDN: X-XSS-Protection (deprecated)</a></li>
      * <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP">MDN: Content Security Policy (CSP)</a></li>
-     * <li><a href="https://www.nexgismo.com/blog/why-browsers-gave-up-on-x-xss-protection">Why Browsers Gave Up on
-     * X-XSS-Protection</a></li>
+     * <li><a href="https://www.nexgismo.com/blog/why-browsers-gave-up-on-x-xss-protection">Why Browsers Gave Up on X-XSS-Protection</a></li>
      * <li><a href="https://owasp.org/www-community/OWASP_Content_Security_Policy_Cheat_Sheet">OWASP CSP Cheat Sheet</a></li>
      * </ul>
      *

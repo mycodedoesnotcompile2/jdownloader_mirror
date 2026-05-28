@@ -88,7 +88,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52844 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -427,7 +427,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return buildAnnotationUrlsDefault(pluginDomains, KVSUrlType.EMBED, KVSUrlType.SLUG_NO_FUID);
     }
 
-    private static String[] buildAnnotationUrlsDefault(final List<String[]> pluginDomains, KVSUrlType... types) {
+    protected static String[] buildAnnotationUrlsDefault(final List<String[]> pluginDomains, KVSUrlType... types) {
         final String pathPattern = buildPathPattern(types);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {

@@ -21,11 +21,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -34,13 +29,18 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MotherLessCom;
 
-@DecrypterPlugin(revision = "$Revision: 51692 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52838 $", interfaceVersion = 3, names = {}, urls = {})
 public class MotherLessComCrawler extends PluginForDecrypt {
     public MotherLessComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -251,13 +251,13 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         // }
         /**
          * Find number of pages to walk through. Website displays max 6 pages so for galleries containing more than 6 pages this value will
-         * be updated after each loop! </br>
-         * Example with a lot of pages: https://motherless.com/GIAEE5076
+         * be updated after each loop! </br> Example with a lot of pages: https://motherless.com/GIAEE5076
          */
         int maxPage = getMaxPage(br);
         final HashSet<String> pages = new HashSet<String>();
         logger.info("Found " + maxPage + " page(s) [!page number may change later!], crawling now...");
         int page = 1;
+        final AvailableStatus resultStatus = get(MotherlessComConfig.class).isCrawlerFastLinkCheckEnabled() ? AvailableStatus.TRUE : AvailableStatus.UNCHECKED;
         while (true) {
             int numberofResultsThisPage = 0;
             /* Find all galleries of [user | user favorites, and so on] */
@@ -284,7 +284,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
                     final DownloadLink dl = createDownloadlink(singlelink);
                     dl.setContentUrl(singlelink);
                     dl.setProperty(MotherLessCom.PROPERTY_TYPE, "video");
-                    dl.setAvailable(true);
+                    dl.setAvailableStatus(resultStatus);
                     if (relative_path != null) {
                         dl.setRelativeDownloadFolderPath(relative_path);
                     }
@@ -313,7 +313,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
                     final DownloadLink dl = createDownloadlink(singlelink);
                     dl.setContentUrl(singlelink);
                     dl.setProperty(MotherLessCom.PROPERTY_TYPE, "image");
-                    dl.setAvailable(true);
+                    dl.setAvailableStatus(resultStatus);
                     if (relative_path != null) {
                         dl.setRelativeDownloadFolderPath(relative_path);
                     }
@@ -381,7 +381,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlGroups(final CryptedLink param) throws IOException, PluginException {
-        final int groupCrawlerMaxLimit = PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit();
+        final int groupCrawlerMaxLimit = get(MotherlessComConfig.class).getGroupCrawlerLimit();
         if (groupCrawlerMaxLimit == 0) {
             logger.info("Returning empty array because user set limit of group crawler to 0 and thus disabled it");
             return new ArrayList<DownloadLink>();
@@ -416,15 +416,14 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlGroupImagesAndVideos(final CryptedLink param) throws IOException, PluginException {
         br.getPage(param.getCryptedUrl());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        ret.addAll(this.crawlPage(param, CRAWL_MODE.IMAGES, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit()));
-        ret.addAll(this.crawlPage(param, CRAWL_MODE.VIDEOS, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit()));
+        ret.addAll(this.crawlPage(param, CRAWL_MODE.IMAGES, get(MotherlessComConfig.class).getGroupCrawlerLimit()));
+        ret.addAll(this.crawlPage(param, CRAWL_MODE.VIDEOS, get(MotherlessComConfig.class).getGroupCrawlerLimit()));
         return ret;
     }
 
     /**
-     * Returns max page number for pagination according to current html code. </br>
-     * This can vary e.g. on first page it looks like last page is number 6 but once we are on page 4 the highest page number visible
-     * changes to 8.
+     * Returns max page number for pagination according to current html code. </br> This can vary e.g. on first page it looks like last page
+     * is number 6 but once we are on page 4 the highest page number visible changes to 8.
      */
     private int getMaxPage(final Browser br) throws MalformedURLException {
         final String[] pageURLs = br.getRegex("<a href=\"([^\"]+page=\\d+[^\"]*)\"").getColumn(0);

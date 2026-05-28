@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,7 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -38,7 +40,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesterMe;
 
-@DecrypterPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.encoding.Base64;
+
+@DecrypterPlugin(revision = "$Revision: 52838 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
@@ -71,6 +75,12 @@ public class FilesterMeFolder extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
+    private String encodePassword(String password, String nonce) {
+        final long timestamp = System.currentTimeMillis();
+        final String payload = password + "|" + timestamp + "|" + nonce;
+        return Base64.encode(payload);
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int page = 1;
@@ -80,6 +90,16 @@ public class FilesterMeFolder extends PluginForDecrypt {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        Form passwordForm = br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
+        if (passwordForm != null) {
+            final String password = getUserInput("Password?", param);
+            passwordForm.put("password", URLEncoder.encode(encodePassword(password, passwordForm.getInputFieldByName("nonce").getValue()), "UTF-8"));
+            br.submitForm(passwordForm);
+            passwordForm = br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
+        }
+        if (passwordForm != null) {
+            throw new DecrypterRetryException(RetryReason.PASSWORD, "This folder is password protected");
         }
         String title = br.getRegex("class=\"folder-title\"[^>]*>\\s*([^<]+)\\s*</h1>").getMatch(0);
         String folder_title;
@@ -176,7 +196,13 @@ public class FilesterMeFolder extends PluginForDecrypt {
             br.getPage(contenturl + "?page=" + page);
         } while (!this.isAbort());
         if (ret.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (br.containsHTML(">\\s*This folder is password protected. Please enter the password to continue.?\\s*<")) {
+                throw new DecrypterRetryException(RetryReason.PASSWORD, "This folder is password protected");
+            } else if (br.containsHTML(">\\s*0\\s* files\\s*<")) {
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, title);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         return ret;
     }

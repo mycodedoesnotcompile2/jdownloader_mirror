@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -31,7 +32,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51231 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52840 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
 public class ArteTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     public ArteTv(PluginWrapper wrapper) {
@@ -87,12 +88,22 @@ public class ArteTv extends PluginForHost {
 
     @Override
     protected void throwConnectionExceptions(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
-        if (con.getResponseCode() == 403) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-        } else if (con.getResponseCode() == 404) {
+        switch (con.getResponseCode()) {
+        case 403:
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", TimeUnit.HOURS.toMillis(1));
+        case 404:
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Video broken?");
+        case 408:
+            // HTTP/1.0 408 Request Time-out
+            // Server: AkamaiGHost
+            /**
+             * <TITLE>Request Timeout</TITLE> </HEAD><BODY> <H1>Request Timeout</H1> The server timed out while waiting for the browser's
+             * request.
+             * <P>
+             */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Request Time-out", TimeUnit.MINUTES.toMillis(15));
+        default:
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Video broken?(" + con.getResponseCode() + ")");
         }
     }
 
@@ -137,7 +148,8 @@ public class ArteTv extends PluginForHost {
             dl.startDownload();
         } else {
             br.setFollowRedirects(true);
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, true, 0);
+            // no need to hammer server when speed is not limited/throttled
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, true, -4);
             handleConnectionErrors(br, dl.getConnection());
             findAndSetMd5Hash(link, dl.getConnection());
             dl.startDownload();

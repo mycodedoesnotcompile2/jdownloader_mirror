@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -55,7 +56,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52828 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52838 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -612,7 +613,12 @@ public class TorboxApp extends UseNet {
         } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg);
         }
-        if (link != null) {
+        if ("60 per 1 hour".equals(errormsg)) {
+            // {"detail":"60 per 1 hour"}
+            // https://api-docs.torbox.app/
+            // POST /webdl/createwebdownload is rate limited to 60/hour per API token.
+            throw new AccountUnavailableException("reached 60 api downloads per hour limit", TimeUnit.MINUTES.toMillis(15));
+        } else if (link != null) {
             /* E.g. {"success":false,"detail":"Failed to request web download. Please try again later.","data":null} */
             mhm.handleErrorGeneric(account, link, errormsg, 50, 1 * 60 * 1000l);
         } else {

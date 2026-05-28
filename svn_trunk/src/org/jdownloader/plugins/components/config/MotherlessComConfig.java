@@ -37,6 +37,14 @@ public interface MotherlessComConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Crawler auto set online status for faster crawling?")
+    @Order(15)
+    boolean isCrawlerFastLinkCheckEnabled();
+
+    boolean setCrawlerFastLinkCheckEnabled(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
     @DescriptionForConfigEntry(text_UseTitleAsFilenameIfExtensionFits)
     @Order(20)
     boolean isUseTitleAsFilenameIfExtensionFits();
