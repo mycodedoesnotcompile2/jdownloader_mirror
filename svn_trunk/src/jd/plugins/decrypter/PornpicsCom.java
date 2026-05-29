@@ -21,6 +21,7 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -34,7 +35,7 @@ import jd.plugins.hoster.DirectHTTP;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
-@DecrypterPlugin(revision = "$Revision: 52566 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52848 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornpicsCom extends PluginForDecrypt {
     public PornpicsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +50,14 @@ public class PornpicsCom extends PluginForDecrypt {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        for (String domain : siteSupportedNames()) {
+            Browser.setRequestIntervalLimitGlobal(domain, 250);
+        }
     }
 
     @Override

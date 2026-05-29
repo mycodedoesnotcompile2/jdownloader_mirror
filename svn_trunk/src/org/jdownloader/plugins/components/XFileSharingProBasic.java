@@ -93,7 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52828 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52845 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -143,7 +143,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     // return this.rewriteHost(getPluginDomains(), host);
     // }
     public static final String getDefaultAnnotationPatternPart() {
-        return "/(d/[A-Za-z0-9]+|(d|e)/[a-z0-9]{12}|embed-[a-z0-9]{12}\\.html|[a-z0-9]{12}(/[^/]+(?:\\.html)?)?)";
+        // don't allow \r|\n (newline) and "\r" and "\n"
+        return "/(d/[A-Za-z0-9]+|(d|e)/[a-z0-9]{12}|embed-[a-z0-9]{12}\\.html|[a-z0-9]{12}(/(?:(?!\\\\r|\r|\\\\n|\n).)+(?:\\.html)?)?)";
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {

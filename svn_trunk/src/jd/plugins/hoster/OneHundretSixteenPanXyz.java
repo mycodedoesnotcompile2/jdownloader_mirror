@@ -23,12 +23,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -46,7 +40,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52384 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 52847 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,6 +73,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         ret.add(new String[] { "116pan.xyz", "116pan.com" }); // formerly known as 116pan.com
         return ret;
     }
+
     // @Override
     // public String rewriteHost(final String host) {
     // if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -362,14 +363,21 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             br.postPageRaw("/login", JSonStorage.serializeToJson(postdata));
             final Map<String, Object> entries_after_login = checkErrorsWebapi(br, null, account);
             final Map<String, Object> props_after_login = (Map<String, Object>) entries_after_login.get("props");
-            final String errorMsg = (String) props_after_login.get("captchaError");
+            String errorMsg = (String) props_after_login.get("captchaError");
             if (errorMsg != null) {
                 /* Wrong captcha or wrong login credentials */
-                if (errorMsg.equalsIgnoreCase("验证码错误，请重新输入")) {
+                if (errorMsg.equalsIgnoreCase("验证码错误，请重新输入") || errorMsg.equals("Captcha error, please try again.")) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 } else {
                     throw new AccountInvalidException(errorMsg);
                 }
+            }
+            final Object errors = props_after_login.get("errors");
+            if (errors != null) {
+                if (errors instanceof Map) {
+                    errorMsg = (String) ((Map<String, Object>) errors).get("login");
+                }
+                throw new AccountInvalidException(errorMsg);
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
             return entries_after_login;
@@ -387,11 +395,11 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
 
     private Map<String, Object> checkErrorsWebapi(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         /* Wait milliseconds for unknown/generic errors */
-        final long waitmillis = 60 * 1000;
-        Map<String, Object> entries = null;
         try {
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            return checkErrorsWebapi(entries, link, account);
         } catch (final JSonMapperException ignore) {
+            final long waitmillis = 60 * 1000;
             /* This should never happen. */
             final String errortext = "Invalid Web-API response";
             if (link != null) {
@@ -400,7 +408,6 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
                 throw new AccountUnavailableException(errortext, waitmillis);
             }
         }
-        return checkErrorsWebapi(entries, link, account);
     }
 
     private Map<String, Object> checkErrorsWebapi(final Map<String, Object> entries, final DownloadLink link, final Account account) throws PluginException {

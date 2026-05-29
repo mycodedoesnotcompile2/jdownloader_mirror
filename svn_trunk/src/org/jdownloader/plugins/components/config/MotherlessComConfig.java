@@ -41,7 +41,7 @@ public interface MotherlessComConfig extends PluginConfigInterface {
     @Order(15)
     boolean isCrawlerFastLinkCheckEnabled();
 
-    boolean setCrawlerFastLinkCheckEnabled(boolean b);
+    void setCrawlerFastLinkCheckEnabled(boolean b);
 
     @AboutConfig
     @DefaultBooleanValue(true)
