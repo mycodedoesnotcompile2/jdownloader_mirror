@@ -17,6 +17,7 @@ import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Browser.BrowserException;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
@@ -33,6 +34,7 @@ import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -41,7 +43,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52855 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,10 +107,10 @@ public class OrfAt extends PluginForDecrypt {
     private final String                                      PROPERTY_SLUG         = "slug";
     /* E.g. https://radiothek.orf.at/ooe --> "ooe" --> Channel == "oe2o" */
     private static LinkedHashMap<String, Map<String, Object>> CHANNEL_CACHE         = new LinkedHashMap<String, Map<String, Object>>() {
-        protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
-            return size() > 50;
-        };
-    };
+                                                                                        protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
+                                                                                            return size() > 50;
+                                                                                        };
+                                                                                    };
     public SubConfiguration                                   cfg                   = null;
 
     /** Wrapper for podcast URLs containing md5 file-hashes inside URL. */
@@ -369,10 +371,14 @@ public class OrfAt extends PluginForDecrypt {
                     progressiveStreamFilesizeCheck: if (looksLikeQualityIsSelected && isProgressive && !settingEnableFastCrawl && !qualityIdentifierToFilesizeMap.containsKey(fmtHumanReadable) && !has_active_youth_protection) {
                         logger.info("Checking progressive URL to find filesize: " + url_directlink_video);
                         URLConnectionAdapter con = null;
+                        final Browser brc = br.cloneBrowser();
                         try {
-                            final Browser brc = br.cloneBrowser();
+                            brc.setFollowRedirects(true);
                             con = brc.openHeadConnection(url_directlink_video);
-                            if (!this.looksLikeDownloadableContent(con)) {
+                            if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
+                                logger.info("Skipping \"insert_video_not_available\": " + url_directlink_video);
+                                continue;
+                            } else if (!this.looksLikeDownloadableContent(con)) {
                                 logger.info("Skipping broken progressive video quality: " + url_directlink_video);
                                 continue;
                             } else if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
@@ -399,6 +405,10 @@ public class OrfAt extends PluginForDecrypt {
                                 logger.info("Exception happened during file size check");
                             }
                         } finally {
+                            try {
+                                brc.followConnection();
+                            } catch (final Throwable e) {
+                            }
                             try {
                                 con.disconnect();
                             } catch (final Throwable e) {
@@ -541,7 +551,8 @@ public class OrfAt extends PluginForDecrypt {
         }
         int numberofGaplessItems = 0;
         crawlGapless: {
-            if (!allowCrawlGapless) {
+            if (!allowCrawlGapless || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                // 2026-05-29 gapless workaround no longer working
                 break crawlGapless;
             }
             /* Gapless video handling */
@@ -602,7 +613,19 @@ public class OrfAt extends PluginForDecrypt {
             DownloadLink best = null;
             for (final String hlsMaster : sources_hls_modified) {
                 /* Every HLS master leads to exactly one quality. */
-                br.getPage(hlsMaster);
+                try {
+                    br.getPage(hlsMaster);
+                    if (ORFMediathek.isInsertVideoNotAvailable(br.getRequest())) {
+                        logger.info("Skipping \"insert_video_not_available\": " + hlsMaster);
+                        continue;
+                    }
+                } catch (BrowserException e) {
+                    if (ORFMediathek.isInsertVideoNotAvailable(br.getRequest())) {
+                        logger.info("Skipping \"insert_video_not_available\": " + hlsMaster);
+                        continue;
+                    }
+                    throw e;
+                }
                 if (ORFMediathek.isGeoBlocked(br.getURL())) {
                     /* Item is GEO-blocked. If one quality is GEO-blocked, all qualities are. */
                     throw new DecrypterRetryException(RetryReason.GEO);

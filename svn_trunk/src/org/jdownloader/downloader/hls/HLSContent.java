@@ -41,9 +41,11 @@ public class HLSContent {
         return Collections.unmodifiableList(ret);
     }
 
-    public M3U8Playlist get(int index) {
+    public M3U8Playlist get(final int index) {
         if (index == 0) {
             return getMain();
+        } else if (index < 0) {
+            return null;
         }
         final List<M3U8Playlist> audioTracks = getAudioTracks();
         if (index - 1 < audioTracks.size()) {

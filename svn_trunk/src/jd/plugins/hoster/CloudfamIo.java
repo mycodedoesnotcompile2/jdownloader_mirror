@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -34,7 +31,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52669 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 52859 $", interfaceVersion = 3, names = {}, urls = {})
 public class CloudfamIo extends PluginForHost {
     public CloudfamIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,18 +133,21 @@ public class CloudfamIo extends PluginForHost {
             if (StringUtils.isEmpty(nextURL)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            nextURL = Encoding.htmlOnlyDecode(nextURL);
             br.getPage(nextURL);
             for (int step = 1; step <= 5; step++) {
-                final String redirectURL = br.getRegex(redirectPattern).getMatch(0);
+                String redirectURL = br.getRegex(redirectPattern).getMatch(0);
                 if (redirectURL == null) {
                     logger.info("Exit step loop in round: " + step);
                     break;
                 }
                 logger.info("Step loop success: Step: " + step + " | URL: " + redirectURL);
+                redirectURL = Encoding.htmlOnlyDecode(redirectURL);
                 br.getPage(redirectURL);
             }
             String redirect3 = br.getRegex("\"(/" + fid + "\\?step=2[^\"]*)").getMatch(0);
             if (redirect3 != null) {
+                redirect3 = Encoding.htmlOnlyDecode(redirect3);
                 br.getPage(redirect3);
             } else {
                 logger.warning("Failed to find redirect3");

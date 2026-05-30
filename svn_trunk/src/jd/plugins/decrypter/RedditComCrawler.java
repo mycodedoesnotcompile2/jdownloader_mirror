@@ -74,7 +74,7 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52850 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -149,12 +149,24 @@ public class RedditComCrawler extends PluginForDecrypt {
         } else if (regex_user.getMatch(1) != null) {
             return crawlUserSavedObjects(param);
         } else if (regex_user.patternFind()) {
+            if (true) {
+                throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "Account is required but currently not supported");
+            }
             return crawlUser(param, regex_user.getMatch(0));
         } else if (new Regex(url, PATTERN_POST).patternFind()) {
+            if (true) {
+                throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "Account is required but currently not supported");
+            }
             return crawlCommentURL(param);
         } else if (new Regex(url, PATTERN_GALLERY.pattern()).patternFind()) {
+            if (true) {
+                throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "Account is required but currently not supported");
+            }
             return this.crawlGalleryURL(param);
         } else {
+            if (true) {
+                throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "Account is required but currently not supported");
+            }
             return crawlSubreddit(param);
         }
     }
@@ -634,7 +646,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 if (StringUtils.endsWithCaseInsensitive(filenameFromURL, ".gif")) {
                                     /*
                                      * Filename from URL contains .gif extension but this is a .mp4 file
-                                     *
+                                     * 
                                      * -> Correct that but keep .gif to signal source of the mp4
                                      */
                                     direct.setFinalFileName(this.applyFilenameExtension(filenameFromURL, ".gif.mp4"));

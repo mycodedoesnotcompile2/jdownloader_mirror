@@ -93,7 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52845 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52856 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4454,6 +4454,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         FILE
     }
 
+    // TODO: check the *general* unit for XFS sites, is it 1000(mega) or 1024(mibi)
     protected long parseSize(Size type, String string) {
         switch (type) {
         case TRAFFIC: {

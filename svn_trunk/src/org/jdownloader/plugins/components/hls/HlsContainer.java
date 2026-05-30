@@ -1,6 +1,7 @@
 package org.jdownloader.plugins.components.hls;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,7 +15,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.GenericM3u8;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist;
@@ -84,6 +84,24 @@ public class HlsContainer {
         protected final Boolean defaultSelect;
         protected final Boolean forced;
         protected final String  uri;
+        protected URL           absoluteURL = null;
+
+        public URL getAbsoluteURL() {
+            return absoluteURL;
+        }
+
+        public void setAbsoluteURL(URL absoluteURL) {
+            this.absoluteURL = absoluteURL;
+        }
+
+        public List<M3U8Playlist> loadM3U8(final Browser br) throws IOException {
+            final URL url = getAbsoluteURL();
+            if (url == null) {
+                // no url does mean the media is embedded into main stream
+                return null;
+            }
+            return M3U8Playlist.loadM3U8(getAbsoluteURL().toExternalForm(), br);
+        }
 
         public MEDIA(TYPE type, String groupID, String language, String name, Boolean autoSelect, Boolean defaultSelect, Boolean forced, String uri) {
             super();
@@ -282,32 +300,32 @@ public class HlsContainer {
         final List<MEDIA> ret = new ArrayList<MEDIA>();
         final String[] extXMedia = new Regex(m3u8, "#EXT-X-MEDIA:([^\r\n]+)").getColumn(0);
         for (final String entry : extXMedia) {
-            try {
-                final String type = new Regex(entry, "(?:,|^)\\s*TYPE\\s*=\\s*(AUDIO|SUBTITLES)").getMatch(0);
-                final TYPE mediaType = TYPE.parse(type);
-                if (mediaType == null) {
-                    continue;
-                } else if (TYPE.CLOSEDCAPTIONS.equals(mediaType)) {
-                    // unsupported
-                    continue;
-                }
-                final String groupID = new Regex(entry, "(?:,|^)\\s*GROUP-ID\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
-                if (groupID == null) {
-                    throw new Exception("No GROUP-ID?:" + entry);
-                }
-                final String uri = new Regex(entry, "(?:,|^)\\s*URI\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
-                if (uri == null) {
-                    // no uri does mean the media is embedded into main stream
-                }
-                final String language = new Regex(entry, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
-                final String name = new Regex(entry, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
-                final String autoSelect = new Regex(entry, "(?:,|^)\\s*AUTOSELECT\\s*=\\s*(YES|NO)").getMatch(0);
-                final String defaultSelect = new Regex(entry, "(?:,|^)\\s*DEFAULT\\s*=\\s*(YES|NO)").getMatch(0);
-                final String forced = new Regex(entry, "(?:,|^)\\s*FORCED\\s*=\\s*(YES|NO)").getMatch(0);
-                ret.add(new MEDIA(mediaType, groupID, language, name, (autoSelect == null ? null : "YES".equals(autoSelect)), (defaultSelect == null ? null : "YES".equals(defaultSelect)), (forced == null ? null : "YES".equals(forced)), uri));
-            } catch (Exception e) {
-                br.getLogger().log(e);
+            final String type = new Regex(entry, "(?:,|^)\\s*TYPE\\s*=\\s*(AUDIO|SUBTITLES)").getMatch(0);
+            final TYPE mediaType = TYPE.parse(type);
+            if (mediaType == null) {
+                continue;
+            } else if (TYPE.CLOSEDCAPTIONS.equals(mediaType)) {
+                // unsupported
+                continue;
             }
+            final String groupID = new Regex(entry, "(?:,|^)\\s*GROUP-ID\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+            if (groupID == null) {
+                throw new Exception("No GROUP-ID?:" + entry);
+            }
+            final String uri = new Regex(entry, "(?:,|^)\\s*URI\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+            if (uri == null) {
+                // no uri does mean the media is embedded into main stream
+            }
+            final String language = new Regex(entry, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+            final String name = new Regex(entry, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+            final String autoSelect = new Regex(entry, "(?:,|^)\\s*AUTOSELECT\\s*=\\s*(YES|NO)").getMatch(0);
+            final String defaultSelect = new Regex(entry, "(?:,|^)\\s*DEFAULT\\s*=\\s*(YES|NO)").getMatch(0);
+            final String forced = new Regex(entry, "(?:,|^)\\s*FORCED\\s*=\\s*(YES|NO)").getMatch(0);
+            final MEDIA media = new MEDIA(mediaType, groupID, language, name, (autoSelect == null ? null : "YES".equals(autoSelect)), (defaultSelect == null ? null : "YES".equals(defaultSelect)), (forced == null ? null : "YES".equals(forced)), uri);
+            if (uri != null) {
+                media.setAbsoluteURL(br.getURL(uri));
+            }
+            ret.add(media);
         }
         return ret;
     }
@@ -389,16 +407,16 @@ public class HlsContainer {
                     if (false) {
                         final String videoID = new Regex(streamInfo, "(?:,|^)\\s*VIDEO\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     }
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    audio: {
                         final String audioID = new Regex(streamInfo, "(?:,|^)\\s*AUDIO\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                         hls.audioGroupID = audioID;
                         containerMedia.addAll(filterMedia(media, TYPE.AUDIO, audioID));
                     }
-                    if (false) {
+                    closedCaptions: {
                         final String closedCaptionsID = new Regex(streamInfo, "(?:,|^)\\s*CLOSED-CAPTIONS\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                         containerMedia.addAll(filterMedia(media, TYPE.CLOSEDCAPTIONS, closedCaptionsID));
                     }
-                    if (false) {
+                    subtitles: {
                         final String subtitlesID = new Regex(streamInfo, "(?:,|^)\\s*SUBTITLES\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                         containerMedia.addAll(filterMedia(media, TYPE.SUBTITLES, subtitlesID));
                     }
@@ -800,34 +818,34 @@ public class HlsContainer {
 
     public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... mediaList) {
         oldVariant: {// old variant to store information
-            if (this.getWidth() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
-            }
-            if (this.getHeight() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_HEIGHT, this.getHeight());
-            }
-            if (this.getFramerate() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_FRAME_RATE, this.getFramerate());
-            }
-            if (this.getBandwidth() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH, this.getBandwidth());
-            }
-            if (this.getAverageBandwidth() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH_AVERAGE, this.getAverageBandwidth());
-            }
-            link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
-            link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
+        if (this.getWidth() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
         }
-        newVariant: {
-            // new variant to store the information
-            final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
-            for (HlsContainer.MEDIA mediaEntry : mediaList) {
-                if (mediaEntry == null) {
-                    continue;
-                }
-                containerStorable.getMedia().add(new HlsContainerMediaStorable(mediaEntry));
-            }
-            link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, containerStorable);
+        if (this.getHeight() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_HEIGHT, this.getHeight());
         }
+        if (this.getFramerate() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_FRAME_RATE, this.getFramerate());
+        }
+        if (this.getBandwidth() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH, this.getBandwidth());
+        }
+        if (this.getAverageBandwidth() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH_AVERAGE, this.getAverageBandwidth());
+        }
+        link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
+        link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
+    }
+    newVariant: {
+        // new variant to store the information
+        final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
+        for (HlsContainer.MEDIA mediaEntry : mediaList) {
+            if (mediaEntry == null) {
+                continue;
+            }
+            containerStorable.getMedia().add(new HlsContainerMediaStorable(mediaEntry));
+        }
+        link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, containerStorable);
+    }
     }
 }

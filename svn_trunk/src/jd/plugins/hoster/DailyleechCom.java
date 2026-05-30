@@ -27,12 +27,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -56,7 +50,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51926 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52854 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     private static final String          PROTOCOL = "https://";
     /** This is the old project of proleech.link owner */
@@ -87,7 +89,7 @@ public class DailyleechCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USERNAME_IS_EMAIL, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
     }
 
     @Override
@@ -160,9 +162,8 @@ public class DailyleechCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Cannot download URLs without filename");
             }
             /**
-             * Okay this website is an absolute chaos: </br>
-             * We need to generate downloadlinks through a chatbox ... after adding new URLs, we need to try to find our downloadlinks by
-             * going through the chat and need to identify our file by filename! </br>
+             * Okay this website is an absolute chaos: </br> We need to generate downloadlinks through a chatbox ... after adding new URLs,
+             * we need to try to find our downloadlinks by going through the chat and need to identify our file by filename! </br>
              * Direct-downloadurls can be broken so we need to ignore the ones we know are broken to speed-up the process of finding the
              * correct one.
              */
@@ -324,8 +325,7 @@ public class DailyleechCom extends PluginForHost {
                 /* same linkID */
                 /**
                  * This extra check is necessary because in theory this website may display the submitted URL in a slightly modified version
-                 * than the original. </br>
-                 * Using the linkIDs for comparison might increase our chances of finding a result.
+                 * than the original. </br> Using the linkIDs for comparison might increase our chances of finding a result.
                  */
                 logger.info("Matched post via linkID");
             } else if (StringUtils.equals(filename, link.getName())) {
@@ -564,6 +564,26 @@ public class DailyleechCom extends PluginForHost {
     }
 
     private void loginWebsite(final Account account, final boolean force) throws Exception {
+        final Cookies userCookies = account.loadUserCookies();
+        if (userCookies != null) {
+            br.setCookies(userCookies);
+            if (!force) {
+                return;
+            }
+            /*
+             * Even though login is forced first check if our cookies are still valid --> If not, force login!
+             */
+            br.getPage(PROTOCOL + this.getHost() + "/cbox/cbox.php");
+            if (isLoggedIn(br)) {
+                logger.info("Login via user cookies successful");
+                return;
+            }
+            if (account.hasEverBeenValid()) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+            } else {
+                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+            }
+        }
         final Cookies cookies = account.loadCookies("");
         /* Re-use cookies to try to avoid login-captcha! */
         if (cookies != null) {
@@ -586,32 +606,31 @@ public class DailyleechCom extends PluginForHost {
         if (loginform == null) {
             /* 2025-12-04 */
             loginform = br.getFormbyKey("Email");
-        }
-        if (loginform == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         loginform.put("Email", Encoding.urlEncode(account.getUser()));
         loginform.put("Password", Encoding.urlEncode(account.getPass()));
-        /* Login-Captcha seems to be always required. */
-        final String captchaimageurl = loginform.getRegex("(captcha_code_file\\.php\\?rand=\\d+)").getMatch(0);
-        if (captchaimageurl != null) {
-            final DownloadLink dummy = new DownloadLink(this, "Account", getHost(), "https://" + getHost(), true);
-            String captcharesult = getCaptchaCode(captchaimageurl, dummy);
-            if (captcharesult != null) {
-                captcharesult = captcharesult.trim();
-            }
-            if (captcharesult == null || captcharesult.length() != 6) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Invalid captcha format");
-            }
-            loginform.put("6_letters_code", Encoding.urlEncode(captcharesult));
-        }
+        final CaptchaHelperHostPluginCloudflareTurnstile turnStile = new CaptchaHelperHostPluginCloudflareTurnstile(this, br);
+        loginform.put("cf-turnstile-response", Encoding.urlEncode(turnStile.getToken()));
         /*
          * Sending this form will always redirect us to the login page once again. We need to refresh this once to see if we're actually
          * logged in or not but let's check for invalid captcha status before.
          */
         br.submitForm(loginform);
-        if (!isLoggedIn(br) && br.containsHTML(">\\s*The captcha code does not match")) {
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+        if (!isLoggedIn(br)) {
+            final String errorMsg = br.getRegex("class\\s*=\\s*\"dl-error-box\"[^>]*>\\s*(.*?)</div").getMatch(0);
+            if ((br.containsHTML(">\\s*The captcha code does not match") || br.containsHTML(">\\s*Turnstile verification failed"))) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            }
+            if (errorMsg != null) {
+                throw new AccountInvalidException(errorMsg.replace("<br>", "").trim());
+            } else if (br.containsHTML(">\\s*Password too short")) {
+                throw new AccountInvalidException("Password too short");
+            } else if (br.containsHTML(">\\s*Wrong email/password combination/Account not verify")) {
+                throw new AccountInvalidException("Wrong email/password combination/Account not verify");
+            }
         }
         logger.info("Looks like correct login captcha has been entered -> Double-Checking if we're logged in");
         br.getPage("/cbox/cbox.php");

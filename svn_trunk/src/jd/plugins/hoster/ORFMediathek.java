@@ -17,23 +17,17 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hds.HDSDownloader;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hds.HDSContainer;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
@@ -49,7 +43,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 52298 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hds.HDSDownloader;
+import org.jdownloader.downloader.hls.HLSContent;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hds.HDSContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52858 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -195,6 +201,7 @@ public class ORFMediathek extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
+                br2.setFollowRedirects(true);
                 final GetRequest request = br2.createGetRequest(dllink);
                 request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
                 con = br2.openRequestConnection(request);
@@ -232,7 +239,7 @@ public class ORFMediathek extends PluginForHost {
         }
         if (!isDownload && link.isSizeSet()) {
             /* Do not check directurl for filesize if filesize has already been set */
-            return AvailableStatus.TRUE;
+            // return AvailableStatus.TRUE;
         }
         /* Not a HLS link -> Technically we can get a file size via http headers */
         dllink = link.getStringProperty(PROPERTY_DIRECTURL);
@@ -244,6 +251,7 @@ public class ORFMediathek extends PluginForHost {
         URLConnectionAdapter con = null;
         try {
             final Browser br2 = br.cloneBrowser();
+            br2.setFollowRedirects(true);
             con = br2.openHeadConnection(dllink);
             handleConnectionErrors(br2, link, con);
             this.findAndSetFileHash(link, con);
@@ -286,7 +294,13 @@ public class ORFMediathek extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, errortextGeoBlocked1);
         } else if (isGeoBlocked(br.getURL())) {
             throw new PluginException(LinkStatus.ERROR_FATAL, errortextGeoBlocked2);
+        } else if (isInsertVideoNotAvailable(br.getRequest())) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Video in this format/quality is no longer available");
         }
+    }
+
+    public static boolean isInsertVideoNotAvailable(final Request request) throws Exception {
+        return request != null && StringUtils.containsIgnoreCase(request.getURL().getPath(), "/insert_video_not_available");
     }
 
     private void checkUrlForAgeProtection(final DownloadLink link, final String url) throws Exception {
@@ -295,8 +309,7 @@ public class ORFMediathek extends PluginForHost {
         }
         if (System.currentTimeMillis() - link.getLongProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, 0) < 30 * 60 * 1000) {
             /**
-             * Recrawl has just happened and we were still unable to download the item :( </br>
-             * This should never happen!
+             * Recrawl has just happened and we were still unable to download the item :( </br> This should never happen!
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 1", 10 * 60 * 1000l);
         }
@@ -390,13 +403,33 @@ public class ORFMediathek extends PluginForHost {
         } else if (isHLSPlaylist(link)) {
             /* HLS playlist which should contain only one quality (for older items from tvthek.orf.at). */
             checkFFmpeg(link, "Download a HLS Stream");
-            br.getPage(dllink);
-            handleURLBasedErrors(br, link);
-            final HlsContainer best = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(true);
+            brc.getPage(dllink);
+            handleURLBasedErrors(brc, link);
+            final HlsContainer best = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(brc));
             if (best == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dl = new HLSDownloader(link, br, best.getDownloadurl());
+            final List<M3U8Playlist> m3u8 = best.getM3U8(brc.cloneBrowser());
+            if (m3u8.size() != 1) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final HLSContent hlsContent = new HLSContent(m3u8.get(0));
+            final List<MEDIA> audioMedias = best.getMedia(TYPE.AUDIO, best.getAudioGroupID());
+            for (MEDIA audioMedia : audioMedias) {
+                final List<M3U8Playlist> audioM3U8 = audioMedia.loadM3U8(brc.cloneBrowser());
+                if (audioM3U8 == null) {
+                    continue;
+                } else if (audioM3U8.size() != 1) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                logger.info("Add media:" + audioMedia);
+                hlsContent.addAudioTrack(audioM3U8.get(0));
+            }
+            final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
+            hlsContents.add(hlsContent);
+            dl = new HLSDownloader(link, brc, hlsContents);
             dl.startDownload();
         } else if (isHLSSingleStream(link)) {
             checkFFmpeg(link, "Download a HLS Stream");

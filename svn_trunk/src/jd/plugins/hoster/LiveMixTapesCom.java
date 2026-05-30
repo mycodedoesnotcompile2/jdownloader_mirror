@@ -19,16 +19,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -43,11 +38,17 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 2, names = { "livemixtapes.com" }, urls = { "https?://((?:\\w+\\.)?livemixtapes\\.com/download(?:/mp3)?/\\d+/[a-z0-9\\-]+\\.html|club\\.livemixtapes\\.com/play/\\d+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
+@HostPlugin(revision = "$Revision: 52852 $", interfaceVersion = 2, names = { "livemixtapes.com" }, urls = { "https?://((?:\\w+\\.)?livemixtapes\\.com/(download(?:/mp3)?/\\d+/[a-z0-9\\-]+\\.html|mixtape/[^/]+)|club\\.livemixtapes\\.com/play/\\d+)" })
 public class LiveMixTapesCom extends antiDDoSForHost {
     private static final String               TYPE_REDIRECTLINK  = "https?://(www\\.)?livemixtap\\.es/[a-z0-9]+";
     private static final String               TYPE_DIRECTLINK    = "https?://club\\.livemixtapes\\.com/play/\\d+";
     private static final String               TYPE_ALBUM         = "https?://(?:www\\.)?livemixtapes\\.com/download/\\d+.*?";
+    private static final String               TYPE_MIXTAPE       = "https?://(?:www\\.)?livemixtapes\\.com/mixtape/([^/]+)";
     protected static HashMap<String, Cookies> antiCaptchaCookies = new HashMap<String, Cookies>();
     private final String                      PROPERTY_DIRECTURL = "directurl";
 
@@ -66,6 +67,8 @@ public class LiveMixTapesCom extends antiDDoSForHost {
                 type = "direct";
             } else if (link.getPluginPatternMatcher().matches(TYPE_ALBUM)) {
                 type = "download_album";
+            } else if (link.getPluginPatternMatcher().matches(TYPE_MIXTAPE)) {
+                type = "download_mixtape";
             } else {
                 type = "download_single";
             }
@@ -76,7 +79,11 @@ public class LiveMixTapesCom extends antiDDoSForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "/(\\d+)(?:/[a-z0-9\\-]+\\.html)?$").getMatch(0);
+        String ret = new Regex(link.getPluginPatternMatcher(), "/(\\d+)(?:/[a-z0-9\\-]+\\.html)?$").getMatch(0);
+        if (ret == null) {
+            ret = new Regex(link.getPluginPatternMatcher(), "/mixtape/([^/]+)").getMatch(0);
+        }
+        return ret;
     }
 
     @Override
@@ -113,7 +120,9 @@ public class LiveMixTapesCom extends antiDDoSForHost {
     }
 
     private boolean isAccountRequired() {
-        if (br.containsHTML("class=\"download-member-only\"")) {
+        if (br.containsHTML(">\\s*NO SIGN UP\\s*/\\s*LOGIN REQUIRED")) {
+            return false;
+        } else if (br.containsHTML("class=\"download-member-only\"")) {
             return true;
         } else {
             return false;
@@ -157,30 +166,14 @@ public class LiveMixTapesCom extends antiDDoSForHost {
             if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)(>Not Found</|The page you requested could not be found\\.<|>This mixtape is no longer available for download.<)")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final String timeRemaining = br.getRegex("TimeRemaining\\s*=\\s*(\\d+);").getMatch(0);
-            if (timeRemaining != null) {
-                /* TODO */
-                link.setName(Encoding.htmlDecode(br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0)));
-                return AvailableStatus.TRUE;
-            }
-            String filename = null, filesize = null, tracknumber = null;
-            /* 2020-04-22: Seems like tracknumber is wrong for single files. Website will always display "1. "! */
-            final boolean addTrackNumberToFilename = false;
-            final Regex fileInfo = br.getRegex("<div class=\"track-num\">\\s*(\\d+)\\.\\s*<span>([^<>\"]+)</span>");
-            tracknumber = fileInfo.getMatch(0);
-            filename = fileInfo.getMatch(1);
-            filesize = br.getRegex("class=\"mt-track-size\">([^<>\"]+)</div>").getMatch(0);
+            String filename = br.getRegex("<title>\\s*(.*?)\\s*(Mixtape\\s*(Hosted by.+))?\\s*<").getMatch(0);
             if (filename == null) {
                 /* Fallback */
                 filename = getFID(link);
             }
             filename = Encoding.htmlDecode(filename).trim();
-            /* Add tracknumber to name if possible */
-            if (tracknumber != null && addTrackNumberToFilename) {
-                filename = tracknumber + ". " + filename;
-            }
             if (!filename.endsWith(".mp3") && !filename.endsWith(".zip")) {
-                if (link.getPluginPatternMatcher().matches(TYPE_ALBUM)) {
+                if (link.getPluginPatternMatcher().matches(TYPE_ALBUM) || link.getPluginPatternMatcher().matches(TYPE_MIXTAPE)) {
                     filename += ".zip";
                 } else {
                     filename += ".mp3";
@@ -189,9 +182,6 @@ public class LiveMixTapesCom extends antiDDoSForHost {
             /* Only set final filename if not e.g. set previously in crawler. */
             if (link.getFinalFileName() == null) {
                 link.setFinalFileName(filename);
-            }
-            if (filesize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesize));
             }
         }
         return AvailableStatus.TRUE;
@@ -202,7 +192,7 @@ public class LiveMixTapesCom extends antiDDoSForHost {
             requestFileInformation(link, true);
             handleUserVerify();
             br.setFollowRedirects(false);
-            String dllink = null;
+            final String dllink;
             if (link.getPluginPatternMatcher().matches(TYPE_DIRECTLINK)) {
                 dllink = link.getPluginPatternMatcher();
             } else {
@@ -215,54 +205,20 @@ public class LiveMixTapesCom extends antiDDoSForHost {
                         throw new AccountRequiredException();
                     }
                 }
-                final String timeRemaining = br.getRegex("(?i)TimeRemaining\\s*=\\s*(\\d+);").getMatch(0);
-                if (timeRemaining != null) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not yet released, cannot download");
-                }
-                if (br.containsHTML("(?i)>\\s*This is a member only download")) {
-                    throw new AccountRequiredException();
-                }
-                Form dlform = br.getFormbyProperty("id", "downloadform");
-                if (dlform == null) {
-                    /* 2021-02-25: E.g. for single mp3 files */
-                    dlform = br.getFormbyProperty("id", "adfreedownload");
-                }
-                if (dlform == null) {
-                    logger.warning("Failed to find dlform");
+                final String download_id = br.getRegex("/images/share/(\\d+)").getMatch(0);
+                if (download_id == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final String action = br.getRegex("href\\s*=\\s*\"(/download/\\d+/.*?)\"").getMatch(0);
-                if (action != null) {
-                    dlform.setAction(action);
-                }
-                /* 2022-06-17: Captcha is required for single mp3 download but not for full album .zip download. */
-                if (dlform.containsHTML("g-recaptcha-response") && br.containsHTML("(?i)Captcha is not ready yet")) {
-                    final String waitStr = br.getRegex("wait\\s*=\\s*(\\d+)").getMatch(0);
-                    if (waitStr == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                    dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    long wait = Long.parseLong(waitStr);
-                    if (wait < 1000) {
-                        wait = wait * 1001;
-                    }
-                    final long passedTime = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
-                    wait -= passedTime;
-                    /* 2021-09-30: Pre download wait is skippable, at least for single songs */
-                    final boolean skipPreDownloadWait = true;
-                    if (!skipPreDownloadWait) {
-                        if (wait > 0) {
-                            sleep(wait, link);
-                        } else {
-                            logger.info("Captcha solving took longer than pre-download-wait :)");
-                        }
-                    }
-                }
-                this.submitForm(dlform);
-                dllink = br.getRedirectLocation();
+                final PostRequest download = br.createPostRequest(" https://api.livemixtapes.com/v3/mixtapes/" + download_id + "/download", "");
+                // can be found here _next/static/chunks/pages/_app-981b367ee1df430.js
+                download.getHeaders().put("X-Api-Key", "CUZD8nfMwMnjzzADA5U2acZPQW806lX9");
+                br.getPage(download);
+                final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                dllink = (String) response.get("download_url");
                 if (dllink == null) {
+                    if ("Unauthorized".equals(response.get("message"))) {
+                        throw new AccountRequiredException();
+                    }
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
