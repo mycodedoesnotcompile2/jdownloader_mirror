@@ -86,6 +86,9 @@ public class PluginBrowser<T extends Plugin> extends Browser {
         final class LocalHostChecker {
             public void check(final InetAddress remoteIP) throws IOException {
                 if (!remoteIP.isLoopbackAddress()) {
+                    if (remoteIP.isAnyLocalAddress()) {
+                        throw new BlockedByException(request, GenericSupportedBlockTypes.GENERIC_LOCALHOST_DNS);
+                    }
                     return;
                 }
                 {

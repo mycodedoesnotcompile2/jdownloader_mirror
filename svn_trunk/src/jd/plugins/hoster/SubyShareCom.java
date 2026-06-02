@@ -25,11 +25,6 @@ import java.util.concurrent.TimeUnit;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -45,7 +40,12 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51855 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -277,8 +277,13 @@ public class SubyShareCom extends XFileSharingProBasic {
     public boolean isPasswordProtectedHTML(final Browser br, final Form pwForm) {
         /* 2020-02-17: Special */
         boolean pwprotected = super.isPasswordProtectedHTML(br, pwForm);
+        pwprotected = false;
         if (!pwprotected) {
-            pwprotected = br.containsHTML("><b>\\s*Password\\s*</b>");
+            // same for more languages
+            pwprotected = br.containsHTML("placeholder\\s*=\\s*\"Put File's Password\"");
+            if (!pwprotected) {
+                pwprotected = br.containsHTML("><b>\\s*(Password|密码|mot de passe|Mật khẩu|пароля)\\s*</b>");
+            }
         }
         return pwprotected;
     }

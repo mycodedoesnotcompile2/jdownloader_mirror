@@ -56,7 +56,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52838 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -230,6 +230,8 @@ public class TorboxApp extends UseNet {
                 query_checkcached.appendEncoded("hash", hash);
                 query_checkcached.appendEncoded("format", "object");
                 /* 2024-06-13: Use this for now to avoid problems with outdated response from this API call. */
+                // TODO: can cause many requests to /webdl/createwebdownload which are limited to 60 per hour
+                // we should store hash and file_id and recheck on this instead of new /webdl/createwebdownload
                 query_checkcached.appendEncoded("bypass_cache", "true");
                 final Request req_checkcached = br.createGetRequest(API_BASE + "/webdl/checkcached?" + query_checkcached.toString());
                 final Object resp_checkcached = this.callAPI(br, req_checkcached, account, link);

@@ -48,7 +48,7 @@ import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 52856 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -90,12 +90,24 @@ public class DdownloadCom extends XFileSharingProBasic {
 
     @Override
     protected long parseSize(Size type, String string) {
+        /**
+         * You're right. Internally we format file sizes using binary units (1024-based), even though the label reads "MB". The display
+         * function divides bytes by 1,024 for KB, by 1,048,576 (1024²) for MB, and by 1024³ for GB — so our "MB" is effectively MiB.
+         *
+         * Your example confirms it: 1,069,547,520 ÷ 1,048,576 = exactly 1020.0, which is why the site shows "1020 MB".
+         *
+         * So please switch the plugin to binary units (1024 / MiB), not decimal (1000 / MB).
+         */
         switch (type) {
-        case FILE:
-            // 1020MB shown but file is 1060Mbyte, so looks like MB is MiB
-            return SizeFormatter.getSize(string, true, false);
+        case TRAFFIC: {
+            final long ret = SizeFormatter.getSize(null, string, true, true);
+            if (ret == -1) {
+                return 0;
+            }
+            return ret;
+        }
         default:
-            return super.parseSize(type, string);
+            return SizeFormatter.getSize(null, string, true, false);
         }
     }
 
@@ -338,10 +350,10 @@ public class DdownloadCom extends XFileSharingProBasic {
         /* 2026-01-26: Still broken */
         if (trafficleftStr != null && trafficleftStr.matches("\\d+")) {
             final boolean trustAPITrafficLeft = false;
-            long traffic_left = SizeFormatter.getSize(trafficleftStr + "MB");
+            long traffic_left = parseSize(Size.TRAFFIC, trafficleftStr + "MB");
             final String premium_extra_trafficStr = PluginJSonUtils.getJson(brc, "premium_traffic_left");
             if (premium_extra_trafficStr != null && premium_extra_trafficStr.matches("\\d+")) {
-                final long premium_extra_traffic = SizeFormatter.getSize(premium_extra_trafficStr + "MB");
+                final long premium_extra_traffic = parseSize(Size.TRAFFIC, premium_extra_trafficStr + "MB");
                 if (premium_extra_traffic > 0) {
                     traffic_left += premium_extra_traffic;
                     if (ai.getStatus() != null) {
@@ -406,7 +418,7 @@ public class DdownloadCom extends XFileSharingProBasic {
             logger.warning("Special trafficleft regexes failed -> Website has changed?"); /* Fallback to template handling */
             final String trafficleftStr = super.regExTrafficLeft(br);
             if (trafficleftStr != null) {
-                ai.setTrafficLeft(SizeFormatter.getSize(trafficleftStr, true, true));
+                ai.setTrafficLeft(parseSize(Size.TRAFFIC, trafficleftStr));
             }
         }
         if (ai.getTrafficLeft() > 0) {

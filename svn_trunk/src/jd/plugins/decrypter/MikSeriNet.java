@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49678 $", interfaceVersion = 2, names = { "mikseri.net" }, urls = { "https?://(?:www\\.)?mikseri\\.net/(artists/[^/]+/[^/]+/\\d+/|artists/\\?id=\\d+|artists/[^\"\\']+\\.\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 52865 $", interfaceVersion = 2, names = { "mikseri.net" }, urls = { "https?://(?:www\\.)?mikseri\\.net/(artists/[^/]+/[^/]+/\\d+/|artists/\\?id=\\d+|artists/[^\"\\']+\\.\\d+)" })
 public class MikSeriNet extends PluginForDecrypt {
     public MikSeriNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +119,7 @@ public class MikSeriNet extends PluginForDecrypt {
         final String songName = br.getRegex("<SongName><\\!\\[CDATA\\[([^<>\"]*?)\\]\\]>").getMatch(0);
         final String songId = br.getRegex("<SongId>([^<>\"]*?)</SongId>").getMatch(0);
         final String minutesStr = br.getRegex("<Minutes>(\\d+)</Minutes>").getMatch(0);
-        final String secondsStr = br.getRegex("<Minutes>(\\d+)</Minutes>").getMatch(0);
+        final String secondsStr = br.getRegex("<Seconds>(\\d+)</Seconds>").getMatch(0);
         final String bitrateStr = br.getRegex("<BitRate>(\\d+)</BitRate>").getMatch(0);
         if (songName != null && songId != null) {
             song.setFinalFileName(songId + "." + songName + ".mp3");

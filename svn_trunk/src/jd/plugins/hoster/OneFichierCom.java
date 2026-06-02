@@ -38,6 +38,40 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.BasicAuthentication;
+import jd.http.BearerAuthentication;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -69,40 +103,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.BasicAuthentication;
-import jd.http.BearerAuthentication;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.download.HashInfo;
-import jd.plugins.download.HashInfo.TYPE;
-import net.miginfocom.swing.MigLayout;
-
-@HostPlugin(revision = "$Revision: 52740 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -207,6 +208,7 @@ public class OneFichierCom extends PluginForHost {
         }
         setPremiumAPIHeaders(br, apiKey);
     }
+
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
     // @Override
     // public LazyPlugin.FEATURE[] getFeatures() {
@@ -214,12 +216,12 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public void init() {
-        setRequestIntervalLimits();
+        setRequestIntervalLimits(this);
     }
 
-    public static void setRequestIntervalLimits() {
+    public static void setRequestIntervalLimits(Plugin plugin) {
         /** 2021-02-10: We use 2500ms as default, 1 request per second is also fine according to admin. */
-        final OneFichierConfigInterface cfg = PluginJsonConfig.get(OneFichierConfigInterface.class);
+        final OneFichierConfigInterface cfg = plugin.get(OneFichierConfigInterface.class);
         Browser.setRequestIntervalLimitGlobal("1fichier.com", cfg.getGlobalRequestIntervalLimit1fichierComMilliseconds());
         Browser.setRequestIntervalLimitGlobal("api.1fichier.com", true, cfg.getGlobalRequestIntervalLimitAPI1fichierComMilliseconds());
     }
@@ -236,7 +238,7 @@ public class OneFichierCom extends PluginForHost {
              * Max total connections for premium = 30 (RE: admin, updated 07.03.2019) --> See also their FAQ:
              * https://1fichier.com/hlp.html#dllent
              */
-            int maxChunks = PluginJsonConfig.get(this.getConfigInterface()).getMaxPremiumChunks();
+            int maxChunks = get(this.getConfigInterface()).getMaxPremiumChunks();
             if (maxChunks == 1) {
                 maxChunks = 1;
             } else if (maxChunks < 1 || maxChunks >= 20) {
@@ -253,7 +255,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     private String getURLWithPreferredProtocol(String url) {
-        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final OneFichierConfigInterface cfg = get(this.getConfigInterface());
         final SSLMode sslmode = cfg.getSSLMode();
         if (sslmode == SSLMode.AUTO) {
             /* Do not modify URL */
@@ -375,9 +377,8 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br>
-                 * 1. It is still working. </br>
-                 * 2. It is the only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
+                 * only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -723,7 +724,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     private void errorHandlingWebsite(final DownloadLink link, final Account account, final Browser br) throws Exception {
-        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final OneFichierConfigInterface cfg = get(this.getConfigInterface());
         final int responsecode = br.getHttpConnection().getResponseCode();
         if (br.containsHTML(">\\s*File not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -774,6 +775,28 @@ public class OneFichierCom extends PluginForHost {
             logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
             throw new AccountInvalidException("Account is not premium anymore");
         } else if (account != null && br.containsHTML(">\\s*Usage of professional services is restricted and requires usage of CDN credits") && !this.isUsingCDNCredits(account)) {
+            errorVPNUsed(account);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (account != null && (br.containsHTML("professional infrastructure detected") || br.containsHTML(">\\s*This IP address has been identified as belonging to a server, proxy, VPN, relay network, or associated with abusive activity.\\s*<"))) {
+            /**
+             * <div class="bloc2"> IP Address xxx.xxx.xxx.xxx : Accès restreint – professional infrastructure detected.<br/>
+             * <br/>
+             * This IP address has been identified as belonging to a server, proxy, VPN, relay network, or associated with abusive activity.<br/>
+             * <br/>
+             * <b>Premium</b> plans are reserved for <b>private, non-shared residential Internet connections</b>.<br/>
+             * <br/>
+             * Exception: certain IP addresses belonging to <b>commercial VPN providers identified by our partner</b> may be allowed only
+             * with the <b>Premium GOLD</b> plan.<br/>
+             * <br/>
+             * For access via servers, proxies, or other professional network infrastructures, please use <b>CDN Credits</b>.<br/>
+             * <br/>
+             * This option is available in the <b>"Parameters"</b> tab of your management interface.<br/>
+             * <br/>
+             * If you are using an unauthorized personal VPN, please disable it and reload the page. <span class="spacer spacer-20"></span>
+             *
+             * </div>
+             */
             errorVPNUsed(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -854,7 +877,7 @@ public class OneFichierCom extends PluginForHost {
         // You can wait for a slot to become available,<br/>
         // or <a href="/register.pl">👉<strong>Sign in for free to access more slots immediately</strong></a><br/>
         // You will also be able to save this file to your account and download it later.
-        final OneFichierConfigInterface cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final OneFichierConfigInterface cfg = get(this.getConfigInterface());
         final long waitMillis = cfg.getNoFreeSlotsWaitMinutes() * 60 * 1000;
         if (account != null) {
             if (AccountType.FREE != account.getType()) {
@@ -878,8 +901,8 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br>
-     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
+     * required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -1489,7 +1512,7 @@ public class OneFichierCom extends PluginForHost {
         } else {
             final long knownDownloadSize = link.getKnownDownloadSize();
             if (knownDownloadSize <= 50 * 1024 * 1024) {
-                final int wait = PluginJsonConfig.get(OneFichierConfigInterface.class).getSmallFilesWaitIntervalSeconds();
+                final int wait = get(OneFichierConfigInterface.class).getSmallFilesWaitIntervalSeconds();
                 /* Small file or big file but only some bytes remaining -> Avoid IP block because of too many downloads in short time */
                 return Math.max(0, wait * 1000);
             } else {
@@ -1540,8 +1563,8 @@ public class OneFichierCom extends PluginForHost {
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
-         * 2021-01-29: Removed this because if login/API is blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login/API is
+         * blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         if (checkFileInfoBeforeDownloadAttempt) {
@@ -1559,7 +1582,7 @@ public class OneFichierCom extends PluginForHost {
         final Map<String, Object> postdata = new HashMap<String, Object>();
         postdata.put("url", this.getContentURL(link));
         postdata.put("pass", passCode);
-        postdata.put("no_ssl", PluginJsonConfig.get(OneFichierConfigInterface.class).getSSLMode() == SSLMode.FORCE_HTTP ? 1 : 0);
+        postdata.put("no_ssl", get(OneFichierConfigInterface.class).getSSLMode() == SSLMode.FORCE_HTTP ? 1 : 0);
         performAPIRequest(API_BASE + "/download/get_token.cgi", JSonStorage.serializeToJson(postdata));
         final Map<String, Object> entries = handleErrorsAPI(account);
         /* 2019-04-04: Downloadlink is officially only valid for 5 minutes */

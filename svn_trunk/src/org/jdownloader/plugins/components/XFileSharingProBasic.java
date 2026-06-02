@@ -93,7 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52856 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -883,7 +883,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      *         false: Link is not password protected
      */
     public boolean isPasswordProtectedHTML(final Browser br, final Form pwForm) {
-        final String pattern = "<br>\\s*<b>\\s*Passwor(d|t)\\s*:\\s*</b>\\s*(<input|</div)";
+        final String pattern = "<br>\\s*<b>\\s*Passwor(d|t)\\s*:?\\s*</b>\\s*(<input|</div)";
         boolean ret = br.containsHTML(pattern);
         if (ret) {
             /* Double-check in cleaned HTML */
@@ -5297,9 +5297,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /* Set cookies on all known domains */
     private void setCookies(final Browser br, final Cookies cookies) {
+        cookies.remove("lang");
         br.setCookies(cookies);
         for (final String domain : siteSupportedNames()) {
             br.setCookies(domain, cookies);
+            // set/override lang cookies
+            br.setCookie(domain, "lang", "english");
         }
     }
 

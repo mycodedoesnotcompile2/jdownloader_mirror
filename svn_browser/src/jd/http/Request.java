@@ -1031,7 +1031,7 @@ public abstract class Request {
 
     public boolean containsHTML(final String regex) {
         final String htmlCode = this.getHtmlCode(false);
-        return htmlCode != null && new Regex(htmlCode, regex).matches();
+        return htmlCode != null && new Regex(htmlCode, regex).patternFind();
     }
 
     public Regex getRegex(final Pattern pattern) {

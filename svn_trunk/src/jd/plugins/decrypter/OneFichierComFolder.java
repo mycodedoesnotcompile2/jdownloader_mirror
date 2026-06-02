@@ -19,9 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.AccountFilter;
@@ -39,12 +36,17 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.OneFichierCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51634 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@DecrypterPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { OneFichierCom.class })
 public class OneFichierComFolder extends PluginForDecrypt {
     public OneFichierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +62,7 @@ public class OneFichierComFolder extends PluginForDecrypt {
 
     @Override
     public void init() {
-        OneFichierCom.setRequestIntervalLimits();
+        OneFichierCom.setRequestIntervalLimits(this);
     }
 
     @Override
@@ -85,8 +87,7 @@ public class OneFichierComFolder extends PluginForDecrypt {
         Account account = null;
         /**
          * 2019-04-05: Folder support via API does not work (serverside) as it requires us to have the internal folder-IDs which we do not
-         * have! </br>
-         * Basically their folder API call is only for internal folders of the current user -> Not useful for us! See also:
+         * have! </br> Basically their folder API call is only for internal folders of the current user -> Not useful for us! See also:
          * https://1fichier.com/api.html
          */
         final boolean internal_allow_api_usage_in_crawler = false;

@@ -21,6 +21,7 @@ import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
@@ -30,13 +31,14 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 52616 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -162,10 +164,12 @@ public class UploadyIo extends XFileSharingProBasic {
          * 2024-06-17: Disabled for now as the captcha is now happening after the wait time also it's now hCaptcha instead of reCaptchaV2.
          */
         final Browser br3 = br.cloneBrowser();
+        GetRequest fetch = br3.createGetRequest("?start_countdown=1");
+        fetch.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");// default on fetch/required to get json response
         /* Wait time is counting serverside now */
-        getPage(br3, br._getURL().getPath() + "?start_countdown=1");
+        sendRequest(br3, fetch);
         final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-        final Map<String, Object> entries = restoreFromString(br3.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(fetch.getHtmlCode(), TypeRef.MAP);
         // final String innerhtml = (String) entries.get("ihtml");
         final String rand = entries.get("rand").toString();
         download1.put("rand", Encoding.urlEncode(rand));
