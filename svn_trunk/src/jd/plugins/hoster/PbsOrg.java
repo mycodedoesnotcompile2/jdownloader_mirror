@@ -16,12 +16,8 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -37,7 +33,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49350 $", interfaceVersion = 2, names = { "pbs.org" }, urls = { "https?://video\\.pbs\\.org/video/\\d+|https?://(?:www\\.)?pbs\\.org/.+|https?://player\\.pbs\\.org/[a-z]+/\\d+" })
+import org.jdownloader.downloader.hls.HLSContent;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 52872 $", interfaceVersion = 2, names = { "pbs.org" }, urls = { "https?://video\\.pbs\\.org/video/\\d+|https?://(?:www\\.)?pbs\\.org/.+|https?://player\\.pbs\\.org/[a-z]+/\\d+" })
 public class PbsOrg extends PluginForHost {
     @SuppressWarnings("deprecation")
     public PbsOrg(PluginWrapper wrapper) {
@@ -218,7 +222,7 @@ public class PbsOrg extends PluginForHost {
         /* Find available streaming formats/protocols */
         String url_http = null;
         String url_hls_base = null;
-        String best_url = null;
+        Object best = null;
         int bestHeight = -1;
         int bestBandwidth = -1;
         final String[] urls = this.br.getRegex("(https?://urs\\.pbs\\.org/redirect/[^<>\"\\']+)").getColumn(0);
@@ -235,12 +239,13 @@ public class PbsOrg extends PluginForHost {
                         brc.getPage(redirect);
                         handleResponsecodeErrors(brc.getHttpConnection());
                         final HlsContainer hlsBest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(brc));
-                        if (hlsBest != null) {
-                            if (bestHeight == -1 && (hlsBest.getHeight() > bestHeight || (hlsBest.getHeight() == bestHeight && hlsBest.getBandwidth() > bestBandwidth))) {
-                                bestHeight = hlsBest.getHeight();
-                                best_url = redirect;
-                                bestBandwidth = hlsBest.getBandwidth();
-                            }
+                        if (hlsBest == null) {
+                            continue;
+                        }
+                        if (bestHeight == -1 && (hlsBest.getHeight() > bestHeight || (hlsBest.getHeight() == bestHeight && hlsBest.getBandwidth() > bestBandwidth))) {
+                            bestHeight = hlsBest.getHeight();
+                            best = hlsBest;
+                            bestBandwidth = hlsBest.getBandwidth();
                         }
                     } else if (redirect.contains(".mp4") && url_http == null) {
                         url_http = redirect;
@@ -248,7 +253,7 @@ public class PbsOrg extends PluginForHost {
                         final int height = heightString != null ? Integer.parseInt(heightString) : -1;
                         if (bestHeight == -1 || height >= bestHeight) {
                             bestHeight = height;
-                            best_url = redirect;
+                            best = redirect;
                         }
                     }
                 } catch (final Throwable e) {
@@ -261,16 +266,38 @@ public class PbsOrg extends PluginForHost {
         }
         this.br.setFollowRedirects(true);
         /* prefer highest resolution but mp4 over hls for highest */
-        if ((url_http == null && url_hls_base != null) || StringUtils.equals(url_hls_base, best_url)) {
-            br.getPage(url_hls_base);
-            handleResponsecodeErrors(this.br.getHttpConnection());
-            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
-            if (hlsbest == null) {
+        if ((url_http == null && url_hls_base != null) || best instanceof HlsContainer) {
+            checkFFmpeg(link, "Download a HLS Stream");
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(true);
+            if (!(best instanceof HlsContainer)) {
+                brc.getPage(url_hls_base);
+                handleResponsecodeErrors(brc.getHttpConnection());
+                best = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(brc));
+            }
+            if (best == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final String url_hls = hlsbest.getDownloadurl();
-            checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, this.br, url_hls);
+            final HlsContainer bestContainer = (HlsContainer) best;
+            final List<M3U8Playlist> m3u8 = bestContainer.getM3U8(brc.cloneBrowser());
+            if (m3u8.size() != 1) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final HLSContent hlsContent = new HLSContent(m3u8.get(0));
+            final List<MEDIA> audioMedias = bestContainer.getMedia(TYPE.AUDIO, bestContainer.getAudioGroupID());
+            for (MEDIA audioMedia : audioMedias) {
+                final List<M3U8Playlist> audioM3U8 = audioMedia.loadM3U8(brc.cloneBrowser());
+                if (audioM3U8 == null) {
+                    continue;
+                } else if (audioM3U8.size() != 1) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                logger.info("Add media:" + audioMedia);
+                hlsContent.addAudioTrack(audioM3U8.get(0));
+            }
+            final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
+            hlsContents.add(hlsContent);
+            dl = new HLSDownloader(link, brc, hlsContents);
             dl.startDownload();
         } else {
             dl = jd.plugins.BrowserAdapter.openDownload(this.br, link, url_http, true, 0);

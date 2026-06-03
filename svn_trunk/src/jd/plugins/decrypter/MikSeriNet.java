@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52865 $", interfaceVersion = 2, names = { "mikseri.net" }, urls = { "https?://(?:www\\.)?mikseri\\.net/(artists/[^/]+/[^/]+/\\d+/|artists/\\?id=\\d+|artists/[^\"\\']+\\.\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 52872 $", interfaceVersion = 2, names = { "mikseri.net" }, urls = { "https?://(?:www\\.)?mikseri\\.net/(artists/[^/]+/[^/]+/\\d+/|artists/\\?id=\\d+|artists/[^\"\\']+\\.\\d+)" })
 public class MikSeriNet extends PluginForDecrypt {
     public MikSeriNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,6 +44,8 @@ public class MikSeriNet extends PluginForDecrypt {
         String anID = new Regex(contenturl, "mikseri\\.net/artists/[^\"\\']+\\.(\\d+)").getMatch(0);
         if (anID != null) {
             contenturl = "https://www." + getHost() + "/artists/?id=" + anID;
+        } else {
+            contenturl = contenturl.replaceFirst("(?i)http://", "https://");
         }
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -113,7 +115,7 @@ public class MikSeriNet extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (!finallink.startsWith("http")) {
-            finallink = "http:" + finallink;
+            finallink = br.getURL(finallink).toExternalForm();
         }
         final DownloadLink song = createDownloadlink(DirectHTTP.createURLForThisPlugin(finallink));
         final String songName = br.getRegex("<SongName><\\!\\[CDATA\\[([^<>\"]*?)\\]\\]>").getMatch(0);

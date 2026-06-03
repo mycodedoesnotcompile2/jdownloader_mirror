@@ -25,6 +25,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -58,7 +59,7 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHos
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52854 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52872 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     private static final String          PROTOCOL = "https://";
     /** This is the old project of proleech.link owner */
@@ -291,7 +292,10 @@ public class DailyleechCom extends PluginForHost {
             logger.info("Failed to find any result");
             return null;
         } else {
-            return foundMyFiles[1];
+            String ret = foundMyFiles[1];
+            // cookies can be https only, so upgrade http URL
+            ret = ret.replaceFirst("(?)^ihttp://", Matcher.quoteReplacement(br._getURL().getProtocol() + "://"));
+            return ret;
         }
     }
 

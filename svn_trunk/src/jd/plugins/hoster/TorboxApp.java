@@ -23,6 +23,21 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.notify.gui.BubbleNotifyConfig.BubbleNotifyEnabledState;
+import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -41,22 +56,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.notify.gui.BubbleNotifyConfig.BubbleNotifyEnabledState;
-import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52871 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -69,6 +69,8 @@ public class TorboxApp extends UseNet {
     public static final String           PROPERTY_DOWNLOAD_TYPE_torrents                          = "torrents";
     public static final String           PROPERTY_DOWNLOAD_TYPE_web_downloads                     = "web_downloads";
     public static final String           PROPERTY_DOWNLOAD_TYPE_usenet_downloads                  = "usenet_downloads";
+    private static final String          PROPERTY_MULTIHOST_FILE_ID                               = "torbox_handlemultihost_file_id";
+    private static final String          PROPERTY_MULTIHOST_HASH                                  = "torbox_handlemultihost_hash";
     private final String                 PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP = "notifications_displayed_until_timestamp";
     private final String                 PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET                    = "max_downloads_usenet";
     private final String                 PROPERTY_ACCOUNT_USENET_USERNAME                         = "usenetU";
@@ -124,8 +126,8 @@ public class TorboxApp extends UseNet {
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
         /**
-         * 2024-06-12: Max 16 total connections according to admin. </br> We'll be doing it this way right know, knowing that the user can
-         * easily try to exceed that limit with JDownloader.
+         * 2024-06-12: Max 16 total connections according to admin. </br>
+         * We'll be doing it this way right know, knowing that the user can easily try to exceed that limit with JDownloader.
          */
         return -16;
     }
@@ -197,10 +199,62 @@ public class TorboxApp extends UseNet {
         final String directlinkproperty = this.getPropertyKey("directlink");
         String storedDirecturl = link.getStringProperty(directlinkproperty);
         final String dllink;
-        if (storedDirecturl != null) {
-            logger.info("Trying to re-use stored directurl: " + storedDirecturl);
-            dllink = storedDirecturl;
-        } else {
+        find_direct_download_link: {
+            if (storedDirecturl != null) {
+                logger.info("Trying to re-use stored directurl: " + storedDirecturl);
+                dllink = storedDirecturl;
+                break find_direct_download_link;
+            }
+            String file_id = link.getStringProperty(PROPERTY_MULTIHOST_FILE_ID);
+            String hash = link.getStringProperty(PROPERTY_MULTIHOST_HASH);
+            webdownloadCheck: if (file_id != null && hash != null) {
+                /** Optional step: Checks server side download status */
+                logger.info("Checking webdownload status of internal file_id: " + file_id + " | hash: " + hash);
+                final UrlQuery query_checkcached = new UrlQuery();
+                query_checkcached.appendEncoded("bypass_cache", "false");
+                query_checkcached.appendEncoded("id", file_id);
+                final Request req_checkcached = br.createGetRequest(API_BASE + "/webdl/mylist?" + query_checkcached.toString());
+                final Map<String, Object> resp;
+                try {
+                    resp = (Map<String, Object>) this.callAPI(br, req_checkcached, account, link);
+                } catch (final PluginException pe) {
+                    /* Ugly but simple check for special case */
+                    if (StringUtils.containsIgnoreCase(pe.getMessage(), "Failed to retrieve web downloads list")) {
+                        /**
+                         * This can happen if: <br>
+                         * - Torbox server side deletes a web download for some reason - The user deletes a web download item and afterwards
+                         * it is re-tries in JDownloader with the now outdated cached web download file_id <br>
+                         * - Maybe also for very very old items in the download list where the web download item has been deleted server
+                         * side due to inactivitys
+                         */
+                        link.removeProperty(PROPERTY_MULTIHOST_FILE_ID);
+                        link.removeProperty(PROPERTY_MULTIHOST_HASH);
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download has been deleted, try again later", 1 * 60 * 1000l);
+                    }
+                    throw pe;
+                }
+                if (Boolean.TRUE.equals(resp.get("download_finished"))) {
+                    logger.info("Server side download is finished -> Download should work");
+                    break webdownloadCheck;
+                }
+                final Number eta_seconds = (Number) resp.get("eta");
+                String eta_str = "Undefined";
+                final int wait_seconds_min = 15;
+                int wait_seconds = wait_seconds_min;
+                if (eta_seconds != null) {
+                    eta_str = eta_seconds.intValue() + " Seconds";
+                    wait_seconds = Math.max(wait_seconds_min, eta_seconds.intValue());
+                }
+                final Number progress = (Number) resp.get("progress");
+                final String progress_percent_str = progress != null ? String.format("%.2f%%", progress.doubleValue() * 100) : "Unknown";
+                final String download_state = (String) resp.get("download_state");
+                // TODO: Implement other states to have nicer error messages
+                if (StringUtils.equalsIgnoreCase(download_state, "downloading")) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is in progress | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is not yet ready, state: " + download_state + " | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
+                }
+            }
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
             if (!StringUtils.isEmpty(link.getDownloadPassword())) {
@@ -209,50 +263,12 @@ public class TorboxApp extends UseNet {
             final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", query);
             final Map<String, Object> entries = (Map<String, Object>) this.callAPI(br, req_createwebdownload, account, link);
             /**
-             * These two strings can be used to identify the unique item/link we just added. </br> We could cache them but instead we will
-             * simply rely on the API to do this for us. </br> Once a download was started successfully we save- and re-use the direct-URL,
-             * that should be enough - we do not want to overcomplicate things.
+             * These two strings can be used to identify the unique item/link we just added.
              */
-            final String file_id = entries.get("webdownload_id").toString();
-            final String hash = entries.get("hash").toString();
-            /*
-             * 2024-06-13: Disabled this handling.
-             */
-            cacheCheck: if (true) {
-                /* Optional step */
-                final boolean doCachecheck = false;
-                if (!doCachecheck) {
-                    break cacheCheck;
-                }
-                /* Some items need to be cached before they can be downloaded -> Check cache status */
-                logger.info("Checking downloadability of internal file_id: " + file_id + " | hash: " + hash);
-                final UrlQuery query_checkcached = new UrlQuery();
-                query_checkcached.appendEncoded("hash", hash);
-                query_checkcached.appendEncoded("format", "object");
-                /* 2024-06-13: Use this for now to avoid problems with outdated response from this API call. */
-                // TODO: can cause many requests to /webdl/createwebdownload which are limited to 60 per hour
-                // we should store hash and file_id and recheck on this instead of new /webdl/createwebdownload
-                query_checkcached.appendEncoded("bypass_cache", "true");
-                final Request req_checkcached = br.createGetRequest(API_BASE + "/webdl/checkcached?" + query_checkcached.toString());
-                final Object resp_checkcached = this.callAPI(br, req_checkcached, account, link);
-                Map<String, Object> cachemap = null;
-                if (resp_checkcached instanceof Map) {
-                    cachemap = (Map<String, Object>) ((Map<String, Object>) resp_checkcached).get(hash);
-                } else {
-                    /* Assume we got a list -> Find cache-map */
-                    final List<Map<String, Object>> cacheitems = (List<Map<String, Object>>) resp_checkcached;
-                    for (final Map<String, Object> cacheitem : cacheitems) {
-                        final String thishash = cacheitem.get("hash").toString();
-                        if (thishash.equals(hash)) {
-                            cachemap = cacheitem;
-                            break;
-                        }
-                    }
-                }
-                if (cachemap == null) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverside download is not yet ready", 30 * 1000);
-                }
-            }
+            file_id = entries.get("webdownload_id").toString();
+            hash = entries.get("hash").toString();
+            link.setProperty(PROPERTY_MULTIHOST_FILE_ID, file_id);
+            link.setProperty(PROPERTY_MULTIHOST_HASH, hash);
             logger.info("Trying to init download for internal file_id: " + file_id + " | hash: " + hash);
             final UrlQuery query_requestdl = new UrlQuery();
             query_requestdl.appendEncoded("token", this.getApikey(account));
@@ -285,8 +301,8 @@ public class TorboxApp extends UseNet {
     }
 
     /**
-     * Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. </br> 2024-11-12: Problems have been fixed server
-     * side so this workaround should not be needed anymore.
+     * Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. </br>
+     * 2024-11-12: Problems have been fixed server side so this workaround should not be needed anymore.
      */
     private String fixDateString(final String dateStr) {
         /* 2024-07-10: They sometimes even return timestamps with 5 digits milli/nanosecs e.g.: 2024-07-05T13:57:33.76273+00:00 */
@@ -325,8 +341,8 @@ public class TorboxApp extends UseNet {
         /* Use shorter timeout than usually to make notification system work in a better way (see end of this function). */
         account.setRefreshTimeout(5 * 60 * 1000l);
         /**
-         * In GUI, used only needs to enter API key so we'll set the username for him here. </br> This is also important to be able to keep
-         * the user from adding the same account multiple times.
+         * In GUI, used only needs to enter API key so we'll set the username for him here. </br>
+         * This is also important to be able to keep the user from adding the same account multiple times.
          */
         account.setUser(user.get("email").toString());
         /* 0 = free, 1 = standard, 2 = pro */
@@ -681,5 +697,12 @@ public class TorboxApp extends UseNet {
         } else {
             return Integer.MAX_VALUE;
         }
+    }
+
+    @Override
+    public void resetDownloadlink(final DownloadLink link) {
+        link.removeProperty(PROPERTY_MULTIHOST_FILE_ID);
+        link.removeProperty(PROPERTY_MULTIHOST_HASH);
+        super.resetDownloadlink(link);
     }
 }

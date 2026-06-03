@@ -15,9 +15,13 @@
 package jd.gui.swing.laf;
 
 import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -28,6 +32,8 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 
+import jd.SecondLevelLaunch;
+
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -37,6 +43,7 @@ import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.synthetica.SyntheticaHelper;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
@@ -56,8 +63,6 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.gui.LAFOptions;
 import org.jdownloader.updatev2.gui.LookAndFeelType;
-
-import jd.SecondLevelLaunch;
 
 public class LookAndFeelController implements LAFManagerInterface {
     private static final LookAndFeelController INSTANCE = new LookAndFeelController();
@@ -171,6 +176,62 @@ public class LookAndFeelController implements LAFManagerInterface {
         }
     }
 
+    private void addJarsToClasspath(List<File> jars) throws IOException {
+        if (jars == null || jars.size() == 0) {
+            return;
+        }
+        final class ClassPathChecker {
+            public boolean isJarInClasspath(String jarName) {
+                try {
+                    final ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                    final Enumeration<URL> urls = classLoader.getResources("META-INF/");
+                    while (urls.hasMoreElements()) {
+                        final URL url = urls.nextElement();
+                        if (url.toString().contains(jarName)) {
+                            return true;
+                        }
+                    }
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+                return false;
+            }
+        }
+        final ClassPathChecker cpc = new ClassPathChecker();
+        // copy the libs to a tmp dir. we do not want to block them
+        for (final File jar : jars) {
+            if (!jar.isFile()) {
+                continue;
+            } else if (cpc.isJarInClasspath(jar.getName())) {
+                continue;
+            }
+            logger.info("Add to classpath: " + jar);
+            final String rel = Files.getRelativePath(Application.getTemp().getParentFile(), jar);
+            // we use the timestamp here. this might result in problems on linux and mac systems
+            final File tmp = new File(Application.getTempResource("synthlibs"), rel + ".ts" + jar.lastModified());
+            if (!tmp.exists()) {
+                try {
+                    // cleanup old versions
+                    if (tmp.getParentFile().exists()) {
+                        for (final File f : tmp.getParentFile().listFiles(new FileFilter() {
+                            @Override
+                            public boolean accept(final File pathname) {
+                                return pathname.getName().startsWith(jar.getName() + ".ts");
+                            }
+                        })) {
+                            f.delete();
+                        }
+                    }
+                } catch (final Exception e) {
+                    logger.log(e);
+                }
+                tmp.getParentFile().mkdirs();
+                IO.copyFile(jar, tmp);
+            }
+            Application.addUrlToClassPath(tmp.toURI().toURL(), LookAndFeelController.class.getClassLoader());
+        }
+    }
+
     /**
      * setups the correct Look and Feel
      */
@@ -193,6 +254,22 @@ public class LookAndFeelController implements LAFManagerInterface {
                 final String customLookAndFeel = config.getCustomLookAndFeelClass();
                 if (StringUtils.isNotEmpty(customLookAndFeel)) {
                     try {
+                        // copy the libs to a tmp dir. we do not want to block them
+                        final File[] lafFiles = Application.getResource("libs/laf/").listFiles();
+                        if (lafFiles != null) {
+                            try {
+                                final ArrayList<File> jars = new ArrayList<File>();
+                                for (final File file : lafFiles) {
+                                    final String name = file.getName();
+                                    if (file.isFile() && name.endsWith(".jar") && !name.startsWith("synthetica")) {
+                                        jars.add(file);
+                                    }
+                                }
+                                addJarsToClasspath(jars);
+                            } catch (Throwable e) {
+                                logger.log(e);
+                            }
+                        }
                         Class.forName(customLookAndFeel);
                         laf = customLookAndFeel;
                     } catch (Throwable e) {

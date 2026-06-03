@@ -1180,7 +1180,14 @@ public class CompiledFiletypeFilter {
                 return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
             }
         },
-        DNG,
+        DNG {
+            private final Pattern pattern = Pattern.compile("(?i)image/(dng|(?:x-)?raw-adobe|(?:x-)?adobe-dng)");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
         GPR,
         EPS {
             private final Pattern pattern = Pattern.compile("(?i)application/postscript");
@@ -1254,6 +1261,22 @@ public class CompiledFiletypeFilter {
             }
         },
         CUR,
+        CR2 {
+            private final Pattern pattern = Pattern.compile("(?i)image/((?:x-)?canon-cr2|cr2)");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
+        CR3 {
+            private final Pattern pattern = Pattern.compile("(?i)image/((?:x-)?canon-cr3|cr3)");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
         WEBP {
             private final Pattern pattern = Pattern.compile("(?i)image/webp");
 

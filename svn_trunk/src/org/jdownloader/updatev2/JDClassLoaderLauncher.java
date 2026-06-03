@@ -68,6 +68,7 @@ public class JDClassLoaderLauncher {
             }
         }
 
+        @Override
         public void addURL(URL url) {
             super.addURL(url);
         }

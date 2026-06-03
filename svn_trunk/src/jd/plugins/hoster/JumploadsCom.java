@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52866 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -188,7 +188,7 @@ public class JumploadsCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         br.getPage(link.getPluginPatternMatcher());
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (is_file_offline_html(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -445,22 +445,25 @@ public class JumploadsCom extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private void login(final Account account, final boolean force) throws Exception {
+    private void login(final Account account, final boolean validate) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             final String path_userinfo = "/drive/";
+            final String url_userinfo = "https://www." + this.getHost() + path_userinfo;
             if (cookies != null) {
-                this.br.setCookies(this.getHost(), cookies);
-                br.getPage("https://www." + this.getHost() + path_userinfo);
+                br.setCookies(cookies);
+                if (!validate) {
+                    return;
+                }
+                br.getPage(url_userinfo);
                 /* 2020-04-07: Seems like their cookies are only valid for a very short time */
                 if (this.isLoggedin(br)) {
                     logger.info("Successfully loggedin via cookies");
-                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
-                } else {
-                    logger.info("Failed to login via cookies");
                 }
+                logger.info("Failed to login via cookies");
             }
             logger.info("Performing full login");
             br.getPage("https://www." + getHost() + "/user/login");
@@ -497,6 +500,10 @@ public class JumploadsCom extends PluginForHost {
                 throw new AccountInvalidException("Login failed for unknown reasons; contact support if this continues to happen");
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
+            if (validate) {
+                /* Access url that contains user information */
+                br.getPage(url_userinfo);
+            }
         }
     }
 
@@ -554,6 +561,7 @@ public class JumploadsCom extends PluginForHost {
                 account.setConcurrentUsePossible(false);
             }
         } else {
+            logger.info("Failed to find json with user information -> Trying to extract user info from html");
             final Regex trafficRegex = br.getRegex(">(\\d+[^<]*) of (\\d+[^<]+)</h2>\\s*<h2[^>]*>\\s*Used Bandwidth\\s*</h2>");
             if (!trafficRegex.patternFind()) {
                 logger.warning("Failed to extract account traffic info");
