@@ -25,6 +25,11 @@ import java.util.concurrent.TimeUnit;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -40,12 +45,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52881 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -251,8 +251,15 @@ public class SubyShareCom extends XFileSharingProBasic {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             String code = getCaptchaCode("xfilesharingprobasic_subysharecom_special", captchaurl, link);
+            /**
+             * 2026-06-03: Website displays uppercase letters in captcha but only accepts lowercase input while also in browser it is
+             * possible to enter uppercase letters -> Usability fail which we are correcting here. <br>
+             * Exemplaric html code: <br>
+             * <div class="alert alert-danger" id="error">Wrong captcha (use lower case ,letter O , not zero)</div>
+             */
+            code = code.toLowerCase(Locale.ROOT);
             if (code.contains("0")) {
-                logger.info("Replacing captcha result zero with lowercase o");
+                logger.info("Replacing captcha result zeros with lowercase o");
                 code = code.replace("0", "o");
             }
             captchaForm.put("code", code);

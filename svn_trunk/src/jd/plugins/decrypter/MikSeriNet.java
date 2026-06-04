@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52872 $", interfaceVersion = 2, names = { "mikseri.net" }, urls = { "https?://(?:www\\.)?mikseri\\.net/(artists/[^/]+/[^/]+/\\d+/|artists/\\?id=\\d+|artists/[^\"\\']+\\.\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "mikseri.net" }, urls = { "https?://(?:www\\.)?mikseri\\.net/(artists/[^/]+/[^/]+/\\d+/|artists/\\?id=\\d+|artists/[^\"\\']+\\.\\d+)" })
 public class MikSeriNet extends PluginForDecrypt {
     public MikSeriNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,6 +64,11 @@ public class MikSeriNet extends PluginForDecrypt {
                     fpName = br.getRegex("<title>(.*?)</title>").getMatch(0);
                 }
             }
+            FilePackage fp = null;
+            if (fpName != null) {
+                fp = FilePackage.getInstance();
+                fp.setName(Encoding.htmlDecode(fpName).trim());
+            }
             String[] fileIDs = br.getRegex("id=\"sharelinks_(\\d+)\"").getColumn(0);
             if (fileIDs == null || fileIDs.length == 0) {
                 fileIDs = br.getRegex("type=\"hidden\" name=\"song_id\" value=\"(\\d+)\"").getColumn(0);
@@ -84,16 +89,12 @@ public class MikSeriNet extends PluginForDecrypt {
             for (String id : fileIDs) {
                 final DownloadLink song = getSingleLink(id);
                 ret.add(song);
+                fp.add(song);
                 distribute(song);
                 progress.increase(1);
                 if (this.isAbort()) {
                     throw new InterruptedException();
                 }
-            }
-            if (fpName != null) {
-                final FilePackage fp = FilePackage.getInstance();
-                fp.setName(Encoding.htmlDecode(fpName).trim());
-                fp.addLinks(ret);
             }
         } else {
             final DownloadLink song = getSingleLink(new Regex(contenturl, "/(\\d+)/$").getMatch(0));

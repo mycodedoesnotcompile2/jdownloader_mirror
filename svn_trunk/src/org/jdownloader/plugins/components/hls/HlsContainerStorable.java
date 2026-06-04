@@ -5,11 +5,12 @@ import java.util.List;
 
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 public class HlsContainerStorable implements Storable {
 
     public static final TypeRef<HlsContainerStorable> TYPE_REF              = new TypeRef<HlsContainerStorable>() {
-                                                                            };
+    };
 
     public static final String                        DOWNLOADLINK_PROPERTY = "hlsContainerStorable";
 
@@ -102,6 +103,27 @@ public class HlsContainerStorable implements Storable {
 
     public List<HlsContainerMediaStorable> getMedia() {
         return media;
+    }
+
+    public List<HlsContainerMediaStorable> getMedia(TYPE type, String groupID) {
+        return filterMedia(getMedia(), type, groupID);
+    }
+
+    private static List<HlsContainerMediaStorable> filterMedia(List<HlsContainerMediaStorable> media, TYPE type, final String groupID) {
+        final List<HlsContainerMediaStorable> ret = new ArrayList<HlsContainerMediaStorable>();
+        if (media == null || media.size() == 0) {
+            return ret;
+        }
+        for (HlsContainerMediaStorable entry : media) {
+            if (type != null && !type.equals(entry.getType())) {
+                continue;
+            }
+            if (groupID != null && !groupID.equals(entry.getGroupID())) {
+                continue;
+            }
+            ret.add(entry);
+        }
+        return ret;
     }
 
     public void setMedia(List<HlsContainerMediaStorable> media) {

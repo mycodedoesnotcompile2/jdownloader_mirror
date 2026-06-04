@@ -56,11 +56,14 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.CODEC;
+import org.jdownloader.plugins.components.hls.HlsContainer.CODEC_TYPE;
+import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52689 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -593,20 +596,24 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             if (StringUtils.isEmpty(hlsMaster)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            brc.setFollowRedirects(true);
-            brc.getPage(hlsMaster);
-            if (brc.getRequest().getHttpConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            final Browser brc2 = brc.cloneBrowser();
+            brc2.setFollowRedirects(true);
+            DailyMotionCom.getM3U8(this, brc2, hlsMaster);
             final ArrayList<DownloadLink> selectedFoundQualities = new ArrayList<DownloadLink>();
-            final List<HlsContainer> hlsqualities = HlsContainer.getHlsQualities(brc);
+            final List<HlsContainer> hlsqualities = HlsContainer.getHlsQualities(brc2);
             DownloadLink bestQuality = null;
             int highestHeight = -1;
+            final DailyMotionCom dailymotionHosterplugin = (DailyMotionCom) this.getNewPluginForHostInstance(this.getHost());
             for (final HlsContainer hlsquality : hlsqualities) {
                 final int height = hlsquality.getHeight();
                 // if (height <= 0) {
                 // continue;
                 // }
+                final StreamCodec codec = hlsquality.getCodecType(CODEC_TYPE.VIDEO);
+                if (codec != null && CODEC.AV1.equals(codec.getCodec())) {
+                    // skip av1 and only h264 for now
+                    continue;
+                }
                 final DownloadLink dl = createDownloadlink("https://dailymotion.com/video/" + videoID);
                 dl.setProperty(DailyMotionCom.PROPERTY_TYPE, DailyMotionCom.TYPE_VIDEO);
                 dl.setProperty(DailyMotionCom.PROPERTY_HLS_MASTER, hlsMaster);
@@ -616,6 +623,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                 dl.setProperty(DailyMotionCom.PROPERTY_CONTENT_URL, contenturl);
                 dl.setProperty(DailyMotionCom.PROPERTY_TITLE, title);
                 dl.setProperty("plain_ext", ".mp4");
+                // dl.setDefaultPlugin(dailymotionHosterplugin);
                 dl.setProperty(DailyMotionCom.PROPERTY_VIDEO_ID, videoID);
                 hlsquality.setPropertiesOnDownloadLink(dl);
                 final String formattedFilename = DailyMotionCom.getFormattedFilename(dl);
@@ -787,7 +795,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                                             // TODO: split auto HLS into multiple entries
                                             final Browser brc = br.cloneBrowser();
                                             brc.setFollowRedirects(true);
-                                            brc.getPage(currentQualityUrl);
+                                            DailyMotionCom.getM3U8(plugin, brc, currentQualityUrl);
                                             final HlsContainer hlsBest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(brc));
                                             if (hlsBest.getHeight() > 1440) {
                                                 dlinfo[3] = "7";

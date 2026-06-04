@@ -19,9 +19,11 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -30,6 +32,7 @@ import jd.config.SubConfiguration;
 import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
+import jd.http.requests.GetRequest;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -48,16 +51,18 @@ import jd.utils.locale.JDL;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSContent;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52681 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -229,6 +234,49 @@ public class DailyMotionCom extends PluginForHost {
         return link.getStringProperty(PROPERTY_CONTENT_URL);
     }
 
+    public static void getM3U8(Plugin plugin, Browser br, final String url) throws Exception {
+        final class FakeHeader {
+
+            private final String pool   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            private final Random random = new Random();
+
+            public Map<String, String> generate() {
+                final Map<String, String> ret = new HashMap<String, String>();
+                final int headerCount = random.nextInt(9) + 6;
+                for (int i = 0; i < headerCount; i++) {
+                    final String key = randomLetters(8, 24);
+                    final String value = randomLetters(16, 32);
+                    ret.put("X-" + key, value);
+                }
+                return ret;
+            }
+
+            private String randomLetters(int minimum, int maximum) {
+                final int length = random.nextInt(maximum - minimum + 1) + minimum;
+                final StringBuilder sb = new StringBuilder(length);
+                for (int i = 0; i < length; i++) {
+                    final int randomIndex = random.nextInt(pool.length());
+                    sb.append(pool.charAt(randomIndex));
+                }
+                return sb.toString();
+            }
+        }
+        final GetRequest getRequest = br.createGetRequest(url);
+        getRequest.getHeaders().putAll(new FakeHeader().generate());
+        br.setFollowRedirects(true);
+        br.getPage(getRequest);
+        if (getRequest.getHttpConnection().getResponseCode() == 403) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        PornHubCom.setSSLSocketStreamOptions(br);
+        return br;
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         br.setFollowRedirects(true);
@@ -247,18 +295,12 @@ public class DailyMotionCom extends PluginForHost {
             /* Make sure to follow redirects! */
             this.br.setFollowRedirects(true);
             final Browser brc = br.cloneBrowser();
-            final String hlsMaster = link.getStringProperty(PROPERTY_HLS_MASTER);
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && hlsMaster != null) {
-                List<HlsContainer> hlsContainers = HlsContainer.getHlsQualities(brc, hlsMaster);
-                HlsContainer hlsContainer = HlsContainer.find(brc, hlsContainers, link);
-                System.out.println("found " + hlsContainer != null);
-            }
             String hlsurl = getDirectlink(link);
-            brc.getPage(hlsurl);
+            getM3U8(this, brc, hlsurl);
             if (!brc.getHttpConnection().isOK()) {
                 /* Typically response 403 when directurl is expired. */
                 hlsurl = this.findFreshDirectlink(link);
-                brc.getPage(hlsurl);
+                getM3U8(this, brc, hlsurl);
             }
             checkFFmpeg(link, "Check a HLS Stream");
             final List<M3U8Playlist> playList = M3U8Playlist.parseM3U8(brc);
@@ -290,6 +332,40 @@ public class DailyMotionCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    private List<HLSContent> getHLSContent(final Browser br, final DownloadLink link) throws Exception {
+        final String hlsMaster = link.getStringProperty(PROPERTY_HLS_MASTER);
+        if (hlsMaster == null) {
+            return null;
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.setFollowRedirects(true);
+        getM3U8(this, brc, hlsMaster);
+        final List<HlsContainer> hlsContainers = HlsContainer.getHlsQualities(brc);
+        final HlsContainer hlsContainer = HlsContainer.find(brc, hlsContainers, link);
+        if (hlsContainer == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final List<M3U8Playlist> m3u8 = hlsContainer.getM3U8(brc.cloneBrowser());
+        if (m3u8.size() != 1) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final HLSContent hlsContent = new HLSContent(m3u8.get(0));
+        final List<MEDIA> audioMedias = hlsContainer.getMedia(TYPE.AUDIO, hlsContainer.getAudioGroupID());
+        for (MEDIA audioMedia : audioMedias) {
+            final List<M3U8Playlist> audioM3U8 = audioMedia.loadM3U8(brc.cloneBrowser());
+            if (audioM3U8 == null) {
+                continue;
+            } else if (audioM3U8.size() != 1) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            logger.info("Add media:" + audioMedia);
+            hlsContent.addAudioTrack(audioM3U8.get(0));
+        }
+        final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
+        hlsContents.add(hlsContent);
+        return hlsContents;
+    }
+
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
         if (link.getBooleanProperty("countryblock", false)) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "This video is not available for your country");
@@ -301,7 +377,12 @@ public class DailyMotionCom extends PluginForHost {
         if (isHLS(link)) {
             /* HLS download */
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, directurl);
+            final List<HLSContent> hlsContents = getHLSContent(br, link);
+            if (hlsContents != null) {
+                dl = new HLSDownloader(link, br, hlsContents);
+            } else {
+                dl = new HLSDownloader(link, br, directurl);
+            }
             dl.startDownload();
         } else {
             /* HTTP download */
@@ -451,13 +532,6 @@ public class DailyMotionCom extends PluginForHost {
                 return authCookie.getValue();
             }
         }
-    }
-
-    @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        PornHubCom.setSSLSocketStreamOptions(br);
-        return br;
     }
 
     private void setGraphqlHeaders(final Browser br) {

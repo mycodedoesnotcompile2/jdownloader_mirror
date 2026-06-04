@@ -33,7 +33,6 @@ import jd.plugins.decrypter.BunkrAlbum;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.encoding.URLEncode.Decoder;
@@ -42,7 +41,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 52862 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52880 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -553,6 +552,7 @@ public class Bunkr extends PluginForHost {
             }
         }
         final Regex safeFileInfoFromHTML = br.getRegex("Debug: Original=(.+), Size=(\\d+)[\r\n]");
+        String filename = null;
         if (safeFileInfoFromHTML.patternFind()) {
             /**
              * 2025-03-04: html contains "debug information" with original file name and file size as bytes <br>
@@ -565,6 +565,7 @@ public class Bunkr extends PluginForHost {
             final long parsedFilesize = Long.parseLong(filesizeBytesStr);
             link.setVerifiedFileSize(parsedFilesize);
             link.setProperty(PROPERTY_PARSED_FILESIZE, parsedFilesize);
+            filename = safeFilenameFromHTML;
         } else {
             logger.info("Failed to find safe/trustworthy file information in html code");
             String filenameFromHTML = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
@@ -601,6 +602,7 @@ public class Bunkr extends PluginForHost {
             } else {
                 logger.warning("Failed to find filesize in html");
             }
+            filename = filenameFromHTML;
         }
         final String videoStreamDirecturl = br.getRegex("<source src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*type=.video/mp4").getMatch(0);
         if (videoStreamDirecturl != null) {
@@ -611,9 +613,17 @@ public class Bunkr extends PluginForHost {
             link.setProperty(PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL, imageFullsizeViewDirecturl);
         }
         final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
-        if (!isDownload && !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+        if (!isDownload) {
             /* We aren't trying to start a download atm -> No need to proceed to next step -> Speeds up linkcheck */
             return null;
+        }
+        fastLane: {
+            try {
+                return this.parseAndSetJsCDNDirectURL(link, br, filename);
+            } catch (final PluginException e) {
+                /* Silent ignore to allow fallback to upper handling */
+                logger.info("Failed to find direct download link on file view page -> Official download button handling is needed");
+            }
         }
         /* 2024-02-16: New: Additional step required to find official downloadurl */
         final String nextStepURL = br.getRegex("(https?://get\\.[^/]+/file/\\d+)").getMatch(0);
@@ -648,7 +658,7 @@ public class Bunkr extends PluginForHost {
     }
 
     /** For links like this: https://get.bunkrr.su/file/123456... */
-    private void crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl) throws PluginException, IOException {
+    private String crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl) throws PluginException, IOException {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -672,10 +682,11 @@ public class Bunkr extends PluginForHost {
             logger.info("Failed to find filesize");
         }
         final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
-        if (!isDownload && !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+        if (!isDownload) {
             /* We aren't trying to download -> Early return to speed up linkcheck */
-            return;
+            return null;
         }
+        /* 2026-06-03: This handling might be outdated, see function parseAndSetJsCDNDirectURL !!! */
         String jsCDN = br.getRegex("var\\s*jsCDN\\s*=\\s*(\"https?:[^\"]+\")").getMatch(0);
         String jsType = br.getRegex("var\\s*jsType\\s*=\\s*(\"[^\"]+\")").getMatch(0);
         String jsSlug = br.getRegex("var\\s*jsSlug\\s*=\\s*(\"[^\"]+\")").getMatch(0);
@@ -699,8 +710,45 @@ public class Bunkr extends PluginForHost {
         if (StringUtils.isEmpty(token) || ex == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String directurl = rawURL + "?token=" + token + "&ex=" + ex + "&n=" + URLEncode.encodeURIComponent(fileName);
+        String directurl = rawURL + "?token=" + token + "&ex=" + ex;
+        if (!StringUtils.isEmpty(fileName)) {
+            directurl = directurl + "&n=" + URLEncode.encodeURIComponent(fileName);
+        }
         setDirectURL(link, directurl);
+        return directurl;
+    }
+
+    /** Extracts/generates and returns final downloadlink from download overview page. */
+    private String parseAndSetJsCDNDirectURL(final DownloadLink link, final Browser br, final String fileName) throws PluginException, IOException {
+        String jsCDN = br.getRegex("var\\s*jsCDN\\s*=\\s*(\"https?:[^\"]+\")").getMatch(0);
+        String jsType = br.getRegex("var\\s*jsType\\s*=\\s*(\"[^\"]+\")").getMatch(0);
+        String jsSlug = br.getRegex("var\\s*jsSlug\\s*=\\s*(\"[^\"]+\")").getMatch(0);
+        String signUrl = br.getRegex("var\\s*signUrl\\s*=\\s*(\"[^\"]+\")").getMatch(0);
+        if (!StringUtils.isAllNotEmpty(jsCDN, jsType, jsSlug, signUrl)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        jsCDN = restoreFromString(jsCDN, TypeRef.STRING);
+        jsType = restoreFromString(jsType, TypeRef.STRING);
+        jsSlug = restoreFromString(jsSlug, TypeRef.STRING);
+        signUrl = restoreFromString(signUrl, TypeRef.STRING);
+        final String path = new URL(jsCDN).getPath();
+        final Browser brc = br.cloneBrowser();
+        final Request fetch = brc.createGetRequest(signUrl + "?path=" + path);
+        fetch.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
+        brc.getPage(fetch);
+        final Map<String, Object> response = restoreFromString(fetch.getHtmlCode(), TypeRef.MAP);
+        final String token = (String) response.get("token");
+        final Object ex = response.get("ex");
+        if (StringUtils.isEmpty(token) || ex == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        String directurl = jsCDN + "?token=" + token + "&ex=" + ex;
+        /* 2026-06-03: n parameter is optional. Server will return value set as n parameter in Content-Disposition header. */
+        if (!StringUtils.isEmpty(fileName)) {
+            directurl += "&n=" + URLEncode.encodeURIComponent(fileName);
+        }
+        setDirectURL(link, directurl);
+        return directurl;
     }
 
     public static void setFilename(final DownloadLink link, final String filename, final boolean canContainFileID, final boolean setFinalName) {

@@ -954,10 +954,13 @@ public abstract class Request {
 
     public Request read(final boolean keepByteArray) throws IOException {
         this.keepByteArray = keepByteArray;
-        final long tima = Time.systemIndependentCurrentJVMTimeMillis();
         this.httpConnection.setCharset(this.getCustomCharset());
-        this.responseBytes = Request.read(this.getHttpConnection(), this.getReadLimit());
-        this.readTime = Time.systemIndependentCurrentJVMTimeMillis() - tima;
+        final long now = Time.systemIndependentCurrentJVMTimeMillis();
+        try {
+            this.responseBytes = Request.read(this.getHttpConnection(), this.getReadLimit());
+        } finally {
+            this.readTime = Time.systemIndependentCurrentJVMTimeMillis() - now;
+        }
         return this;
     }
 

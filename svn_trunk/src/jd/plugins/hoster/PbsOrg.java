@@ -33,6 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.storage.TypeRef;
 import org.jdownloader.downloader.hls.HLSContent;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
@@ -41,7 +42,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52872 $", interfaceVersion = 2, names = { "pbs.org" }, urls = { "https?://video\\.pbs\\.org/video/\\d+|https?://(?:www\\.)?pbs\\.org/.+|https?://player\\.pbs\\.org/[a-z]+/\\d+" })
+@HostPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "pbs.org" }, urls = { "https?://video\\.pbs\\.org/video/\\d+|https?://(?:www\\.)?pbs\\.org/.+|https?://player\\.pbs\\.org/[a-z]+/\\d+" })
 public class PbsOrg extends PluginForHost {
     @SuppressWarnings("deprecation")
     public PbsOrg(PluginWrapper wrapper) {
@@ -172,31 +173,31 @@ public class PbsOrg extends PluginForHost {
             }
         }
         link.setLinkID(vid);
-        br.getPage("http://player.pbs.org/viralplayer/" + vid);
-        /* 2020-03-10: E.g. offline: https://www.pbs.org/video/2018-bmw-x2-2018-callaway-tahoes-3ph8t5/ */
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("This video is currently not available")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*We're sorry, but this video is not available")) {
-            /* 2020-11-24 */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("class=\"error-message\"")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        String title = br.getRegex("\\\\\"videoTitle\\\\\"\\s*:\\s*\\\\\"(.*?)\\\\\"").getMatch(0);
+        if (title != null) {
+            title = restoreFromString("\"" + title + "\"", TypeRef.STRING);
         }
-        if (br.containsHTML(">\\s*This video is unavailable in your area")) {
-            geoblocked = true;
+        String availability = br.getRegex("\\\\\"availability\\\\\"\\s*:\\s*\\\\\"(.*?)\\\\\"").getMatch(0);
+        if (availability != null) {
+            availability = restoreFromString("\"" + availability + "\"", TypeRef.STRING);
         }
-        String title = null;
-        String availability = null;
-        try {
-            final String json = br.getRegex("window\\.videoBridge = (\\{.*?\\});\\s*</script>").getMatch(0);
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
-            // final List<Object> ressourcelist = (List<Object>) entries.get("");
-            title = (String) entries.get("title");
-            availability = (String) entries.get("availability");
-        } catch (final Throwable e) {
-        }
-        if (availability != null && !"available".equals(availability)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        if (availability == null || "available".equals(availability) || PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
+            br.getPage("http://player.pbs.org/viralplayer/" + vid);
+            if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("This video is currently not available")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            geoblocked = br.containsHTML(">\\s*This video is unavailable in your area");
+            try {
+                final String json = br.getRegex("window\\.videoBridge = (\\{.*?\\});\\s*</script>").getMatch(0);
+                final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
+                if (title == null) {
+                    title = (String) entries.get("title");
+                }
+                if (availability == null) {
+                    availability = (String) entries.get("availability");
+                }
+            } catch (final Throwable e) {
+            }
         }
         if (title != null) {
             title = vid + "_" + title;
@@ -206,7 +207,16 @@ public class PbsOrg extends PluginForHost {
         }
         title = Encoding.unicodeDecode(title);
         link.setName(title + ".mp4");
-        return AvailableStatus.TRUE;
+        if (availability != null && !"available".equals(availability)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*We're sorry, but this video is not available")) {
+            /* 2020-11-24 */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"error-message\"")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            return AvailableStatus.TRUE;
+        }
     }
 
     @Override

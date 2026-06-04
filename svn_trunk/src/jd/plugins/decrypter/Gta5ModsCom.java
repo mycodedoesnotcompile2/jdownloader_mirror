@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -30,15 +31,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52873 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52878 $", interfaceVersion = 3, names = {}, urls = {})
 public class Gta5ModsCom extends PluginForDecrypt {
     public Gta5ModsCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     // always in english, also I haven't seen anything but "1 minute" but account for others cause why not
-    private static final Pattern WAIT_TIME = Pattern.compile("(?i)^Due to a high number of requests we have temporarily blocked traffic from your ip address for (\\d+) (minute|second|hour)s?\\b");
-    private static final Pattern DL_URL    = Pattern.compile("<a class=\"btn btn-primary btn-download\" href=\"(https?://files\\.gta5\\-mods\\.com/uploads/[^\"]+)\"");
+    private final Pattern WAIT_TIME = Pattern.compile("(?i)^Due to a high number of requests we have temporarily blocked traffic from your ip address for (\\d+) (minute|second|hour)s?\\b");
+    private final Pattern DL_URL    = Pattern.compile("<a class\\s*=\\s*\"btn btn-primary btn-download\"\\s*href\\s*=\\s*\"(https?://files\\.gta5\\-mods\\.com/uploads/[^\"]+)\"");
 
     private static List<String[]> getPluginDomains() {
         List<String> doms = new ArrayList<String>();
@@ -78,9 +79,17 @@ public class Gta5ModsCom extends PluginForDecrypt {
         getPage(url, param);
         url = br.getRegex(DL_URL).getMatch(0);
         if (url == null) {
-            getPage(br.getRegex("<a href=\"([^\"]+)\" class=\"btn btn-primary btn-download\"").getMatch(0), param);
+            final String downloadButton = br.getRegex("<a href=\"([^\"]+)\" class=\"btn btn-primary btn-download\"").getMatch(0);
+            if (downloadButton == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            getPage(downloadButton, param);
             url = br.getRegex(DL_URL).getMatch(0);
+            if (url == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
+        url = Encoding.htmlOnlyDecode(url);
         final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
         final String[] urlsplit = url.split("/");
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
