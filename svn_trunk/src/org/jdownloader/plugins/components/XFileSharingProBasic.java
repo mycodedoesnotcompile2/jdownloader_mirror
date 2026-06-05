@@ -93,7 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52883 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -809,15 +809,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return getMainPage(this.br);
     }
 
-    protected String getMainPage(final DownloadLink link) {
-        final URL url;
-        try {
-            url = new URL(getContentURL(link));
-        } catch (final MalformedURLException e) {
-            /* This should never happen */
-            e.printStackTrace();
-            return null;
-        }
+    protected String getMainPage(final DownloadLink link, final URL url) {
         final String urlHost = this.getPreferredHost(link, url);
         final List<String> deadDomains = this.getDeadDomains();
         final String domainToUse;
@@ -836,6 +828,17 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         final String finalDomainToUse = this.appendWWWIfRequired(domainToUse);
         return protocol + finalDomainToUse;
+    }
+
+    protected String getMainPage(final DownloadLink link) {
+        try {
+            final URL url = new URL(getContentURL(link));
+            return getMainPage(link, url);
+        } catch (final MalformedURLException e) {
+            /* This should never happen */
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /** Adds "www." to given host if it doesn't already contain that and if it doesn't contain any other subdomain. */
@@ -2167,7 +2170,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         /*
          * 2019-07-10: ONLY "No such file" as response might always be wrong and should be treated as a failure! Example: xvideosharing.com
          */
-        if (br.containsHTML(">\\s*No such file\\s*<")) {
+        if (br.containsHTML(">\\s*No such file\\s*<") || br.containsHTML("^No such file$")) {
             /* Success */
             timestampAbuseAvailablecheckLastFailure = -1;
             numberofContinuousFailuresAbuseAvailablecheckLastFailure = 0;
@@ -4373,7 +4376,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected void checkServerErrors(Browser br, String html, final DownloadLink link, final Account account) throws PluginException {
-        if (new Regex(html, "^(No file|error_nofile|Not Found)$").patternFind()) {
+        if (new Regex(html, "^(No file|error_nofile|Not Found|No such file)$").patternFind()) {
             /* Possibly dead file but it is supposed to be online so let's wait and retry! */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'No file'", 30 * 60 * 1000l);
         } else if (new Regex(html, "^Wrong IP$").patternFind()) {

@@ -37,7 +37,7 @@ import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
-@DecrypterPlugin(revision = "$Revision: 52372 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52883 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class CutyIo extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "cuty.io", "cutty.app", "cety.app", "cuttlinks.com" });
+        ret.add(new String[] { "cuttty.com", "cuty.io", "cutty.app", "cety.app", "cuttlinks.com" });
         return ret;
     }
 

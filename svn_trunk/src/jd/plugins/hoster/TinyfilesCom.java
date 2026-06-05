@@ -20,9 +20,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -35,7 +32,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 52883 $", interfaceVersion = 3, names = {}, urls = {})
 public class TinyfilesCom extends XFileSharingProBasic {
     public TinyfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,12 @@ public class TinyfilesCom extends XFileSharingProBasic {
     @Override
     protected String getContentURL(final DownloadLink link) {
         final String path = new Regex(link.getPluginPatternMatcher(), "(?i)https?://[^/]+(/.+)").getMatch(0);
-        return this.getMainPage(link) + path;
+        try {
+            final URL url = new URL(link.getPluginPatternMatcher());
+            return this.getMainPage(link, url) + "/" + path;
+        } catch (MalformedURLException e) {
+            return link.getPluginPatternMatcher();
+        }
     }
 
     /**
