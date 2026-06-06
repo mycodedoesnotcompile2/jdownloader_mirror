@@ -41,7 +41,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 52880 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52884 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -619,14 +619,17 @@ public class Bunkr extends PluginForHost {
         }
         fastLane: {
             try {
-                return this.parseAndSetJsCDNDirectURL(link, br, filename);
+                final String ret = this.parseAndSetJsCDNDirectURL(link, br, filename);
+                if (ret != null) {
+                    return ret;
+                }
             } catch (final PluginException e) {
                 /* Silent ignore to allow fallback to upper handling */
                 logger.info("Failed to find direct download link on file view page -> Official download button handling is needed");
             }
         }
         /* 2024-02-16: New: Additional step required to find official downloadurl */
-        final String nextStepURL = br.getRegex("(https?://get\\.[^/]+/file/\\d+)").getMatch(0);
+        final String nextStepURL = br.getRegex("(https?://(?:get|dl)\\.[^/]+/file/\\d+)").getMatch(0);
         if (nextStepURL == null) {
             logger.warning("Failed to find nextStepURL");
             return null;
@@ -686,25 +689,46 @@ public class Bunkr extends PluginForHost {
             /* We aren't trying to download -> Early return to speed up linkcheck */
             return null;
         }
-        /* 2026-06-03: This handling might be outdated, see function parseAndSetJsCDNDirectURL !!! */
-        String jsCDN = br.getRegex("var\\s*jsCDN\\s*=\\s*(\"https?:[^\"]+\")").getMatch(0);
-        String jsType = br.getRegex("var\\s*jsType\\s*=\\s*(\"[^\"]+\")").getMatch(0);
-        String jsSlug = br.getRegex("var\\s*jsSlug\\s*=\\s*(\"[^\"]+\")").getMatch(0);
-        String signUrl = br.getRegex("var\\s*signUrl\\s*=\\s*(\"[^\"]+\")").getMatch(0);
-        if (!StringUtils.isAllNotEmpty(jsCDN, jsType, jsSlug, signUrl)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final String internalFileID = br.getRegex("data-id=\"(\\d+)\"").getMatch(0);
+        String rawURL = null;
+        Map<String, Object> response = null;
+        api: if (internalFileID != null) {
+            final String SIGN_SERVICE_URL = br.getRegex("(?:var|const)\\s*SIGN_SERVICE_URL\\s*=\\s*'(https?:[^\']+)").getMatch(0);
+            if (SIGN_SERVICE_URL == null) {
+                break api;
+            }
+            Browser brc = br.cloneBrowser();
+            brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
+            brc.getHeaders().put("Content-Type", "application/json");
+            brc.postPageRaw("/api/_001_v2", "{\"id\":\"" + internalFileID + "\"}");
+            Map<String, Object> apiResponse = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            rawURL = (String) apiResponse.get("mediafiles") + (String) apiResponse.get("path");
+            final String path = new URL(rawURL).getPath();
+            brc = br.cloneBrowser();
+            final Request fetch = brc.createGetRequest(SIGN_SERVICE_URL + "?path=" + path);
+            fetch.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
+            brc.getPage(fetch);
+            response = restoreFromString(fetch.getHtmlCode(), TypeRef.MAP);
         }
-        jsCDN = restoreFromString(jsCDN, TypeRef.STRING);
-        jsType = restoreFromString(jsType, TypeRef.STRING);
-        jsSlug = restoreFromString(jsSlug, TypeRef.STRING);
-        signUrl = restoreFromString(signUrl, TypeRef.STRING);
-        final String rawURL = jsCDN.replaceFirst("([/]+$)", "") + "/storage/media/" + jsSlug;
-        final String path = new URL(rawURL).getPath();
-        final Browser brc = br.cloneBrowser();
-        final Request fetch = brc.createGetRequest(signUrl + "?path=" + path);
-        fetch.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
-        brc.getPage(fetch);
-        final Map<String, Object> response = restoreFromString(fetch.getHtmlCode(), TypeRef.MAP);
+        if (response == null) {
+            /* 2026-06-03: This handling might be outdated, see function parseAndSetJsCDNDirectURL !!! */
+            String jsCDN = br.getRegex("var\\s*jsCDN\\s*=\\s*(\"https?:[^\"]+\")").getMatch(0);
+            String jsSlug = br.getRegex("var\\s*jsSlug\\s*=\\s*(\"[^\"]+\")").getMatch(0);
+            String signUrl = br.getRegex("var\\s*signUrl\\s*=\\s*(\"[^\"]+\")").getMatch(0);
+            if (!StringUtils.isAllNotEmpty(jsCDN, jsSlug, signUrl)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            jsCDN = restoreFromString(jsCDN, TypeRef.STRING);
+            jsSlug = restoreFromString(jsSlug, TypeRef.STRING);
+            signUrl = restoreFromString(signUrl, TypeRef.STRING);
+            rawURL = jsCDN.replaceFirst("([/]+$)", "") + "/storage/media/" + jsSlug;
+            final String path = new URL(rawURL).getPath();
+            final Browser brc = br.cloneBrowser();
+            final Request fetch = brc.createGetRequest(signUrl + "?path=" + path);
+            fetch.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
+            brc.getPage(fetch);
+            response = restoreFromString(fetch.getHtmlCode(), TypeRef.MAP);
+        }
         final String token = (String) response.get("token");
         final Object ex = response.get("ex");
         if (StringUtils.isEmpty(token) || ex == null) {
@@ -721,14 +745,12 @@ public class Bunkr extends PluginForHost {
     /** Extracts/generates and returns final downloadlink from download overview page. */
     private String parseAndSetJsCDNDirectURL(final DownloadLink link, final Browser br, final String fileName) throws PluginException, IOException {
         String jsCDN = br.getRegex("var\\s*jsCDN\\s*=\\s*(\"https?:[^\"]+\")").getMatch(0);
-        String jsType = br.getRegex("var\\s*jsType\\s*=\\s*(\"[^\"]+\")").getMatch(0);
         String jsSlug = br.getRegex("var\\s*jsSlug\\s*=\\s*(\"[^\"]+\")").getMatch(0);
         String signUrl = br.getRegex("var\\s*signUrl\\s*=\\s*(\"[^\"]+\")").getMatch(0);
-        if (!StringUtils.isAllNotEmpty(jsCDN, jsType, jsSlug, signUrl)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (!StringUtils.isAllNotEmpty(jsCDN, jsSlug, signUrl)) {
+            return null;
         }
         jsCDN = restoreFromString(jsCDN, TypeRef.STRING);
-        jsType = restoreFromString(jsType, TypeRef.STRING);
         jsSlug = restoreFromString(jsSlug, TypeRef.STRING);
         signUrl = restoreFromString(signUrl, TypeRef.STRING);
         final String path = new URL(jsCDN).getPath();
@@ -854,11 +876,11 @@ public class Bunkr extends PluginForHost {
             /* File size we got is smaller than user defined min threshold. */
             /*
              * Content-Type: image/jpeg
-             * 
+             *
              * Content-Length: 5534281
-             * 
+             *
              * Cf-Bgj: imgq:100,h2pri
-             * 
+             *
              * Cf-Polished: origSize=5817221
              */
             final String origSize = new Regex(con.getHeaderField("Cf-Polished"), "origSize=(\\d+)").getMatch(0);
