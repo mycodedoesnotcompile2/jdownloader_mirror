@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52886 $", interfaceVersion = 2, names = {}, urls = {})
 public class TnaFlixCom extends PluginForHost {
     public TnaFlixCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -186,6 +186,7 @@ public class TnaFlixCom extends PluginForHost {
         String vkey = this.getViewkey(link.getPluginPatternMatcher());
         String videoid = this.getVideoID(link.getPluginPatternMatcher());
         if (videoid == null) {
+            /* Fallback */
             videoid = this.getVideoID(br.getURL());
         }
         if (vkey == null) {
@@ -251,17 +252,5 @@ public class TnaFlixCom extends PluginForHost {
             }
         }
         dl.startDownload();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

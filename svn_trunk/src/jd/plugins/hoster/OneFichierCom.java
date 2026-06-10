@@ -38,6 +38,37 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.FreeDownloadNoFreeSlotsMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.FreeDownloadWaitBetweenDownloadsLimitMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -72,38 +103,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.FreeDownloadNoFreeSlotsMode;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.FreeDownloadWaitBetweenDownloadsLimitMode;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52887 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -208,7 +208,6 @@ public class OneFichierCom extends PluginForHost {
         }
         setPremiumAPIHeaders(br, apiKey);
     }
-
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
     // @Override
     // public LazyPlugin.FEATURE[] getFeatures() {
@@ -377,8 +376,9 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
-                 * only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br>
+                 * 1. It is still working. </br>
+                 * 2. It is the only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -559,7 +559,7 @@ public class OneFichierCom extends PluginForHost {
         if (inspector.looksLikeDownloadableContent(urlConnection)) {
             return true;
         }
-        if (StringUtils.containsIgnoreCase(getDownloadLink().getName(), ".htm") && urlConnection.isContentDisposition() && (urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206)) {
+        if ((urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206) && StringUtils.containsIgnoreCase(getDownloadLink().getName(), ".htm") && urlConnection.isContentDisposition()) {
             /* special handling to allow download of inline .html files */
             final String contentDispositionHeader = urlConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_DISPOSITION);
             final String contentDispositionFileName = HTTPConnectionUtils.getFileNameFromDispositionHeader(contentDispositionHeader);
@@ -604,7 +604,8 @@ public class OneFichierCom extends PluginForHost {
             instantRetryOnNoFreeSlots = false;
         }
         String dllink = null;
-        freeSlotRetry: for (int freeSlotRetryIndex = 0; freeSlotRetryIndex <= (instantRetryOnNoFreeSlots && account == null ? 10 : 0); freeSlotRetryIndex++) {
+        final int maxFreeSlotRetries = instantRetryOnNoFreeSlots && account == null ? 10 : 0;
+        freeSlotRetry: for (int freeSlotRetryIndex = 0; freeSlotRetryIndex <= maxFreeSlotRetries; freeSlotRetryIndex++) {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
@@ -650,6 +651,7 @@ public class OneFichierCom extends PluginForHost {
             }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
                 if (link.isPasswordProtected()) {
                     logger.info("User entered valid download password: " + passCode);
                     /* Save download-password */
@@ -676,26 +678,23 @@ public class OneFichierCom extends PluginForHost {
             /* Important: Execute free slots check before looking for directlink */
             if (this.isErrorNoFreeSlots(br)) {
                 if (account == null && instantRetryOnNoFreeSlots) {
-                    final int maxRetries = 15;
-                    if (freeSlotRetryIndex < maxRetries) {
+                    if (freeSlotRetryIndex < maxFreeSlotRetries) {
                         final long waitMS = (long) (Math.random() * 3000);
-                        logger.info("No free slots, retry " + (freeSlotRetryIndex + 1) + "/" + maxRetries + " in " + waitMS + "ms");
+                        logger.info("No free slots, retry " + (freeSlotRetryIndex + 1) + "/" + maxFreeSlotRetries + " in " + waitMS + "ms");
                         this.sleep(waitMS, link);
                         continue freeSlotRetry;
-                    } else {
-                        logger.info("No free slots, giving up after " + maxRetries + " retries");
-                        timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.set(Time.systemIndependentCurrentJVMTimeMillis());
                     }
+                    logger.info("No free slots, giving up after " + maxFreeSlotRetries + " retries");
+                    timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.set(Time.systemIndependentCurrentJVMTimeMillis());
                 }
                 this.errorNoFreeSlots(account);
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                /* Nullification */
-                if (account == null) {
-                    /* Reset no free slots instant retry handling cooldown timer before error handling gets called. */
-                    timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.set(0);
-                }
+            }
+            /* Nullification */
+            if (account == null) {
+                /* Reset no free slots instant retry handling cooldown timer before error handling gets called. */
+                timestampLastFreeDownloadNoFreeSlotsHandlingInstantRetryFailed.set(0);
             }
             dllink = br.getRegex("<a href=\"([^\"]+)\"[^>]*>\\s*Click here to download").getMatch(0);
             if (dllink == null) {
@@ -782,7 +781,8 @@ public class OneFichierCom extends PluginForHost {
             /**
              * <div class="bloc2"> IP Address xxx.xxx.xxx.xxx : Accès restreint – professional infrastructure detected.<br/>
              * <br/>
-             * This IP address has been identified as belonging to a server, proxy, VPN, relay network, or associated with abusive activity.<br/>
+             * This IP address has been identified as belonging to a server, proxy, VPN, relay network, or associated with abusive
+             * activity.<br/>
              * <br/>
              * <b>Premium</b> plans are reserved for <b>private, non-shared residential Internet connections</b>.<br/>
              * <br/>
@@ -901,8 +901,8 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
-     * required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br>
+     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -1563,8 +1563,8 @@ public class OneFichierCom extends PluginForHost {
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login/API is
-         * blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
+         * 2021-01-29: Removed this because if login/API is blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         if (checkFileInfoBeforeDownloadAttempt) {

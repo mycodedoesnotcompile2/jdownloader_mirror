@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -60,7 +61,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 52367 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52887 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -103,19 +104,37 @@ public class TiktokComCrawler extends PluginForDecrypt {
     }
 
     /** 2023-09-04: new: vt.tiktok.com */
-    private final String TYPE_REDIRECT       = "(?i)https?://(?:vm|vt)\\.[^/]+/([A-Za-z0-9]+).*";
-    private final String TYPE_APP            = "(?i)https?://[^/]+/t/([A-Za-z0-9]+).*";
-    private final String TYPE_USER_USERNAME  = "(?i)https?://[^/]+/@([^\\?/]+).*";
-    private final String TYPE_USER_USER_ID   = "(?i)https?://[^/]+/share/user/(\\d+).*";
-    private final String TYPE_PLAYLIST_TAG   = "(?i)https?://[^/]+/tag/([^/]+)";
-    private final String TYPE_PLAYLIST_MUSIC = "(?i)https?://[^/]+/music/([a-z0-9\\-]+)-(\\d+)";
+    private static final Pattern TYPE_REDIRECT       = Pattern.compile("https?://(?:vm|vt)\\.[^/]+/([A-Za-z0-9]+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_APP            = Pattern.compile("/t/([A-Za-z0-9]+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_USER_USERNAME  = Pattern.compile("/@([^\\?/]+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_USER_USER_ID   = Pattern.compile("/share/user/(\\d+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_PLAYLIST_TAG   = Pattern.compile("/tag/([^/]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_PLAYLIST_MUSIC = Pattern.compile("/music/([a-z0-9\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    /** Patterns mirroring the URL types handled by the hoster plugin (see {@link TiktokCom#buildAnnotationUrls}). */
+    private static final Pattern TYPE_VIDEO          = Pattern.compile("/@[^/]+/video/(\\d+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_EMBED          = Pattern.compile("/embed/(\\d+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MOBILE         = Pattern.compile("https?://m\\.[^/]+/v/(\\d+)\\.html.*", Pattern.CASE_INSENSITIVE);
+
+    /** 2023-01-26: Replace photo -> video is just a cheap workaround for now. */
+    private String normalizeContentUrl(final String url) {
+        if (url == null) {
+            return null;
+        }
+        return url.replaceFirst("(?i)http://", "https://").replace("/photo/", "/video/");
+    }
+
+    private boolean matchesAnyKnownPattern(final String url) {
+        if (url == null) {
+            return false;
+        }
+        return TYPE_REDIRECT.matcher(url).matches() || TYPE_APP.matcher(url).matches() || TYPE_USER_USERNAME.matcher(url).matches() || TYPE_USER_USER_ID.matcher(url).matches() || TYPE_PLAYLIST_TAG.matcher(url).matches() || TYPE_PLAYLIST_MUSIC.matcher(url).matches() || TYPE_VIDEO.matcher(url).matches() || TYPE_EMBED.matcher(url).matches() || TYPE_MOBILE.matcher(url).matches();
+    }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final TiktokCom hostPlg = (TiktokCom) this.getNewPluginForHostInstance(this.getHost());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        /* 2023-01-26: Replace photo -> video is just a cheap workaround for now. */
-        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://").replace("/photo/", "/video/");
-        if (contenturl.matches(TYPE_REDIRECT) || contenturl.matches(TYPE_APP)) {
+        final String contenturl = normalizeContentUrl(param.getCryptedUrl());
+        if (new Regex(contenturl, TYPE_REDIRECT).patternFind() || new Regex(contenturl, TYPE_APP).patternFind()) {
             /* Single redirect URLs */
             br.setFollowRedirects(false);
             final String initialURL = contenturl;
@@ -123,10 +142,12 @@ public class TiktokComCrawler extends PluginForDecrypt {
             int loops = 0;
             do {
                 br.getPage(redirect);
-                redirect = br.getRedirectLocation();
+                redirect = normalizeContentUrl(br.getRedirectLocation());
                 if (redirect == null) {
                     break;
                 } else if (hostPlg.canHandle(redirect)) {
+                    break;
+                } else if (matchesAnyKnownPattern(redirect)) {
                     break;
                 } else if (loops >= 5) {
                     logger.info("Redirectloop -> URL must be offline");
@@ -134,16 +155,16 @@ public class TiktokComCrawler extends PluginForDecrypt {
                 } else if (this.isAbort()) {
                     /* Aborted by user */
                     throw new InterruptedException();
-                } else {
-                    loops++;
                 }
+                /* Continue to next redirect */
+                loops++;
             } while (true);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (redirect == null) {
                 logger.info("Failed to find redirect -> Looks like content is offline");
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (!hostPlg.canHandle(redirect)) {
+            } else if (!hostPlg.canHandle(redirect) && !matchesAnyKnownPattern(redirect)) {
                 /* E.g. redirect to mainpage */
                 logger.info("Redirect did not lead to supported URL -> Looks like content is offline");
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -154,11 +175,11 @@ public class TiktokComCrawler extends PluginForDecrypt {
         }
         if (hostPlg.canHandle(contenturl)) {
             return crawlSingleMedia(hostPlg, param, contenturl);
-        } else if (contenturl.matches(TYPE_USER_USERNAME) || contenturl.matches(TYPE_USER_USER_ID)) {
+        } else if (new Regex(contenturl, TYPE_USER_USERNAME).patternFind() || new Regex(contenturl, TYPE_USER_USER_ID).patternFind()) {
             return crawlProfile(param, contenturl);
-        } else if (contenturl.matches(TYPE_PLAYLIST_TAG)) {
+        } else if (new Regex(contenturl, TYPE_PLAYLIST_TAG).patternFind()) {
             return this.crawlPlaylistTag(param, contenturl);
-        } else if (contenturl.matches(TYPE_PLAYLIST_MUSIC)) {
+        } else if (new Regex(contenturl, TYPE_PLAYLIST_MUSIC).patternFind()) {
             return this.crawlPlaylistMusic(param, contenturl);
         } else {
             // unsupported url pattern
@@ -569,7 +590,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             /* Profile does not exist */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String usernameSlug = new Regex(br.getURL(), TYPE_USER_USERNAME).getMatch(0);
+        final String usernameSlug = new Regex(br.getURL(), TYPE_USER_USERNAME.pattern()).getMatch(0);
         if (usernameSlug == null) {
             /* Redirect to somewhere else -> Probably profile does not exist */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -855,12 +876,12 @@ public class TiktokComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> crawlProfileAPI(final CryptedLink param, final String contenturl) throws Exception {
         String user_id = null;
-        if (contenturl.matches(TYPE_USER_USER_ID)) {
+        if (TYPE_USER_USER_ID.matcher(contenturl).matches()) {
             /* user_id is given inside URL. */
-            user_id = new Regex(contenturl, TYPE_USER_USER_ID).getMatch(0);
+            user_id = new Regex(contenturl, TYPE_USER_USER_ID.pattern()).getMatch(0);
         } else {
             /* Only username is given and we need to find the user_id. */
-            final String usernameSlug = new Regex(contenturl, TYPE_USER_USERNAME).getMatch(0);
+            final String usernameSlug = new Regex(contenturl, TYPE_USER_USERNAME.pattern()).getMatch(0);
             if (usernameSlug == null) {
                 /* Developer mistake */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -980,7 +1001,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> crawlPlaylistAPI(final CryptedLink param, final String contenturl) throws Exception {
-        final String tagName = new Regex(contenturl, TYPE_PLAYLIST_TAG).getMatch(0);
+        final String tagName = new Regex(contenturl, TYPE_PLAYLIST_TAG.pattern()).getMatch(0);
         if (tagName == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -1003,7 +1024,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
         if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_PLAYLIST_MUSIC);
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_PLAYLIST_MUSIC.pattern());
         final String musicPlaylistTitle = urlinfo.getMatch(0);
         final String musicID = urlinfo.getMatch(1);
         if (musicPlaylistTitle == null || musicID == null) {

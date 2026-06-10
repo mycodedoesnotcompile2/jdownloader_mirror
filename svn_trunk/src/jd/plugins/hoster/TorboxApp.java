@@ -42,6 +42,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -56,7 +57,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52871 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52887 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -255,10 +256,14 @@ public class TorboxApp extends UseNet {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is not yet ready, state: " + download_state + " | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
                 }
             }
+            String passCode = link.getDownloadPassword();
+            if (link.isPasswordProtected() && passCode == null) {
+                passCode = getUserInput("Password?", link);
+            }
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
-            if (!StringUtils.isEmpty(link.getDownloadPassword())) {
-                query.appendEncoded("password", link.getDownloadPassword());
+            if (passCode != null) {
+                query.appendEncoded("password", passCode);
             }
             final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", query);
             final Map<String, Object> entries = (Map<String, Object>) this.callAPI(br, req_createwebdownload, account, link);
@@ -276,6 +281,11 @@ public class TorboxApp extends UseNet {
             query_requestdl.appendEncoded("zip", "false");
             final Request req_requestdl = br.createGetRequest(API_BASE + "/webdl/requestdl?" + query_requestdl.toString());
             dllink = this.callAPI(br, req_requestdl, account, link).toString();
+            if (passCode != null && link.getDownloadPassword() == null) {
+                logger.info("User has entered correct download password: " + passCode);
+                /* Store password so we can re-use it next time */
+                link.setDownloadPassword(passCode);
+            }
         }
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -621,6 +631,16 @@ public class TorboxApp extends UseNet {
          */
         downloadErrorsHostUnavailable.add("DOWNLOAD_LIMIT_REACHED");
         final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
+        /* First check some special cases */
+        if (new Regex(errormsg, ".*This link is password protected.*").patternFind()) {
+            link.setPasswordProtected(true);
+            if (link.getDownloadPassword() == null) {
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Link is password protected");
+            } else {
+                link.setDownloadPassword(null);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            }
+        }
         if (accountErrorsPermanent.contains(errorcode)) {
             /* This is the only error which allows us to remove the apikey and re-login. */
             throw new AccountInvalidException(errormsg);

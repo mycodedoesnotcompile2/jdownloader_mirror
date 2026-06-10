@@ -21,10 +21,32 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.CountingPushbackInputStream;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.RedditConfig;
+import org.jdownloader.plugins.components.config.RedditConfig.VideoDownloadStreamType;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -42,27 +64,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.RedditComCrawler;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.CountingPushbackInputStream;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.plugins.components.config.RedditConfig;
-import org.jdownloader.plugins.components.config.RedditConfig.VideoDownloadStreamType;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52885 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,16 +72,21 @@ public class RedditCom extends PluginForHost {
          * Why we do not have Reddit account support in stable: <br>
          * - NSFW content is accessible via API even without account <br>
          * - Overall account usage is not required to download reddit content. It's only useful for e.g. downloading the users own saved
-         * posts.
+         * posts. <br>
+         * - 2026/06: Reddit blocked API access for non-account users (login cookies are required now) see:
+         * https://www.reddit.com/r/modnews/comments/1tq9vxo/protecting_communities_from_scrapers_and_platform/
          */
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://www.reddit.com/register/");
-        }
+        this.enablePremium("https://www." + getHost() + "/register/");
     }
 
     @Override
     public boolean isSpeedLimited(DownloadLink link, Account account) {
         return false;
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
     }
 
     public static final String PROPERTY_SUBREDDIT                      = "subreddit";
@@ -154,9 +161,6 @@ public class RedditCom extends PluginForHost {
         ret.add(RedditComCrawler.PATTERN_SELFHOSTED_VIDEO + "|" + RedditComCrawler.PATTERN_SELFHOSTED_IMAGE + "|reddidtext://[a-z0-9]+");
         return ret.toArray(new String[0]);
     }
-
-    /* Connection stuff */
-    private final int MAXDOWNLOADS = -1;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -457,7 +461,7 @@ public class RedditCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     private static final String PROPERTY_ACCOUNT_initial_password          = "initial_password";
@@ -487,12 +491,39 @@ public class RedditCom extends PluginForHost {
         return false;
     }
 
+    public void loginWebsite(final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setCookiesExclusive(true);
+            final Cookies userCookies = account.loadUserCookies();
+            logger.info("Attempting cookie login");
+            br.setCookies(userCookies);
+            if (!force) {
+                /* Don't validate cookies */
+                return;
+            }
+            br.getPage("https://www." + this.getHost() + "/");
+            if (!this.isLoggedin(br)) {
+                logger.info("Cookie login failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                } else {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                }
+            }
+            logger.info("Cookie login successful");
+        }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("user-logged-in=\"true\"");
+    }
+
+    /**
+     * 2026-06-09: Unfinished code! <br>
+     * We probably won't ever be allowed to officially built a scraper/downloader application utilizing the official Reddit API!
+     */
     public void loginAPI(final Account account, final boolean validateToken) throws Exception {
         synchronized (account) {
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                showUnderDevelopmentDialog();
-                throw new AccountInvalidException("The login process of this plugin is still under development");
-            }
             br.setCookiesExclusive(true);
             prepBRAPI(br);
             if (!isAuthorizationURL(account.getPass())) {
@@ -739,51 +770,21 @@ public class RedditCom extends PluginForHost {
         return thread;
     }
 
-    private Thread showUnderDevelopmentDialog() {
-        final String forumURL = "https://board.jdownloader.org/showthread.php?t=80259";
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = "Reddit.com - In Entwicklung";
-                        message += "Hallo liebe(r) Reddit NutzerIn\r\n";
-                        message += "Dieses Plugin befindet sich derzeit noch in Entwicklung.\r\n";
-                        message += "Siehe: :\r\n\t'" + forumURL + "'\t\r\n";
-                    } else {
-                        title = "Reddit.com - Under development";
-                        message += "Hello dear Reddit user\r\n";
-                        message += "This plugin is still under development.\r\n";
-                        message += "See:\r\n\t'" + forumURL + "'\t\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(2 * 60 * 1000);
-                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                        CrossSystem.openURL(forumURL);
-                    }
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
-    }
-
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        loginAPI(account, true);
-        /*
-         * 2020-07-23: We're trying to request minimal API permissions (via oauth2 scopes) so we don't get access to the users' profile -->
-         * Just display all accounts as free accounts! To get information about the users' profile, we'd have to additionally request the
-         * scope "identity": https://github.com/reddit-archive/reddit/wiki/OAuth2
-         */
-        // br.getPage(getApiBaseOauth() + "/api/v1/me");
+        final boolean useOfficialAPI = false;
+        if (useOfficialAPI) {
+            loginAPI(account, true);
+            /*
+             * 2020-07-23: We're trying to request minimal API permissions (via oauth2 scopes) so we don't get access to the users' profile
+             * --> Just display all accounts as free accounts! To get information about the users' profile, we'd have to additionally
+             * request the scope "identity": https://github.com/reddit-archive/reddit/wiki/OAuth2
+             */
+            // br.getPage(getApiBaseOauth() + "/api/v1/me");
+        } else {
+            this.loginWebsite(account, true);
+        }
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
         return ai;
@@ -797,7 +798,7 @@ public class RedditCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -807,14 +808,8 @@ public class RedditCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public void resetDownloadlink(final DownloadLink link) {
-        if (link != null) {
-            link.removeProperty(PROPERTY_LAST_USED_DOWNLOAD_STREAM_TYPE);
-        }
+        link.removeProperty(PROPERTY_LAST_USED_DOWNLOAD_STREAM_TYPE);
     }
 
     @Override

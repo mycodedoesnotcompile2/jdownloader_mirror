@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -30,10 +32,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52886 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileDitchCom extends PluginForHost {
     public FileDitchCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     private static final Pattern DLLINK = Pattern.compile("<a href=\"([^\"]+)\" class=\"btn btn\\-main\"");
@@ -62,20 +71,21 @@ public class FileDitchCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://" + buildHostsPatternPart(domains) + "/file\\.php\\?f=(/[^/]+){3}");
+            ret.add("https?://" + buildHostsPatternPart(domains) + "/file\\.php\\?f=/([a-z0-9]{3,})/([^/#\\?]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.containsHTML("<h2>File unreachable</h2>")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<h2>File unreachable</h2>")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setFinalFileName(br.getRegex("<span>/[^/]+/[^/]+/([^</]+)</span>").getMatch(0));
-        link.setDownloadSize(SizeFormatter.getSize(null, br.getRegex("<span class=\"size\">([^<]+)</span>").getMatch(0), false, false));
+        link.setFinalFileName(br.getRegex("<span>/[^<]*/([^</]+)</span>").getMatch(0));
+        link.setDownloadSize(SizeFormatter.getSize(null, br.getRegex("<span class=\"size\">([^<]+)</span>").getMatch(0), true, false));
         return AvailableStatus.TRUE;
     }
 
@@ -86,5 +96,10 @@ public class FileDitchCom extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlurl, true, 0);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
     }
 }

@@ -45,7 +45,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52881 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52886 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -340,14 +340,13 @@ public class SubyShareCom extends XFileSharingProBasic {
         if (br.getURL().contains(checkddosPage)) {
             logger.warning("Failed to solve challenge(?)");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else {
-            logger.info("Checkddos challenge solved successfully");
-            if (br.getURL().matches("^https?://[^/]+/?$")) {
-                logger.info("Redirect to mainpage happened");
-                if (targetPage != null && !targetPage.equalsIgnoreCase(br.getURL())) {
-                    logger.info("Trying to correct bad redirect to mainpage to: " + targetPage);
-                    br.getPage(targetPage);
-                }
+        }
+        logger.info("Checkddos challenge solved successfully");
+        if (br.getURL().matches("^https?://[^/]+/?$")) {
+            logger.info("Redirect to mainpage happened");
+            if (targetPage != null && !targetPage.equalsIgnoreCase(br.getURL())) {
+                logger.info("Trying to correct bad redirect to mainpage to: " + targetPage);
+                br.getPage(targetPage);
             }
         }
     }
@@ -378,5 +377,13 @@ public class SubyShareCom extends XFileSharingProBasic {
             fileInfo[1] = Encoding.htmlDecode(betterFilesize).trim();
         }
         return fileInfo;
+    }
+
+    @Override
+    protected void checkErrorsLastResort(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        if (br.containsHTML("<title>Expired</title>") || br.containsHTML(">\\s*Your download link is expired")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error: 'Your download link is expired! Please download it at the beginning'");
+        }
+        super.checkErrorsLastResort(br, link, account);
     }
 }
