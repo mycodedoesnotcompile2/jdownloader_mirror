@@ -57,7 +57,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52887 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52888 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -634,11 +634,11 @@ public class TorboxApp extends UseNet {
         /* First check some special cases */
         if (new Regex(errormsg, ".*This link is password protected.*").patternFind()) {
             link.setPasswordProtected(true);
-            if (link.getDownloadPassword() == null) {
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Link is password protected");
-            } else {
+            if (link.getDownloadPassword() != null) {
                 link.setDownloadPassword(null);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            } else {
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Link is password protected");
             }
         }
         if (accountErrorsPermanent.contains(errorcode)) {

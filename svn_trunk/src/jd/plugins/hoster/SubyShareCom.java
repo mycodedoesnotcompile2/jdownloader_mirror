@@ -45,7 +45,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52886 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52888 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -381,7 +381,7 @@ public class SubyShareCom extends XFileSharingProBasic {
 
     @Override
     protected void checkErrorsLastResort(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        if (br.containsHTML("<title>Expired</title>") || br.containsHTML(">\\s*Your download link is expired")) {
+        if (br.containsHTML("<title>\\s*Expired\\s</title>") || br.containsHTML(">\\s*Your download link is expired")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error: 'Your download link is expired! Please download it at the beginning'");
         }
         super.checkErrorsLastResort(br, link, account);

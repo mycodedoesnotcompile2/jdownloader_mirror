@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52786 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
+@HostPlugin(revision = "$Revision: 52888 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
 public class ScribdCom extends PluginForHost {
     private final String        formats       = "formats";
     /** The list of server values displayed to the user */
@@ -123,6 +123,7 @@ public class ScribdCom extends PluginForHost {
         String description = null;
         final String fid = this.getFID(link);
         boolean is_audiobook = false;
+        String filesizeStr = null;
         if (checkViaJson) {
             /* This way we can only determine is_audiobook status via URL. */
             is_audiobook = link.getPluginPatternMatcher().matches(TYPE_AUDIO);
@@ -175,7 +176,7 @@ public class ScribdCom extends PluginForHost {
                     title = (String) entries.get("document_title");
                     description = (String) entries.get("document_description");
                     is_deleted = ((Boolean) JavaScriptEngineFactory.walkJson(entries, "document/deleted")).booleanValue();
-                } else {
+                } else if (json3 != null) {
                     json_type = 3;
                     entries = restoreFromString(json3, TypeRef.MAP);
                     Map<String, Object> docmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "page/word_document");
@@ -186,6 +187,17 @@ public class ScribdCom extends PluginForHost {
                     entries = docmap;
                     title = (String) entries.get("title");
                     // final boolean show_archive_paywall = ((Boolean) entries.get("show_archive_paywall")).booleanValue();
+                    final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) docmap.get("formats");
+                    if (ressourcelist != null && ressourcelist.size() > 0) {
+                        /* Obtain first file size value */
+                        // TODO: Get file size depending on available- and user-preferred format
+                        for (final Map<String, Object> ressource : ressourcelist) {
+                            filesizeStr = (String) ressource.get("filesize");
+                            break;
+                        }
+                    }
+                } else {
+                    logger.warning("Failed to find any json source");
                 }
                 /* 2019-08-11: TODO: Find out what these are good for: 'secret_password' and 'access_key' */
             } catch (final Throwable e) {
@@ -203,6 +215,9 @@ public class ScribdCom extends PluginForHost {
             }
         }
         link.setName(Encoding.htmlDecode(title).trim() + "." + getExtension(is_audiobook));
+        if (filesizeStr != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        }
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
@@ -220,7 +235,6 @@ public class ScribdCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
         final boolean fetchDataViaPurchaseHistory = true;
         String accountType = null;
@@ -285,6 +299,7 @@ public class ScribdCom extends PluginForHost {
             /* Fallback */
             userID = br.getRegex("var _user_id\\s*?=\\s*?\"(\\d+)\";").getMatch(0);
         }
+        final AccountInfo ai = new AccountInfo();
         String accountStatus = null;
         if (expireTimestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
@@ -312,7 +327,7 @@ public class ScribdCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://support.scribd.com/forums/33939/entries/25459";
+        return "http://" + getHost() + "/terms";
     }
 
     private String getExtension(final boolean is_audiobook) {
@@ -418,6 +433,8 @@ public class ScribdCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, "This file is not downloadable");
         } else if (is_view_restricted_archive && show_archive_paywall && account.getType() != AccountType.PREMIUM) {
             this.premiumonlyArchiveViewRestricted();
+            /* Unreachable code */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (is_audiobook) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Audiobooks cannot be downloaded yet!");
         }
@@ -581,45 +598,45 @@ public class ScribdCom extends PluginForHost {
         String formatToDownload = null;
         br.getPage("https://www." + this.getHost() + "/doc-page/download-receipt-modal-props/" + fileId);
         Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        entries = (Map<String, Object>) entries.get("document");
+        final Map<String, Object> document = (Map<String, Object>) entries.get("document");
         String firstAvailableFormat = null;
-        final List<Object> ressourcelist = (List<Object>) entries.get("formats");
+        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) document.get("formats");
         String filesize = null;
         String firstFilesize = null;
-        for (final Object typeO : ressourcelist) {
-            entries = (Map<String, Object>) typeO;
-            final String extensionTmp = (String) entries.get("extension");
-            final String filesizeTmp = (String) entries.get("filesize");
-            if (StringUtils.isEmpty(extensionTmp)) {
-                continue;
-            }
-            if (firstAvailableFormat == null) {
-                firstAvailableFormat = extensionTmp;
-                firstFilesize = filesizeTmp;
-            }
-            if (firstAvailableFormat.equalsIgnoreCase(userPreferredFormat)) {
-                logger.info("User preferred format is available: " + userPreferredFormat);
-                formatToDownload = userPreferredFormat;
-                filesize = filesizeTmp;
-                break;
+        if (ressourcelist != null && ressourcelist.size() > 0) {
+            for (final Map<String, Object> ressource : ressourcelist) {
+                final String extensionTmp = (String) ressource.get("extension");
+                final String filesizeTmp = (String) ressource.get("filesize");
+                if (StringUtils.isEmpty(extensionTmp)) {
+                    continue;
+                }
+                if (firstAvailableFormat == null) {
+                    firstAvailableFormat = extensionTmp;
+                    firstFilesize = filesizeTmp;
+                }
+                if (firstAvailableFormat.equalsIgnoreCase(userPreferredFormat)) {
+                    logger.info("User preferred format is available: " + userPreferredFormat);
+                    formatToDownload = userPreferredFormat;
+                    filesize = filesizeTmp;
+                    break;
+                }
             }
         }
         if (firstAvailableFormat == null) {
             /* E.g. for free accounts, this will return an empty list of items */
             logger.info("Seems like not a single download is available --> This item is READ-ONLY");
-            if (account != null) {
-                if (link.getPluginPatternMatcher().matches(TYPE_DOCUMENT)) {
-                    /*
-                     * Should never happen - maybe we were logged-out or account is not premium but item is only downloadable for premium
-                     * users ... or not downloadable at all for some reason.
-                     */
-                    throw new AccountRequiredException();
-                } else {
-                    /* E.g. not even website provides download-button. Maybe downloadable inside their own app (DRM protected). */
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "This item is not downloadable");
-                }
-            } else {
+            if (account == null) {
                 throw new AccountRequiredException();
+            }
+            if (link.getPluginPatternMatcher().matches(TYPE_DOCUMENT)) {
+                /*
+                 * Should never happen - maybe we were logged-out or account is not premium but item is only downloadable for premium users
+                 * ... or not downloadable at all for some reason.
+                 */
+                throw new AccountRequiredException();
+            } else {
+                /* E.g. not even website provides download-button. Maybe downloadable inside their own app (DRM protected). */
+                throw new PluginException(LinkStatus.ERROR_FATAL, "This item is not downloadable");
             }
         }
         if (formatToDownload == null) {

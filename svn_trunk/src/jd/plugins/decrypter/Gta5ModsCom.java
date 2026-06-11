@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -31,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52878 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52888 $", interfaceVersion = 3, names = {}, urls = {})
 public class Gta5ModsCom extends PluginForDecrypt {
     public Gta5ModsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,28 +74,70 @@ public class Gta5ModsCom extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        String url = param.getCryptedUrl();
-        br.setHeader("referer", url);
-        getPage(url, param);
-        url = br.getRegex(DL_URL).getMatch(0);
-        if (url == null) {
-            final String downloadButton = br.getRegex("<a href=\"([^\"]+)\" class=\"btn btn-primary btn-download\"").getMatch(0);
-            if (downloadButton == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            getPage(downloadButton, param);
-            url = br.getRegex(DL_URL).getMatch(0);
-            if (url == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    private static final String[] IGNORE_PATH_SEGMENTS = new String[] { "day", "tags", "most-downloaded", "week", "highest-rated", "month", "most-liked", "latest-uploads" };
+
+    private boolean isIgnoredURL(final String url) {
+        final String path = new Regex(url, "https?://[^/]+(/[^?#]*)").getMatch(0);
+        if (path == null) {
+            return false;
+        }
+        final String lastSegment = new Regex(path, ".*/([^/]+)/*$").getMatch(0);
+        if (lastSegment == null) {
+            return false;
+        }
+        for (final String ignoredSegment : IGNORE_PATH_SEGMENTS) {
+            if (ignoredSegment.equalsIgnoreCase(lastSegment)) {
+                return true;
             }
         }
-        url = Encoding.htmlOnlyDecode(url);
-        final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
-        final String[] urlsplit = url.split("/");
+        return false;
+    }
+
+    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
+        String url = param.getCryptedUrl();
+        if (isIgnoredURL(url)) {
+            return new ArrayList<DownloadLink>();
+        }
+        br.setHeader("referer", url);
+        getPage(url, param);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*The page you were looking for doesn't exist")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        url = br.getRegex(DL_URL).getMatch(0);
+        if (url != null) {
+            url = Encoding.htmlOnlyDecode(url);
+            final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+            final String[] urlsplit = url.split("/");
+            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+            file.setFinalFileName(urlsplit[urlsplit.length - 1].split("-", 2)[1]);
+            ret.add(file);
+            return ret;
+        }
+        final String downloadButton = br.getRegex("<a href=\"([^\"]+)\" class=\"btn btn-primary btn-download\"").getMatch(0);
+        if (downloadButton == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        getPage(downloadButton, param);
+        url = br.getRegex(DL_URL).getMatch(0);
+        if (url != null) {
+            url = Encoding.htmlOnlyDecode(url);
+            final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+            final String[] urlsplit = url.split("/");
+            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+            file.setFinalFileName(urlsplit[urlsplit.length - 1].split("-", 2)[1]);
+            ret.add(file);
+            return ret;
+        }
+        /* Redirect to external website such as drive.google.com */
+        url = br.getRedirectLocation();
+        if (url == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        dl.setFinalFileName(urlsplit[urlsplit.length - 1].split("-", 2)[1]);
-        ret.add(dl);
+        final DownloadLink file = createDownloadlink(url);
+        ret.add(file);
         return ret;
     }
 

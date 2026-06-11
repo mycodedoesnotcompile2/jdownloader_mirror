@@ -21,6 +21,8 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.TnaFlixComConfig;
+import org.jdownloader.plugins.components.config.TnaFlixComConfig.PreferredStreamQuality;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -34,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52886 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52892 $", interfaceVersion = 2, names = {}, urls = {})
 public class TnaFlixCom extends PluginForHost {
     public TnaFlixCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,12 +109,12 @@ public class TnaFlixCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.tnaflix.com/terms.php";
+        return "https://www." + getHost() + "/terms.php";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return 18;
+        return Integer.MAX_VALUE;
     }
 
     private String getURLName(final DownloadLink link) {
@@ -139,8 +141,8 @@ public class TnaFlixCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
-        br.setCookie("https://" + link.getHost(), "content_filter2", "type%3Dstraight%26filter%3Dcams");
-        br.setCookie("https://" + link.getHost(), "content_filter3", "type%3Dstraight%2Ctranny%2Cgay%26filter%3Dcams");
+        br.setCookie(link.getHost(), "content_filter2", "type%3Dstraight%26filter%3Dcams");
+        br.setCookie(link.getHost(), "content_filter3", "type%3Dstraight%2Ctranny%2Cgay%26filter%3Dcams");
         String filename = null;
         br.getPage(this.getContentURL(link));
         if (br.containsHTML("class=\"errorPage page404\"|> This video is set to private") || this.br.getHttpConnection().getResponseCode() == 404 || this.br.getURL().length() < 30) {
@@ -200,22 +202,51 @@ public class TnaFlixCom extends PluginForHost {
             /* This may sometimes return 403 - avoid it if possible! */
             download = br.getRegex("download href=\"((https?:)?//[^<>\"]+)\"").getMatch(0);
         }
+        final int preferredHeight = getPreferredStreamQualityHeight();
         String dllink = null;
         if (download != null) {
             /* Official download */
-            if (StringUtils.isNotEmpty(dllink)) {
-                dllink = br.getURL(dllink).toExternalForm();
-            } else {
-                final String[] qualities = { "720", "480", "360", "240", "144" };
-                for (final String quality : qualities) {
+            if (preferredHeight > 0) {
+                dllink = new Regex(download, "href=(\"|')((?:https?:)?//.*?)\\1>Download in " + preferredHeight).getMatch(1);
+            }
+            if (dllink == null) {
+                /* Preferred quality not found or BEST selected: pick highest available */
+                final String[] qualityOrder = { "1080", "720", "480", "360", "240", "144" };
+                for (final String quality : qualityOrder) {
                     dllink = new Regex(download, "href=(\"|')((?:https?:)?//.*?)\\1>Download in " + quality).getMatch(1);
                     if (dllink != null) {
                         break;
                     }
                 }
             }
+            if (StringUtils.isNotEmpty(dllink)) {
+                dllink = br.getURL(dllink).toExternalForm();
+            }
         }
         if (dllink == null) {
+            /* 2026-06-11 */
+            /* Search streams in already loaded page HTML (no extra request needed) */
+            final String[][] pageSources = new Regex(br.toString(), "<source src=\"(https?://[^\"]+)\"[^>]*type=\"video/mp4\"[^>]*size=\"(\\d+)\"").getMatches();
+            if (pageSources != null && pageSources.length > 0) {
+                int bestHeight = -1;
+                String bestLink = null;
+                String preferredLink = null;
+                for (final String[] source : pageSources) {
+                    final String url = source[0];
+                    final int height = Integer.parseInt(source[1]);
+                    if (bestLink == null || height > bestHeight) {
+                        bestHeight = height;
+                        bestLink = url;
+                    }
+                    if (preferredHeight > 0 && height == preferredHeight) {
+                        preferredLink = url;
+                    }
+                }
+                dllink = preferredLink != null ? preferredLink : bestLink;
+            }
+        }
+        if (dllink == null) {
+            // old
             if (videoid == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -224,17 +255,23 @@ public class TnaFlixCom extends PluginForHost {
             final String html = entries.get("html").toString();
             final String[] qualities = new Regex(html, "(https?://[^\"]+)\" type=\"video/mp4").getColumn(0);
             int bestHeight = -1;
+            String bestLink = null;
+            String preferredLink = null;
             for (final String quality : qualities) {
                 final String heightStr = new Regex(quality, "(\\d+)p\\.mp4").getMatch(0);
                 int height = -1;
                 if (heightStr != null) {
                     height = Integer.parseInt(heightStr);
                 }
-                if (dllink == null || height > bestHeight) {
+                if (bestLink == null || height > bestHeight) {
                     bestHeight = height;
-                    dllink = quality;
+                    bestLink = quality;
+                }
+                if (preferredHeight > 0 && height == preferredHeight) {
+                    preferredLink = quality;
                 }
             }
+            dllink = preferredLink != null ? preferredLink : bestLink;
         }
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -252,5 +289,30 @@ public class TnaFlixCom extends PluginForHost {
             }
         }
         dl.startDownload();
+    }
+
+    private int getPreferredStreamQualityHeight() {
+        final TnaFlixComConfig cfg = get(getConfigInterface());
+        final PreferredStreamQuality quality = cfg.getPreferredStreamQuality();
+        if (quality == PreferredStreamQuality.Q1080P) {
+            return 1080;
+        } else if (quality == PreferredStreamQuality.Q720P) {
+            return 720;
+        } else if (quality == PreferredStreamQuality.Q480P) {
+            return 480;
+        } else if (quality == PreferredStreamQuality.Q360P) {
+            return 360;
+        } else if (quality == PreferredStreamQuality.Q240P) {
+            return 240;
+        } else if (quality == PreferredStreamQuality.Q144P) {
+            return 144;
+        } else {
+            return -1;
+        }
+    }
+
+    @Override
+    public Class<? extends TnaFlixComConfig> getConfigInterface() {
+        return TnaFlixComConfig.class;
     }
 }

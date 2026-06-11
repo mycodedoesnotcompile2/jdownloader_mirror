@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 51142 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52890 $", interfaceVersion = 3, names = {}, urls = {})
 public class HideCx extends PluginForDecrypt {
     public HideCx(PluginWrapper wrapper) {
         super(wrapper);
@@ -187,6 +187,7 @@ public class HideCx extends PluginForDecrypt {
                 link.setAvailable(false);
             } else {
                 /* Do not set any status, let hoster plugin check such links. */
+                logger.info("Found unknown status: " + link_status);
             }
             link._setFilePackage(fp);
             ret.add(link);

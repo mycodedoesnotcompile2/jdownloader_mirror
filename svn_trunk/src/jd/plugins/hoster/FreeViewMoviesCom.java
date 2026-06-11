@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FreeViewMoviesComCrawler;
 
-@HostPlugin(revision = "$Revision: 52764 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52888 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.FreeViewMoviesComCrawler.class })
 public class FreeViewMoviesCom extends PluginForHost {
     private String              dllink      = null;
@@ -77,12 +77,12 @@ public class FreeViewMoviesCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.freeviewmovies.com/page/tos/";
+        return "https://www." + getHost() + "/page/tos/";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

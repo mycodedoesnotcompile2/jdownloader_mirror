@@ -18,6 +18,18 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -36,19 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52890 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -97,6 +97,10 @@ public class DdownloadCom extends XFileSharingProBasic {
          * Your example confirms it: 1,069,547,520 ÷ 1,048,576 = exactly 1020.0, which is why the site shows "1020 MB".
          *
          * So please switch the plugin to binary units (1024 / MiB), not decimal (1000 / MB).
+         */
+        /*
+         * TODO: 2026-06-10: Remove this override once current superclass revision is live since superclass is using the same (correct) kibi
+         * parsing now.
          */
         switch (type) {
         case TRAFFIC: {
@@ -389,7 +393,7 @@ public class DdownloadCom extends XFileSharingProBasic {
         // remove comments, eg ddl.to just comment some buttons/links for expired cookies/non logged in
         final String htmlWithoutScriptTagsAndComments = br.toString().replaceAll("(?s)(<script.*?</script>)", "").replaceAll("(?s)(<!--.*?-->)", "");
         final String ahref = "<a[^<]*href\\s*=\\s*\"[^\"]*";
-        final boolean logoutOkay = new Regex(htmlWithoutScriptTagsAndComments, ahref + "(&|\\?)op=logout").matches() || new Regex(htmlWithoutScriptTagsAndComments, ahref + "/(user_)?logout\"").matches();
+        final boolean logoutOkay = new Regex(htmlWithoutScriptTagsAndComments, ahref + "(&|\\?)op=logout").patternFind() || new Regex(htmlWithoutScriptTagsAndComments, ahref + "/(user_)?logout\"").patternFind();
         // unsafe, not every site does redirect
         final boolean loginURLFailed = br.getURL().contains("op=") && br.getURL().contains("op=login");
         /*
@@ -397,7 +401,7 @@ public class DdownloadCom extends XFileSharingProBasic {
          * This may be the case if a user has direct downloads enabled. We access downloadurl --> Redirect happens --> We check for login
          */
         final boolean isRedirect = br.getRedirectLocation() != null;
-        final boolean myAccountOkay = (new Regex(htmlWithoutScriptTagsAndComments, ahref + "(&|\\?)op=my_account").matches() || new Regex(htmlWithoutScriptTagsAndComments, ahref + "/my(-|_)account\"").matches() || isRedirect);
+        final boolean myAccountOkay = (new Regex(htmlWithoutScriptTagsAndComments, ahref + "(&|\\?)op=my_account").patternFind() || new Regex(htmlWithoutScriptTagsAndComments, ahref + "/my(-|_)account\"").patternFind() || isRedirect);
         logger.info("login_xfss_CookieOkay:" + login_xfss_CookieOkay);
         logger.info("logoutOkay:" + logoutOkay);
         logger.info("myAccountOkay:" + myAccountOkay);
@@ -485,9 +489,8 @@ public class DdownloadCom extends XFileSharingProBasic {
         /* 2026-04-20: Special */
         logger.info("Looking for API key in affiliate settings");
         try {
-            final Browser brc = br.cloneBrowser();
-            getPage(brc, "/affiliate?tab=settings");
-            apikey = regexAPIKey(brc);
+            getPage(br, "/affiliate?tab=settings");
+            apikey = regexAPIKey(br);
             if (apikey != null) {
                 return apikey;
             }
@@ -501,9 +504,22 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
+    protected String getAPIBase() {
+        // final String custom_apidomain = this.getPluginConfig().getStringProperty(PROPERTY_PLUGIN_api_domain_with_protocol);
+        // TODO: Use field reference PROPERTY_PLUGIN_api_domain_with_protocol instead of the string down below!
+        final String custom_apidomain = this.getPluginConfig().getStringProperty("apidomain");
+        if (custom_apidomain != null) {
+            return custom_apidomain;
+        } else {
+            return "https://api-v2.ddownload.com/api";
+        }
+    }
+
+    @Override
     public void resetDownloadlink(DownloadLink link) {
         super.resetDownloadlink(link);
         if (link == null) {
+            /* This should never happen */
             return;
         }
         link.removeProperty(CLOUDFLARE_BLOCKED_WORKAROUND_PROPERTY);
@@ -572,10 +588,8 @@ public class DdownloadCom extends XFileSharingProBasic {
 
     @Override
     protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
-        /* 2020-01-20: Special */
-        if (new Regex(html, "(?i)>\\s*This server is in maintenance mode").patternFind()) {
-            /* <strong>Oops!</strong> This server is in maintenance mode. Refresh this page in some minutes. */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This server is in maintenance mode", 15 * 60 * 1000l);
+        if (br.getHttpConnection().getResponseCode() == 429) {
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 Too Many Requests", 1 * 60 * 1000l);
         } else if (br.getHttpConnection().getResponseCode() == 500) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500", 1 * 60 * 1000l);
         }

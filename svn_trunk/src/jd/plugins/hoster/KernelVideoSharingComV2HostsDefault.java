@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52822 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52892 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -157,6 +157,12 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "fapbox.com" });
         ret.add(new String[] { "nakedtube.com" });
         ret.add(new String[] { "txxx.porn" });
+        ret.add(new String[] { "xmegadrive.com" });
+        ret.add(new String[] { "alphaporno.com" });
+        ret.add(new String[] { "hellporno.com" });
+        ret.add(new String[] { "bravotube.net" });
+        ret.add(new String[] { "shameless.com" });
+        ret.add(new String[] { "femdomtb.com" });
         return ret;
     }
 

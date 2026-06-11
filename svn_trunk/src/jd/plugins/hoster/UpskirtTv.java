@@ -22,11 +22,11 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -37,9 +37,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 @HostPlugin(revision = "$Revision: 52890 $", interfaceVersion = 3, names = {}, urls = {})
-public class FilesterMe extends PluginForHost {
-    public FilesterMe(PluginWrapper wrapper) {
+public class UpskirtTv extends PluginForHost {
+    public UpskirtTv(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
     @Override
@@ -54,10 +59,10 @@ public class FilesterMe extends PluginForHost {
         return "https://" + getHost();
     }
 
-    public static List<String[]> getPluginDomains() {
+    private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filester.me", "filester.si", "filester.sh", "filester.gg" });
+        ret.add(new String[] { "upskirt.tv" });
         return ret;
     }
 
@@ -70,7 +75,7 @@ public class FilesterMe extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL = Pattern.compile("/d/([a-zA-Z0-9]{2,})");
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/play/(\\d+)(/([a-z0-9\\-]+)/?)?");
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
@@ -105,7 +110,14 @@ public class FilesterMe extends PluginForHost {
 
     @Override
     protected String getDefaultFileName(DownloadLink link) {
-        return this.getFID(link);
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL);
+        String urlTitle = urlinfo.getMatch(2);
+        if (urlTitle != null) {
+            /* Return <titleFromURL> + .mp4 */
+            return Encoding.htmlDecode(urlTitle).replace("-", " ").trim() + ".mp4";
+        }
+        /* Return <file_id>.mp4 */
+        return urlinfo.getMatch(0) + ".mp4";
     }
 
     @Override
@@ -114,25 +126,15 @@ public class FilesterMe extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 410) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("window\\.fileName = \"([^\"]+)").getMatch(0);
-        String filesize = br.getRegex("Size\\s*</span[^>]*>\\s*<span[^>]*>([^<]+)</span").getMatch(0);
-        if (filename != null) {
-            filename = restoreFromString("\"" + filename + "\"", TypeRef.STRING);
-            link.setFinalFileName(filename);
+        String urlTitle = new Regex(br.getURL(), PATTERN_NORMAL).getMatch(2);
+        if (urlTitle != null) {
+            urlTitle = Encoding.htmlDecode(urlTitle).replace("-", " ").trim();
+            link.setFinalFileName(urlTitle + ".mp4");
         } else {
-            logger.warning("Failed to find filename");
-        }
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(null, filesize, false, false));
-        } else {
-            logger.warning("Failed to find filesize");
-        }
-        final String sha256 = br.getRegex("SHA-256</span.*>([a-f0-9]{64})").getMatch(0);
-        if (sha256 != null) {
-            link.setSha256Hash(sha256);
-        } else {
-            logger.warning("Failed to find sha256");
+            logger.warning("Failed to find file title");
         }
         return AvailableStatus.TRUE;
     }
@@ -144,38 +146,43 @@ public class FilesterMe extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String fid = this.getFID(link);
         final Browser brc = br.cloneBrowser();
-        brc.getPage("https://filester.me/js/file_dl.js?ver=1.0.5");
-        String dl_host = brc.getRegex("const CDN_URL\\s*=\\s*'(https?://[^'/]+)';").getMatch(0);
-        if (dl_host == null) {
-            final String dl_hosts = brc.getRegex("const CDN_URLS\\s*=\\s*(\\[.*?\\])\\s*;").getMatch(0);
-            if (dl_hosts != null) {
-                final String cdnURLs[] = restoreFromString(dl_hosts.replace("'", "\""), TypeRef.STRING_ARRAY);
-                dl_host = cdnURLs == null ? null : cdnURLs[(int) (Math.floor(Math.random() * cdnURLs.length))];
-            }
-            if (dl_host == null) {
-                dl_host = brc.getRegex("const CDN_URLS\\s*=\\s*\\[\\s*'(https?://[^'/]+)'").getMatch(0);
-            }
-            if (StringUtils.isEmpty(dl_host)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find dl_host");
-            }
-        }
-        brc.postPageRaw("/api/public/download", "{\"file_slug\":\"" + fid + "\"}");
-        if (brc.getHttpConnection().getResponseCode() == 429) {
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 Too Many Requests", 1 * 60 * 1000l);
-        }
+        brc.postPage("https://api.upskirt.tv/hls", "id=" + this.getFID(link));
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (Boolean.FALSE.equals(entries.get("success"))) {
-            /* e.g. {"success":false,"error":"E4006","message":"Too many requests"} */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Error " + entries.get("error") + " | " + entries.get("message"));
+        final List<Map<String, Object>> mp4List = (List<Map<String, Object>>) entries.get("mp4");
+        if (mp4List == null || mp4List.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        String dllink = entries.get("download_url").toString();
-        if (StringUtils.isEmpty(dllink)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+        String bestUrl = null;
+        int bestQuality = -1;
+        for (final Map<String, Object> entry : mp4List) {
+            final String url = (String) entry.get("src");
+            if (url == null) {
+                continue;
+            }
+            final String title = (String) entry.get("title"); // e.g. 480p.mp4
+            int quality = -1;
+            /* Try title first, then URL */
+            String qualityMatch = new Regex(title, "(\\d+)p").getMatch(0);
+            if (qualityMatch == null) {
+                qualityMatch = new Regex(url, "/(\\d+)p\\.mp4").getMatch(0);
+            }
+            if (qualityMatch != null) {
+                quality = Integer.parseInt(qualityMatch);
+            }
+            if (quality == -1) {
+                /* No quality found — use as fallback if nothing better found */
+                if (bestUrl == null) {
+                    bestUrl = url;
+                }
+                continue;
+            }
+            if (quality > bestQuality) {
+                bestQuality = quality;
+                bestUrl = url;
+            }
         }
-        dllink = dl_host + dllink;
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, bestUrl, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
