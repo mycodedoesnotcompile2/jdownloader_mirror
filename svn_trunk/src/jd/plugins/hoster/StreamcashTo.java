@@ -18,15 +18,15 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -36,10 +36,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
-public class FilesterMe extends PluginForHost {
-    public FilesterMe(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 52896 $", interfaceVersion = 3, names = {}, urls = {})
+public class StreamcashTo extends PluginForHost {
+    public StreamcashTo(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -54,10 +59,10 @@ public class FilesterMe extends PluginForHost {
         return "https://" + getHost();
     }
 
-    public static List<String[]> getPluginDomains() {
+    private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        /* Find current list of domains here: https://filester.me/proxy */
-        ret.add(new String[] { "filester.me", "filester.si", "filester.sh", "filester.gg" });
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "streamcash.to" });
         return ret;
     }
 
@@ -70,12 +75,13 @@ public class FilesterMe extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL = Pattern.compile("/d/([a-zA-Z0-9]{2,})");
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/watch/([a-zA-Z0-9]{10})");
+    private static final Pattern PATTERN_EMBED  = Pattern.compile("/embed/([a-zA-Z0-9]{10})");
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern());
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_NORMAL.pattern().substring(1) + "|" + PATTERN_EMBED.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -91,7 +97,12 @@ public class FilesterMe extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).getMatch(0);
+        return fid;
     }
 
     @Override
@@ -105,7 +116,7 @@ public class FilesterMe extends PluginForHost {
 
     @Override
     protected String getDefaultFileName(DownloadLink link) {
-        return this.getFID(link);
+        return this.getFID(link) + ".mp4";
     }
 
     @Override
@@ -115,24 +126,18 @@ public class FilesterMe extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("window\\.fileName = \"([^\"]+)").getMatch(0);
-        String filesize = br.getRegex("Size\\s*</span[^>]*>\\s*<span[^>]*>([^<]+)</span").getMatch(0);
+        if (isVideoBeingProcessed(br)) {
+            /* No file information available */
+            return AvailableStatus.TRUE;
+        }
+        String filename = br.getRegex("").getMatch(0); // TODO: Adjust this to websites' html
+        String filesize = br.getRegex("File Size:<br> ([^<>\"]+)<").getMatch(0);
         if (filename != null) {
-            filename = restoreFromString("\"" + filename + "\"", TypeRef.STRING);
-            link.setFinalFileName(filename);
-        } else {
-            logger.warning("Failed to find filename");
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename + ".mp4");
         }
         if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(null, filesize, false, false));
-        } else {
-            logger.warning("Failed to find filesize");
-        }
-        final String sha256 = br.getRegex("SHA-256</span.*>([a-f0-9]{64})").getMatch(0);
-        if (sha256 != null) {
-            link.setSha256Hash(sha256);
-        } else {
-            logger.warning("Failed to find sha256");
+            link.setDownloadSize(SizeFormatter.getSize(filesize));
         }
         return AvailableStatus.TRUE;
     }
@@ -144,40 +149,20 @@ public class FilesterMe extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String fid = this.getFID(link);
-        final Browser brc = br.cloneBrowser();
-        brc.getPage("https://filester.me/js/file_dl.js?ver=1.0.5");
-        String dl_host = brc.getRegex("const CDN_URL\\s*=\\s*'(https?://[^'/]+)';").getMatch(0);
-        if (dl_host == null) {
-            final String dl_hosts = brc.getRegex("const CDN_URLS\\s*=\\s*(\\[.*?\\])\\s*;").getMatch(0);
-            if (dl_hosts != null) {
-                final String cdnURLs[] = restoreFromString(dl_hosts.replace("'", "\""), TypeRef.STRING_ARRAY);
-                dl_host = cdnURLs == null ? null : cdnURLs[(int) (Math.floor(Math.random() * cdnURLs.length))];
-            }
-            if (dl_host == null) {
-                dl_host = brc.getRegex("const CDN_URLS\\s*=\\s*\\[\\s*'(https?://[^'/]+)'").getMatch(0);
-            }
-            if (StringUtils.isEmpty(dl_host)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find dl_host");
-            }
+        if (isVideoBeingProcessed(br)) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video is being processed, please check back shortly.", 5 * 60 * 1000l);
         }
-        brc.postPageRaw("/api/public/download", "{\"file_slug\":\"" + fid + "\"}");
-        if (brc.getHttpConnection().getResponseCode() == 429) {
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 Too Many Requests", 1 * 60 * 1000l);
-        }
-        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (Boolean.FALSE.equals(entries.get("success"))) {
-            /* e.g. {"success":false,"error":"E4006","message":"Too many requests"} */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Error " + entries.get("error") + " | " + entries.get("message"));
-        }
-        String dllink = entries.get("download_url").toString();
+        String dllink = br.getRegex("").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
-        dllink = dl_host + dllink;
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    private boolean isVideoBeingProcessed(final Browser br) {
+        return br.containsHTML(">\\s*Video is being processed");
     }
 
     @Override

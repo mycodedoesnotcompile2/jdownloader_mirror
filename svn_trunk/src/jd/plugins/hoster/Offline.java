@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 52890 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52894 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -335,6 +335,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "ausfile.com" });
         ret.add(new String[] { "linkto.net" });
         ret.add(new String[] { "yourvoyeurvideos.com", "homemade-voyeur.com" });
+        ret.add(new String[] { "meocloud.pt" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

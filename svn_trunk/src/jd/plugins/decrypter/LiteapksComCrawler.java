@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
@@ -32,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
 public class LiteapksComCrawler extends PluginForDecrypt {
     public LiteapksComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +105,11 @@ public class LiteapksComCrawler extends PluginForDecrypt {
         }
         title = Encoding.htmlDecode(title).trim();
         title = title.replaceFirst("(?i) Download$", "");
-        final String[] filesizes = br.getRegex("<span class=\"text-muted d-block ml-auto\"[^>]*>([^<]+)</span>").getColumn(0);
+        String[] filesizes = br.getRegex("<span class=\"text-muted d-block ml-auto\"[^>]*>([^<]+)</span>").getColumn(0);
+        if (filesizes == null || filesizes.length == 0) {
+            /* 2026-06-11 */
+            filesizes = br.getRegex("group-hover:text-primary transition-colors\">(\\d+[^<]+)</span>").getColumn(0);
+        }
         final String[] links = br.getRegex("(/download/[\\w+\\-]+/\\d+)\"").getColumn(0);
         if (links == null || links.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -116,7 +121,10 @@ public class LiteapksComCrawler extends PluginForDecrypt {
             link.setName(title + "_" + (index + 1) + ".apk");
             link.setAvailable(true);
             if (filesizes != null && links.length == filesizes.length) {
-                final String filesizeStr = filesizes[index];
+                String filesizeStr = filesizes[index];
+                if (StringUtils.endsWithCaseInsensitive(filesizeStr, "M")) {
+                    filesizeStr += "b";
+                }
                 link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
             }
             ret.add(link);

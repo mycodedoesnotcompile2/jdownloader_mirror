@@ -57,7 +57,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52888 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52894 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -72,6 +72,7 @@ public class TorboxApp extends UseNet {
     public static final String           PROPERTY_DOWNLOAD_TYPE_usenet_downloads                  = "usenet_downloads";
     private static final String          PROPERTY_MULTIHOST_FILE_ID                               = "torbox_handlemultihost_file_id";
     private static final String          PROPERTY_MULTIHOST_HASH                                  = "torbox_handlemultihost_hash";
+    private static final String          PROPERTY_MULTIHOST_WEB_DOWNLOAD_FAILED_TIMESTAMP         = "torbox_handlemultihost_web_download_failed_ts";
     private final String                 PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP = "notifications_displayed_until_timestamp";
     private final String                 PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET                    = "max_downloads_usenet";
     private final String                 PROPERTY_ACCOUNT_USENET_USERNAME                         = "usenetU";
@@ -235,6 +236,7 @@ public class TorboxApp extends UseNet {
                     throw pe;
                 }
                 if (Boolean.TRUE.equals(resp.get("download_finished"))) {
+                    /* download_state should be "completed" in this case. */
                     logger.info("Server side download is finished -> Download should work");
                     break webdownloadCheck;
                 }
@@ -250,10 +252,16 @@ public class TorboxApp extends UseNet {
                 final String progress_percent_str = progress != null ? String.format("%.2f%%", progress.doubleValue() * 100) : "Unknown";
                 final String download_state = (String) resp.get("download_state");
                 // TODO: Implement other states to have nicer error messages
-                if (StringUtils.equalsIgnoreCase(download_state, "downloading")) {
+                if (StringUtils.startsWithCaseInsensitive(download_state, "downloading")) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is in progress | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
+                } else if (StringUtils.startsWithCaseInsensitive(download_state, "failed")) {
+                    /* e.g. "download_state":"failed (Download 1Fichier)" */
+                    // TODO: Decide whether or not any retry is worth doing her; for now I just set a very long delay on such items, also
+                    // make use of this stored timestamp
+                    link.setProperty(PROPERTY_MULTIHOST_WEB_DOWNLOAD_FAILED_TIMESTAMP, System.currentTimeMillis());
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download failed | Progress: " + progress_percent_str, 3 * 60 * 60 * 1000l);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is not yet ready, state: " + download_state + " | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is in unknown state: " + download_state + " | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
                 }
             }
             String passCode = link.getDownloadPassword();

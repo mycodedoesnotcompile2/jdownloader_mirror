@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
@@ -52,6 +54,7 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -73,7 +76,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 52885 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52894 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -160,14 +163,37 @@ public class RedditComCrawler extends PluginForDecrypt {
         }
     }
 
-    private void loginWebsite() throws Exception {
+    private final AtomicReference<String> CACHED_LOID           = new AtomicReference<String>();
+    private final AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1);
+    private static final long             CACHED_LOID_MAX_AGE   = 3 * 60 * 60 * 1000L;
+
+    private void authorize_json_api_usage() throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        if (account == null && ACCOUNT_REQUIRED_FOR_ANY_CRAWL_ACTIVITY) {
-            throw new AccountRequiredException("Account is required to access reddit json API");
-        }
         if (account != null) {
+            /* User has account -> Use that */
             final RedditCom plugin = (RedditCom) this.getNewPluginForHostInstance(this.getHost());
             plugin.loginWebsite(account, false);
+            return;
+        }
+        final boolean try_anonymous_workaround = true;
+        if (ACCOUNT_REQUIRED_FOR_ANY_CRAWL_ACTIVITY && try_anonymous_workaround) {
+            /* 2026-06-11: Props to: https://github.com/yt-dlp/yt-dlp/commit/72ac62051593184552733e353da4a8cb8ec214ed */
+            final long now = System.currentTimeMillis();
+            if (!StringUtils.isEmpty(CACHED_LOID.get()) && (now - CACHED_LOID_TIMESTAMP.get()) < CACHED_LOID_MAX_AGE) {
+                br.setCookie(getHost(), "loid", CACHED_LOID.get());
+            } else {
+                br.getPage("https://old.reddit.com/");
+                final String cookie_loid = br.getCookie(br.getHost(), "loid", Cookies.NOTDELETEDPATTERN);
+                if (StringUtils.isEmpty(cookie_loid)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Anonymous json API authorization workaround failed");
+                }
+                CACHED_LOID.set(cookie_loid);
+                CACHED_LOID_TIMESTAMP.set(now);
+            }
+            return;
+        }
+        if (ACCOUNT_REQUIRED_FOR_ANY_CRAWL_ACTIVITY) {
+            throw new AccountRequiredException("Account is required to access reddit json API");
         }
     }
 
@@ -201,7 +227,7 @@ public class RedditComCrawler extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        loginWebsite();
+        authorize_json_api_usage();
         String sorting = urlinfo.getMatch(2);
         if (sorting == null) {
             /* No specific sort order = use "new" */
@@ -230,7 +256,7 @@ public class RedditComCrawler extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        loginWebsite();
+        authorize_json_api_usage();
         final UrlQuery query = UrlQuery.parse(contenturl);
         final String sorting = query.get("sort");
         final String timeRange = query.get("t");
@@ -410,7 +436,7 @@ public class RedditComCrawler extends PluginForDecrypt {
         if (commentID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        loginWebsite();
+        authorize_json_api_usage();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         getPage(br, "https://www." + this.getHost() + "/comments/" + commentID + "/.json");
         if (br.getHttpConnection().getResponseCode() == 404) {

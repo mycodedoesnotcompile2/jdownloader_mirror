@@ -21,6 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.encoding.Base64;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -40,9 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesterMe;
 
-import org.appwork.utils.encoding.Base64;
-
-@DecrypterPlugin(revision = "$Revision: 52838 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
@@ -91,15 +91,14 @@ public class FilesterMeFolder extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        Form passwordForm = br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
+        final Form passwordForm = findPasswordForm(br);
         if (passwordForm != null) {
             final String password = getUserInput("Password?", param);
             passwordForm.put("password", URLEncoder.encode(encodePassword(password, passwordForm.getInputFieldByName("nonce").getValue()), "UTF-8"));
             br.submitForm(passwordForm);
-            passwordForm = br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
-        }
-        if (passwordForm != null) {
-            throw new DecrypterRetryException(RetryReason.PASSWORD, "This folder is password protected");
+            if (findPasswordForm(br) != null) {
+                throw new DecrypterRetryException(RetryReason.PASSWORD, "This folder is password protected");
+            }
         }
         String title = br.getRegex("class=\"folder-title\"[^>]*>\\s*([^<]+)\\s*</h1>").getMatch(0);
         String folder_title;
@@ -205,6 +204,10 @@ public class FilesterMeFolder extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    private Form findPasswordForm(final Browser br) {
+        return br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
     }
 
     @Override

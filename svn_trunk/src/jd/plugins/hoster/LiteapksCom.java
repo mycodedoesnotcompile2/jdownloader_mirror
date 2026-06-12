@@ -19,6 +19,9 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -32,10 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.LiteapksComCrawler;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LiteapksComCrawler.class })
 public class LiteapksCom extends PluginForHost {
     public LiteapksCom(PluginWrapper wrapper) {
@@ -71,7 +71,7 @@ public class LiteapksCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://liteapks.com/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -103,15 +103,33 @@ public class LiteapksCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         dllink = br.getRegex("href=\"(https?://[^\"]+)\" download>").getMatch(0);
+        if (dllink == null) {
+            final String dllink_b64encoded = br.getRegex("data-link=\"(aHR0[^\"]+)").getMatch(0);
+            if (dllink_b64encoded != null) {
+                dllink = Encoding.Base64Decode(dllink_b64encoded);
+                if (!dllink.contains("token=") && !dllink.contains("?")) {
+                    /* 2026-06-11: See: https://liteapks.com/wp-content/themes/liteapks/js/site.js?ver=1773647695 */
+                    long timeToLive = System.currentTimeMillis() / 1000 + 3600 * 3;
+                    String step1 = Encoding.Base64Encode(Long.toString(timeToLive));
+                    String token = Encoding.Base64Encode(step1);
+                    dllink += "?token=" + token;
+                }
+            }
+        }
         if (dllink != null) {
             final String filename = Plugin.getFileNameFromURL(new URL(dllink));
             if (filename != null) {
                 link.setName(Encoding.htmlDecode(filename));
             }
         }
-        final String filesize = br.getRegex("Download \\((\\d+[^\\)]+)\\)").getMatch(0);
+        String filesize = br.getRegex("id=\"download-size-label\"[^>]*>\\((\\d+[^<]+)\\)</span>").getMatch(0);
         if (filesize != null) {
+            if (StringUtils.endsWithCaseInsensitive(filesize, "M")) {
+                filesize += "b";
+            }
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -129,18 +147,6 @@ public class LiteapksCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }
