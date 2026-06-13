@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52896 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52897 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamcashTo extends PluginForHost {
     public StreamcashTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,7 @@ public class StreamcashTo extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(link.getPluginPatternMatcher().replace("/embed/", "/watch/"));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -130,14 +130,13 @@ public class StreamcashTo extends PluginForHost {
             /* No file information available */
             return AvailableStatus.TRUE;
         }
-        String filename = br.getRegex("").getMatch(0); // TODO: Adjust this to websites' html
-        String filesize = br.getRegex("File Size:<br> ([^<>\"]+)<").getMatch(0);
+        String filename = br.getRegex("class=\"video-title\"[^>]*>([^<]+)</div>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename + ".mp4");
-        }
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
+            if (!StringUtils.endsWithCaseInsensitive(filename, ".mp4")) {
+                filename += ".mp4";
+            }
+            link.setName(filename);
         }
         return AvailableStatus.TRUE;
     }
@@ -152,12 +151,12 @@ public class StreamcashTo extends PluginForHost {
         if (isVideoBeingProcessed(br)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video is being processed, please check back shortly.", 5 * 60 * 1000l);
         }
-        String dllink = br.getRegex("").getMatch(0);
+        String dllink = br.getRegex("src: '(https://[^\"']+/index\\.m3u8)'").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-        this.handleConnectionErrors(br, dl.getConnection());
+        checkFFmpeg(link, "Download a HLS Stream");
+        dl = new HLSDownloader(link, br, dllink);
         dl.startDownload();
     }
 

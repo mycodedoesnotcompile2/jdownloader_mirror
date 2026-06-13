@@ -13,6 +13,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -33,17 +43,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52855 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52898 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,14 +95,15 @@ public class OrfAt extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private final String                                      PATTERN_TYPE_OLD      = "(?i)https?://tvthek\\.orf\\.at/(?:index\\.php/)?(?:programs?|topic|profile)/.+";
-    private final String                                      PATTERN_BROADCAST_OLD = "(?i)https?://([a-z0-9]+)\\.orf\\.at/(?:player|programm)/(\\d+)/([a-zA-Z0-9]+).*";
-    private final String                                      PATTERN_BROADCAST_NEW = "(?i)https?://radiothek\\.orf\\.at/([a-z0-9]+)/(\\d+)/([a-zA-Z0-9]+).*";
-    private final String                                      PATTERN_BROADCAST_2   = "(?i)https://[^/]+/radio/([a-z0-9]+)/sendung/(\\d+)/([\\w\\-]+).*";
-    private final String                                      PATTERN_ARTICLE       = "(?i)https?://([a-z0-9]+)\\.orf\\.at/artikel/(\\d+)/([a-zA-Z0-9]+).*";
-    private final String                                      PATTERN_PODCAST       = "(?i)https?://[^/]+/podcasts?/([a-z0-9]+)/([A-Za-z0-9\\-]+)(/([a-z0-9\\-]+))?.*";
-    private final String                                      PATTERN_COLLECTION    = "(?i)^(https?://.*(?:/collection|podcast/highlights))/(\\d+)(/(\\d+)(/[a-z0-9\\-]+)?)?.*";
-    private final String                                      PATTERN_VIDEO         = "(?i)^https?://[^/]+/program/(\\w+)/(\\w+)\\.html.*";
+    private final Pattern                                     PATTERN_TYPE_OLD      = Pattern.compile("(?i)https?://tvthek\\.orf\\.at/(?:index\\.php/)?(?:programs?|topic|profile)/.+");
+    private final Pattern                                     PATTERN_BROADCAST_OLD = Pattern.compile("(?i)https?://([a-z0-9]+)\\.orf\\.at/(?:player|programm)/(\\d+)/([a-zA-Z0-9]+).*");
+    private final Pattern                                     PATTERN_BROADCAST_NEW = Pattern.compile("(?i)https?://radiothek\\.orf\\.at/([a-z0-9]+)/(\\d+)/([a-zA-Z0-9]+).*");
+    private final Pattern                                     PATTERN_BROADCAST_2   = Pattern.compile("(?i)https://[^/]+/radio/([a-z0-9]+)/sendung/(\\d+)/([\\w\\-]+).*");
+    private final Pattern                                     PATTERN_ARTICLE       = Pattern.compile("(?i)https?://([a-z0-9]+)\\.orf\\.at/artikel/(\\d+)/([a-zA-Z0-9]+).*");
+    private final Pattern                                     PATTERN_PODCAST       = Pattern.compile("(?i)https?://[^/]+/podcasts?/([a-z0-9]+)/([A-Za-z0-9\\-]+)(/([a-z0-9\\-]+))?.*");
+    private final Pattern                                     PATTERN_COLLECTION    = Pattern.compile("(?i)^(https?://.*(?:/collection|podcast/highlights))/(\\d+)(/(\\d+)(/[a-z0-9\\-]+)?)?.*");
+    private final Pattern                                     PATTERN_VIDEO         = Pattern.compile("(?i)^https?://[^/]+/program/(\\w+)/(\\w+)\\.html.*");
+    private final Pattern                                     PATTERN_ON_ORF        = Pattern.compile("(?i)https?://on\\.orf\\.at/.+");
     private final String                                      API_BASE              = "https://audioapi.orf.at";
     private final String                                      PROPERTY_SLUG         = "slug";
     /* E.g. https://radiothek.orf.at/ooe --> "ooe" --> Channel == "oe2o" */
@@ -136,15 +137,15 @@ public class OrfAt extends PluginForDecrypt {
         Regex broadcastOld = null;
         Regex broadcastNew = null;
         Regex broadcast2 = null;
-        if (param.getCryptedUrl().matches(PATTERN_TYPE_OLD)) {
+        if (PATTERN_TYPE_OLD.matcher(param.getCryptedUrl()).matches()) {
             return this.crawlOrfmediathekOld(param);
-        } else if (param.getCryptedUrl().matches("(?i)https?://on\\.orf\\.at/.+")) {
+        } else if (PATTERN_ON_ORF.matcher(param.getCryptedUrl()).matches()) {
             return this.crawlOrfmediathekNew(param, param.getCryptedUrl());
-        } else if (param.getCryptedUrl().matches(PATTERN_ARTICLE)) {
+        } else if (PATTERN_ARTICLE.matcher(param.getCryptedUrl()).matches()) {
             return this.crawlArticle(param);
-        } else if (param.getCryptedUrl().matches(PATTERN_COLLECTION)) {
+        } else if (PATTERN_COLLECTION.matcher(param.getCryptedUrl()).matches()) {
             return this.crawlCollection(param);
-        } else if (param.getCryptedUrl().matches(PATTERN_PODCAST)) {
+        } else if (PATTERN_PODCAST.matcher(param.getCryptedUrl()).matches()) {
             return this.crawlPodcast(param);
         } else if ((broadcastOld = new Regex(param.getCryptedUrl(), PATTERN_BROADCAST_OLD)).patternFind()) {
             final String broadCastID = broadcastOld.getMatch(2);
@@ -160,7 +161,7 @@ public class OrfAt extends PluginForDecrypt {
             final String domainID = broadcast2.getMatch(0);
             final String broadcastID = broadcast2.getMatch(1);
             return crawlBroadcast(domainID, broadcastID);
-        } else if (param.getCryptedUrl().matches(PATTERN_VIDEO)) {
+        } else if (PATTERN_VIDEO.matcher(param.getCryptedUrl()).matches()) {
             return crawlVideo(param);
         } else {
             /* Unsupported URL -> Developer mistake */
@@ -191,7 +192,7 @@ public class OrfAt extends PluginForDecrypt {
         // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "DRM protected");
         // }
         if (sourceurl == null) {
-            sourceurl = (String) entries.get("share_body");
+            sourceurl = entries.get("share_body").toString();
             if (StringUtils.isEmpty(sourceurl)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -204,9 +205,8 @@ public class OrfAt extends PluginForDecrypt {
         }
         fp.setPackageKey("orfmediathek://video/" + contentIDSlashPlaylistIDSlashVideoID);
         final boolean has_active_youth_protection = ((Boolean) entries.get("has_active_youth_protection")).booleanValue();
-        final SubConfiguration cfg = SubConfiguration.getConfig("orf.at");
         final ORFMediathek hosterplugin = (ORFMediathek) this.getNewPluginForHostInstance("orf.at");
-        final Map<String, Long> qualityIdentifierToFilesizeMapGLOBAL = new HashMap<String, Long>();
+        final Map<String, Long> cumulativeFilesizeMap = new HashMap<String, Long>();
         final List<String> selectedQualities = new ArrayList<String>();
         final List<String> selectedQualitiesInternal = new ArrayList<String>();
         /* Collect user desired video qualities. */
@@ -285,6 +285,8 @@ public class OrfAt extends PluginForDecrypt {
                 selectedDeliveryTypes.add("progressive");
             }
             int videoPosition = 0;
+            /* null = not yet checked, TRUE/FALSE = result applies to all segments */
+            Boolean q8cHlsAvailable = null;
             for (final Map<String, Object> segment : segments) {
                 videoPosition++;
                 final String segmentID = segment.get("id").toString();
@@ -297,6 +299,45 @@ public class OrfAt extends PluginForDecrypt {
                     thumbnailurlFromFirstSegment = thumbnailurl;
                 }
                 final List<Map<String, Object>> sources = (List<Map<String, Object>>) segment_embedded_playlist.get("sources");
+                if (videoPosition == 1 && q8cHlsAvailable == null && (settingPreferBestVideo || selectedQualitiesInternal.contains("Q8C"))) {
+                    /**
+                     * Check Q8C HLS availability once on the first segment; result is reused for all subsequent segments. <br>
+                     * Background: Since 2026-06, HLS 1080p audio+video version is often not available anymore thus if we do not check it
+                     * here, it gets declared best while it is not available.
+                     */
+                    String q8cHlsUrl = null;
+                    for (final Map<String, Object> source : sources) {
+                        if ("Q8C".equals(source.get("quality")) && "hls".equalsIgnoreCase((String) source.get("delivery")) && "http".equalsIgnoreCase((String) source.get("protocol"))) {
+                            q8cHlsUrl = (String) source.get("src");
+                            break;
+                        }
+                    }
+                    if (q8cHlsUrl == null) {
+                        logger.info("Q8C HLS not present in sources -> marking as unavailable");
+                        q8cHlsAvailable = Boolean.FALSE;
+                    } else {
+                        logger.info("Q8C HLS availability check for: " + q8cHlsUrl);
+                        q8cHlsAvailable = Boolean.FALSE;
+                        final Browser brc = br.cloneBrowser();
+                        brc.setFollowRedirects(true);
+                        URLConnectionAdapter con = null;
+                        try {
+                            con = brc.openHeadConnection(q8cHlsUrl);
+                            if (!ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
+                                q8cHlsAvailable = Boolean.TRUE;
+                            }
+                        } catch (final Exception e) {
+                            logger.log(e);
+                            logger.info("Q8C HLS availability check failed -> treating as unavailable");
+                        } finally {
+                            try {
+                                con.disconnect();
+                            } catch (final Throwable e) {
+                            }
+                        }
+                    }
+                    logger.info("Q8C HLS available: " + q8cHlsAvailable);
+                }
                 final List<Map<String, Object>> subtitlemaps = (List<Map<String, Object>>) segment_embedded_playlist.get("subtitles");
                 String subtitleurl = null;
                 if (subtitlemaps != null && subtitlemaps.size() > 0) {
@@ -325,15 +366,15 @@ public class OrfAt extends PluginForDecrypt {
                 for (final Map<String, Object> source : sources) {
                     sources_index++;
                     final boolean isLastItem = sources_index == sources.size() - 1;
-                    final String url_directlink_video = (String) source.get("src");
-                    final String fmt = source.get("quality").toString();
+                    final String src = (String) source.get("src");
+                    final String quality = source.get("quality").toString();
                     final String quality_string = source.get("quality_string").toString();
                     final String protocol = source.get("protocol").toString();
                     final String delivery = source.get("delivery").toString();
                     // final String subtitleUrl = (String) entry_source.get("SubTitleUrl");
-                    allFMTs.add(fmt);
+                    allFMTs.add(quality);
                     /* Skip stuff we cannot handle */
-                    if (StringUtils.equals(fmt, "QXADRM")) {
+                    if (StringUtils.equals(quality, "QXADRM")) {
                         numberofSkippedDRMItems++;
                         continue;
                     } else if (!"http".equalsIgnoreCase(protocol)) {
@@ -347,6 +388,8 @@ public class OrfAt extends PluginForDecrypt {
                         continue;
                     } else if ("rtsp".equals(delivery)) {
                         continue;
+                    } else if ("Q8C".equals(quality) && "hls".equalsIgnoreCase(delivery) && Boolean.FALSE.equals(q8cHlsAvailable)) {
+                        continue;
                     }
                     /* possible protocols: http, rtmp, rtsp, hds, hls */
                     final boolean isProgressive;
@@ -356,7 +399,14 @@ public class OrfAt extends PluginForDecrypt {
                     } else {
                         isProgressive = false;
                     }
-                    final String fmtHumanReadable = humanReadableQualityIdentifier(fmt.toUpperCase(Locale.ENGLISH).trim());
+                    if (isProgressive && "Q1A".equals(quality) && StringUtils.endsWithCaseInsensitive(src, ".3gp")) {
+                        /**
+                         * 2026-06-12: Skip unavailable very old .3gp progressive video items e.g. <br>
+                         * http://apasfpd.sf.apa.at/cms-worldwide/online/2026/06/03/4c4cac86d1882f3ed00b3ac319e34fda/1781474400/2026-06-03_2149_in_02_Tierisch-promin_____14325457__o__777106136a__s16096980_Q1A.3gp
+                         */
+                        continue;
+                    }
+                    final String fmtHumanReadable = humanReadableQualityIdentifier(quality.toUpperCase(Locale.ENGLISH).trim());
                     boolean looksLikeQualityIsSelected = false;
                     if (settingPreferBestVideo) {
                         if (isLastItem) {
@@ -369,17 +419,17 @@ public class OrfAt extends PluginForDecrypt {
                         }
                     }
                     progressiveStreamFilesizeCheck: if (looksLikeQualityIsSelected && isProgressive && !settingEnableFastCrawl && !qualityIdentifierToFilesizeMap.containsKey(fmtHumanReadable) && !has_active_youth_protection) {
-                        logger.info("Checking progressive URL to find filesize: " + url_directlink_video);
+                        logger.info("Checking progressive URL to find filesize: " + src);
                         URLConnectionAdapter con = null;
                         final Browser brc = br.cloneBrowser();
                         try {
                             brc.setFollowRedirects(true);
-                            con = brc.openHeadConnection(url_directlink_video);
+                            con = brc.openHeadConnection(src);
                             if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
-                                logger.info("Skipping \"insert_video_not_available\": " + url_directlink_video);
+                                logger.info("Skipping \"insert_video_not_available\": " + src);
                                 continue;
                             } else if (!this.looksLikeDownloadableContent(con)) {
-                                logger.info("Skipping broken progressive video quality: " + url_directlink_video);
+                                logger.info("Skipping broken progressive video quality: " + src);
                                 continue;
                             } else if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
                                 /* Item is GEO-blocked */
@@ -390,11 +440,11 @@ public class OrfAt extends PluginForDecrypt {
                                 break progressiveStreamFilesizeCheck;
                             }
                             qualityIdentifierToFilesizeMap.put(fmtHumanReadable, filesize);
-                            final Long filesizeSumForAllSegmentsOfThisQuality = qualityIdentifierToFilesizeMapGLOBAL.get(fmtHumanReadable);
+                            final Long filesizeSumForAllSegmentsOfThisQuality = cumulativeFilesizeMap.get(fmtHumanReadable);
                             if (filesizeSumForAllSegmentsOfThisQuality != null) {
-                                qualityIdentifierToFilesizeMapGLOBAL.put(fmtHumanReadable, filesizeSumForAllSegmentsOfThisQuality + filesize);
+                                cumulativeFilesizeMap.put(fmtHumanReadable, filesizeSumForAllSegmentsOfThisQuality + filesize);
                             } else {
-                                qualityIdentifierToFilesizeMapGLOBAL.put(fmtHumanReadable, filesize);
+                                cumulativeFilesizeMap.put(fmtHumanReadable, filesize);
                             }
                         } catch (final Exception e) {
                             if (e instanceof DecrypterRetryException) {
@@ -416,14 +466,14 @@ public class OrfAt extends PluginForDecrypt {
                         }
                     }
                     allAvailableQualitiesAsHumanReadableIdentifiers.add(fmtHumanReadable);
-                    final DownloadLink video = super.createDownloadlink(url_directlink_video);
+                    final DownloadLink video = super.createDownloadlink(src);
                     video.setDefaultPlugin(hosterplugin);
                     video.setHost(hosterplugin.getHost());
                     video.setContentUrl(sourceurl);
                     video.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_VIDEO);
-                    video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, url_directlink_video);
+                    video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, src);
                     video.setProperty(ORFMediathek.PROPERTY_QUALITY_HUMAN_READABLE, fmtHumanReadable);
-                    video.setProperty(ORFMediathek.PROPERTY_INTERNAL_QUALITY, fmt);
+                    video.setProperty(ORFMediathek.PROPERTY_INTERNAL_QUALITY, quality);
                     video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, protocol);
                     video.setProperty(ORFMediathek.PROPERTY_DELIVERY, delivery);
                     video.setAvailable(true);
@@ -441,14 +491,7 @@ public class OrfAt extends PluginForDecrypt {
                         videoresult.setDownloadSize(filesize);
                     }
                 }
-                String bestAvailableQualityIdentifierHumanReadable = null;
-                final String[] qualities = { "VERYHIGH", "HIGH", "MEDIUM", "LOW", "VERYLOW" };
-                for (final String qual : qualities) {
-                    if (allAvailableQualitiesAsHumanReadableIdentifiers.contains(qual)) {
-                        bestAvailableQualityIdentifierHumanReadable = qual;
-                        break;
-                    }
-                }
+                final String bestAvailableQualityIdentifierHumanReadable = findBestQuality(allAvailableQualitiesAsHumanReadableIdentifiers);
                 final List<DownloadLink> selectedVideoQualities = new ArrayList<DownloadLink>();
                 final List<DownloadLink> bestVideos = new ArrayList<DownloadLink>();
                 for (final DownloadLink videoresult : videoresults) {
@@ -483,26 +526,11 @@ public class OrfAt extends PluginForDecrypt {
                 /* Add a subtitle-result for each chosen video quality */
                 if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_SUBTITLES, ORFMediathek.Q_SUBTITLES_default) && !StringUtils.isEmpty(subtitleurl)) {
                     for (final DownloadLink chosenVideoResult : chosenVideoResults) {
-                        final DownloadLink subtitle = createDownloadlink(subtitleurl);
-                        subtitle.setDefaultPlugin(hosterplugin);
-                        subtitle.setHost(hosterplugin.getHost());
-                        subtitle.setProperties(chosenVideoResult.getProperties());
-                        subtitle.setProperty(ORFMediathek.PROPERTY_DIRECTURL, subtitleurl);
-                        subtitle.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_SUBTITLE);
-                        subtitle.setProperty(ORFMediathek.CONTENT_EXT_HINT, subtitle_ext);
-                        subtitle.setAvailable(true);
-                        subtitle.setContentUrl(sourceurl);
-                        finalresults.add(subtitle);
+                        finalresults.add(createSubtitleLink(subtitleurl, subtitle_ext, chosenVideoResult, hosterplugin, sourceurl));
                     }
                 }
                 if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default) && !StringUtils.isEmpty(thumbnailurl)) {
-                    final DownloadLink thumbnail = this.createDownloadlink(thumbnailurl);
-                    thumbnail.setDefaultPlugin(hosterplugin);
-                    thumbnail.setHost(hosterplugin.getHost());
-                    thumbnail.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_IMAGE);
-                    thumbnail.setProperty(ORFMediathek.PROPERTY_DIRECTURL, thumbnailurl);
-                    thumbnail.setAvailable(true);
-                    finalresults.add(thumbnail);
+                    finalresults.add(createThumbnailLink(thumbnailurl, hosterplugin));
                 }
                 if (videoresults.isEmpty() && numberofSkippedDRMItems > 0) {
                     /* Seems like all available video streams are DRM protected. */
@@ -649,7 +677,7 @@ public class OrfAt extends PluginForDecrypt {
                     video.setProperty(ORFMediathek.PROPERTY_INTERNAL_QUALITY, fmt);
                     video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, "http");
                     video.setProperty(ORFMediathek.PROPERTY_DELIVERY, "hls");
-                    final Long guessedFilesize = qualityIdentifierToFilesizeMapGLOBAL.get(fmtHumanReadable);
+                    final Long guessedFilesize = cumulativeFilesizeMap.get(fmtHumanReadable);
                     if (guessedFilesize != null) {
                         video.setDownloadSize(guessedFilesize);
                     }
@@ -666,8 +694,9 @@ public class OrfAt extends PluginForDecrypt {
             }
             if (gaplessresults.isEmpty()) {
                 /**
-                 * All possible results were skipped? -> This should never happen / very very rare case. </br> Either all available video
-                 * resolutions are unsupported resolutions or GEO-blocked detection failed or something super unexpected happened.
+                 * All possible results were skipped? -> This should never happen / very very rare case. </br>
+                 * Either all available video resolutions are unsupported resolutions or GEO-blocked detection failed or something super
+                 * unexpected happened.
                  */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -681,25 +710,12 @@ public class OrfAt extends PluginForDecrypt {
                 gaplessFinalResults.add(chosenVideoResult);
                 /* Add a subtitle-result for each chosen video quality */
                 if ((cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_SUBTITLES, ORFMediathek.Q_SUBTITLES_default)) && !StringUtils.isEmpty(gapless_subtitleurl)) {
-                    final DownloadLink subtitle = createDownloadlink(gapless_subtitleurl);
-                    subtitle.setDefaultPlugin(hosterplugin);
-                    subtitle.setHost(hosterplugin.getHost());
-                    /* Inherit properties from video item */
-                    subtitle.setProperties(chosenVideoResult.getProperties());
-                    subtitle.setProperty(ORFMediathek.PROPERTY_DIRECTURL, gapless_subtitleurl);
-                    subtitle.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_SUBTITLE);
-                    subtitle.setProperty(ORFMediathek.CONTENT_EXT_HINT, subtitle_ext);
-                    gaplessFinalResults.add(subtitle);
+                    gaplessFinalResults.add(createSubtitleLink(gapless_subtitleurl, subtitle_ext, chosenVideoResult, hosterplugin, null));
                 }
             }
             /* Add teaser/thumbnail image */
             if ((cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default)) && !StringUtils.isEmpty(thumbnailurlFromFirstSegment)) {
-                final DownloadLink thumbnail = this.createDownloadlink(thumbnailurlFromFirstSegment);
-                thumbnail.setDefaultPlugin(hosterplugin);
-                thumbnail.setHost(hosterplugin.getHost());
-                thumbnail.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_IMAGE);
-                thumbnail.setProperty(ORFMediathek.PROPERTY_DIRECTURL, thumbnailurlFromFirstSegment);
-                gaplessFinalResults.add(thumbnail);
+                gaplessFinalResults.add(createThumbnailLink(thumbnailurlFromFirstSegment, hosterplugin));
             }
             if (isCrawlGaplessOnly) {
                 /* Discard previously found results as we want gapless items only. */
@@ -708,9 +724,7 @@ public class OrfAt extends PluginForDecrypt {
             /* Add properties and add results to final list */
             for (final DownloadLink result : gaplessFinalResults) {
                 result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
-                result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
                 result.setProperty(ORFMediathek.PROPERTY_SEGMENT_ID, "gapless");
-                result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
                 ret.add(result);
             }
             numberofGaplessItems = gaplessFinalResults.size();
@@ -730,7 +744,8 @@ public class OrfAt extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /**
-         * Add more properties which are the same for all results. </br> It is important that all items run through this loop!
+         * Add more properties which are the same for all results. </br>
+         * It is important that all items run through this loop!
          */
         for (final DownloadLink result : ret) {
             if (!result.hasProperty(ORFMediathek.PROPERTY_CONTENT_TYPE)) {
@@ -747,6 +762,41 @@ public class OrfAt extends PluginForDecrypt {
         }
         fp.addLinks(ret);
         return ret;
+    }
+
+    private static String findBestQuality(final HashSet<String> available) {
+        final String[] qualities = { "VERYHIGH", "HIGH", "MEDIUM", "LOW", "VERYLOW" };
+        for (final String qual : qualities) {
+            if (available.contains(qual)) {
+                return qual;
+            }
+        }
+        return null;
+    }
+
+    private DownloadLink createSubtitleLink(final String subtitleUrl, final String subtitleExt, final DownloadLink videoResult, final ORFMediathek hosterplugin, final String contentUrl) {
+        final DownloadLink subtitle = createDownloadlink(subtitleUrl);
+        subtitle.setDefaultPlugin(hosterplugin);
+        subtitle.setHost(hosterplugin.getHost());
+        subtitle.setProperties(videoResult.getProperties());
+        subtitle.setProperty(ORFMediathek.PROPERTY_DIRECTURL, subtitleUrl);
+        subtitle.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_SUBTITLE);
+        subtitle.setProperty(ORFMediathek.CONTENT_EXT_HINT, subtitleExt);
+        subtitle.setAvailable(true);
+        if (contentUrl != null) {
+            subtitle.setContentUrl(contentUrl);
+        }
+        return subtitle;
+    }
+
+    private DownloadLink createThumbnailLink(final String thumbnailUrl, final ORFMediathek hosterplugin) {
+        final DownloadLink thumbnail = this.createDownloadlink(thumbnailUrl);
+        thumbnail.setDefaultPlugin(hosterplugin);
+        thumbnail.setHost(hosterplugin.getHost());
+        thumbnail.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_IMAGE);
+        thumbnail.setProperty(ORFMediathek.PROPERTY_DIRECTURL, thumbnailUrl);
+        thumbnail.setAvailable(true);
+        return thumbnail;
     }
 
     private ArrayList<DownloadLink> crawlOrfmediathekNew(final CryptedLink param, final String contenturl) throws Exception {

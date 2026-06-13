@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ModTheSimsInfo;
 
-@DecrypterPlugin(revision = "$Revision: 47653 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52897 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModTheSimsInfoCrawler extends PluginForDecrypt {
     public ModTheSimsInfoCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,6 +73,12 @@ public class ModTheSimsInfoCrawler extends PluginForDecrypt {
         final URL addedlink = new URL(param.getCryptedUrl());
         br.getPage(param.getCryptedUrl().replaceFirst(addedlink.getHost(), this.getHost()));
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<h1>\\s*Content Not Found|>\\s*This thread has been deleted by")) {
+            /*
+             * Some errors come with http response 401 which usually means "unauthorized" which is why this 2nd check relies on html code
+             * instead
+             */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String slug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1);
