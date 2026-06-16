@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -35,12 +37,15 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.FilesterMeFolder;
 
-@HostPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52902 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesterMe extends PluginForHost {
     public FilesterMe(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    public static final String PROPERTY_FOLDER_ACCESS_TOKEN = "folder_access_token";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -111,6 +116,11 @@ public class FilesterMe extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
+        String folder_access_token = link.getStringProperty(FilesterMe.PROPERTY_FOLDER_ACCESS_TOKEN);
+        if (folder_access_token != null) {
+            /* Reuse folder access token so we do not have to send password again (saves us one http request). */
+            br.setCookie(getHost(), "folder_access_token", folder_access_token);
+        }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -144,6 +154,23 @@ public class FilesterMe extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
+        final Form passwordForm = findPasswordForm(br);
+        if (passwordForm != null) {
+            /* Handle download password */
+            /* Use existing password if possible */
+            String password = link.getDownloadPassword();
+            if (password == null) {
+                password = getUserInput("Password?", link);
+            }
+            passwordForm.put("password", URLEncoder.encode(encodePassword(password, passwordForm.getInputFieldByName("nonce").getValue()), "UTF-8"));
+            br.submitForm(passwordForm);
+            if (findPasswordForm(br) != null) {
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            }
+            link.setDownloadPassword(password);
+            final String folder_access_token = br.getCookie(br.getHost(), "folder_access_token");
+            link.setProperty(PROPERTY_FOLDER_ACCESS_TOKEN, folder_access_token);
+        }
         final String fid = this.getFID(link);
         final Browser brc = br.cloneBrowser();
         brc.getPage("https://filester.me/js/file_dl.js?ver=1.0.5");
@@ -178,6 +205,14 @@ public class FilesterMe extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    private Form findPasswordForm(final Browser br) {
+        return FilesterMeFolder.findPasswordForm(br);
+    }
+
+    private String encodePassword(String password, String nonce) {
+        return FilesterMeFolder.encodePassword(password, nonce);
     }
 
     @Override

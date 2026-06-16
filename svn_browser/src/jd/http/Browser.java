@@ -3304,6 +3304,42 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 return null;
             }
         },
+        DNS_BLOCK_A1 {
+            @Override
+            public String getLabel() {
+                return "DNS block by A1 Onlineschutz, see a1.net/protection-dashboard";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                if (request == null || !request.isLoaded() || request.getHttpConnection() == null) {
+                    return null;
+                }
+                final String host = request.getBrowser().getHost(true);
+                if (host == null) {
+                    return null;
+                }
+                if (host.equals("redirect.a1-onlineschutz")) {
+                    return this;
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.DNS;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.ISP;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         DNS_BLOCK_AGCOM {
             @Override
             public String getLabel() {

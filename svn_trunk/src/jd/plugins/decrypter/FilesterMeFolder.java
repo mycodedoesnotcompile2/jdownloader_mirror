@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesterMe;
 
-@DecrypterPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52902 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
@@ -75,7 +75,7 @@ public class FilesterMeFolder extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private String encodePassword(String password, String nonce) {
+    public static String encodePassword(String password, String nonce) {
         final long timestamp = System.currentTimeMillis();
         final String payload = password + "|" + timestamp + "|" + nonce;
         return Base64.encode(payload);
@@ -87,18 +87,31 @@ public class FilesterMeFolder extends PluginForDecrypt {
         final HashSet<String> dupes = new HashSet<String>();
         final String contenturl = param.getCryptedUrl();
         final String folder_id = new Regex(contenturl, PATTERN_NORMAL).getMatch(0);
+        String folder_access_token = null;
+        final DownloadLink parent = param.getDownloadLink();
+        if (parent != null) {
+            folder_access_token = parent.getStringProperty(FilesterMe.PROPERTY_FOLDER_ACCESS_TOKEN);
+            if (folder_access_token != null) {
+                /* Reuse folder access token so we do not have to send password again (saves us one http request). */
+                br.setCookie(getHost(), "folder_access_token", folder_access_token);
+            }
+        }
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        String password = param.getDecrypterPassword();
         final Form passwordForm = findPasswordForm(br);
         if (passwordForm != null) {
-            final String password = getUserInput("Password?", param);
+            if (password == null) {
+                password = getUserInput("Password?", param);
+            }
             passwordForm.put("password", URLEncoder.encode(encodePassword(password, passwordForm.getInputFieldByName("nonce").getValue()), "UTF-8"));
             br.submitForm(passwordForm);
             if (findPasswordForm(br) != null) {
                 throw new DecrypterRetryException(RetryReason.PASSWORD, "This folder is password protected");
             }
+            folder_access_token = br.getCookie(br.getHost(), "folder_access_token");
         }
         String title = br.getRegex("class=\"folder-title\"[^>]*>\\s*([^<]+)\\s*</h1>").getMatch(0);
         String folder_title;
@@ -161,6 +174,10 @@ public class FilesterMeFolder extends PluginForDecrypt {
                     link.setAvailable(true);
                     link._setFilePackage(fp);
                     link.setRelativeDownloadFolderPath(path);
+                    if (password != null) {
+                        link.setDownloadPassword(password);
+                        link.setProperty(FilesterMe.PROPERTY_FOLDER_ACCESS_TOKEN, folder_access_token);
+                    }
                     ret.add(link);
                     distribute(link);
                 }
@@ -174,6 +191,10 @@ public class FilesterMeFolder extends PluginForDecrypt {
                     final String url = "https://" + br.getHost() + "/f/" + folder_id_entry;
                     final DownloadLink link = this.createDownloadlink(url);
                     link.setRelativeDownloadFolderPath(path);
+                    if (password != null) {
+                        link.setDownloadPassword(password);
+                        link.setProperty(FilesterMe.PROPERTY_FOLDER_ACCESS_TOKEN, folder_access_token);
+                    }
                     ret.add(link);
                     distribute(link);
                 }
@@ -206,7 +227,7 @@ public class FilesterMeFolder extends PluginForDecrypt {
         return ret;
     }
 
-    private Form findPasswordForm(final Browser br) {
+    public static Form findPasswordForm(final Browser br) {
         return br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
     }
 

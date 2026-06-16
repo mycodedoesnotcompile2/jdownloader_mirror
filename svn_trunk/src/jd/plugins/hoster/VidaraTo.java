@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52703 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52902 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidaraTo extends PluginForHost {
     public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,7 +65,7 @@ public class VidaraTo extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidara.to", "vidara.so", "streamix.so", "streamix.so", "stmix.io" });
+        ret.add(new String[] { "vidara.to", "vidara.so", "vidaraa.cc", "streamix.so", "streamix.so", "stmix.io" });
         return ret;
     }
 
