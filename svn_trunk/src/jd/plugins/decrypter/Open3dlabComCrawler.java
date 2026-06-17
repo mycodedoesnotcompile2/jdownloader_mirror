@@ -45,9 +45,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.Open3dlabCom;
 
-@DecrypterPlugin(revision = "$Revision: 52631 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { Open3dlabCom.class })
 public class Open3dlabComCrawler extends PluginForDecrypt {
     public Open3dlabComCrawler(PluginWrapper wrapper) {
@@ -132,6 +133,7 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
             title = br.getRegex("<meta name=\"twitter:title\" content=\"([^\"]+)").getMatch(0);
         }
         if (title != null) {
+            title = PluginJSonUtils.unescape(title);
             title = Encoding.htmlDecode(title).trim();
         }
         final Open3dlabComConfig cfg;
@@ -248,8 +250,9 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         }
         final String[] userUploadedPreviewMediaURLs = br.getRegex("\"(https?://[^/]+/content/content/[^/]+/user_uploads/[^\"]+)").getColumn(0);
         if (userUploadedPreviewMediaURLs != null && userUploadedPreviewMediaURLs.length > 0 && cfg.isCrawlPreviewSlashPromoMedia()) {
-            for (final String userUploadedPreviewMediaURL : userUploadedPreviewMediaURLs) {
-                final DownloadLink userUpload = this.createDownloadlink(userUploadedPreviewMediaURL);
+            for (String url : userUploadedPreviewMediaURLs) {
+                url = Encoding.htmlDecode(url);
+                final DownloadLink userUpload = this.createDownloadlink(url);
                 ret.add(userUpload);
             }
         }

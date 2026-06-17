@@ -18,15 +18,18 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48444 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52907 $", interfaceVersion = 3, names = {}, urls = {})
 public class OiiIo extends MightyScriptAdLinkFly {
     public OiiIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,6 +69,7 @@ public class OiiIo extends MightyScriptAdLinkFly {
         final Form captcha2 = br.getFormbyProperty("id", "link-view");
         final CaptchaType captchaType = getCaptchaType(captcha2);
         final Form form20231023 = br.getFormbyProperty("id", "submit_data");
+        final Form turnstileForm20260616 = br.getFormbyProperty("id", "verificationFormm");
         if (captcha2 != null && captchaType != null) {
             if (captchaType == CaptchaType.reCaptchaV2 || captchaType == CaptchaType.reCaptchaV2_invisible) {
                 handleRecaptcha(captchaType, br, captcha2);
@@ -75,6 +79,9 @@ public class OiiIo extends MightyScriptAdLinkFly {
             submitForm(br, captcha2);
         } else if (form20231023 != null) {
             submitForm(br, form20231023);
+        } else if (turnstileForm20260616 != null) {
+            final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+            turnstileForm20260616.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
         }
         /* Page with button "Click here to continue" */
         final Form continueForm = br.getFormByRegex("ad_form_data");

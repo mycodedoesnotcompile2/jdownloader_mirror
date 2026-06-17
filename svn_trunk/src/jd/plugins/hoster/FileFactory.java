@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.websocket.WebSocketClient;
 
-@HostPlugin(revision = "$Revision: 52710 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52903 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -832,7 +832,7 @@ public class FileFactory extends PluginForHost {
     }
 
     private AccountInfo fetchAccountInfo(final Browser br, final Account account, final String token) throws Exception {
-        final WebSocketClient wsc = new WebSocketClient(br, new URL("https://tacit-mammoth-55.eu-west-1.convex.cloud/api/1.31.7/sync")) {
+        final WebSocketClient wsc = new WebSocketClient(br, new URL("https://convex-ulta.filefactory.com/api/1.31.7/sync")) {
             @Override
             public void writeFrame(WriteWebSocketFrame webSocketFrame) throws IOException {
                 super.writeFrame(webSocketFrame);
@@ -871,26 +871,34 @@ public class FileFactory extends PluginForHost {
                             break payload;
                         }
                         for (final Map<String, Object> modification : modifications) {
-                            if (((Number) modification.get("queryId")).intValue() == 0) {
-                                final Map<String, Object> value = (Map<String, Object>) modification.get("value");
-                                final AccountInfo ai = new AccountInfo();
-                                final String email = (String) value.get("email");
-                                if (email != null) {
-                                    account.setUser(email);
-                                }
-                                final Number premiumUntil = (Number) value.get("premiumUntil");
-                                if (Boolean.TRUE.equals(value.get("isLifetime"))) {
-                                    account.setType(AccountType.LIFETIME);
-                                    ai.setValidUntil(-1);
-                                } else if (Boolean.TRUE.equals(value.get("isPremium")) && premiumUntil != null) {
-                                    account.setType(AccountType.PREMIUM);
+                            if (((Number) modification.get("queryId")).intValue() != 0) {
+                                continue;
+                            }
+                            final Map<String, Object> value = (Map<String, Object>) modification.get("value");
+                            final AccountInfo ai = new AccountInfo();
+                            final String email = (String) value.get("email");
+                            if (email != null) {
+                                account.setUser(email);
+                            }
+                            final Number premiumUntil = (Number) value.get("premiumUntil");
+                            /* 2026-06-16: Both boolean fields "isLifetime" and "lifetimeMember" exist. */
+                            if (Boolean.TRUE.equals(value.get("isLifetime")) || Boolean.TRUE.equals(value.get("lifetimeMember"))) {
+                                account.setType(AccountType.LIFETIME);
+                                ai.setValidUntil(-1);
+                            } else if (Boolean.TRUE.equals(value.get("isPremium"))) {
+                                account.setType(AccountType.PREMIUM);
+                                if (premiumUntil != null) {
                                     ai.setValidUntil(premiumUntil.longValue());
                                 } else {
-                                    account.setType(AccountType.FREE);
-                                    ai.setValidUntil(-1);
+                                    /* This should never happen */
+                                    logger.warning("Found premium account without expire date");
                                 }
-                                return ai;
+                            } else {
+                                account.setType(AccountType.FREE);
+                                ai.setValidUntil(-1);
                             }
+                            ai.setCreateTime(TimeFormatter.getMilliSeconds(value.get("joinDate").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH));
+                            return ai;
                         }
                     }
                     break;

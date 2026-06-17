@@ -25,6 +25,20 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
+import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -42,20 +56,6 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
-import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 /**
  *
  * @author raztoki
@@ -64,7 +64,7 @@ import org.jdownloader.plugins.components.antiDDoSForDecrypt;
  *            With reCaptchaV2 (like most): sh2rt.com <br />
  *
  */
-@DecrypterPlugin(revision = "$Revision: 52466 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52906 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     public enum CaptchaType {
         hCaptcha,
@@ -158,9 +158,9 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                 key = getAppVarsResult("invisible_reCAPTCHA_site_key");
             }
             /**
-             * Some websites do not allow users to access the target URL directly but will require a certain Referer to be set. </br> We
-             * pre-set this in our browser but if that same URL is opened in browser, it may redirect to another website as the Referer is
-             * missing. In this case we'll use the main page to solve the captcha to prevent this from happening.
+             * Some websites do not allow users to access the target URL directly but will require a certain Referer to be set. </br>
+             * We pre-set this in our browser but if that same URL is opened in browser, it may redirect to another website as the Referer
+             * is missing. In this case we'll use the main page to solve the captcha to prevent this from happening.
              */
             final String reCaptchaSiteURL;
             if (this.getSpecialReferer() != null) {
@@ -269,7 +269,6 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                                 } else {
                                     return new CloudflareTurnstileChallenge(plugin, siteKey) {
-
                                         @Override
                                         public String getSiteUrl() {
                                             return siteURL;
@@ -293,7 +292,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                         requiresCaptchaWhichCanFail = false;
                         final String key = getAppVarsResult("hcaptcha_checkbox_site_key");
                         if (StringUtils.isEmpty(key)) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find reCaptchaV2 key");
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find hCaptcha key");
                         }
                         final String siteURL;
                         if (this.getSpecialReferer() != null) {
@@ -337,7 +336,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                     captchaFailed = false;
                     break;
                 } else if (Boolean.FALSE.equals(requiresCaptchaWhichCanFail)) {
-                    logger.info("Quit captcha loop because: Required captcha only needs one attempt");
+                    logger.info("Quit captcha loop because: Required captcha only allows one attempt");
                     break;
                 } else if (this.br.containsHTML("(?i)The CAPTCHA was incorrect")) {
                     captchaFailed = true;
@@ -583,10 +582,10 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
         }
         if (firstRedirect != null) {
             /**
-             * Check if this is redirect redirect or if it really is the one we expect. </br> Some websites redirect e.g. to a fake blog and
-             * only redirect back to the usual handling if you re-access the main URL with that fake blog as referer header e.g.:
-             * adshort.co, ez4short.com </br> In some cases this special referer is pre-given via getSpecialReferer in which we do not have
-             * to re-check.
+             * Check if this is redirect redirect or if it really is the one we expect. </br>
+             * Some websites redirect e.g. to a fake blog and only redirect back to the usual handling if you re-access the main URL with
+             * that fake blog as referer header e.g.: adshort.co, ez4short.com </br>
+             * In some cases this special referer is pre-given via getSpecialReferer in which we do not have to re-check.
              */
             if (getSpecialReferer() != null) {
                 /* Assume that redirect redirects to external website and use it as our final result. */
@@ -710,7 +709,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
         return hasCaptcha;
     }
 
-    protected CaptchaType getCaptchaType(Form form) {
+    protected CaptchaType getCaptchaType(final Form form) {
         String captchaTypeStr = getAppVarsResult("captcha_type");
         if (form != null && ("recaptcha".equalsIgnoreCase(captchaTypeStr) || "invisible-recaptcha".equalsIgnoreCase(captchaTypeStr))) {
             /* First compare expected recaptcha type/key against key in our Form. */

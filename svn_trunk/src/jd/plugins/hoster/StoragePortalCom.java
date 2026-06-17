@@ -17,10 +17,12 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -45,9 +47,8 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52618 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52906 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
 public class StoragePortalCom extends PluginForHost {
     /* API docs: https://www.storage-portal.com/docs/download-client-api */
     private static final String          API_BASE           = "https://www.storage-portal.com/api/external/v1";
@@ -124,8 +125,16 @@ public class StoragePortalCom extends PluginForHost {
             link.setProperty(PROPERTY_NOTRAFFIC, true);
         } else {
             setAuthHeader(account);
-            final String postBody = "{\"url\":\"" + PluginJSonUtils.escape(link.getDefaultPlugin().buildExternalDownloadURL(link, this)) + "\"}";
-            br.postPageRaw(API_BASE + "/unrestrict", postBody);
+            String passCode = link.getDownloadPassword();
+            if (link.isPasswordProtected() && passCode == null) {
+                passCode = getUserInput("Password?", link);
+            }
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("url", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
+            if (passCode != null) {
+                postdata.put("password", passCode);
+            }
+            br.postPageRaw(API_BASE + "/unrestrict", JSonStorage.serializeToJson(postdata));
             final Map<String, Object> data = handleAPIErrors(account, link);
             final String linkId = data.get("linkId").toString();
             link.setProperty(PROPERTY_LINKID, linkId);
@@ -245,7 +254,7 @@ public class StoragePortalCom extends PluginForHost {
                 mhost.setTrafficLeftAndMax(trafficleft.longValue(), trafficmax_daily.longValue());
             }
             final Number traffic24h_used = (Number) hostinfo.get("traffic24h_used");
-            if (traffic24h_used != null) {
+            if (traffic24h_used != null && traffic24h_used.longValue() > 0) {
                 mhost.setStatusText("Usage last 24h: " + SIZEUNIT.formatValue(maxSizeUnit, traffic24h_used.longValue()));
             }
             supportedhosts.add(mhost);
@@ -319,7 +328,17 @@ public class StoragePortalCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, msg);
         case 104:
             /* File offline */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File offline, unavailable, or upstream could not provide file/download information", 1 * 60 * 60 * 1000);
+        case 109:
+            /* File password required; retry /unrestrict with the password field */
+            link.setDownloadPassword(null);
+            link.setPasswordProtected(true);
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Link is password protected");
+        case 110:
+            /* Supplied file password is incorrect; prompt again and retry */
+            link.setDownloadPassword(null);
+            link.setPasswordProtected(true);
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
         default:
             if (PluginEnvironment.ACCOUNT_CHECK.isCurrentPluginEnvironment()) {
                 throw new AccountUnavailableException(msg, retryWait);

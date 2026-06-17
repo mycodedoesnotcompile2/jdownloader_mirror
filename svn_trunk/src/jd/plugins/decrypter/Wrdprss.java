@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52141 $", interfaceVersion = 3, names = { "hoerbuch.in", "hi10anime.com", "scene-rls.com", "cgpersia.com" }, urls = { "https?://(www\\.)?hoerbuch\\.in/blog\\.php\\?id=[\\d]+", "https?://(www\\.)?hi10anime\\.com/\\?page_id=.+", "https?://((www|nfo)\\.)?scene-rls\\.(com|net)/(?!(?:category/|releases/|contact/|wp-json/))[\\w-/]+/?$", "https?://(?:www\\.)?cgpersia\\.com/\\d+/\\d+/[^/$]+\\.html?" })
+@DecrypterPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = { "hoerbuch.in", "hi10anime.com", "scene-rls.com", "cgpersia.com" }, urls = { "https?://(www\\.)?hoerbuch\\.in/blog\\.php\\?id=[\\d]+", "https?://(www\\.)?hi10anime\\.com/\\?page_id=.+", "https?://((www|nfo)\\.)?scene-rls\\.(com|net)/(?!(?:category/|releases/|contact/|wp-json/))[\\w-/]+/?$", "https?://(?:www\\.)?cgpersia\\.com/\\d+/\\d+/[^/$]+\\.html?" })
 public class Wrdprss extends antiDDoSForDecrypt {
     private HashMap<String, String[]> defaultPasswords = new HashMap<String, String[]>();
 
@@ -53,15 +53,11 @@ public class Wrdprss extends antiDDoSForDecrypt {
         return true;
     }
 
-    private String contenturl = null;
-
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        contenturl = param.getCryptedUrl();
-        if (StringUtils.startsWithCaseInsensitive(param.getCryptedUrl(), "https")) {
-            contenturl = contenturl.replaceFirst("^http://", "https://");
-        }
+        String contenturl = param.getCryptedUrl();
+        contenturl = contenturl.replaceFirst("^http://", "https://");
         getPage(contenturl);
         br.followRedirect();
         if (br.getHttpConnection().getResponseCode() == 403) {
@@ -105,6 +101,8 @@ public class Wrdprss extends antiDDoSForDecrypt {
         /* Alle Parts suchen */
         final String[] links = br.getRegex(Pattern.compile("href=.*?((?:(?:https?|ftp):)?//[^\"']{2,}|(&#x[a-f0-9]{2};)+)", Pattern.CASE_INSENSITIVE)).getColumn(0);
         final HashSet<String> dupe = new HashSet<String>();
+        final String filesizeStr = br.getRegex(">\\s*(\\d+(\\.\\d+)? (MB|GB))\\s*<br").getMatch(0);
+        long filesizeBytes = filesizeStr != null ? SizeFormatter.getSize(filesizeStr) : -1;
         for (String link : links) {
             if (link.matches("(&#x[a-f0-9]{2};)+")) {
                 // decode
@@ -114,16 +112,26 @@ public class Wrdprss extends antiDDoSForDecrypt {
             if (!dupe.add(link)) {
                 continue;
             }
-            if (kanHandle(link)) {
-                final DownloadLink dLink = createDownloadlink(link);
-                if (link_passwds != null && link_passwds.size() > 0) {
-                    dLink.setSourcePluginPasswordList(link_passwds);
-                }
-                if (!customHeaders.isEmpty()) {
-                    dLink.setProperty(DirectHTTP.PROPERTY_HEADERS, customHeaders);
-                }
-                ret.add(dLink);
+            if (this.canHandle(link)) {
+                /* Skip links that would go back into this crawler */
+                continue;
             }
+            if (link.matches("(?i).+\\.(css|xml)(.*)?")) {
+                /* Skip other links we don't want */
+                continue;
+            }
+            final DownloadLink result = createDownloadlink(link);
+            if (link_passwds != null && link_passwds.size() > 0) {
+                result.setSourcePluginPasswordList(link_passwds);
+            }
+            if (!customHeaders.isEmpty()) {
+                result.setProperty(DirectHTTP.PROPERTY_HEADERS, customHeaders);
+            }
+            if (filesizeBytes != -1) {
+                /* Set estimated file size. This can be helpful for offline entries or such that won't set any file size. */
+                result.setDownloadSize(filesizeBytes);
+            }
+            ret.add(result);
         }
         if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -136,15 +144,6 @@ public class Wrdprss extends antiDDoSForDecrypt {
         }
         fp.addLinks(ret);
         return ret;
-    }
-
-    public boolean kanHandle(final String link) {
-        final boolean ch = !canHandle(link);
-        if (!ch) {
-            return ch;
-        } else {
-            return !link.matches(".+\\.(css|xml)(.*)?");
-        }
     }
 
     @Override

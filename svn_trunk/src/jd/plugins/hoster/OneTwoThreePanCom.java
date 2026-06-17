@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OneTwoThreePanComFolder;
 
-@HostPlugin(revision = "$Revision: 49099 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { OneTwoThreePanComFolder.class })
 public class OneTwoThreePanCom extends PluginForHost {
     public OneTwoThreePanCom(PluginWrapper wrapper) {
@@ -59,7 +59,7 @@ public class OneTwoThreePanCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.123pan.com/UserAgreement";
+        return "https://www." + getHost() + "/UserAgreement";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -268,13 +268,5 @@ public class OneTwoThreePanCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
