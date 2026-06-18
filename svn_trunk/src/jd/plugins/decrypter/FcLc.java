@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -43,41 +44,29 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 52554 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52910 $", interfaceVersion = 2, names = {}, urls = {})
 public class FcLc extends PluginForDecrypt {
-    private static final String[] domains = { "fc.lc", "fcc.lc", "short.fc-lc.com", "short.articlix.com", "fc-lc.com", "fc-lc.xyz" };
-
-    /**
-     * returns the annotation pattern array
-     *
-     */
-    public static String[] getAnnotationUrls() {
-        // construct pattern
-        final String host = getHostsPattern();
-        return new String[] { host + "/[a-zA-Z0-9]{2,}" };
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "fc.lc", "fcc.lc", "short.fc-lc.com", "short.articlix.com", "fc-lc.com", "fc-lc.xyz" });
+        return ret;
     }
 
-    private static String getHostsPattern() {
-        final StringBuilder pattern = new StringBuilder();
-        for (final String name : domains) {
-            pattern.append((pattern.length() > 0 ? "|" : "") + Pattern.quote(name));
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-zA-Z0-9]{2,})");
         }
-        final String hosts = "https?://(?:www\\.)?" + "(?:" + pattern.toString() + ")";
-        return hosts;
+        return ret.toArray(new String[0]);
     }
 
     @Override
     public String[] siteSupportedNames() {
-        return domains;
+        return buildSupportedNames(getPluginDomains());
     }
 
-    /**
-     * Returns the annotations names array
-     *
-     * @return
-     */
     public static String[] getAnnotationNames() {
-        return new String[] { "fc.lc" };
+        return buildAnnotationNames(getPluginDomains());
     }
 
     public enum CaptchaType {
@@ -250,7 +239,7 @@ public class FcLc extends PluginForDecrypt {
                 locationReplace = br.getRequest().getHTMLRefresh();
             }
             if (locationReplace != null) {
-                logger.info("Found locationReplace");
+                logger.info("Found locationReplace: " + locationReplace);
                 locationReplace = PluginJSonUtils.unescape(locationReplace);
                 br.getPage(locationReplace);
             } else {
@@ -296,11 +285,10 @@ public class FcLc extends PluginForDecrypt {
                 break;
             }
             final Browser brc = br.cloneBrowser();
-            brc.getHeaders().put("", "");
             brc.getPage(br.getURL() + "?start_countdown=1");
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String fdata = entries.get("rand").toString();
-            verifyform.put("fdata", fdata);
+            final String rand = entries.get("rand").toString();
+            verifyform.put("fdata", rand);
             br.submitForm(verifyform);
         } while (counter <= 3);
         /* The following logger is just an indicator for development */
@@ -330,6 +318,11 @@ public class FcLc extends PluginForDecrypt {
             }
             long passedTimeMillis = 0;
             final String cfSiteKey = br.getRegex("class=\"cf-turnstile\" data-sitekey=\"([^\"]+)\" data-callback=\"onTurnstileSuccess\"").getMatch(0);
+            String waitStr = this.getAppVarsResult("counter_value");
+            if (waitStr != null && !waitStr.matches("\\d+")) {
+                /* This should never happen */
+                logger.warning("WTF found invalid wait time string: " + waitStr);
+            }
             if (cfSiteKey != null) {
                 logger.info("Cloudflare Turnstile captcha #2 required");
                 /* We know that the last captcha, ione had been requested this run, has been successful. */
@@ -345,10 +338,9 @@ public class FcLc extends PluginForDecrypt {
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
             br.getHeaders().put("Origin", "https://" + br.getHost());
-            String waitStr = this.getAppVarsResult("counter_value");
             if (!skipWait) {
                 int waitSeconds = 15;
-                if (waitStr != null && waitStr.matches("\\d+")) {
+                if (waitStr != null) {
                     logger.info("Found waittime in html, waiting (seconds): " + waitStr);
                     waitSeconds = Integer.parseInt(waitStr) * +1;
                     long waitMillis = waitSeconds * 1000;

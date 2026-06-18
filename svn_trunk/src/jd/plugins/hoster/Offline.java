@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52909 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -337,6 +337,8 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "yourvoyeurvideos.com", "homemade-voyeur.com" });
         ret.add(new String[] { "meocloud.pt" });
         ret.add(new String[] { "tiny-files.com" });
+        /* "Goodbye OtrkeyFinder! Our .otrkey-File search service was terminated on May 31st, 2025." */
+        ret.add(new String[] { "otrkeyfinder.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

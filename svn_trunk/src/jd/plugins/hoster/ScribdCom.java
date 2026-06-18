@@ -16,11 +16,13 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -50,20 +52,52 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52899 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
+@HostPlugin(revision = "$Revision: 52909 $", interfaceVersion = 2, names = {}, urls = {})
 public class ScribdCom extends PluginForHost {
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "scribd.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_SUPPORTED = Pattern.compile("/(doc|document|book|embeds|read)/(\\d+)(/([\\w\\-]+))?", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:[a-z0-9]+\\.)?" + buildHostsPatternPart(domains) + PATTERN_SUPPORTED.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
     private final String        SETTING_PREFERRED_FORMAT                 = "formats";
     private final String        PROPERTY_DOWNLOADLINK_LAST_CHOSEN_FORMAT = "last_chosen_format";
     /** The list of server values displayed to the user */
     private final String[]      allFormats                               = new String[] { "PDF", "TXT", "DOCX" };
-    private static final String TYPE_DOCUMENT                            = ".+/(doc|document)/.+";
-    private static final String TYPE_AUDIO                               = ".+/audiobook/.+";
     private Map<String, Object> entries                                  = null;
 
     public ScribdCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.scribd.com");
+        this.enablePremium("https://www." + getHost());
         setConfigElements();
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "http://" + getHost() + "/terms";
     }
 
     @Override
@@ -89,7 +123,7 @@ public class ScribdCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "/(\\d+)(?:/[^/]+)?$").getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_SUPPORTED).getMatch(1);
     }
 
     @Override
@@ -98,9 +132,19 @@ public class ScribdCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_SUPPORTED);
+        final String fid = urlinfo.getMatch(1);
+        final String urlTitle = urlinfo.getMatch(3);
+        if (urlTitle != null) {
+            return fid + "-" + urlTitle + this.getPreferredFormat(link);
+        }
+        return fid + this.getPreferredFormat(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException, InterruptedException {
         prepFreeBrowser(this.br);
-        // final boolean checkViaJson = !link.getPluginPatternMatcher().matches(TYPE_AUDIO);
         String title = null;
         String description = null;
         final String fid = this.getFID(link);
@@ -113,17 +157,17 @@ public class ScribdCom extends PluginForHost {
             br.getPage(link.getPluginPatternMatcher());
             counter400++;
         } while (counter400 <= 5 && br.getHttpConnection().getResponseCode() == 400);
-        if (br.getURL().contains("/removal/") || br.getURL().contains("/deleted/")) {
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/removal/")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/deleted/")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 400) {
-            logger.info("Server returns error 400");
-            return AvailableStatus.UNCHECKABLE;
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 400");
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 500) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         boolean is_deleted = false;
@@ -154,12 +198,8 @@ public class ScribdCom extends PluginForHost {
             /* 2019-08-11: TODO: Find out what these are good for: 'secret_password' and 'access_key' */
         } catch (final Throwable e) {
         }
-        if (is_deleted) {
-            /* 2019-08-12: Rare case */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         if (StringUtils.isEmpty(title)) {
-            /* Fallback */
+            /* Fallback: Try to obtain title from url */
             title = new Regex(br.getURL(), "/" + fid + "/([^/]+)").getMatch(0); // url slug
         }
         if (Boolean.TRUE.equals(is_audiobook)) {
@@ -179,7 +219,7 @@ public class ScribdCom extends PluginForHost {
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
-        /* saving session info can result in avoiding 400, 410 server errors */
+        /* Saving session info can result in avoiding 400, 410 server errors */
         final Map<String, String> cookies = new HashMap<String, String>();
         final Cookies add = br.getCookies(this.getHost());
         for (final Cookie c : add.getCookies()) {
@@ -187,6 +227,10 @@ public class ScribdCom extends PluginForHost {
         }
         synchronized (cookieMonster) {
             cookieMonster.set(cookies);
+        }
+        if (is_deleted) {
+            /* 2019-08-12: Rare case: Item is deleted but we are still able to fetch file information. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
     }
@@ -284,11 +328,6 @@ public class ScribdCom extends PluginForHost {
         return ai;
     }
 
-    @Override
-    public String getAGBLink() {
-        return "http://" + getHost() + "/terms";
-    }
-
     private String getPreferredFormat(final DownloadLink link) {
         final String preChosenFormat = link.getStringProperty(PROPERTY_DOWNLOADLINK_LAST_CHOSEN_FORMAT);
         if (preChosenFormat != null) {
@@ -319,12 +358,7 @@ public class ScribdCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        if (link.getPluginPatternMatcher().matches(TYPE_DOCUMENT)) {
-            /* Account required to be able to download anything */
-            throw new AccountRequiredException();
-        } else {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "This item is not downloadable at all or only for registered users");
-        }
+        throw new AccountRequiredException("This item is not downloadable at all or only for registered users");
     }
 
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
@@ -368,22 +402,10 @@ public class ScribdCom extends PluginForHost {
         final List<Map<String, Object>> formats = (List<Map<String, Object>>) entries.get("formats");
         if (formats == null || formats.isEmpty()) {
             /* E.g. for free accounts, this will return an empty list of items */
-            logger.info("Seems like not a single download is available --> This item is READ-ONLY");
-            // if (account == null) {
-            // throw new AccountRequiredException();
-            // }
-            if (link.getPluginPatternMatcher().matches(TYPE_DOCUMENT)) {
-                /*
-                 * Should never happen - maybe we were logged-out or account is not premium but item is only downloadable for premium users
-                 * ... or not downloadable at all for some reason.
-                 */
-                throw new AccountRequiredException();
-            } else {
-                /* E.g. not even website provides download-button. Maybe downloadable inside their own app (DRM protected). */
-                throw new PluginException(LinkStatus.ERROR_FATAL, "This item is not downloadable");
-            }
+            logger.info("Seems like not a single download is available --> This item must be READ-ONLY?");
+            throw new PluginException(LinkStatus.ERROR_FATAL, "This item is not downloadable");
         }
-        String formatToDownload = "pdf";
+        String formatToDownload = null;
         boolean foundUserPreferredFormat = false;
         for (final Map<String, Object> format : formats) {
             formatToDownload = format.get("extension").toString();
@@ -409,8 +431,6 @@ public class ScribdCom extends PluginForHost {
         }
         final String dllink = brc.getRedirectLocation();
         if (dllink == null) {
-            /* 2020-07-20: */
-            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             if (brc.getRequest().getHtmlCode().length() <= 100) {
                 /* 2020-07-20: E.g. errormessage: All download limits exceeded from your IP (123.123.123.123). */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Website-error: " + brc.getRequest().getHtmlCode());
@@ -422,13 +442,13 @@ public class ScribdCom extends PluginForHost {
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             /* Assume that our current account type = free and the file is not downloadable */
-            throw new AccountRequiredException();
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Failed to download file in format " + formatToDownload);
         }
         final String fname = getFileNameFromConnection(dl.getConnection());
         if (fname != null) {
             link.setFinalFileName(Encoding.htmlDecode(fname));
         }
-        /* Remember in order to avoid resume with other format. */
+        /* Remember chosen format in order to avoid resume with other format. */
         link.setProperty(PROPERTY_DOWNLOADLINK_LAST_CHOSEN_FORMAT, formatToDownload);
         dl.startDownload();
     }

@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
@@ -35,10 +36,39 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediadeliveryNet;
 
-@DecrypterPlugin(revision = "$Revision: 48406 $", interfaceVersion = 3, names = { "porn3dx.com" }, urls = { "https?://(?:www\\.)?porn3dx\\.com/post/(\\d+)(/([a-z0-9\\-_]+))?" })
+@DecrypterPlugin(revision = "$Revision: 52911 $", interfaceVersion = 3, names = {}, urls = {})
 public class Porn3dxComCrawler extends PluginForDecrypt {
     public Porn3dxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "porn3dx.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_POST = Pattern.compile("/post/(\\d+)(/([a-z0-9\\-_]+))?", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:[a-z0-9]+\\.)?" + buildHostsPatternPart(domains) + PATTERN_POST.pattern());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -107,10 +137,13 @@ public class Porn3dxComCrawler extends PluginForDecrypt {
             }
             final String imagesJson = br.getRegex("\"image\":\\s*(\\[[^\\]]+\\])").getMatch(0);
             final String[] imageURLs = br.getRegex("data-full-url=\"(https?://[^/]+/post/\\d+/[a-f0-9]+\\.jpg)\"").getColumn(0);
-            final int padLength = StringUtils.getPadLength(imageURLs.length);
+            /* 2026-06-17: extract contentUrl values from hasPart ImageObjects in ld+json */
+            final String ldJson = br.getRegex("<script type=\"application/ld\\+json\">\\s*(\\{[\\s\\S]*?\\})\\s*</script>").getMatch(0);
+            final String[] contentURLs = ldJson != null ? new Regex(ldJson, "\"contentUrl\":\"(https?://[^\"]+)\"").getColumn(0) : new String[0];
             int imagecounter = 1;
             if (imageURLs != null && imageURLs.length > 0) {
                 /* Old */
+                final int padLength = StringUtils.getPadLength(imageURLs.length);
                 for (final String imageURL : imageURLs) {
                     final DownloadLink image = this.createDownloadlink(imageURL);
                     image.setFinalFileName(filenameBase + "_" + StringUtils.formatByPadLength(padLength, imagecounter) + ".jpg");
@@ -122,6 +155,7 @@ public class Porn3dxComCrawler extends PluginForDecrypt {
             } else if (imagesJson != null) {
                 /* New 2023-10-30 */
                 final List<String> imageurls = restoreFromString(imagesJson, TypeRef.STRING_LIST);
+                final int padLength = StringUtils.getPadLength(imageurls.size());
                 for (final String imageurl : imageurls) {
                     final DownloadLink image = this.createDownloadlink(imageurl);
                     image.setFinalFileName(filenameBase + "_" + StringUtils.formatByPadLength(padLength, imagecounter) + ".jpg");
@@ -130,9 +164,21 @@ public class Porn3dxComCrawler extends PluginForDecrypt {
                     ret.add(image);
                     imagecounter++;
                 }
+            } else if (contentURLs.length > 0) {
+                /* New 2026-06-17: hasPart ImageObject array in ld+json */
+                final int padLength = StringUtils.getPadLength(contentURLs.length);
+                for (final String contentURL : contentURLs) {
+                    final String ext = Plugin.getFileNameExtensionFromString(contentURL, ".jpg");
+                    final DownloadLink image = this.createDownloadlink(contentURL);
+                    image.setFinalFileName(filenameBase + "_" + StringUtils.formatByPadLength(padLength, imagecounter) + ext);
+                    image.setAvailable(true);
+                    image._setFilePackage(fp);
+                    ret.add(image);
+                    imagecounter++;
+                }
             }
             final String imageURLLarge = br.getRegex("(https?://media\\.[^/]+/post/\\d+/large\\.[a-z]+)").getMatch(0);
-            if (imagecounter == 0 && imageURLLarge != null) {
+            if (imagecounter == 1 && imageURLLarge != null) {
                 /* No images from image gallery found -> Add single image if possible */
                 final DownloadLink image = this.createDownloadlink(imageURLLarge);
                 image.setFinalFileName(filenameBase + Plugin.getFileNameExtensionFromString(imageURLLarge));
