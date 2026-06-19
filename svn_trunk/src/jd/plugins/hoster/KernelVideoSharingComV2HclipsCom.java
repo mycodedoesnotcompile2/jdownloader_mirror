@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49189 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52917 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HclipsCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HclipsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,5 +57,10 @@ public class KernelVideoSharingComV2HclipsCom extends KernelVideoSharingComV2 {
     protected boolean useEmbedWorkaround() {
         /* 2024-06-25: Their embed URLs are broken. */
         return true;
+    }
+
+    @Override
+    protected KVSUrlType getExpectedURLType() {
+        return KVSUrlType.VIDEOS_SLUG_FUID_AT_END;
     }
 }

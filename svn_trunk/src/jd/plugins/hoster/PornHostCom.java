@@ -16,6 +16,9 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -32,13 +35,61 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49716 $", interfaceVersion = 2, names = { "pornhost.com" }, urls = { "https?://(?:www\\.)?pornhost\\.com/([0-9]+/([0-9]+\\.html)?|[0-9]+|embed/\\d+)" })
+@HostPlugin(revision = "$Revision: 52917 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornHostCom extends PluginForHost {
     private String ending = null;
     private String dllink = null;
 
     public PornHostCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "pornhost.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_FILE  = Pattern.compile("/([0-9]+(?:/[0-9]+\\.html)?)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED = Pattern.compile("/embed/(\\d+)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_EMBED.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private String getFID(final DownloadLink link) {
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).getMatch(0);
+        if (fid == null) {
+            fid = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
+        }
+        return fid;
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        }
+        return super.getLinkID(link);
     }
 
     @Override
@@ -48,7 +99,7 @@ public class PornHostCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.pornhost.com/tos.html";
+        return "http://www." + getHost() + "/tos.html";
     }
 
     @Override
@@ -57,13 +108,17 @@ public class PornHostCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".mp4";
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("gallery not found") || br.containsHTML("You will be redirected to")) {
+        final String contenturl = link.getPluginPatternMatcher().replace("/embed/", "/");
+        br.getPage(contenturl);
+        if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         boolean isVideo = true;
@@ -108,14 +163,11 @@ public class PornHostCom extends PluginForHost {
             try {
                 final Browser brc = br.cloneBrowser();
                 con = brc.openHeadConnection(dllink);
-                if (!looksLikeDownloadableContent(con)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                if (con.getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Final downloadurl is offline -> Content looks to be offline");
                 }
-                if (title == null) {
-                    final String filename = Plugin.getFileNameFromConnection(con);
-                    if (filename != null) {
-                        link.setFinalFileName(filename);
-                    }
+                if (!looksLikeDownloadableContent(con)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -132,6 +184,18 @@ public class PornHostCom extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    public static boolean isOffline(final Browser br) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML("gallery not found") || br.containsHTML("You will be redirected to")) {
+            return true;
+        } else if (!br.containsHTML("class=\"report button\"")) {
+            /* Offline without error message e.g. /2435978716 */
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -162,17 +226,5 @@ public class PornHostCom extends PluginForHost {
             logger.log(e);
         }
         dl.startDownload();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

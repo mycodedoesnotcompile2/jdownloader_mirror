@@ -16,6 +16,8 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -27,14 +29,45 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+import jd.plugins.hoster.PornHostCom;
 
-@DecrypterPlugin(revision = "$Revision: 49158 $", interfaceVersion = 2, names = { "pornhost.com" }, urls = { "https?://(www\\.)?pornhost\\.com/([0-9]+.*|embed/\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 52917 $", interfaceVersion = 2, names = {}, urls = {})
+@PluginDependencies(dependencies = { PornHostCom.class })
 public class PrnHstComFldr extends PluginForDecrypt {
     public PrnHstComFldr(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        return PornHostCom.getPluginDomains();
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_GALLERY = Pattern.compile("/([0-9]+[^?#]*)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED   = Pattern.compile("/embed/(\\d+)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:" + PATTERN_GALLERY.pattern().substring(1) + "|" + PATTERN_EMBED.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -48,21 +81,21 @@ public class PrnHstComFldr extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
         final PluginForHost hosterplugin = this.getNewPluginForHostInstance(this.getHost());
-        if (hosterplugin.canHandle(contenturl) && StringUtils.startsWithCaseInsensitive(contenturl, ".html")) {
+        if (hosterplugin.canHandle(contenturl) && StringUtils.endsWithCaseInsensitive(contenturl, ".html")) {
             ret.add(createDownloadlink(contenturl));
             return ret;
         }
         br.getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("gallery not found") || br.containsHTML("You will be redirected to")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         if (br.containsHTML("(moviecontainer|flashmovie|play this movie|createPlayer|>The movie needs to be converted first|jwplayer\\(\"div_video\"\\)\\.setup\\(\\{)") || br.getURL().contains(".com/embed/")) {
             /* Looks like single video */
             // final String finallink = br.getURL();
-            ret.add(createDownloadlink(contenturl));
+            final DownloadLink video = createDownloadlink(contenturl);
+            video.setAvailable(true);
+            ret.add(video);
         } else {
+            if (PornHostCom.isOffline(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             String[] urls = br.getRegex("class=\"thumb\">\\s*<a href=\"(.*?)\">").getColumn(0);
             if (urls.length == 0) {
                 urls = br.getRegex("\"(https?://(?:www\\.)?pornhost\\.com/[0-9]+/[0-9]+\\.html)\"").getColumn(0);

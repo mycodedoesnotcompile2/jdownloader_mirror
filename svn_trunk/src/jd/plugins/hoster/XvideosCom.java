@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.components.config.XvideosComConfig;
 
@@ -27,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 50841 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52915 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -35,9 +36,13 @@ public class XvideosCom extends XvideosCore {
         this.enablePremium("https://xvideos.red/");
     }
 
+    private static final Pattern PATTERN_NORMAL_DOT = Pattern.compile("video\\.[a-z0-9]+/.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NORMAL     = Pattern.compile("video\\d+/.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SPECIAL    = Pattern.compile("[a-z0-9\\-]+/(upload|pornstar|model)/[a-z0-9\\-_]+/\\d+/[^/#\\?]+", Pattern.CASE_INSENSITIVE);
+
     @Override
     public String getAGBLink() {
-        return "https://info.xvideos.com/legal/tos/";
+        return "https://info." + getHost() + "/legal/tos/";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -86,14 +91,9 @@ public class XvideosCom extends XvideosCore {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            String pattern = "https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(";
-            pattern += "video\\.[a-z0-9]+/.*";
-            pattern += "|video\\d+/.*";
-            pattern += "|embedframe/\\d+";
-            pattern += "|[a-z0-9\\-]+/(upload|pornstar|model)/[a-z0-9\\-_]+/\\d+/[^/#\\?]+";
+            final String pattern = "https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_NORMAL_DOT.pattern() + "|" + PATTERN_NORMAL.pattern() + "|" + TYPE_EMBED.pattern().substring(1) + "|" + PATTERN_SPECIAL.pattern()
             /* 2024-04-02 */
-            pattern += "|prof-video-click/upload/[a-z0-9\\-_]+/[a-z0-9\\-]+/[a-z0-9\\-_]+";
-            pattern += ")";
+                    + "|" + TYPE_CLICK.pattern().substring(1) + ")";
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);
@@ -122,7 +122,7 @@ public class XvideosCom extends XvideosCore {
             return null;
         }
         String newURL;
-        if (new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL_DOT).patternFind() || new Regex(link.getPluginPatternMatcher(), TYPE_CLICK).patternFind()) {
+        if (new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL_DOT).patternFind() || new Regex(link.getPluginPatternMatcher(), TYPE_CLICK).patternFind() || new Regex(link.getPluginPatternMatcher(), TYPE_EMBED).patternFind()) {
             newURL = "https://www." + urlHost + "/video." + videoID;
         } else {
             newURL = "https://www." + urlHost + "/video" + videoID;
@@ -135,13 +135,5 @@ public class XvideosCom extends XvideosCore {
             newURL += "/dummytext";
         }
         return newURL;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
