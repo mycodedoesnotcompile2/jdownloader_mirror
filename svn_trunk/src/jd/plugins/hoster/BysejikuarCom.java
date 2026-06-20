@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 52508 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52918 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class BysejikuarCom extends PluginForHost {
     public BysejikuarCom(PluginWrapper wrapper) {
@@ -148,9 +148,13 @@ public class BysejikuarCom extends PluginForHost {
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
-        if (!link.isSizeSet() || PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
+        findFilesize: if (!link.isSizeSet() || PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
             this.fetchDldata(link);
             final List<Map<String, Object>> dloptions = (List<Map<String, Object>>) this.dldata.get("options");
+            if (dloptions.isEmpty()) {
+                logger.info("No download options available");
+                break findFilesize;
+            }
             long filesizeMax = -1;
             for (final Map<String, Object> dloption : dloptions) {
                 final long size_bytes = ((Number) dloption.get("size_bytes")).longValue();
@@ -170,6 +174,7 @@ public class BysejikuarCom extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* Example response when currently no downloads are available: {"options":[],"captions":[],"cache_status":"miss"} */
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         this.dldata = entries;
         return entries;
@@ -190,6 +195,10 @@ public class BysejikuarCom extends PluginForHost {
             dllink = storedDirectlink;
         } else {
             /* 2026-01-27: Typically 30 seconds */
+            final List<Map<String, Object>> dloptions = (List<Map<String, Object>>) this.dldata.get("options");
+            if (dloptions.isEmpty()) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "No download options available");
+            }
             final int countdown_seconds = ((Number) this.dldata.get("countdown_seconds")).intValue();
             if (countdown_seconds >= 500) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
@@ -45,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 52911 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52919 $", interfaceVersion = 2, names = {}, urls = {})
 public class OiiIo extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -101,9 +100,6 @@ public class OiiIo extends PluginForDecrypt {
             /* 2020-05-29: E.g. https://uii.io/full */
             logger.info("Invalid HTML - probably offline content");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Form viewform = br.getFormbyProperty("id", "link-view");
         if (viewform != null) {
@@ -267,17 +263,21 @@ public class OiiIo extends PluginForDecrypt {
         } else {
             logger.info("Skipping waittime (seconds): " + waitSecondsStr);
         }
-        /* TODO: 2026-06-17: Fix this request, website always responds with: {"status":"success","message":"Access Denied.","url":""} */
         brc.submitForm(finalform);
+        /*
+         * e.g. error response: {"status":"success","message":"Access Denied.","url":""} <br> If this happens in browser, it will do
+         * infinite looping on pre-ad pages.
+         */
+        /* example success: {"status":"success","message":"Go without Earn because anonymous user","url":"https..."} */
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String finallink = entries.get("url").toString();
-        if (StringUtils.isEmpty(finallink)) {
+        final String message = (String) entries.get("message");
+        if ("Access Denied.".equalsIgnoreCase(message)) {
             /* e.g. {"status":"success","message":"Access Denied.","url":""} */
-            if (br.containsHTML("<h1>\\s*Whoops, looks like something went wrong\\.\\s*</h1>")) {
-                throw new DecrypterRetryException(RetryReason.HOST);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
+        }
+        if (!StringUtils.startsWithCaseInsensitive(finallink, "http")) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         ret.add(createDownloadlink(finallink));
         return ret;
@@ -289,27 +289,6 @@ public class OiiIo extends PluginForDecrypt {
             result = PluginJSonUtils.getJson(this.appVars, input);
         }
         return result;
-    }
-
-    private String getFinallink() throws Exception {
-        String finallink = null;
-        if (br.getRequest().getHtmlCode().startsWith("{")) {
-            /* For >90%, this json-attempt should work! */
-            finallink = PluginJSonUtils.getJsonValue(br, "url");
-        }
-        if (StringUtils.isEmpty(finallink) || !finallink.startsWith("http")) {
-            finallink = br.getRegex("<a href=(\"|')(.*?)\\1[^>]+>\\s*Get\\s+Link\\s*</a>").getMatch(1);
-            if (StringUtils.isEmpty(finallink)) {
-                finallink = br.getRegex("<a\\s+[^>]*href=(\"|')(.*?)\\1[^>]*>Continue[^<]*</a>").getMatch(1);
-            }
-        }
-        /* 2020-02-03: clk.in: p.clk.in/?n=bla */
-        if (!StringUtils.isEmpty(finallink) && finallink.matches("https?://p\\.[^/]+/\\?n=.+")) {
-            logger.info("Special case: Finallink seems to lead to another step");
-            br.getPage(finallink);
-            finallink = br.getRegex("<div class=\"button\">\\s*?<center>\\s*?<a name=\"a\"\\s*?href=\"(http[^\"]+)\">").getMatch(0);
-        }
-        return finallink;
     }
 
     @Override

@@ -17,8 +17,11 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
-import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.storage.TypeRef;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -37,10 +40,40 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 52832 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 52919 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesFmFolder extends PluginForDecrypt {
     public FilesFmFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "files.fm" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static final Pattern PATTERN_FOLDER = Pattern.compile("/u/([a-z0-9]+)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + PATTERN_FOLDER.pattern());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -60,7 +93,7 @@ public class FilesFmFolder extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final PluginForHost hostplg = this.getNewPluginForHostInstance(this.getHost());
         /* 2016-03-10: They enforce https */
-        final String folderID = new Regex(param.getCryptedUrl(), "([a-z0-9]+)$").getMatch(0);
+        final String folderID = new Regex(param.getCryptedUrl(), PATTERN_FOLDER).getMatch(0);
         br.getPage("https://files.fm/u/" + folderID + "?view=gallery&items_only=true&index=0&count=10000");
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">This link does not contain any files|These files are deleted by the owner<|The expiry date of these files is over<|class=\"deleted_wrapper\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -86,8 +119,9 @@ public class FilesFmFolder extends PluginForDecrypt {
             ret.add(createDownloadlink(contentUrl));
             numberofFolders++;
         }
-        String[] htmls = br.getRegex("id=\"report_[^\"]+\".*?class=\"OrderID\"").getColumn(-1);
-        if (htmls == null || htmls.length == 0) {
+        final String json = new Regex(br.getRequest().getHtmlCode(), "(?s)var\\s+objFilesData\\s*=\\s*(\\{.*?\\});").getMatch(0);
+        final Map<String, Object> filesData = json != null ? restoreFromString(json, TypeRef.MAP) : null;
+        if (filesData == null || filesData.isEmpty()) {
             if (numberofFolders > 0) {
                 /* Only subfolders and no single files */
                 logger.info("Found only subfolders and no single files");
@@ -111,33 +145,28 @@ public class FilesFmFolder extends PluginForDecrypt {
             /* Fallback */
             fp.setName(br._getURL().getPath());
         }
-        for (final String html : htmls) {
-            String filename = new Regex(html, "class=\"full-file-name\">([^<>\"]+)<").getMatch(0);
-            final String ext = new Regex(html, "class=\"filename-extension\"[^>]*>([^<>\"]+)<").getMatch(0);
-            final String filesize = new Regex(html, "class=\"file_size\">([^<>}\"]*?)<").getMatch(0);
-            String fileid = new Regex(html, "(?:\\?|&)i=([a-z0-9]+)").getMatch(0);
-            if (fileid == null) {
-                /* 2021-01-25 */
-                fileid = new Regex(html, "id=\"report_([a-z0-9]+)\"").getMatch(0);
+        fp.setPackageKey("files.fm://folder/" + folderID);
+        if (filesData != null) {
+            for (final Object entryO : filesData.values()) {
+                final Map<String, Object> entry = (Map<String, Object>) entryO;
+                final String fileid = entry.get("hash").toString();
+                if (!dupes.add(fileid)) {
+                    continue;
+                }
+                String filename = entry.get("display_name").toString();
+                final String filesize = entry.get("size").toString();
+                filename = Encoding.htmlDecode(filename).trim();
+                final String contentUrl = Request.getLocation("/down.php?i=" + fileid + "&n=" + filename, br.getRequest());
+                final DownloadLink file = createDownloadlink(contentUrl);
+                file.setProperty("mainlink", param.getCryptedUrl());
+                file.setContentUrl(contentUrl);
+                file.setAvailable(true);
+                file.setName(filename);
+                file.setVerifiedFileSize(Long.parseLong(filesize));
+                file.setProperty("originalname", filename);
+                file._setFilePackage(fp);
+                ret.add(file);
             }
-            if (filename == null || filesize == null || fileid == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            filename = Encoding.htmlDecode(filename).trim();
-            if (ext != null && !filename.endsWith(ext)) {
-                filename += ext;
-            }
-            final String contentUrl = Request.getLocation("/down.php?i=" + fileid + "&n=" + filename, br.getRequest());
-            final DownloadLink file = createDownloadlink(contentUrl);
-            file.setProperty("mainlink", param.getCryptedUrl());
-            file.setContentUrl(contentUrl);
-            file.setLinkID(fileid);
-            file.setAvailable(true);
-            file.setName(Encoding.htmlDecode(filename));
-            file.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(filesize)));
-            file.setProperty("originalname", filename);
-            file._setFilePackage(fp);
-            ret.add(file);
         }
         if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -35,16 +36,19 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48444 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52918 $", interfaceVersion = 3, names = {}, urls = {})
 public class TransfernowNet extends PluginForHost {
     public TransfernowNet(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.transfernow.net/de/bedingungen";
+        return getBaseURL() + "/de/bedingungen";
+    }
+
+    private String getBaseURL() {
+        return "https://www." + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
@@ -72,9 +76,8 @@ public class TransfernowNet extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -89,7 +92,7 @@ public class TransfernowNet extends PluginForHost {
     private String getFID(final DownloadLink link) {
         if (link.getPluginPatternMatcher() == null) {
             return null;
-        } else if (link.getPluginPatternMatcher().matches(TYPE_1)) {
+        } else if (TYPE_1.matcher(link.getPluginPatternMatcher()).matches()) {
             return new Regex(link.getPluginPatternMatcher(), TYPE_1).getMatch(0);
         } else {
             return new Regex(link.getPluginPatternMatcher(), TYPE_2).getMatch(0);
@@ -99,24 +102,28 @@ public class TransfernowNet extends PluginForHost {
     private String getSecret(final DownloadLink link) {
         if (link.getPluginPatternMatcher() == null) {
             return null;
-        } else if (link.getPluginPatternMatcher().matches(TYPE_1)) {
+        } else if (TYPE_1.matcher(link.getPluginPatternMatcher()).matches()) {
             return new Regex(link.getPluginPatternMatcher(), TYPE_1).getMatch(2);
         } else {
             return new Regex(link.getPluginPatternMatcher(), TYPE_2).getMatch(2);
         }
     }
 
-    private final String        PROPERTY_SINGLE_FILE_ID = "single_file_id";
-    private static final String TYPE_1                  = "https?://[^/]+/dl/([A-Za-z0-9]+)(/([A-Za-z0-9]+))?";
-    private static final String TYPE_2                  = "https?://[^/]+/[a-z]{2,}/dltransfer\\?utm_source=([A-Za-z0-9]+)(\\&utm_medium=([A-Za-z0-9]+))?";
-    private static final String API_BASE                = "https://www.transfernow.net/api";
+    private final String  PROPERTY_SINGLE_FILE_ID = "single_file_id";
+    private static final Pattern TYPE_1           = Pattern.compile("https?://[^/]+/dl/([A-Za-z0-9]+)(/([A-Za-z0-9]+))?");
+    private static final Pattern TYPE_2           = Pattern.compile("https?://[^/]+/[a-z]{2,}/dltransfer\\?utm_source=([A-Za-z0-9]+)(\\&utm_medium=([A-Za-z0-9]+))?");
+
+    private String getAPIBase() {
+        return getBaseURL() + "/api";
+    }
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFID(link) + ".zip";
+    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link) + ".zip");
-        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final UrlQuery query = new UrlQuery();
@@ -124,7 +131,7 @@ public class TransfernowNet extends PluginForHost {
         final String secret = getSecret(link);
         query.add("userSecret", secret != null ? secret : "");
         query.add("preview", "false");
-        br.getPage(API_BASE + "/transfer/downloads/metadata?" + query.toString());
+        br.getPage(getAPIBase() + "/transfer/downloads/metadata?" + query.toString());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -187,7 +194,7 @@ public class TransfernowNet extends PluginForHost {
                 }
                 query.add("password", Encoding.urlEncode(passCode));
             }
-            br.getPage(API_BASE + "/transfer/downloads/link?" + query.toString());
+            br.getPage(getAPIBase() + "/transfer/downloads/link?" + query.toString());
             if (br.getHttpConnection().getResponseCode() == 403 && link.isPasswordProtected()) {
                 link.setDownloadPassword(null);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
@@ -249,14 +256,6 @@ public class TransfernowNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

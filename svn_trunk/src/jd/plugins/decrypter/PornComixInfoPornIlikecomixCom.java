@@ -1,6 +1,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -20,7 +21,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52772 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52918 $", interfaceVersion = 3, names = {}, urls = {})
 /** Formerly known as: porncomix.one / porncomixone.net */
 public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
     @Override
@@ -50,7 +51,7 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
 
     private static final Pattern PATTERN_1 = Pattern.compile("/allporn/comics/([\\w-]+)/([\\w-]+)/?", Pattern.CASE_INSENSITIVE);
     /* 2026-03-27: ilikecomix.com */
-    private static final Pattern PATTERN_2 = Pattern.compile("/manga/c/([\\w-]+)/([\\w-]+)/?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_2 = Pattern.compile("/manga/c/([\\w-]+)((/([\\w-]+)/?|/))?", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_3 = Pattern.compile("/([\\w-]+)/([\\w-]+)/?", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_4 = Pattern.compile("/([\\w-]+)/([\\w-]+)/?(page/\\d+/?)?", Pattern.CASE_INSENSITIVE);
 
@@ -76,22 +77,24 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
         final Regex pattern2 = new Regex(path, PATTERN_2);
         final Regex pattern3 = new Regex(path, PATTERN_3);
         final Regex pattern4 = new Regex(path, PATTERN_4);
-        final String urltitle;
+        String urlBookSlug = null;
+        final String urlBookChapterSlug;
         String[] images;
         String extra_image = null;
         String postTitle = null;
         if (pattern1.patternFind()) {
-            urltitle = pattern1.getMatch(1);
+            urlBookChapterSlug = pattern1.getMatch(1);
             postTitle = br.getRegex("\"headline\": \"([^\"]+)").getMatch(0);
             images = br.getRegex("img id=\"image-\\d+\" src=\"([^\"]+)").getColumn(0);
         } else if (pattern2.patternFind()) {
-            urltitle = pattern2.getMatch(1);
+            urlBookSlug = pattern2.getMatch(0);
+            urlBookChapterSlug = pattern2.getMatch(3);
             postTitle = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
             images = br.getRegex("id=\"image-\\d+\" data-src=\"([^\"]+)").getColumn(0);
             /* 2026-05-04: First image is different */
             extra_image = br.getRegex("src=\"(https?://[^\"]+)\" id=\"image-0\"").getMatch(0);
         } else {
-            urltitle = pattern3.getMatch(0);
+            urlBookChapterSlug = pattern3.getMatch(0);
             postTitle = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
             images = br.getRegex("/ImageObject\" data-pswp-src=\"(https[^\"]+)").getColumn(0);
             if (images == null || images.length == 0) {
@@ -104,7 +107,7 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
             postTitle = postTitle.replaceFirst(" - Porn Comics \\| Ilike Comix$", "");
         } else {
             /* Fallback */
-            postTitle = urltitle.replace("-", " ").trim();
+            postTitle = urlBookChapterSlug.replace("-", " ").trim();
         }
         if (images == null || images.length == 0) {
             /* Only allow one level of crawling here otherwise this one may result in endless crawling. */
@@ -113,10 +116,47 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
                 logger.info("Prohibit endless crawling -> Returning nothing");
                 return ret;
             }
-            if (pattern4.patternFind()) {
-                /* Generic crawler e.g. for https://ilikecomix.com/author/bla/ */
+            if (pattern2.patternFind()) {
+                /* Crawl all chapters of a book e.g. /manga/c/book-slug/<-- all chapters here */
+                final HashSet<String> dupes = new HashSet<String>();
                 final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
                 for (final String url : urls) {
+                    if (!dupes.add(url)) {
+                        continue;
+                    }
+                    final Regex book_url_info = new Regex(url, PATTERN_2);
+                    if (!book_url_info.patternFind()) {
+                        continue;
+                    }
+                    final String thisUrlBookSlug = book_url_info.getMatch(0);
+                    final String thisUrlBookChapterSlug = book_url_info.getMatch(3);
+                    if (thisUrlBookChapterSlug == null) {
+                        /* Not a single-chapter url */
+                        continue;
+                    }
+                    if (!this.canHandle(url)) {
+                        /* Skips invalid URLs such as: https://www.statcounter.com/counter/counter.js */
+                        continue;
+                    }
+                    if (!thisUrlBookSlug.equalsIgnoreCase(urlBookSlug)) {
+                        /* Chapter belongs to another book -> Skip it */
+                        continue;
+                    }
+                    ret.add(this.createDownloadlink(url));
+                }
+                logger.info("Found book chapters: " + ret.size());
+                if (ret.isEmpty()) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+            }
+            if (pattern4.patternFind()) {
+                /* Generic crawler e.g. for https://ilikecomix.com/author/bla/ */
+                final HashSet<String> dupes = new HashSet<String>();
+                final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+                for (final String url : urls) {
+                    if (!dupes.add(url)) {
+                        continue;
+                    }
                     if (new Regex(url, PATTERN_3).patternFind()) {
                         ret.add(this.createDownloadlink(url));
                     }
@@ -125,9 +165,8 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 return ret;
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(postTitle);
@@ -141,8 +180,8 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
                 imgs.add(imageurl);
             }
         }
-        for (String imageurl : imgs) {
-            final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
+        for (final String url : imgs) {
+            final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
             link.setAvailable(true);
             link.setContainerUrl(contenturl);
             link._setFilePackage(fp);

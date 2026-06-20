@@ -23,7 +23,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 52107 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52918 $", interfaceVersion = 2, names = {}, urls = {})
 public class MangadexOrg extends antiDDoSForDecrypt {
     public MangadexOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,6 +77,21 @@ public class MangadexOrg extends antiDDoSForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        /**
+         * 2026-06-19: Required otherwise API responds (among other html) with this html code instead of json: <br>
+         * <p>
+         * Your browser is missing important security features.
+         * </p>
+         */
+        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36");
+        br.getHeaders().put("Accept", "*/*");
+        br.getHeaders().put("Accept-Language", "en-US,en;q=0.9");
+        br.getHeaders().put("sec-ch-ua", "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not=A?Brand\";v=\"99\"");
+        br.getHeaders().put("sec-ch-ua-mobile", "?0");
+        br.getHeaders().put("sec-ch-ua-platform", "\"Windows\"");
+        br.getHeaders().put("sec-fetch-dest", "empty");
+        br.getHeaders().put("sec-fetch-mode", "cors");
+        br.getHeaders().put("sec-fetch-site", "same-site");
         if (param.getCryptedUrl().matches(TYPE_LEGACY)) {
             /* Handling for older URLs */
             getPage(param.getCryptedUrl());
@@ -93,7 +108,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
+            Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             if (!"ok".equals(root.get("result"))) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -116,7 +131,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                 int limit = 32;
                 while (!isAbort()) {
                     getPage(apiBase + "cover?order[volume]=asc&manga[]=" + mangaID + "&limit=" + limit + "&offset=" + offset);
-                    root = restoreFromString(br.toString(), TypeRef.MAP);
+                    root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (!"ok".equals(root.get("result"))) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
@@ -169,7 +184,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                 int limit = 32;
                 while (!isAbort()) {
                     getPage(apiBase + "manga/" + mangaID + "/feed?limit=" + limit + "&includes[]=scanlation_group&includes[]=user&order[volume]=desc&order[chapter]=desc&offset=" + offset + "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic");
-                    root = restoreFromString(br.toString(), TypeRef.MAP);
+                    root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (!"ok".equals(root.get("result"))) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
@@ -200,7 +215,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> data = (Map<String, Object>) root.get("data");
             final Map<String, Object> attributes = (Map<String, Object>) data.get("attributes");
             final StringBuilder sb = new StringBuilder();
@@ -275,7 +290,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                 titleForFilename = mangaTitle;
             }
             this.getPage("/at-home/server/" + chapterID + "?forcePort443=false");
-            final Map<String, Object> root2 = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> root2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> chapter2 = (Map<String, Object>) root2.get("chapter");
             final String baseUrl = (String) root2.get("baseUrl");
             final String hash = (String) chapter2.get("hash");
