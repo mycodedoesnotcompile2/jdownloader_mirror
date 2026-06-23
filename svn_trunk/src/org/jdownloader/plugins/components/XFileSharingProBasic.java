@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52891 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52924 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4503,7 +4503,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     break obtainAccountInfoFromAPI;
                 }
                 try {
-                    ai = this.fetchAccountInfoAPI(this.br.cloneBrowser(), account);
+                    ai = this.fetchAccountInfoAPI(br2, account);
                     apiAccountType = account.getType();
                     logger.info("Found AccountInfo via API but trying to obtain trafficleft value from website as it is usually not given via API");
                 } catch (final Throwable e) {

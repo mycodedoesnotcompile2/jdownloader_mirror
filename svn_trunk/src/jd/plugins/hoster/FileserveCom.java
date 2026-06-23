@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -30,9 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52924 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileserveCom extends XFileSharingProBasic {
     public FileserveCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -154,12 +154,12 @@ public class FileserveCom extends XFileSharingProBasic {
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return -1;
+        return 1;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return -1;
+        return 1;
     }
 
     @Override
@@ -175,5 +175,19 @@ public class FileserveCom extends XFileSharingProBasic {
             fileInfo[1] = betterFilesize;
         }
         return fileInfo;
+    }
+
+    @Override
+    protected String regExTrafficLeft(final Browser br) {
+        String tr = br.getRegex("Traffic available today:\\s*<[^>]*>([^<]+)</span>").getMatch(0);
+        if (tr != null) {
+            return tr;
+        }
+        /* Page: /?op=my_account */
+        tr = br.getRegex("name=\"traffic_left\"[^>]*>([^<]+)</div>").getMatch(0);
+        if (tr != null) {
+            return tr;
+        }
+        return super.regExTrafficLeft(br);
     }
 }

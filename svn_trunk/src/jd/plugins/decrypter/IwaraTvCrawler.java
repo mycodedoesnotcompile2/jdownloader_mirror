@@ -22,6 +22,12 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.IwaraTvConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -38,13 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.IwaraTv;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.IwaraTvConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 52799 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52928 $", interfaceVersion = 3, names = {}, urls = {})
 public class IwaraTvCrawler extends PluginForDecrypt {
     public IwaraTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class IwaraTvCrawler extends PluginForDecrypt {
         if (param.getCryptedUrl().matches(PATTERN_USER)) {
             return crawlChannel(param, account);
         } else if ((playlistID = new Regex(param.getCryptedUrl(), PATTERN_PLAYLIST).getMatch(0)) != null) {
-            return this.crawlPlaylist(playlistID);
+            return this.crawlPlaylist(param, playlistID);
         } else {
             return crawlSingleVideo(param, account);
         }
@@ -128,9 +128,16 @@ public class IwaraTvCrawler extends PluginForDecrypt {
         return this.crawlItemsPagination(baseurl, query, fp);
     }
 
-    private ArrayList<DownloadLink> crawlPlaylist(final String playlistID) throws Exception {
+    private ArrayList<DownloadLink> crawlPlaylist(final CryptedLink param, final String playlistID) throws Exception {
         if (playlistID == null) {
             throw new IllegalArgumentException();
+        }
+        if (StringUtils.containsIgnoreCase(param.getCryptedUrl(), "iwara.ai")) {
+            /**
+             * 2026-06-23: New and mandatory otherwise this response will happen: <br>
+             * {"message":"errors.notFound"}
+             */
+            br.getHeaders().put("x-site", "www.iwara.ai");
         }
         final String url = "https://apiq.iwara.tv/playlist/" + playlistID;
         return crawlItemsPagination(url, new UrlQuery(), null);

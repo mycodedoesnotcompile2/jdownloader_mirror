@@ -387,6 +387,8 @@ public class CrossSystem {
         MAC_SEQUOIA(OSFamily.MAC), // 10.20/15.00
         @StorableDoc("macOS 26.0 (Tahoe)")
         MAC_TAHOE(OSFamily.MAC), // 10.xx/26.00
+        @StorableDoc("macOS 27.0 (Golden Gate)")
+        MAC_GOLDEN_GATE(OSFamily.MAC), // 10.xx/27.00
         /*
          * OS2
          */
@@ -456,7 +458,9 @@ public class CrossSystem {
         @StorableDoc("Windows 11 version 25H2 (2025 Update)")
         WINDOWS_11_25H2(OSFamily.WINDOWS),
         @StorableDoc("Windows 11 version 26H1 (2026 Update)")
-        WINDOWS_11_26H1(OSFamily.WINDOWS);
+        WINDOWS_11_26H1(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11 version 26H2 (2026 Update)")
+        WINDOWS_11_26H2(OSFamily.WINDOWS);
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -990,6 +994,8 @@ public class CrossSystem {
                     if (buildNumber >= 28000) {
                         // https://blogs.windows.com/windows-insider/2025/11/07/announcing-windows-11-insider-preview-build-28000-canary-channel/
                         this.set(OperatingSystem.WINDOWS_11_26H1);
+                    } else if (buildNumber >= 26300) {
+                        this.set(OperatingSystem.WINDOWS_11_26H2);
                     } else if (buildNumber >= 26200) {
                         this.set(OperatingSystem.WINDOWS_11_25H2);
                     } else if (buildNumber >= 26052 || buildNumber >= 26080 || buildNumber >= 26100) {
@@ -1196,7 +1202,9 @@ public class CrossSystem {
                 }
                 final long version = Math.max(parseMacOSVersion(osVersion), parseMacOSVersion(sw_ver.get()));
                 // new version scheme
-                if (version >= 26000000) {
+                if (version >= 27000000) {
+                    return OperatingSystem.MAC_GOLDEN_GATE;
+                } else if (version >= 26000000) {
                     return OperatingSystem.MAC_TAHOE;
                 } else if (version >= 15000000) {
                     return OperatingSystem.MAC_SEQUOIA;
@@ -1210,7 +1218,10 @@ public class CrossSystem {
                     return OperatingSystem.MAC_BIG_SUR;
                 } else {
                     // old version scheme
-                    if (version >= 10021000 || version >= 10026000) {
+                    if (version >= 10027000) {
+                        // TODO: unconfirmed
+                        return OperatingSystem.MAC_GOLDEN_GATE;
+                    } else if (version >= 10021000 || version >= 10026000) {
                         // TODO: unconfirmed
                         return OperatingSystem.MAC_TAHOE;
                     } else if (version >= 10020000) {

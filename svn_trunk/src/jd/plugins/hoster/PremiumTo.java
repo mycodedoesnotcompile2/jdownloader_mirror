@@ -71,7 +71,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 51998 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 52925 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String             PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String             PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -599,7 +599,7 @@ public class PremiumTo extends UseNet {
                     req = this.getAPIRequest(API_BASE_STORAGE + "/download.php", query, account, AuthType.PARAMETER);
                 } else {
                     /* WTF this should never happen */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown storage status");
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown storage status: " + status);
                 }
                 /* We might need this later */
                 serverside_filename = (String) resp.get("Filename");
@@ -891,7 +891,7 @@ public class PremiumTo extends UseNet {
                 dllink = "https://" + api_host + "/api/2/getfile.php?userid=" + userid + "&apikey=" + apikey + "&torrent=" + torrentID + "&file=" + fileID;
             }
         } else {
-            /* Remote-Directurl (Torrent & Storage) - no API and no account required */
+            /* Remote-Direct-url (Torrent & Storage) - no API and no account required */
             dllink = link.getPluginPatternMatcher();
         }
         return dllink;

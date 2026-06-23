@@ -27,6 +27,7 @@ import javax.script.ScriptEngineManager;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -45,13 +46,22 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52888 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52926 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
         /* 2021-03-08: Trying to avoid running into "/checkddos.php" */
         this.setStartIntervall(10 * 1000l);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        // Website does support IPv6 but DownloadServer are still IPV4 only -> Error "Your download link is expired" happens on download
+        // attempt, download will fail but users' IP will still be limited for the next few hours.
+        br.setIPVersion(IPVERSION.IPV4_IPV6);
+        return br;
     }
 
     private final String  PROPERTY_FAKE_OFFLINE_STATUS             = "fake_offline_status";

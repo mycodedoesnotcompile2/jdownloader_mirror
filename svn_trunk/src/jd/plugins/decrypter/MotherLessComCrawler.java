@@ -20,6 +20,11 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,11 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MotherLessCom;
 
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52838 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52927 $", interfaceVersion = 3, names = {}, urls = {})
 public class MotherLessComCrawler extends PluginForDecrypt {
     public MotherLessComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,8 +50,14 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "motherless.com" });
+        ret.add(new String[] { "motherless.xxx", "motherless.com" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("motherless.com"); // 2026-06-22
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -66,20 +73,34 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    /* Path-only patterns (no protocol/domain) shared between buildAnnotationUrls() and the TYPE_* matchers below. */
+    private static final Pattern PATTERN_SINGLE_ITEM_IN_GALLERY1   = Pattern.compile("/g/([\\w\\-%]+)/([A-Fa-f0-9]+)");
+    private static final Pattern PATTERN_GROUP_CATEGORIES_OVERVIEW = Pattern.compile("/g/([\\w\\-%]+)");
+    private static final Pattern PATTERN_GROUP_CATEGORY_IMAGE      = Pattern.compile("/gi/([\\w\\-%]+)");
+    private static final Pattern PATTERN_GROUP_CATEGORY_VIDEO      = Pattern.compile("/gv/([\\w\\-%]+)");
+    private static final Pattern PATTERN_SINGLE_ITEM_IN_GALLERY2   = Pattern.compile("/(G[A-Fa-f0-9]+)/([A-Fa-f0-9]+)");
+    private static final Pattern PATTERN_GALLERY_IMAGE_AND_VIDEO   = Pattern.compile("/(G([A-Fa-f0-9]+))");
+    private static final Pattern PATTERN_GALLERY_IMAGE             = Pattern.compile("/GI[A-Fa-f0-9]+");
+    private static final Pattern PATTERN_GALLERY_VIDEO             = Pattern.compile("/GV[A-Fa-f0-9]+");
+    private static final Pattern PATTERN_GALLERY_GALLERIES         = Pattern.compile("/GG[A-Fa-f0-9]+");
+    private static final Pattern PATTERN_USER                      = Pattern.compile("/u/[^/]+(?:\\?t=[aiv])?");
+    private static final Pattern PATTERN_FAVOURITES_ALL            = Pattern.compile("/f/([^/]+)/(images|galleries|videos)");
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/";
-            regex += "(g/[\\w\\-%]+/[A-Fa-f0-9]+";
-            regex += "|g/[\\w\\-%]+";
-            regex += "|g(i|v)/[a-z0-9\\-_]+";
-            regex += "|G[A-Fa-f0-9]+/[A-Fa-f0-9]+";
-            regex += "|G[A-Fa-f0-9]+";
-            regex += "|GI[A-Fa-f0-9]+";
-            regex += "|GV[A-Fa-f0-9]+";
-            regex += "|GG[A-Fa-f0-9]+";
-            regex += "|u/[^/]+(\\?t=[aiv])?";
-            regex += "|f/[^/]+/(?:images|galleries|videos)";
+            regex += "(" + PATTERN_SINGLE_ITEM_IN_GALLERY1.pattern().substring(1);
+            regex += "|" + PATTERN_GROUP_CATEGORIES_OVERVIEW.pattern().substring(1);
+            regex += "|" + PATTERN_GROUP_CATEGORY_IMAGE.pattern().substring(1);
+            regex += "|" + PATTERN_GROUP_CATEGORY_VIDEO.pattern().substring(1);
+            regex += "|" + PATTERN_SINGLE_ITEM_IN_GALLERY2.pattern().substring(1);
+            regex += "|" + PATTERN_GALLERY_IMAGE_AND_VIDEO.pattern().substring(1);
+            regex += "|" + PATTERN_GALLERY_IMAGE.pattern().substring(1);
+            regex += "|" + PATTERN_GALLERY_VIDEO.pattern().substring(1);
+            regex += "|" + PATTERN_GALLERY_GALLERIES.pattern().substring(1);
+            regex += "|" + PATTERN_USER.pattern().substring(1);
+            regex += "|" + PATTERN_FAVOURITES_ALL.pattern().substring(1);
             regex += ")";
             ret.add(regex);
         }
@@ -97,17 +118,17 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     // - set same User-Agent from hoster plugin, making it harder to distinguish.
     // - Server issues can return many 503's in high load situations.
     // - Server also punishes user who downloads with too many connections. This is a linkchecking issue also, as grabs info from headers.
-    private final String TYPE_USER                               = "https?://[^/]+/u/.*";
-    private final String TYPE_GALLERY_IMAGE_AND_VIDEO            = "(?i)https?://[^/]+/(G([A-Fa-f0-9]+))";
-    private final String TYPE_GALLERY_IMAGE                      = "https?://[^/]+/GI[A-Fa-f0-9]+$";
-    private final String TYPE_GALLERY_VIDEO                      = "https?://[^/]+/GV[A-Fa-f0-9]+$";
-    private final String TYPE_GALLERY_GALLERIES                  = "https?://[^/]+/GG[A-Fa-f0-9]+$";
-    private final String TYPE_GROUP_CATEGORIES_OVERVIEW          = "https?://[^/]+/g/([\\w\\-%]+)$";
-    private final String TYPE_GROUP_CATEGORY_IMAGE               = "https?://[^/]+/gi/([\\w\\-%]+)$";
-    private final String TYPE_GROUP_CATEGORY_VIDEO               = "https?://[^/]+/gv/([\\w\\-%]+)$";
-    private final String TYPE_SINGLE_ITEM_IN_CONTEXT_OF_GALLERY1 = "https?://[^/]+/g/([^/]+)/([A-Fa-f0-9]+)";
-    private final String TYPE_SINGLE_ITEM_IN_CONTEXT_OF_GALLERY2 = "https?://[^/]+/(G[A-F0-9]+)/([A-Fa-f0-9]+)$";
-    private final String TYPE_FAVOURITES_ALL                     = "https?://[^/]+/f/([^/]+)/(images|galleries|videos)";
+    private final String TYPE_USER                               = "https?://[^/]+" + PATTERN_USER.pattern();
+    private final String TYPE_GALLERY_IMAGE_AND_VIDEO            = "(?i)https?://[^/]+" + PATTERN_GALLERY_IMAGE_AND_VIDEO.pattern();
+    private final String TYPE_GALLERY_IMAGE                      = "https?://[^/]+" + PATTERN_GALLERY_IMAGE.pattern();
+    private final String TYPE_GALLERY_VIDEO                      = "https?://[^/]+" + PATTERN_GALLERY_VIDEO.pattern();
+    private final String TYPE_GALLERY_GALLERIES                  = "https?://[^/]+" + PATTERN_GALLERY_GALLERIES.pattern();
+    private final String TYPE_GROUP_CATEGORIES_OVERVIEW          = "https?://[^/]+" + PATTERN_GROUP_CATEGORIES_OVERVIEW.pattern();
+    private final String TYPE_GROUP_CATEGORY_IMAGE               = "https?://[^/]+" + PATTERN_GROUP_CATEGORY_IMAGE.pattern();
+    private final String TYPE_GROUP_CATEGORY_VIDEO               = "https?://[^/]+" + PATTERN_GROUP_CATEGORY_VIDEO.pattern();
+    private final String TYPE_SINGLE_ITEM_IN_CONTEXT_OF_GALLERY1 = "https?://[^/]+" + PATTERN_SINGLE_ITEM_IN_GALLERY1.pattern();
+    private final String TYPE_SINGLE_ITEM_IN_CONTEXT_OF_GALLERY2 = "https?://[^/]+" + PATTERN_SINGLE_ITEM_IN_GALLERY2.pattern();
+    private final String TYPE_FAVOURITES_ALL                     = "https?://[^/]+" + PATTERN_FAVOURITES_ALL.pattern();
 
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -164,7 +185,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String[] subGalURLs = br.getRegex("(/G(I|V|G)" + subgalID + ")").getColumn(0);
-        /* Remove duplicates */
+        /* Avoid duplicates */
         final ArrayList<String> subGalsDeduped = new ArrayList<String>();
         for (final String subGalURL : subGalURLs) {
             if (!subGalsDeduped.contains(subGalURL)) {
@@ -251,7 +272,8 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         // }
         /**
          * Find number of pages to walk through. Website displays max 6 pages so for galleries containing more than 6 pages this value will
-         * be updated after each loop! </br> Example with a lot of pages: https://motherless.com/GIAEE5076
+         * be updated after each loop! </br>
+         * Example with a lot of pages: https://motherless.com/GIAEE5076
          */
         int maxPage = getMaxPage(br);
         final HashSet<String> pages = new HashSet<String>();
@@ -359,23 +381,23 @@ public class MotherLessComCrawler extends PluginForDecrypt {
             } else if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
-            } else {
-                /* Double-check that we're accessing the expected page */
-                final UrlQuery nextPageQuery = UrlQuery.parse(nextPageURL);
-                final String nextPageNumberStr = nextPageQuery.get("page");
-                if (nextPageNumberStr == null || Integer.parseInt(nextPageNumberStr) != (page + 1)) {
-                    /* This should never happen */
-                    logger.warning("Stopping because: nextPageNumberStr does not match expected value: Got: " + nextPageNumberStr + " | Expected: " + (page + 1));
-                    break;
-                }
-                br.getPage(nextPageURL);
-                final int newMaxPage = getMaxPage(br);
-                if (newMaxPage != maxPage && newMaxPage > maxPage) {
-                    logger.info("maxPage changed: Old: " + maxPage + " | New: " + newMaxPage);
-                    maxPage = newMaxPage;
-                }
-                page++;
             }
+            /* Continue to next page */
+            /* Double-check that we're accessing the expected page */
+            final UrlQuery nextPageQuery = UrlQuery.parse(nextPageURL);
+            final String nextPageNumberStr = nextPageQuery.get("page");
+            if (nextPageNumberStr == null || Integer.parseInt(nextPageNumberStr) != (page + 1)) {
+                /* This should never happen */
+                logger.warning("Stopping because: nextPageNumberStr does not match expected value: Got: " + nextPageNumberStr + " | Expected: " + (page + 1));
+                break;
+            }
+            br.getPage(nextPageURL);
+            final int newMaxPage = getMaxPage(br);
+            if (newMaxPage != maxPage && newMaxPage > maxPage) {
+                logger.info("maxPage changed: Old: " + maxPage + " | New: " + newMaxPage);
+                maxPage = newMaxPage;
+            }
+            page++;
         }
         return ret;
     }
@@ -407,7 +429,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String[] urls = br.getRegex("(/g(i|v)/" + groupSlug + ")").getColumn(0);
         for (String url : urls) {
-            url = br.getURL(url).toString();
+            url = br.getURL(url).toExternalForm();
             ret.add(this.createDownloadlink(url));
         }
         return ret;
@@ -422,8 +444,9 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Returns max page number for pagination according to current html code. </br> This can vary e.g. on first page it looks like last page
-     * is number 6 but once we are on page 4 the highest page number visible changes to 8.
+     * Returns max page number for pagination according to current html code. </br>
+     * This can vary e.g. on first page it looks like last page is number 6 but once we are on page 4 the highest page number visible
+     * changes to 8.
      */
     private int getMaxPage(final Browser br) throws MalformedURLException {
         final String[] pageURLs = br.getRegex("<a href=\"([^\"]+page=\\d+[^\"]*)\"").getColumn(0);
@@ -442,6 +465,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         return br.getRegex("<a href=\"[^\"]+[^/]+/" + contentID + "\" title=\"([^\"]+)\"").getMatch(0);
     }
 
+    @Override
     public boolean hasCaptcha(final CryptedLink link, final jd.plugins.Account acc) {
         return false;
     }

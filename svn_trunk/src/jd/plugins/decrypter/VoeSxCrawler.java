@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -44,7 +40,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.VoeSx;
 
-@DecrypterPlugin(revision = "$Revision: 52920 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
+
+@DecrypterPlugin(revision = "$Revision: 52923 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,10 +66,6 @@ public class VoeSxCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    public static String[] getAnnotationNames() {
-        return buildAnnotationNames(getPluginDomains());
-    }
-
     @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
@@ -77,6 +73,10 @@ public class VoeSxCrawler extends PluginForDecrypt {
 
     public static String[] getAnnotationUrls() {
         return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
     }
 
     private static Pattern PATTERN_FOLDER = Pattern.compile("/folder/([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);

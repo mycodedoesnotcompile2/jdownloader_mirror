@@ -21,6 +21,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -44,12 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.MotherLessComCrawler;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51442 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52927 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MotherLessComCrawler.class })
 public class MotherLessCom extends PluginForHost {
     public static final String  text_subscribeFailed        = "Failed to subscribe to the owner of the video";
@@ -63,12 +63,12 @@ public class MotherLessCom extends PluginForHost {
     public MotherLessCom(PluginWrapper wrapper) {
         super(wrapper);
         this.setStartIntervall(2500l);
-        this.enablePremium("https://motherless.com/register");
+        this.enablePremium("https://" + getHost() + "/register");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://motherless.com/tou";
+        return "https://" + getHost() + "/tou";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -94,6 +94,12 @@ public class MotherLessCom extends PluginForHost {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Fa-f0-9]+)$");
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-06-22: Domain changed from motherless.com to motherless.xxx */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     @Override
@@ -124,12 +130,20 @@ public class MotherLessCom extends PluginForHost {
         return new Regex(url, "https?://[^/]+/(.+)").getMatch(0);
     }
 
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final String ext = getAssumedFileExtension(link);
+        if (ext != null) {
+            return this.getFID(link) + ext;
+        }
+        return this.getFID(link);
+    }
+
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, false);
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
-        setWeakFilename(link);
         if (this.checkDirectLinkAndSetFilesize(link) != null) {
             logger.info("Linkcheck done via directurl");
             return AvailableStatus.TRUE;
@@ -144,22 +158,10 @@ public class MotherLessCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String dllink = link.getStringProperty(PROPERTY_DIRECTURL);
-        if (dllink != null && !isDownload) {
+        if (dllink != null && !isDownload && !link.isSizeSet()) {
             this.checkDirectLinkAndSetFilesize(link);
         }
         return AvailableStatus.TRUE;
-    }
-
-    public void setWeakFilename(final DownloadLink link) {
-        if (!link.isNameSet()) {
-            /* Set fallback filename */
-            final String ext = getAssumedFileExtension(link);
-            if (ext != null) {
-                link.setName(this.getFID(link) + ext);
-            } else {
-                link.setName(this.getFID(link));
-            }
-        }
     }
 
     public static String getAssumedFileExtension(final DownloadLink link) {
@@ -173,7 +175,6 @@ public class MotherLessCom extends PluginForHost {
     }
 
     public AvailableStatus parseFileInfoAndSetFilename(final DownloadLink link) {
-        setWeakFilename(link);
         String dllink = null;
         if (isVideo(this.br)) {
             link.setProperty(PROPERTY_TYPE, "video");
@@ -210,11 +211,11 @@ public class MotherLessCom extends PluginForHost {
             return true;
         } else if (br.containsHTML("class=\"error-not-found\"")) {
             return true;
-        } else if (br.containsHTML("(?i)Violated Site Terms of Use|The page you're looking for cannot be found|You will be redirected to")) {
+        } else if (br.containsHTML("Violated Site Terms of Use|The page you're looking for cannot be found|You will be redirected to")) {
             return true;
         } else if (br.containsHTML("<img src=\"/images/icons.*/exclamation\\.png\" style=\"margin-top: -5px;\" />[\t\n\r ]+404")) {
             return true;
-        } else if (br.containsHTML("(?i)>\\s*The member has deleted the upload\\s*<")) {
+        } else if (br.containsHTML(">\\s*The member has deleted the upload\\s*<")) {
             return true;
         } else {
             return false;
@@ -291,7 +292,7 @@ public class MotherLessCom extends PluginForHost {
     }
 
     public static boolean isVideoNotOnlineYet(final Browser br) {
-        if (br.containsHTML("(?i)(This video is being processed and will be available shortly|This video will be available in (less than a minute|\\d+ minutes?))")) {
+        if (br.containsHTML("(This video is being processed and will be available shortly|This video will be available in (less than a minute|\\d+ minutes?))")) {
             return true;
         } else {
             return false;
@@ -299,7 +300,7 @@ public class MotherLessCom extends PluginForHost {
     }
 
     public static boolean isDownloadAccountOnly(final Browser br) {
-        if (br.containsHTML("(?i)This link is only downloadable for registered users\\.")) {
+        if (br.containsHTML("This link is only downloadable for registered users\\.")) {
             return true;
         } else {
             return false;
@@ -307,7 +308,7 @@ public class MotherLessCom extends PluginForHost {
     }
 
     public static boolean isViewSubscriberOnly(final Browser br) {
-        if (br.containsHTML("(?i)The upload is subscriber only\\. You can subscribe to the member from their")) {
+        if (br.containsHTML("The upload is subscriber only\\. You can subscribe to the member from their")) {
             return true;
         } else if (br.containsHTML(html_contentSubscriberVideo)) {
             return true;
@@ -319,7 +320,7 @@ public class MotherLessCom extends PluginForHost {
     }
 
     private static boolean isViewFriendsOnly(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*The content you are trying to view is for friends only")) {
+        if (br.containsHTML(">\\s*The content you are trying to view is for friends only")) {
             return true;
         } else {
             return false;
@@ -380,38 +381,38 @@ public class MotherLessCom extends PluginForHost {
 
     private String checkDirectLinkAndSetFilesize(final DownloadLink link) {
         String dllink = link.getStringProperty(PROPERTY_DIRECTURL);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                br2.getHeaders().put("Accept-Encoding", "identity");
-                prepHeadersDownload(link, br2);
-                con = br2.openHeadConnection(dllink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                    return dllink;
-                } else {
-                    throw new IOException();
+        if (dllink == null) {
+            return null;
+        }
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            br2.setFollowRedirects(true);
+            br2.getHeaders().put("Accept-Encoding", "identity");
+            prepHeadersDownload(link, br2);
+            con = br2.openHeadConnection(dllink);
+            if (this.looksLikeDownloadableContent(con)) {
+                if (con.getCompleteContentLength() > 0) {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
-            } catch (final Exception e) {
-                logger.log(e);
-                return null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
-                }
+                return dllink;
+            } else {
+                throw new IOException();
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            return null;
+        } finally {
+            if (con != null) {
+                con.disconnect();
             }
         }
-        return null;
     }
 
     private void prepHeadersDownload(final DownloadLink link, final Browser brc) {
         br.getHeaders().put("Accept-Encoding", "identity");
         if (isVideo(link)) {
-            brc.getHeaders().put("Referer", "http://motherless.com/scripts/jwplayer.flash.swf");
+            brc.getHeaders().put("Referer", "http://" + getHost() + "/scripts/jwplayer.flash.swf");
         }
     }
 
@@ -540,7 +541,7 @@ public class MotherLessCom extends PluginForHost {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         login(account, false);
         requestFileInformation(link);
-        if (br.containsHTML("(?i)Subscribers Only")) {
+        if (br.containsHTML("Subscribers Only")) {
             logger.info("Content is subscriber only --> Auto-subscribing to content-owner");
             String profileToSubscribe = br.getRegex("You can subscribe to the member from\\s*their <a href=(\"|')(https?://motherless\\.com)?/m/(.*?)\\1").getMatch(2);
             if (profileToSubscribe == null) {
@@ -552,7 +553,7 @@ public class MotherLessCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, text_subscribeFailed);
             }
             br.postPage("/subscribe/" + profileToSubscribe, "_token=" + token);
-            if (!br.containsHTML("(?i)(>\\s*You are already subscribed to|>\\s*You are now subscribed to)")) {
+            if (!br.containsHTML("(>\\s*You are already subscribed to|>\\s*You are now subscribed to)")) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, text_subscribeFailed);
             }
             br.getPage(link.getPluginPatternMatcher());
