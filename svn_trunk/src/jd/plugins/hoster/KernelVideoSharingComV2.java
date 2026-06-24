@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52892 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52931 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1006,8 +1006,16 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (account != null) {
             this.login(account, false, link);
         }
-        final String videoID = this.getFUID(link);
+        String videoID = this.getFUID(link);
+        if (videoID == null && br.getRequest() != null) {
+            /* Fallback: Try to extract videoID from current browser url e.g. hclips.com -> /videos/korean-girl- */
+            videoID = this.getFUID(br.getURL());
+        }
         final String contenturl = this.getContentURL(link);
+        if (videoID == null) {
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         br.setCurrentURL(contenturl);
         final String lifetime = "86400";
         Request request = br.createGetRequest(getProtocol() + new URL(contenturl).getHost() + "/api/json/video/" + lifetime + "/" + getAPIParam1(videoID) + "/" + this.getAPICroppedVideoID(videoID) + "/" + videoID + ".json");

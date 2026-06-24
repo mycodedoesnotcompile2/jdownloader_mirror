@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52911 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52933 $", interfaceVersion = 3, names = {}, urls = {})
 public class FlyfileApp extends PluginForHost {
     public FlyfileApp(PluginWrapper wrapper) {
         super(wrapper);
@@ -177,6 +177,7 @@ public class FlyfileApp extends PluginForHost {
         final String dllink;
         if (Boolean.TRUE.equals(videoSettings.get("disableDownload"))) {
             /* Official download is disabled -> Download stream */
+            /* TODO: 2026-06-23: Check if this works, possibly a captcha is now also required for streaming */
             br.getPage("/api/streaming/assign/" + fid);
             final Map<String, Object> streaminfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String stream_host = streaminfo.get("url").toString();
@@ -189,16 +190,23 @@ public class FlyfileApp extends PluginForHost {
             dl.startDownload();
         } else {
             /* Official download is allowed -> Preferably do that. */
-            final boolean skipCaptchaViaSpecialWorkaround = true;
+            /**
+             * 2026-06-23: That workaround is not possible anymore -> {"message":"CAPTCHA_REQUIRED"} <br>
+             * -> Looks like for streaming, users now also need to solve a captcha?
+             */
+            final boolean skipCaptchaViaSpecialWorkaround = false;
             if (skipCaptchaViaSpecialWorkaround) {
                 /*
                  * 2026-06-17: Special: Streaming URLs can also be used for official download and generating them works without the need of
                  * solving a captcha.
                  */
                 br.getPage("/api/streaming/assign/" + fid);
-                final Map<String, Object> streaminfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String stream_host = streaminfo.get("url").toString();
-                final String stream_token = streaminfo.get("token").toString();
+                final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (br.getHttpConnection().getResponseCode() != 200) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Unexpected API response: " + resp.get("message"));
+                }
+                final String stream_host = resp.get("url").toString();
+                final String stream_token = resp.get("token").toString();
                 dllink = stream_host.replace("streaming-", "downloader-") + "/download/" + stream_token;
             } else {
                 br.getHeaders().put("Accept", "application/json, text/plain, */*");
@@ -215,8 +223,11 @@ public class FlyfileApp extends PluginForHost {
                      * Media Type"}
                      */
                     br.postPageRaw("/api/download/nonce", "");
-                    final Map<String, Object> resp_nonce = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                    nonce = resp_nonce.get("nonce").toString();
+                    final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    if (br.getHttpConnection().getResponseCode() != 200) {
+                        throw new PluginException(LinkStatus.ERROR_FATAL, "Unexpected API response: " + resp.get("message"));
+                    }
+                    nonce = resp.get("nonce").toString();
                 }
                 /* Hardcoded Turnstile sitekey date: 2026-06-17 */
                 final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, "0x4AAAAAADQoQ3fUclo7VmxF").getToken();

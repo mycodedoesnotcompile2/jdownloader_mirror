@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50851 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52929 $", interfaceVersion = 3, names = {}, urls = {})
 public class DailyuploadsNet extends XFileSharingProBasic {
     public DailyuploadsNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -129,5 +129,14 @@ public class DailyuploadsNet extends XFileSharingProBasic {
             return form;
         }
         return super.findFormDownload2Premium(downloadLink, account, br);
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        /*
+         * 2026-06-23: File size is not displayed anymore on download1 page which means if we leave this enabled, parser will find and
+         * return wrong value "4 GB".
+         */
+        return false;
     }
 }

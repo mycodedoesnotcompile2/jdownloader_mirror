@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,8 +33,6 @@ import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -50,7 +49,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ChoMikujPl;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51127 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
+@DecrypterPlugin(revision = "$Revision: 52930 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
 public class ChoMikujPlFolder extends PluginForDecrypt {
     public ChoMikujPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,7 +146,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             linkending = content_url.substring(content_url.lastIndexOf("/") + 1);
         }
         /* Correct added link */
-        content_url = content_url.replace("www.", "").replace("http://", "https://");
+        content_url = content_url.replace("www.", "").replaceFirst("(?i)^http://", "https://");
         /********************** Load recent cookies ************************/
         this.loadCookies(br, this.getHost());
         /********************** Login if possible ************************/
@@ -163,8 +162,8 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         String username = null;
         specialWorkaround: if (br.getHttpConnection().getResponseCode() == 400) {
             /**
-             * Workaround for a website bug where when trying to open a folder structuree via normal GET request fails although the folder
-             * is online. <br>
+             * Workaround for a website bug where when trying to open a folder structure via normal GET request fails although the folder is
+             * online. <br>
              * Via browser it is possible to navigate to the final folder by starting from the users' root folder and then performing one
              * ajax request for each subfolder until the final file/folder is reached.
              */
@@ -252,49 +251,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             logger.info("Special workaround looks to be successful");
             performedSpecialWorkaround = true;
         }
-        if (requestVerificationToken == null) {
-            requestVerificationToken = findRequestVerificationToken(br);
-        }
-        passwordHandling(param);
-        if (scanForMorePages) {
-            /* Find all pages and re-add them to the crawler to handle one page after another! */
-            if (br.containsHTML("fileListPage")) {
-                int maxPage = 1;
-                int pageTemp = 1;
-                final String[] pages = br.getRegex("class=\"\" rel=\"(\\d+)\" ").getColumn(0);
-                if (pages != null && pages.length > 0) {
-                    for (final String pageStr : pages) {
-                        pageTemp = Integer.parseInt(pageStr);
-                        if (pageTemp > maxPage) {
-                            maxPage = pageTemp;
-                        }
-                    }
-                }
-                /* Add separate links for all found pages so call can be crawled independently from each other! */
-                if (maxPage > startPage) {
-                    logger.info("Found " + maxPage + " pages");
-                    final FilePackage fp = FilePackage.getInstance();
-                    for (int pageCounter = startPage + 1; pageCounter <= maxPage; pageCounter++) {
-                        String crawlerURL = "https://chomikujpagedecrypt.pl/result/" + Encoding.Base64Encode(parameter_without_page_number + "," + pageCounter);
-                        /*
-                         * 2019-07-26: Folders with over 9 pages will not contain the final maxPage value inside html. Users will have to
-                         * access page 9 to see more pages (or even to see the last page).
-                         */
-                        if (pageCounter == maxPage && br.containsHTML("rel=\"" + pageCounter + "\" title=\"" + pageCounter + " \\.\\.\\.\"")) {
-                            crawlerURL += "?check_for_more=true";
-                        }
-                        final DownloadLink dl = createDownloadlink(crawlerURL);
-                        fp.add(dl);
-                        distribute(dl);
-                        ret.add(dl);
-                    }
-                }
-            } else {
-                logger.info("Looks like we got a single page with files");
-            }
-        }
-        /********************** Multiple pages handling END ************************/
-        /* Checking if the single link is folder with EXTENSTION in the name */
+        passwordHandling(param, content_url);
         /* Check if we have a single file or a folder */
         final DownloadLink singleFile = this.crawlSingleFile(this.br);
         if (singleFile != null) {
@@ -302,6 +259,48 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             return ret;
         }
         logger.info("Failed to find single file --> Looking to crawl multiple files or subfolders");
+        if (requestVerificationToken == null) {
+            requestVerificationToken = findRequestVerificationToken(br);
+        }
+        scanForMorePages: if (scanForMorePages) {
+            /* Find all pages and re-add them to the crawler to handle one page after another! */
+            if (!br.containsHTML("fileListPage")) {
+                logger.info("Looks like we got a single folder page with files");
+                break scanForMorePages;
+            }
+            int maxPage = 1;
+            int pageTemp = 1;
+            final String[] pages = br.getRegex("class=\"\" rel=\"(\\d+)\" ").getColumn(0);
+            if (pages != null && pages.length > 0) {
+                for (final String pageStr : pages) {
+                    pageTemp = Integer.parseInt(pageStr);
+                    if (pageTemp > maxPage) {
+                        maxPage = pageTemp;
+                    }
+                }
+            }
+            /* Add separate links for all found pages so call can be crawled independently from each other! */
+            if (maxPage > startPage) {
+                logger.info("Found " + maxPage + " pages");
+                final FilePackage fp = FilePackage.getInstance();
+                for (int pageCounter = startPage + 1; pageCounter <= maxPage; pageCounter++) {
+                    String crawlerURL = "https://chomikujpagedecrypt.pl/result/" + Encoding.Base64Encode(parameter_without_page_number + "," + pageCounter);
+                    /*
+                     * 2019-07-26: Folders with over 9 pages will not contain the final maxPage value inside html. Users will have to access
+                     * page 9 to see more pages (or even to see the last page).
+                     */
+                    if (pageCounter == maxPage && br.containsHTML("rel=\"" + pageCounter + "\" title=\"" + pageCounter + " \\.\\.\\.\"")) {
+                        crawlerURL += "?check_for_more=true";
+                    }
+                    final DownloadLink dl = createDownloadlink(crawlerURL);
+                    fp.add(dl);
+                    distribute(dl);
+                    ret.add(dl);
+                }
+            }
+        }
+        /********************** Multiple pages handling END ************************/
+        /* Checking if the single link is folder with EXTENSTION in the name */
         /*
          * If e.g. crawler found page 100 but that folder only has 50 pages, there will be a redirect to the max/last page --> We do not
          * want to crawl anything then!
@@ -313,7 +312,6 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             ret.add(offline);
             return ret;
         }
-        final String numberofFilesStr = br.getRegex("class=\"bold\">(\\d+)</span> plik\\&#243;w<br />").getMatch(0);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("Nie znaleziono \\- błąd 404")) {
@@ -330,6 +328,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             ret.add(dummy);
             return ret;
         }
+        final String numberofFilesStr = br.getRegex("class=\"bold\">(\\d+)</span> plik\\&#243;w<br />").getMatch(0);
         /* Obtain some requiredvalues */
         if (username == null) {
             username = br.getRegex("name=\"(?:chomikId|ChomikName)\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
@@ -347,9 +346,6 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         String folderID = br.getRegex("type=\"hidden\" name=\"FolderId\" value=\"(\\d+)\"").getMatch(0);
         if (folderID == null) {
             folderID = br.getRegex("name=\"FolderId\" type=\"hidden\" value=\"(\\d+)\"").getMatch(0);
-        }
-        if (requestVerificationToken == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String url = br.getURL();
         String baseURL = br.getURL();
@@ -390,6 +386,8 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                 if (username == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 } else if (folderID == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (requestVerificationToken == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final UrlQuery query = new UrlQuery();
@@ -549,21 +547,35 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
      * This can be used to determine if the current page is a folder or a single file.
      *
      * @throws PluginException
+     * @throws IOException
      */
-    private DownloadLink crawlSingleFile(final Browser br) throws PluginException {
+    private DownloadLink crawlSingleFile(final Browser br) throws PluginException, IOException {
         String filename = br.getRegex("Download:\\s*<b>([^<]+)</b>").getMatch(0);
         final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
         final String fid = br.getRegex("id=\"fileDetails_(\\d+)\"").getMatch(0);
-        final String singleFileFolderPath = br.getRegex("id=\"fileDetails\"[^>]*>\\s*<h1[^>]*><a href=\"/([^\"]*?)/[^/]+\"").getMatch(0);
+        final Regex urlinfo = br.getRegex("id=\"fileDetails\"[^>]*>\\s*<h1[^>]*><a href=\"(/([^\"]+)/([^/]+))\"");
+        String contenturlFromHtml = null;
+        String singleFileFolderPath = null;
+        if (urlinfo.patternFind()) {
+            contenturlFromHtml = br.getURL(urlinfo.getMatch(0)).toExternalForm();
+            singleFileFolderPath = urlinfo.getMatch(1);
+        }
         if (filename == null || fid == null) {
+            /* No single file html present */
             return null;
         }
-        if (!br.getURL().contains("," + fid)) {
+        String contenturl = null;
+        if (urlContainsFileID(br.getURL(), fid)) {
+            contenturl = br.getURL();
+        } else if (this.urlContainsFileID(contenturlFromHtml, fid)) {
+            /* Fallback */
+            contenturl = contenturlFromHtml;
+        }
+        if (contenturl == null) {
             /* FileID is not contained in current URL -> Someting must have gone really wrong. */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find single file URL");
         }
         filename = correctFilename(Encoding.htmlDecode(filename));
-        final String contenturl = br.getURL();
         final DownloadLink file = createDownloadlink(contenturl);
         file.setContentUrl(contenturl);
         file.setDefaultPlugin(this.plugin);
@@ -579,6 +591,10 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             file.setRelativeDownloadFolderPath(singleFileFolderPath);
         }
         return file;
+    }
+
+    private boolean urlContainsFileID(final String url, final String file_id) {
+        return url.contains("," + file_id);
     }
 
     public static String findRequestVerificationToken(final Browser br) {
@@ -607,12 +623,14 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
      * Subfolders may require different passwords than root folders so even though we store working passwords and retry them, users will be
      * asked for passwords countless times when adding big folders!
      */
-    public void passwordHandling(final Object param) throws Exception {
+    public void passwordHandling(final Object param, final String target_url) throws Exception {
         synchronized (LOCK) {
             logger.info("Entered password handling");
-            final String urlBeforeEnteringPassword = br.getURL();
+            boolean pw1 = false;
+            boolean pw2 = false;
             if (isSpecialUserPasswordProtected(br)) {
                 logger.info("Content is password protected (special folder user password)");
+                pw1 = true;
                 /**
                  * This is not a folder password but another type of password which needs to be entered before! Some folders have this
                  * protection AND a folder-password!
@@ -639,12 +657,11 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                     /* This is set to true in host plugin - we will try to save- and re-use cookies there! */
                     pass.put("Remember", "False");
                     submitForm(pass);
-                    if (isSpecialUserPasswordProtected(br)) {
-                        continue;
-                    } else {
+                    if (!isSpecialUserPasswordProtected(br)) {
                         success = true;
                         break;
                     }
+                    /* Try again */
                 }
                 if (!success) {
                     logger.info("Special folder password handling failed");
@@ -655,14 +672,14 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                     ((DownloadLink) param).setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
                 }
                 this.getPluginConfig().setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
-                if (!br.getURL().equals(urlBeforeEnteringPassword)) {
-                    /* Sometimes redirect to root may happen --> Correct that */
-                    logger.info("Correcting URL: " + br.getURL() + " --> " + urlBeforeEnteringPassword);
-                    br.getPage(urlBeforeEnteringPassword);
-                }
+                /*
+                 * Redirect to root may happen so it is very important to access the URL we were on before password was prompted, see end of
+                 * function.
+                 */
             }
             if (isFolderPasswordProtected(br)) {
                 logger.info("Content is password protected (folder password)");
+                pw2 = true;
                 // prevent more than one password from processing and displaying at
                 // any point in time!
                 prepareBrowser(param.toString(), br);
@@ -700,9 +717,9 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                     if (Boolean.TRUE.equals(folderAnswer.get("IsSuccess"))) {
                         success = true;
                         break;
-                    } else {
-                        continue;
                     }
+                    /* Try again */
+                    continue;
                 }
                 if (!success) {
                     logger.info("Folder password handling failed");
@@ -715,11 +732,13 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                     ((DownloadLink) param).setDownloadPassword(FOLDERPASSWORD);
                 }
                 this.getPluginConfig().setProperty(CFG_FOLDERPASSWORD, FOLDERPASSWORD);
-                /** Small workaround so following code can work with the raw HTML code */
-                /* TODO: Remove this as it will nullify "br.getHttpConnection()"! */
-                final Request req = new GetRequest(urlBeforeEnteringPassword);
-                req.setHtmlCode(folderAnswer.get("Data").toString());
-                br.setRequest(req);
+                /* Now our browsers' URL is the URL of this password request -> Needs to be corrected down below! */
+            }
+            if (pw1 || pw2) {
+                if (!br.getURL().equals(target_url)) {
+                    logger.info("Accessing URL before password: " + target_url);
+                    br.getPage(target_url);
+                }
             }
         }
     }
@@ -775,10 +794,10 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         getPage(br, parameter);
     }
 
-    private void getPage(final Browser br, final String parameter) throws Exception {
+    private void getPage(final Browser br, final String url) throws Exception {
         loadHosterPlugin();
         plugin.setBrowser(br);
-        br.getPage(parameter);
+        br.getPage(url);
     }
 
     private void submitForm(final Form form) throws Exception {

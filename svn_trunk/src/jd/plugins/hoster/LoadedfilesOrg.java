@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51312 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52929 $", interfaceVersion = 2, names = {}, urls = {})
 public class LoadedfilesOrg extends YetiShareCore {
     public LoadedfilesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,5 +107,20 @@ public class LoadedfilesOrg extends YetiShareCore {
     protected boolean requiresWWW() {
         /* 2025-08-08: Important otherwise we run into Cloudflare error "526: Invalid SSL certificate" */
         return false;
+    }
+
+    public static final Object LOCK = new Object();
+
+    @Override
+    protected void runPostRequestTask(final Browser br) throws Exception {
+        synchronized (LOCK) {
+            /* Very basic anti bot handling */
+            if (br.getHttpConnection().getResponseCode() == 403) {
+                final String specialRedirect = br.getRegex("<script> window\\.location\\.href\\s*=\"(/[^\"]+)\";\\s*</script>").getMatch(0);
+                if (specialRedirect != null) {
+                    br.getPage(specialRedirect);
+                }
+            }
+        }
     }
 }
