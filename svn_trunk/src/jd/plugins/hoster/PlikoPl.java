@@ -42,16 +42,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52919 $", interfaceVersion = 3, names = { "pliko.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 3, names = { "pliko.pl" }, urls = { "" })
 public class PlikoPl extends PluginForHost {
     private static final String          API_BASE                   = "https://pliko.pl/jd2";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("pliko.pl");
-    private static final String          PROPERTY_APIKEY            = "apikey";
+    private static final String          PROPERTY_APIKEY            = "plikopl_apikey";
     private static final String          PROPERTY_APIKEY_EXPIRES    = "plikopl_apikey_expires_timestamp";
     private static final String          PROPERTY_JOB_ID            = "plikopl_job_id";
     private static final String          PROPERTY_RESUMABLE         = "plikopl_resumable";
     private static final String          PROPERTY_MAXCHUNKS         = "plikopl_maxchunks";
-    private static final long            APIKEY_RENEW_BEFORE_EXPIRE = 45 * 60 * 1000l;
+    private static final long            APIKEY_RENEW_BEFORE_EXPIRE = 35 * 60 * 1000l;
 
     public PlikoPl(final PluginWrapper wrapper) {
         super(wrapper);
@@ -165,7 +165,7 @@ public class PlikoPl extends PluginForHost {
          * Pliko.pl admin for a way to fetch this account data via the stored apikey instead so we do not need to re-login every time
          * fetchAccountInfo runs.
          */
-        final Map<String, Object> accountData = performFullLogin(account);
+        final Map<String, Object> accountData = this.login(account);
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hostsList = (List<Map<String, Object>>) accountData.get("supportedhosts");
         for (final Map<String, Object> hostmap : hostsList) {
@@ -195,16 +195,19 @@ public class PlikoPl extends PluginForHost {
     }
 
     /** Reuses the stored apikey as long as it is not about to expire, otherwise performs a full login. */
-    private void login(final Account account) throws IOException, PluginException, InterruptedException {
+    private Map<String, Object> login(final Account account) throws IOException, PluginException, InterruptedException {
         synchronized (account) {
             final String apikey = account.getStringProperty(PROPERTY_APIKEY);
             final long expiresTimestamp = account.getLongProperty(PROPERTY_APIKEY_EXPIRES, 0);
             if (!StringUtils.isEmpty(apikey) && System.currentTimeMillis() < expiresTimestamp - APIKEY_RENEW_BEFORE_EXPIRE) {
                 /* Trust stored apikey, it is not about to expire yet. */
                 logger.info("Trust stored apikey, it is not about to expire yet | Remaining validity: " + (expiresTimestamp - System.currentTimeMillis()) / 1000 + " seconds");
-                return;
+                br.getPage(API_BASE + "/account.php?apikey=" + apikey);
+                final Map<String, Object> resp = handleErrors(account, null);
+                final Map<String, Object> data = (Map<String, Object>) resp.get("data");
+                return data;
             }
-            performFullLogin(account);
+            return performFullLogin(account);
         }
     }
 

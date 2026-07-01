@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.security.SecureRandom;
@@ -77,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 52637 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -185,9 +186,26 @@ public class XHamsterCom extends PluginForHost {
         return pattern.toString();
     }
 
+    private boolean isSupportedDomain(final String domain) {
+        for (final String domainTmp : getAnnotationNames()) {
+            if (domainTmp.equalsIgnoreCase(domain)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isSupportedPremiumDomain(final String domain) {
+        for (final String domainTmp : premium_domains) {
+            if (domainTmp.equalsIgnoreCase(domain)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /* The list of qualities/formats displayed to the user */
     public static final String   domain_premium                                            = "faphouse.com";
-    public static final String   api_base_premium                                          = "https://faphouse.com/api";
     private static final Pattern TYPE_VIDEOS                                               = Pattern.compile("/(?:[a-z]{2}/)?videos/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_MOMENTS                                              = Pattern.compile("/moments/([a-z0-9\\-_]+)-([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_MOVIES                                               = Pattern.compile("/movies/(\\d+)/([^/]+)\\.html", Pattern.CASE_INSENSITIVE);
@@ -201,6 +219,7 @@ public class XHamsterCom extends PluginForHost {
     private final static String  PROPERTY_NUMERIC_VIDEO_ID                                 = "numeric_video_id";
     private final static String  PROPERTY_DEBUG_IS_SET_AS_FAVORITE                         = "debug_is_set_as_favorite";
     private final String         PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN                    = "last_used_free_domain";
+    private final String         PROPERTY_ACCOUNT_LAST_USED_PREMIUM_DOMAIN                 = "last_used_premium_domain";
     private final String         PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL                        = "premium_login_url";
     private final String         PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_LEFT  = "premium_monthly_official_downloads_left";
     private final String         PROPERTY_ACCOUNT_PREMIUM_MONTHLY_OFFICIAL_DOWNLOADS_MAX   = "premium_monthly_official_downloads_max";
@@ -210,20 +229,19 @@ public class XHamsterCom extends PluginForHost {
      */
     private final String         PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT = "timestamp_last_time_premium_only_account";
     private static final String  COOKIE_KEY_PREMIUM                                        = "premium";
-    private boolean              free_login_2fa_required                                   = false;
 
     @Override
     public String getAGBLink() {
         return "https://" + getHost() + "/info/terms";
     }
 
-    public static final String   TYPE_MOBILE    = "(?i).+m\\.xhamster\\.+";
+    public static final String    TYPE_MOBILE     = "(?i).+m\\.xhamster\\.+";
     /* Important: Keep this up2date! */
-    private static final Pattern TYPE_PREMIUM   = Pattern.compile(".+(xhamsterpremium\\.com|faphouse\\.com|faphouse2\\.com).+", Pattern.CASE_INSENSITIVE);
-    private static final String  NORESUME       = "NORESUME";
-    private final String         recaptchav2    = "<div class=\"text\">\\s*In order to watch this video please prove you are a human";
-    private String               dllink         = null;
-    public static final String   DOMAIN_CURRENT = "xhamster.com";
+    private static final String[] premium_domains = new String[] { "faphouse.com", "faphouse2.com", "xhamsterpremium.com" };
+    private static final String   NORESUME        = "NORESUME";
+    private final String          recaptchav2     = "<div class=\"text\">\\s*In order to watch this video please prove you are a human";
+    private String                dllink          = null;
+    public static final String    DOMAIN_CURRENT  = "xhamster.com";
 
     public static String getCorrectedURL(String url) {
         /*
@@ -249,11 +267,17 @@ public class XHamsterCom extends PluginForHost {
         return url;
     }
 
-    /** Returns true if the full content behind the given URL can only be viewed with a paid account. */
-    private static boolean isPremiumURL(final String url) {
+    /**
+     * Returns true if the full content behind the given URL can only be viewed with a paid account.
+     *
+     * @throws MalformedURLException
+     */
+    private boolean isPremiumURL(final String url) throws MalformedURLException {
         if (url == null) {
             return false;
-        } else if (new Regex(url, TYPE_PREMIUM).patternFind()) {
+        }
+        final String domain = new URL(url).getHost();
+        if (this.isSupportedPremiumDomain(domain)) {
             return true;
         } else {
             return false;
@@ -291,8 +315,28 @@ public class XHamsterCom extends PluginForHost {
         if (id != null) {
             return id;
         }
+        return find_internal_video_id_for_download(br);
+    }
+
+    /**
+     * Checks fir internal video_id in html code. <br>
+     * This is is required for downloading.
+     */
+    private String find_internal_video_id_for_download(final Browser br) {
         /* For xhamster premium/faphouse items */
-        id = br.getRegex("data-el-video-id=\"(\\d+)").getMatch(0);
+        String id = br.getRegex("data-el-video-id=\"(\\d+)").getMatch(0);
+        if (id != null) {
+            return id;
+        }
+        /* 2026-06-30: For VR videos */
+        id = br.getRegex("data-el-item-id\\s*=\\s*\"(\\d+)").getMatch(0);
+        if (id != null) {
+            return id;
+        }
+        id = br.getRegex("data-video-id\\s*=\\s*\"(\\d+)").getMatch(0);
+        if (id != null) {
+            return id;
+        }
         return id;
     }
 
@@ -356,6 +400,44 @@ public class XHamsterCom extends PluginForHost {
     @Override
     public boolean isProxyRotationEnabledForLinkChecker() {
         return false;
+    }
+
+    private String getFreeDomain(final Account account, String fallback) {
+        return account.getStringProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN, fallback);
+    }
+
+    private void setFreeDomain(final Account account, String domain) {
+        if (!this.isSupportedDomain(domain)) {
+            return;
+        }
+        account.setProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN, domain);
+    }
+
+    private void setPremiumDomain(final Account account, String domain) {
+        if (!this.isSupportedPremiumDomain(domain)) {
+            /** Most likely a domain that needs to be added to our list of supported domains or a very bad developer mistake. */
+            logger.warning("Rejecting to set unsupported premium domain: " + domain);
+            return;
+        }
+        account.setProperty(PROPERTY_ACCOUNT_LAST_USED_PREMIUM_DOMAIN, domain);
+    }
+
+    private String getPremiumDomain(final Account account, final boolean allowFallback) {
+        final String fallback = allowFallback ? domain_premium : null;
+        return account.getStringProperty(PROPERTY_ACCOUNT_LAST_USED_PREMIUM_DOMAIN, fallback);
+    }
+
+    private String getPremiumAPIBase(final Account account) {
+        return "https://" + this.getPremiumDomain(account, true) + "/api";
+    }
+
+    private void setCookies(final Cookies cookies) {
+        br.setCookies(cookies);
+        for (final String[] domains : getPluginDomains()) {
+            for (final String domain : domains) {
+                br.setCookies(domain, cookies);
+            }
+        }
     }
 
     @Override
@@ -827,6 +909,9 @@ public class XHamsterCom extends PluginForHost {
         if (br.containsHTML("class=\"video-info-details__actions video-info-details__actions_not-buyed\"") || br.containsHTML("data-el-jes=\"video_get_full\"")) {
             /* Some videos are not included in users' paid subscription for example: /videos/syW3z3 */
             throw new AccountRequiredException("This video needs to be bought separately");
+        } else if (br.containsHTML("data-testid=\"vr-join-button\"")) {
+            /* e.g. /videos/teach-3PfVM1 */
+            throw new AccountRequiredException("This video needs to be bought separately as part of VR subscription");
         }
         final String streamHlsMaster = br.getRegex("data-el-hls-url=\"(https?://[^\"]+)").getMatch(0);
         if (mode == PremiumDownloadMode.STREAM_DOWNLOAD_ONLY) {
@@ -858,11 +943,11 @@ public class XHamsterCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* Preconditions are fine -> Try official video download */
-            final String internalVideoID = br.getRegex("data-el-item-id\\s*=\\s*\"(\\d+)").getMatch(0);
+            final String internalVideoID = find_internal_video_id_for_download(br);
             if (internalVideoID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.getPage(String.format(api_base_premium + "/videos/%s/original-video-config", internalVideoID));
+            br.getPage(String.format(this.getPremiumAPIBase(account) + "/videos/%s/original-video-config", internalVideoID));
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> errors = (Map<String, Object>) entries.get("errors");
             if (errors != null) {
@@ -1657,7 +1742,7 @@ public class XHamsterCom extends PluginForHost {
             boolean freeLoginSuccess = false;
             AccountInvalidException freeLoginFailedException = null;
             if (this.isPremiumOnlyAccount(account)) {
-                logger.info("Skipping free login because this account is known to be premium only (= " + domain_premium + " only)");
+                logger.info("Skipping free login because this account is known to be premium only (= " + this.getPremiumDomain(account, true) + " only)");
                 freeLoginSuccess = false;
             } else {
                 try {
@@ -1675,7 +1760,7 @@ public class XHamsterCom extends PluginForHost {
                 if (freeLoginFailedException != null) {
                     throw freeLoginFailedException;
                 } else {
-                    throw new AccountInvalidException("Account cannot be used for xhamster.com login and at the same time is not a " + domain_premium + " premium account which means there is no point in using it with JDownloader.");
+                    throw new AccountInvalidException("Account cannot be used for xhamster.com login and at the same time is not a " + this.getPremiumDomain(account, true) + " premium account which means there is no point in using it with JDownloader.");
                 }
             }
             if (!freeLoginSuccess) {
@@ -1695,39 +1780,38 @@ public class XHamsterCom extends PluginForHost {
 
     private void loginFree(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies) throws IOException, PluginException, InterruptedException {
         /* Nullification */
-        free_login_2fa_required = false;
-        String freeDomain = account.getStringProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN);
+        String freeDomain = this.getFreeDomain(account, null);
         if (freeDomain == null) {
             logger.info("Determining current free domain");
-            if (customCheckURL != null && !this.isPremiumURL(customCheckURL)) {
+            if (customCheckURL != null && !isPremiumURL(customCheckURL)) {
                 br.getPage(customCheckURL);
             } else {
                 br.getPage("https://" + this.getHost() + "/");
             }
             freeDomain = br.getHost();
             logger.info("Current free domain is: " + freeDomain);
-            account.setProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN, freeDomain);
+            this.setFreeDomain(account, freeDomain);
         }
         final Cookies cookies = account.loadCookies("");
         if (cookies != null) {
             logger.info("Trying free cookie login");
-            br.setCookies(freeDomain, cookies, true);
+            this.setCookies(cookies);
             if (!validateCookies) {
                 /* Do not check cookies */
                 return;
             }
             if (checkLoginFree(br, account, customCheckURL)) {
-                logger.info("Free cookie login successful");
+                freeDomain = br.getHost();
+                logger.info("Free cookie login successful | domain: " + freeDomain);
                 /* Save new cookie timestamp */
                 account.saveCookies(br.getCookies(br.getHost()), "");
-                account.setProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN, br.getHost());
+                this.setFreeDomain(account, freeDomain);
                 return;
-            } else {
-                /* Try full login */
-                logger.info("Free cookie login failed");
-                br.clearCookies(null);
-                prepBr(this, br);
             }
+            /* Try full login */
+            logger.info("Free cookie login failed");
+            br.clearCookies(null);
+            prepBr(this, br);
         }
         logger.info("Performing full login");
         /* Only access URL if it hasn't been accessed before */
@@ -1748,7 +1832,6 @@ public class XHamsterCom extends PluginForHost {
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         brc.postPageRaw("/x-api", requestData);
         if (twoFaLoginRequired(brc)) {
-            free_login_2fa_required = true;
             logger.info("2FA code required");
             final String twoFACode = this.getTwoFACode(account, "\\d{6}");
             logger.info("Submitting 2FA code");
@@ -1792,10 +1875,8 @@ public class XHamsterCom extends PluginForHost {
     }
 
     private boolean checkLoginFree(final Browser br, final Account account, final String customCheckURL) throws IOException {
-        String freeDomain = account.getStringProperty(PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN);
-        if (freeDomain == null) {
-            freeDomain = br.getHost();
-        }
+        final String fallbackDomain = br.getHost() != null ? br.getHost() : getHost();
+        final String freeDomain = this.getFreeDomain(account, fallbackDomain);
         if (customCheckURL == null || isPremiumURL(customCheckURL)) {
             br.getPage("https://" + freeDomain + "/");
         } else {
@@ -1853,19 +1934,21 @@ public class XHamsterCom extends PluginForHost {
     private void loginPremium(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies) throws IOException, PluginException, InterruptedException {
         final Cookies premiumCookies = account.loadCookies(COOKIE_KEY_PREMIUM);
         if (premiumCookies != null) {
-            br.setCookies(domain_premium, premiumCookies);
+            String premiumDomain = this.getPremiumDomain(account, true);
+            this.setCookies(premiumCookies);
             if (!validateCookies) {
                 return;
             }
             if (this.checkLoginPremium(br, account, customCheckURL)) {
-                logger.info("Premium cookie login successful");
-                account.saveCookies(br.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
+                premiumDomain = br.getHost();
+                logger.info("Premium cookie login successful | Domain: " + premiumDomain);
+                account.saveCookies(br.getCookies(premiumDomain), COOKIE_KEY_PREMIUM);
+                this.setPremiumDomain(account, premiumDomain);
                 return;
-            } else {
-                logger.info("Premium cookie login failed");
-                br.clearCookies(domain_premium);
-                prepBr(this, br);
             }
+            logger.info("Premium cookie login failed");
+            br.clearCookies(premiumDomain);
+            prepBr(this, br);
         }
         final String magicPremiumLoginURL = getMagicPremiumLoginURL(account);
         if (magicPremiumLoginURL != null) {
@@ -1879,8 +1962,10 @@ public class XHamsterCom extends PluginForHost {
                 logger.warning("Failed to find redirect to premium domain -> Possible login failure");
             }
             if (isLoggedinHTMLPremium(br, account)) {
-                logger.info("Premium login via magic link was successful");
-                account.saveCookies(br.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
+                final String premiumDomain = br.getHost();
+                logger.info("Premium login via magic link was successful | Domain: " + premiumDomain);
+                account.saveCookies(br.getCookies(premiumDomain), COOKIE_KEY_PREMIUM);
+                this.setPremiumDomain(account, premiumDomain);
                 return;
             }
             logger.info("Simple login via magic link failed --> Attempting advanced magic link login");
@@ -1908,8 +1993,10 @@ public class XHamsterCom extends PluginForHost {
                 final String redirectUrl = data.get("redirectUrl").toString();
                 br.getPage(redirectUrl);
                 if (isLoggedinHTMLPremium(br, account)) {
-                    logger.info("Extended premium login via magic link was successful");
+                    final String premiumDomain = br.getHost();
+                    logger.info("Extended premium login via magic link was successful | Domain: " + premiumDomain);
                     account.saveCookies(br.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
+                    this.setPremiumDomain(account, premiumDomain);
                     return;
                 }
             }
@@ -1969,8 +2056,8 @@ public class XHamsterCom extends PluginForHost {
 
     /** Checks premium login status and sets AccountInfo */
     private boolean checkLoginPremium(final Browser br, final Account account, String checkURL) throws IOException {
-        if (checkURL == null || !this.isPremiumURL(checkURL)) {
-            checkURL = "https://" + domain_premium + "/en";
+        if (checkURL == null || !isPremiumURL(checkURL)) {
+            checkURL = "https://" + this.getPremiumDomain(account, true) + "/en";
         }
         /* Check via html */
         br.getPage(checkURL);
@@ -2013,12 +2100,12 @@ public class XHamsterCom extends PluginForHost {
         if (AccountType.PREMIUM.equals(account.getType()) || AccountType.LIFETIME.equals(account.getType())) {
             /* Check vja ajax request -> json */
             logger.info("Fetching detailed premium account information");
-            br.getPage(api_base_premium + "/subscription/get");
+            br.getPage(this.getPremiumAPIBase(account) + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
+             * Returns "null" (without quotation mark) if cookies are valid but this is not a premium account. </br>
+             * Redirects to main page if cookies are invalid. </br>
              * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Can also return json along with http response code 400 for valid cookies but user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */
@@ -2068,7 +2155,7 @@ public class XHamsterCom extends PluginForHost {
                     }
                 }
                 logger.info("Obtaining account download limits");
-                br.getPage(api_base_premium + "/user/download-limits");
+                br.getPage(this.getPremiumAPIBase(account) + "/user/download-limits");
                 final Map<String, Object> limitresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 /* E.g. {"isLimitReached":false,"monthlyDownloads":{"limit":300,"available":299}} */
                 final Map<String, Object> monthlyDownloads = (Map<String, Object>) limitresponse.get("monthlyDownloads");

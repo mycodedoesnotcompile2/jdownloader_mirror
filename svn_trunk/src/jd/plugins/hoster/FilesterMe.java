@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FilesterMeFolder;
 
-@HostPlugin(revision = "$Revision: 52902 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52934 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesterMe extends PluginForHost {
     public FilesterMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -173,35 +173,61 @@ public class FilesterMe extends PluginForHost {
         }
         final String fid = this.getFID(link);
         final Browser brc = br.cloneBrowser();
-        brc.getPage("https://filester.me/js/file_dl.js?ver=1.0.5");
-        String dl_host = brc.getRegex("const CDN_URL\\s*=\\s*'(https?://[^'/]+)';").getMatch(0);
-        if (dl_host == null) {
-            final String dl_hosts = brc.getRegex("const CDN_URLS\\s*=\\s*(\\[.*?\\])\\s*;").getMatch(0);
-            if (dl_hosts != null) {
-                final String cdnURLs[] = restoreFromString(dl_hosts.replace("'", "\""), TypeRef.STRING_ARRAY);
-                dl_host = cdnURLs == null ? null : cdnURLs[(int) (Math.floor(Math.random() * cdnURLs.length))];
+        String dl_host = null;
+        String dllink = null;
+        final boolean use_api_v2 = true; // 2026-06-30
+        if (use_api_v2) {
+            brc.postPageRaw("/v2/api/public/download", "{\"file_slug\":\"" + fid + "\"}");
+            if (brc.getHttpConnection().getResponseCode() == 429) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 Too Many Requests", 1 * 60 * 1000l);
             }
-            if (dl_host == null) {
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.FALSE.equals(entries.get("success"))) {
+                /* e.g. {"success":false,"error":"E4006","message":"Too many requests"} */
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Error " + entries.get("error") + " | " + entries.get("message"));
+            }
+            dl_host = entries.get("server").toString();
+            final String name = entries.get("name").toString();
+            final String internal_filename = entries.get("file").toString();
+            final String token = entries.get("token").toString();
+            dllink = dl_host + "/v2/" + internal_filename + "?token=" + token + "&download=true&n=" + name;
+        } else {
+            /*
+             * 2026-06-30: Old API request still works but download links generated via this old way cannot be used anymore (http error
+             * 404).
+             */
+            brc.getPage("https://" + getHost() + "/js/file_dl.js?ver=1.0.5");
+            dl_host = brc.getRegex("const CDN_URL\\s*=\\s*'(https?://[^'/]+)';").getMatch(0);
+            find_dl_host: if (dl_host == null) {
+                final String dl_hosts = brc.getRegex("const CDN_URLS\\s*=\\s*(\\[.*?\\])\\s*;").getMatch(0);
+                if (dl_hosts != null) {
+                    final String cdnURLs[] = restoreFromString(dl_hosts.replace("'", "\""), TypeRef.STRING_ARRAY);
+                    dl_host = cdnURLs == null ? null : cdnURLs[(int) (Math.floor(Math.random() * cdnURLs.length))];
+                    if (dl_host != null) {
+                        break find_dl_host;
+                    }
+                }
                 dl_host = brc.getRegex("const CDN_URLS\\s*=\\s*\\[\\s*'(https?://[^'/]+)'").getMatch(0);
-            }
-            if (StringUtils.isEmpty(dl_host)) {
+                if (dl_host != null) {
+                    break find_dl_host;
+                }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find dl_host");
             }
+            brc.postPageRaw("/api/public/download", "{\"file_slug\":\"" + fid + "\"}");
+            if (brc.getHttpConnection().getResponseCode() == 429) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 Too Many Requests", 1 * 60 * 1000l);
+            }
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.FALSE.equals(entries.get("success"))) {
+                /* e.g. {"success":false,"error":"E4006","message":"Too many requests"} */
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Error " + entries.get("error") + " | " + entries.get("message"));
+            }
+            dllink = entries.get("download_url").toString();
+            if (StringUtils.isEmpty(dllink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            }
+            dllink = dl_host + dllink;
         }
-        brc.postPageRaw("/api/public/download", "{\"file_slug\":\"" + fid + "\"}");
-        if (brc.getHttpConnection().getResponseCode() == 429) {
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 Too Many Requests", 1 * 60 * 1000l);
-        }
-        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (Boolean.FALSE.equals(entries.get("success"))) {
-            /* e.g. {"success":false,"error":"E4006","message":"Too many requests"} */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Error " + entries.get("error") + " | " + entries.get("message"));
-        }
-        String dllink = entries.get("download_url").toString();
-        if (StringUtils.isEmpty(dllink)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
-        }
-        dllink = dl_host + dllink;
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();

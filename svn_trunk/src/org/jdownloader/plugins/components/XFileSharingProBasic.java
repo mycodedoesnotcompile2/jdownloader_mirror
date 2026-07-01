@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52924 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,7 +105,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     // TODO: Use these patterns in default regex down below
     public static final Pattern PATTERN_NORMAL                  = Pattern.compile("/([a-z0-9]{12})(/([^/]+)(?:\\.html))?", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_FILE                    = Pattern.compile("/file/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
-    public static final Pattern PATTERN_EMBED_VIDEO             = Pattern.compile("/embed-([a-z0-9]{12})\\.html", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_EMBED_VIDEO             = Pattern.compile("/embed-([a-z0-9]{12})(\\.html)?", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_EMBED_VIDEO_2           = Pattern.compile("/e/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_SHORT                   = Pattern.compile("/d/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_OFFICIAL_VIDEO_DOWNLOAD = Pattern.compile("/d/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);

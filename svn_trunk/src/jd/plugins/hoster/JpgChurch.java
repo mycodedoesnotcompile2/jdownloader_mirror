@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 52641 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,12 @@ public class JpgChurch extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        /**
+         * 2026-06-30: Looks like they will be gone soon: "JPG6 is closing down, viewing images is disabled." <br>
+         * New project looks to be: goonbox.cr
+         */
         ret.add(new String[] { "jpg6.su", "jpg7.cr", "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
+        /* 2026-06-30: putmega.com displays Cloudflare error 526: Invalid SSL certificate */
         ret.add(new String[] { "putmega.com" });
         return ret;
     }
