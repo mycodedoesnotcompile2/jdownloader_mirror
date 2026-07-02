@@ -46,7 +46,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52926 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -382,7 +382,7 @@ public class SubyShareCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilesize = br.getRegex("<span class=\"label label-warning\"[^>]*>([^<]+)</span>").getMatch(0);
+        final String betterFilesize = new Regex(html, "<span class=\"label label-warning\"[^>]*>([^<]+)</span>").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = Encoding.htmlDecode(betterFilesize).trim();
         }

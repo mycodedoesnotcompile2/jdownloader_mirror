@@ -23,6 +23,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
@@ -31,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50810 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class VtubeTo extends XFileSharingProBasic {
     public VtubeTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -125,9 +126,9 @@ public class VtubeTo extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
-        final String betterFiletitle = br.getRegex("<h3 [^>]*>Watch ([^<]+)</h3>").getMatch(0);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFiletitle = new Regex(html, "<h3 [^>]*>Watch ([^<]+)</h3>").getMatch(0);
         if (betterFiletitle != null) {
             fileInfo[0] = betterFiletitle;
         }

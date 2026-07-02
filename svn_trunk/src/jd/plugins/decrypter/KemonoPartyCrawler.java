@@ -29,6 +29,23 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigPawchiveSt;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -47,23 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52940 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,6 +95,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "coomer.st", "coomer.su", "coomer.party" }); // onlyfans.com content
         ret.add(new String[] { "kemono.cr", "kemono.su", "kemono.party" }); // content of other websites such as patreon.com
+        ret.add(new String[] { "pawchive.st" }); // Fork project of coomer/kemono projects
         return ret;
     }
 
@@ -113,15 +115,15 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?.+)?)(/post/(p\\-)?[a-z0-9]+(/revision/(\\d+))?)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_PROFILE.pattern().substring(1) + "|" + PATTERN_POST.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
 
-    private final String TYPE_PROFILE = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)(\\?.+)?$";
-    private final String TYPE_POST    = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)/post/((p\\-)?[a-z0-9]+)(/revision/(\\d+))?$";
-    private KemonoParty  hostPlugin   = null;
-    private CryptedLink  cl           = null;
+    private static final Pattern PATTERN_PROFILE = Pattern.compile("/([^/]+)/user/([\\w\\-\\.]+)(\\?.+)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_POST    = Pattern.compile("/([^/]+)/user/([\\w\\-\\.]+)/post/((p\\-)?[a-z0-9]+)(/revision/(\\d+))?$", Pattern.CASE_INSENSITIVE);
+    private KemonoParty          hostPlugin      = null;
+    private CryptedLink          cl              = null;
 
     private String getApiBase() {
         return "https://" + getHost() + "/api/v1";
@@ -132,9 +134,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         cfg = PluginJsonConfig.get(getConfigInterface());
         cl = param;
-        if (param.getCryptedUrl().matches(TYPE_PROFILE)) {
+        if (new Regex(param.getCryptedUrl(), PATTERN_PROFILE).patternFind()) {
             return this.crawlProfile(param);
-        } else if (param.getCryptedUrl().matches(TYPE_POST)) {
+        } else if (new Regex(param.getCryptedUrl(), PATTERN_POST).patternFind()) {
             return this.crawlPost(param);
         } else {
             /* Unsupported URL --> Developer mistake */
@@ -149,7 +151,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlProfile(final CryptedLink param) throws Exception {
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_PROFILE);
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), PATTERN_PROFILE);
         if (!urlinfo.patternFind()) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -317,7 +319,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlPost(final CryptedLink param) throws Exception {
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_POST);
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), PATTERN_POST);
         if (!urlinfo.patternFind()) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -349,7 +351,11 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Map<String, Object>> postRevisions = new HashMap<String, Map<String, Object>>();
         mainPostResponse: {
-            final Map<String, Object> post = (Map<String, Object>) entries.get("post");
+            Map<String, Object> post = (Map<String, Object>) entries.get("post");
+            if (post == null) {
+                /* Main json/map = Already the data of our desired post */
+                post = entries;
+            }
             postRevisions.put(StringUtils.valueOfOrNull(post.get("revision_id")), post);// null -> head revision
         }
         otherPostRevisions: {
@@ -412,7 +418,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
          * If given, this field is a Number field.
          */
         final String revisionID = StringUtils.valueOfOrNull(postmap.get("revision_id"));
-        final String posturl = "https://" + this.getHost() + "/" + service + "/user/" + usernameOrUserID + "/post/" + postID;
+        final String posturl = "https://" + getHost() + "/" + service + "/user/" + usernameOrUserID + "/post/" + postID;
         final String postTitle = postmap.get("title").toString();
         /* Every item has a "published" date */
         final String publishedDateStr = StringUtils.valueOfOrNull(postmap.get("published"));
@@ -428,7 +434,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             if (media != null) {
                 kemonoResults.add(media);
                 index++;
-
             }
             numberofResultsSimpleCount++;
         }
@@ -447,7 +452,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 numberofResultsSimpleCount++;
             }
         }
-        logger.info("service: " + service + " | UserID: " + usernameOrUserID + " | PostID: " + postID + " | File items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + kemonoResults.size());
+        logger.info("service: " + service + " | UserID: " + usernameOrUserID + " | PostID: " + postID + " | Attachment/File items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + kemonoResults.size());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage postFilePackage = getFilePackageForPostCrawler(service, usernameOrUserID, postID, postTitle);
         String postTextContent = (String) postmap.get("content");
@@ -504,7 +509,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             final TextCrawlMode mode = cfg.getTextCrawlMode();
             if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && kemonoResults.isEmpty())) {
                 ensureInitHosterplugin();
-                final DownloadLink textfile = new DownloadLink(this.hostPlugin, this.getHost(), posturl);
+                final DownloadLink textfile = new DownloadLink(this.hostPlugin, getHost(), posturl);
                 textfile.setProperty(KemonoParty.PROPERTY_TEXT, postTextContent);
                 textfile.setFinalFileName(postFilePackage.getName() + ".txt");
                 try {
@@ -601,7 +606,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             return null;
         }
         final String filepath = filepathO.toString();
-        String url = "https://" + this.getHost() + "/data" + filepath;
+        String url = "https://" + getHost() + "/data" + filepath;
         if (filename != null) {
             final String nameExt = Files.getExtension(filename, true);
             final String pathExt = Files.getExtension(filepath, true);
@@ -622,7 +627,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             /* Skip dupe */
             return null;
         }
-        final DownloadLink media = new DownloadLink(this.hostPlugin, this.getHost(), url);
+        final DownloadLink media = new DownloadLink(this.hostPlugin, getHost(), url);
         if (filename != null) {
             media.setFinalFileName(filename);
             media.setProperty(KemonoParty.PROPERTY_BETTER_FILENAME, filename);
@@ -641,7 +646,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     };
 
     /**
-     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br>
+     * Uses API to find userID. </br>
+     * Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {
@@ -682,7 +689,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
 
     private void ensureInitHosterplugin() throws PluginException {
         if (this.hostPlugin == null) {
-            this.hostPlugin = (KemonoParty) getNewPluginForHostInstance(this.getHost());
+            this.hostPlugin = (KemonoParty) getNewPluginForHostInstance(getHost());
         }
     }
 
@@ -756,6 +763,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public Class<? extends KemonoPartyConfig> getConfigInterface() {
         if ("kemono.party".equalsIgnoreCase(getHost())) {
             return KemonoPartyConfig.class;
+        } else if ("pawchive.st".equalsIgnoreCase(getHost())) {
+            return KemonoPartyConfigPawchiveSt.class;
         } else {
             return KemonoPartyConfigCoomerParty.class;
         }

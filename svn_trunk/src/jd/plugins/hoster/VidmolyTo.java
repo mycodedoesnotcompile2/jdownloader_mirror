@@ -19,8 +19,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -33,16 +33,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
-    }
-
-    @Override
-    protected String buildNormalURLPath(DownloadLink link, final String fuid) {
-        return "/" + fuid;
     }
 
     /**
@@ -71,7 +66,7 @@ public class VidmolyTo extends XFileSharingProBasic {
         /* 2025-09-19: Changed main domain from vidmoly.to to vidmoly.net */
         /* 2026-01-27: Changed main domain from vidmoly.net to vidmoly.biz */
         /*
-         * 2026-01-29: Changed main domain from vidmoly.biz to vidmoly.me as .biz domain displays this atm:
+         * 2026-01-29: Changed main domain from vidmoly.biz to vidmoly.me as .biz domain displays this text atm:
          * {"name":"embed-service","version":"1.0.0","status":"running"}
          */
         return this.rewriteHost(getPluginDomains(), host);
@@ -90,9 +85,21 @@ public class VidmolyTo extends XFileSharingProBasic {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    /**
+     * Path patterns for the different URL types seen for this host, see enum URL_TYPE in super class. <br />
+     * All of them use a 12 char alphanumeric fuid.
+     */
+    private static final Pattern PATTERN_NORMAL      = Pattern.compile("/([a-z0-9]{12})(/[^/]+)?(\\.html)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED_VIDEO = Pattern.compile("/embed-([a-z0-9]{12})(\\.html)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_DOWNLOAD    = Pattern.compile("/dl?/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_WATCH       = Pattern.compile("/w/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    /* 2026-07-01: New URL type */
+    private static final Pattern PATTERN_VIDEO       = Pattern.compile("/v/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+
     public static final String getDefaultAnnotationPatternPartCustom() {
         /* 2020-05-18: Special */
-        return "/(?:embed-|dl?/|w/)?[a-z0-9]{12}(/[^/]+)?(\\.html)?";
+        /* 2026-07-01: Built from the PATTERN_* constants above so both stay in sync. */
+        return "(" + PATTERN_EMBED_VIDEO.pattern() + "|" + PATTERN_DOWNLOAD.pattern() + "|" + PATTERN_WATCH.pattern() + "|" + PATTERN_VIDEO.pattern() + "|" + PATTERN_NORMAL.pattern() + ")";
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -105,18 +112,24 @@ public class VidmolyTo extends XFileSharingProBasic {
 
     @Override
     public String getFUIDFromURL(final DownloadLink link) {
+        if (link == null || link.getPluginPatternMatcher() == null) {
+            return null;
+        }
         /* 2020-05-18: Special */
+        /* 2026-07-01: Uses the PATTERN_* constants above so both stay in sync. In each of them the fuid is capturing group 1. */
         try {
-            if (link != null && link.getPluginPatternMatcher() != null) {
-                final String result = new Regex(new URL(link.getPluginPatternMatcher()).getPath(), "/(?:embed-|dl?/|w/)?([a-z0-9]{12})").getMatch(0);
-                return result;
-            } else {
-                return null;
+            final String path = new URL(link.getPluginPatternMatcher()).getPath();
+            final Pattern[] patterns = new Pattern[] { PATTERN_EMBED_VIDEO, PATTERN_DOWNLOAD, PATTERN_WATCH, PATTERN_VIDEO, PATTERN_NORMAL };
+            for (final Pattern pattern : patterns) {
+                final String fuid = new Regex(path, pattern).getMatch(0);
+                if (fuid != null) {
+                    return fuid;
+                }
             }
         } catch (MalformedURLException e) {
             logger.log(e);
         }
-        return null;
+        return super.getFUIDFromURL(link);
     }
 
     @Override
@@ -161,7 +174,7 @@ public class VidmolyTo extends XFileSharingProBasic {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -182,17 +195,19 @@ public class VidmolyTo extends XFileSharingProBasic {
         return true;
     }
 
-    public String[] scanInfo(final String[] fileInfo) {
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2020-05-18: Special */
-        super.scanInfo(fileInfo);
-        String betterFilename = br.getRegex(">([^>]+)</span><br>\\s+<span style=").getMatch(0);
-        if (betterFilename == null && StringUtils.containsIgnoreCase(br._getURL().getPath(), "/embed-")) {
-            betterFilename = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        super.scanInfo(html, fileInfo);
+        String betterFilename = new Regex(html, ">([^>]+)</span><br>\\s+<span style=").getMatch(0);
+        if (betterFilename == null) {
+            betterFilename = new Regex(html, "<title>([^<]+)</title>").getMatch(0);
         }
         if (betterFilename != null) {
+            betterFilename = betterFilename.replaceFirst("(?i) - Kino$", "");
             fileInfo[0] = betterFilename;
         }
-        final String betterFilesize = br.getRegex(">\\((\\d+[^<]+)\\) Download\\s*</a>").getMatch(0);
+        final String betterFilesize = new Regex(html, ">\\((\\d+[^<]+)\\) Download\\s*</a>").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }
@@ -234,10 +249,15 @@ public class VidmolyTo extends XFileSharingProBasic {
     }
 
     @Override
+    protected boolean supports_availablecheck_alt() {
+        return false;
+    }
+
+    @Override
     protected String buildURLPath(final DownloadLink link, final String fuid, final URL_TYPE type) {
         if (type == URL_TYPE.NORMAL) {
             /* 2025-03-18: Special: .html ending needed */
-            return "/" + fuid + ".html";
+            return "/v/" + fuid;
         } else {
             return super.buildURLPath(link, fuid, type);
         }

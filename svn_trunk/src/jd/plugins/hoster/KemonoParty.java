@@ -48,7 +48,7 @@ import jd.plugins.decrypter.KemonoPartyCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 51757 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -189,16 +189,16 @@ public class KemonoParty extends PluginForHost {
         return new Regex(path, HASH_PATTERN).getMatch(0);
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        return requestFileInformation(link, false);
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        if (this.isTextFile(link)) {
+            return this.getFID(link) + ".txt";
+        }
+        return super.getDefaultFileName(link);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         if (isTextFile(link)) {
-            if (!link.isNameSet()) {
-                /* Fallback */
-                link.setName(this.getFID(link) + ".txt");
-            }
             final String textContent = link.getStringProperty(PROPERTY_TEXT);
             if (StringUtils.isEmpty(textContent)) {
                 /* This should never happen */
@@ -218,7 +218,7 @@ public class KemonoParty extends PluginForHost {
             if (betterFilename != null) {
                 link.setFinalFileName(betterFilename);
             }
-            if (!isDownload) {
+            if (this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD) {
                 final Browser brc = br.cloneBrowser();
                 brc.setFollowRedirects(true);
                 basicLinkCheck(brc, brc.createHeadRequest(link.getPluginPatternMatcher()), link, betterFilename, null, FILENAME_SOURCE.prefer(FILENAME_SOURCE.values(), FILENAME_SOURCE.FORCED, FILENAME_SOURCE.CUSTOM));
@@ -248,10 +248,14 @@ public class KemonoParty extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (this.isTextFile(link)) {
             /* Write text to file */
             final String text = link.getStringProperty(PROPERTY_TEXT);
+            if (StringUtils.isEmpty(text)) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             dl = new TextDownloader(this, link, text);
             dl.startDownload();
         } else {
@@ -309,12 +313,11 @@ public class KemonoParty extends PluginForHost {
                 if (publishedDateStr == null) {
                     /* Missing property */
                     return super.getLastModifiedTimestamp();
-                } else if (!publishedDateStr.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")) {
-                    /* Invalid format */
-                    return super.getLastModifiedTimestamp();
+                } else if (publishedDateStr.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")) {
+                    final long timestamp = TimeFormatter.getMilliSeconds(publishedDateStr, "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
+                    return timestamp;
                 }
-                final long timestamp = TimeFormatter.getMilliSeconds(publishedDateStr, "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
-                return timestamp;
+                return super.getLastModifiedTimestamp();
             }
         };
     }
@@ -336,13 +339,5 @@ public class KemonoParty extends PluginForHost {
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
         /* No not allow multihost plugins to handle items from this plugin. */
         return link.getHost().equalsIgnoreCase(plugin.getHost());
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

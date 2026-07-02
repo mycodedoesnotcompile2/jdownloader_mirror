@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 43837 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class Mp4UploadCom extends XFileSharingProBasic {
     public Mp4UploadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,8 +117,8 @@ public class Mp4UploadCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
         if (fileInfo[0] != null && fileInfo[0].equals(".mp4")) {
             /* 2021-01-11: Fallback for bad given filename string */
             fileInfo[0] = this.getFUIDFromURL(this.getDownloadLink());

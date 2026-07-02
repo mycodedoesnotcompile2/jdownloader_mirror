@@ -24,12 +24,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidozaNet extends XFileSharingProBasic {
     public VidozaNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -64,9 +65,9 @@ public class VidozaNet extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
-        final String betterFilename = br.getRegex("curFileName\\s*(?:=|:)\\s*\"([^\"]+)\"").getMatch(0);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "curFileName\\s*(?:=|:)\\s*\"([^\"]+)\"").getMatch(0);
         if (StringUtils.isNotEmpty(betterFilename)) {
             fileInfo[0] = betterFilename;
         }

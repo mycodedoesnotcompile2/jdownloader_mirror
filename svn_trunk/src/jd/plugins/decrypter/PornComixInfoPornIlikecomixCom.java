@@ -21,8 +21,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52918 $", interfaceVersion = 3, names = {}, urls = {})
-/** Formerly known as: porncomix.one / porncomixone.net */
+@DecrypterPlugin(revision = "$Revision: 52940 $", interfaceVersion = 3, names = {}, urls = {})
+/**
+ * Formerly known as: porncomix.one / porncomixone.net <br>
+ * 2026-07-01: porncomixone.net is RIP
+ */
 public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -31,8 +34,7 @@ public class PornComixInfoPornIlikecomixCom extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "ilikecomix.com", "porncomixone.net" });
+        ret.add(new String[] { "ilikecomix.com" });
         return ret;
     }
 

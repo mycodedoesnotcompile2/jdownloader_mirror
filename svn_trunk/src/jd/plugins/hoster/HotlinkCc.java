@@ -40,7 +40,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51848 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -283,16 +283,17 @@ public class HotlinkCc extends XFileSharingProBasic {
         return 2;
     }
 
-    public String[] scanInfo(final String[] fileInfo) {
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2021-01-22: Prefer this as template will pickup filename without extension */
-        super.scanInfo(fileInfo);
-        String filename = new Regex(getCorrectBR(br), "<i class=\"glyphicon glyphicon-download\"></i>([^<>\"]+)<").getMatch(0);
+        super.scanInfo(html, fileInfo);
+        String filename = new Regex(html, "<i class=\"glyphicon glyphicon-download\"></i>([^<>\"]+)<").getMatch(0);
         if (StringUtils.isEmpty(filename)) {
             /* 2021-03-02 */
-            filename = new Regex(getCorrectBR(br), "class=\"glyphicon glyphicon-play-circle\"[^>]*></i>([^<>\"]+)<").getMatch(0);
+            filename = new Regex(html, "class=\"glyphicon glyphicon-play-circle\"[^>]*></i>([^<>\"]+)<").getMatch(0);
         }
         /* 2021-04-15: Important workaround or we might set video filenames without file-extension. */
-        final boolean isVideoFile = br.containsHTML(">\\s*Select quality for download video|id=\"over_player_msg\"");
+        final boolean isVideoFile = new Regex(html, ">\\s*Select quality for download video|id=\"over_player_msg\"").patternFind();
         /* Do not check for Form because file could be premiumonly -> No Form present! */
         // final Form videoDL = this.getOfficialVideoDownloadForm(this.br);
         if (isVideoFile && !StringUtils.isEmpty(filename) && !filename.toLowerCase(Locale.ENGLISH).endsWith(".mp4")) {

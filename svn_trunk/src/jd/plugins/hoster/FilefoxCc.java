@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilefoxCc extends XFileSharingProBasic {
     public FilefoxCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -126,10 +126,10 @@ public class FilefoxCc extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(getCorrectBR(br), "<p>([^<>\"]+)</p>\\s*?<p class=\"file\\-size\"").getMatch(0);
+            fileInfo[0] = new Regex(html, "<p>([^<>\"]+)</p>\\s*?<p class=\"file\\-size\"").getMatch(0);
         }
         return fileInfo;
     }

@@ -23,12 +23,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52667 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class BigwarpIo extends XFileSharingProBasic {
     public BigwarpIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -133,7 +134,7 @@ public class BigwarpIo extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilename = br.getRegex("<th colspan=2>Download ([^<]+)</th>").getMatch(0);
+        final String betterFilename = new Regex(html, "<th colspan=2>Download ([^<]+)</th>").getMatch(0);
         if (betterFilename != null) {
             fileInfo[0] = Encoding.htmlDecode(betterFilename).trim();
         }

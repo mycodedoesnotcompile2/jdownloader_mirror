@@ -23,12 +23,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileaxaCom extends XFileSharingProBasic {
     public FileaxaCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,10 +118,10 @@ public class FileaxaCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
         /* 2021-08-23 */
-        final String betterFilesize = br.getRegex("(?i)>\\s*File Size\\s*:\\s*(\\d+[^<]+)<").getMatch(0);
+        final String betterFilesize = new Regex(html, ">\\s*File Size\\s*:\\s*(\\d+[^<]+)<").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }

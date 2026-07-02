@@ -32,7 +32,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52625 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -169,9 +169,9 @@ public class LulustreamCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        String betterFilename = br.getRegex("name=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
+        String betterFilename = new Regex(html, "name=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
         if (betterFilename == null) {
-            betterFilename = br.getRegex("<h1 class=\"h5\">([^<]+)</h1>").getMatch(0);
+            betterFilename = new Regex(html, "<h1 class=\"h5\">([^<]+)</h1>").getMatch(0);
         }
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;

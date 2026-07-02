@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51244 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52940 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexCakeCom extends PluginForHost {
     public SexCakeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,6 +68,7 @@ public class SexCakeCom extends PluginForHost {
         ret.add(new String[] { "qorno.video" });
         ret.add(new String[] { "rubias19.red" });
         ret.add(new String[] { "sexyfilm.blue" });
+        /* 2026-07-01: porncomixone.net also redirects to this one RE forum 90642 */
         ret.add(new String[] { "redporn.video" });
         ret.add(new String[] { "voglioporno.gratis" });
         ret.add(new String[] { "voglioporno.cc" });
@@ -126,7 +127,7 @@ public class SexCakeCom extends PluginForHost {
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         dllink = null;
         final String path = new URL(link.getPluginPatternMatcher()).getPath();
-        final String title = Encoding.htmlDecode(path).replace("-", " ").trim().replaceFirst("\\.html$", "");
+        final String title = Encoding.htmlDecode(path).substring(1).replace("-", " ").trim().replaceFirst("\\.html$", "");
         link.setFinalFileName(title + ".mp4");
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());

@@ -58,6 +58,7 @@ import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
@@ -71,7 +72,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51884 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -274,17 +275,17 @@ public class SendCm extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        String betterFilename = br.getRegex("class\\s*=\\s*\"modal-title\"\\s*id=\"qr\"[^>]*>\\s*([^<]*?)\\s*</h\\d+>").getMatch(0);
+        String betterFilename = new Regex(html, "class\\s*=\\s*\"modal-title\"\\s*id=\"qr\"[^>]*>\\s*([^<]*?)\\s*</h\\d+>").getMatch(0);
         if (betterFilename == null) {
-            betterFilename = br.getRegex("data-feather\\s*=\\s*\"file\"[^>]*>\\s*</i>\\s*([^<]*?)\\s*</h\\d+>").getMatch(0);
+            betterFilename = new Regex(html, "data-feather\\s*=\\s*\"file\"[^>]*>\\s*</i>\\s*([^<]*?)\\s*</h\\d+>").getMatch(0);
             if (betterFilename == null) {
-                betterFilename = br.getRegex("\\&text=([^\"]+)\" target=\"_blank\">\\s*Share on Telegram").getMatch(0);
+                betterFilename = new Regex(html, "\\&text=([^\"]+)\" target=\"_blank\">\\s*Share on Telegram").getMatch(0);
             }
         }
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
         }
-        final String betterFilesize = br.getRegex("id=\"downloadbtn[>]*><i [^>]*></i>\\s*Download \\[([^<\\]]+)\\]</button>").getMatch(0);
+        final String betterFilesize = new Regex(html, "id=\"downloadbtn[>]*><i [^>]*></i>\\s*Download \\[([^<\\]]+)\\]</button>").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }

@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -25,10 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class Up4everCom extends XFileSharingProBasic {
     public Up4everCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -85,10 +85,11 @@ public class Up4everCom extends XFileSharingProBasic {
         return 1;
     }
 
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
         if (StringUtils.isEmpty(fileInfo[1])) {
-            fileInfo[1] = new Regex(getCorrectBR(br), "You have requested <span class=\"text\\-info\">[^<>\"]+</span>\\s*?\\((\\d+(?:\\.\\d{1,2})? [A-Za-z]+)\\)").getMatch(0);
+            fileInfo[1] = new Regex(html, "You have requested <span class=\"text\\-info\">[^<>\"]+</span>\\s*?\\((\\d+(?:\\.\\d{1,2})? [A-Za-z]+)\\)").getMatch(0);
         }
         return fileInfo;
     }

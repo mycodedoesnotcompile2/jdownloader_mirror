@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1294,11 +1294,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (currentBrowserURLType != URL_TYPE.EMBED_VIDEO) {
             /* URL needs to be accessed */
             final URL_TYPE type = this.getURLType(link);
-            final String url;
-            if (type == URL_TYPE.EMBED_VIDEO) {
-                url = this.getContentURL(link);
-            } else {
-                url = this.getMainPage(br) + this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO);
+            String url = this.findEmbedURL_old(br, link, account);
+            if (url == null) {
+                if (type == URL_TYPE.EMBED_VIDEO) {
+                    /* User added embed url -> Trust user added url */
+                    url = this.getContentURL(link);
+                } else {
+                    url = this.getMainPage(br) + this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO);
+                }
             }
             final String referer = this.getReferer(link);
             if (referer != null) {
@@ -1318,7 +1321,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         boolean isFilesizeSet = false;
         if (!StringUtils.isEmpty(dllink)) {
             this.videoStreamDownloadurl = dllink;
-            if (findAndSetFilesize && !dllink.contains(".m3u8")) {
+            if (findAndSetFilesize && !StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
                 /* Get- and set filesize from directurl */
                 if (checkDirectLinkAndSetFilesize(link, dllink, true) != null) {
                     /* Directurl is valid -> Store it */
@@ -1328,14 +1331,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
         }
         final String[] fileInfo = internal_getFileInfoArray();
-        scanInfo(fileInfo);
+        this.scanInfo(br.getRequest().getHtmlCode(), fileInfo);
         processFileInfo(fileInfo, br, link);
         if (!StringUtils.isEmpty(fileInfo[0])) {
             /* Correct- and set filename */
             setFilename(fileInfo[0], link, br);
         }
         /* Set filesize */
-        if (!StringUtils.isEmpty(fileInfo[1]) && !isFilesizeSet) {
+        if (!isFilesizeSet && !StringUtils.isEmpty(fileInfo[1])) {
             link.setDownloadSize(parseSize(Size.FILE, fileInfo[1]));
         }
     }
@@ -1700,10 +1703,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /**
      * Tries to find filename, filesize and md5hash inside html. On Override, make sure to first use your special RegExes e.g.
-     * fileInfo[0]="bla", THEN, if needed, call super.scanInfo(fileInfo). <br>
+     * fileInfo[0]="bla", THEN, if needed, call super.scanInfo(html, fileInfo). Do NOT call super.scanInfo(fileInfo) (the single-arg
+     * variant) from within this override -- that method is final and re-dispatches to this same overridden method, causing infinite
+     * recursion/StackOverflowError. <br>
      * fileInfo[0] = filename, fileInfo[1] = filesize, fileInfo[2] = md5hash
      */
-    public String[] scanInfo(final String[] fileInfo) {
+    private final String[] scanInfo(final String[] fileInfo) {
         return scanInfo(getCorrectBR(br), fileInfo);
     }
 
@@ -2433,23 +2438,33 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /** Returns relative URL to embed content if available in current browsers' html code. */
-    protected String findEmbedURL(final Browser br, final DownloadLink link, final Account Account) {
+    protected String findEmbedURL(final Browser br, final DownloadLink link, final Account account) {
         final String fid = this.getFUIDFromURL(link);
         final URL_TYPE urltype = this.getURLType(link);
         if (fid == null || urltype == null) {
             return null;
         }
-        final String expectedurl;
+        String url = findEmbedURL_old(br, link, account);
+        if (url != null) {
+            return url;
+        }
+        /* Assume how an embed url would look and check existence of it in html code. */
         if (this.isXFSOld(urltype)) {
-            expectedurl = this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO);
+            url = this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO);
         } else {
-            expectedurl = this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO_2);
+            url = this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO_2);
         }
-        if (br.containsHTML(Pattern.quote(expectedurl))) {
-            return expectedurl;
-        } else {
-            return null;
+        if (br.containsHTML(Pattern.quote(url))) {
+            return url;
         }
+        logger.info("Failed to find any embed url in html code");
+        return null;
+    }
+
+    /** Returns older XFS style embed url regexed from current browsers' html code. */
+    protected String findEmbedURL_old(final Browser br, final DownloadLink link, final Account Account) {
+        final String fid = this.getFUIDFromURL(link);
+        return br.getRegex("(https?://[^/]+/embed-" + fid + "\\.html)").getMatch(0);
     }
 
     /**
@@ -3675,9 +3690,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     } else {
                         logger.info("Successfully found BEST quality: " + quality_picked);
                     }
-                } else {
-                    logger.info("Failed to find any stream downloadurl");
+                    return dllink;
                 }
+                logger.info("Failed to find any stream downloadurl");
             } catch (final Throwable e) {
                 logger.log(e);
                 logger.info("BEST handling for multiple video source failed");

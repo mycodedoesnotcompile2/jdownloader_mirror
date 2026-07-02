@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -188,7 +188,7 @@ public class StreamwishCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        String betterFilename = br.getRegex("<h1 class=\"h5 mb-3\">([^<]+)</h1>").getMatch(0);
+        String betterFilename = new Regex(html, "<h1 class=\"h5 mb-3\">([^<]+)</h1>").getMatch(0);
         if (betterFilename == null) {
             /* streamhg.com */
             betterFilename = new Regex(html, "<h3[^>]*>\\s*Download ([^<]+)</h3>").getMatch(0);

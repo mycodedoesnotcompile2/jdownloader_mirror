@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51353 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
 public class UbiqfileCom extends XFileSharingProBasic {
     public UbiqfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -157,17 +157,17 @@ public class UbiqfileCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
+    public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2019-06-27: Special */
-        super.scanInfo(fileInfo);
+        super.scanInfo(html, fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(this.getCorrectBR(br), "class=\"paneld\">([^<>\"]+)\\[\\d+\\.\\d+ [A-Za-z]{2,5}\\]</div>").getMatch(0);
+            fileInfo[0] = new Regex(html, "class=\"paneld\">([^<>\"]+)\\[\\d+\\.\\d+ [A-Za-z]{2,5}\\]</div>").getMatch(0);
             if (StringUtils.isEmpty(fileInfo[0])) {
                 /* Weak attempt!! */
-                fileInfo[0] = new Regex(this.getCorrectBR(br), "name=description content=\"Download File ([^<>\"]+)\"").getMatch(0);
+                fileInfo[0] = new Regex(html, "name=description content=\"Download File ([^<>\"]+)\"").getMatch(0);
             }
         }
-        final String betterFilesize = br.getRegex(">\\s*Size\\s*:\\s*(\\d+[^<]+)</div>").getMatch(0);
+        final String betterFilesize = new Regex(html, ">\\s*Size\\s*:\\s*(\\d+[^<]+)</div>").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }
