@@ -48,7 +48,7 @@ import jd.plugins.decrypter.KemonoPartyCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52943 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -69,6 +69,7 @@ public class KemonoParty extends PluginForHost {
     public static String                      PROPERTY_DATE               = "date";
     public static String                      PROPERTY_DATE_EDIT          = "date_edit";
     public static String                      PROPERTY_POST_CONTENT_INDEX = "postContentIndex";
+    public static String                      PROPERTY_IS_THUMBNAIL       = "is_thumbnail";
     private static Map<String, AtomicInteger> freeRunning                 = new HashMap<String, AtomicInteger>();
     public static final String                UNIQUE_ID_PREFIX            = "kemonocoomer://";
     private static final Pattern              HASH_PATTERN                = Pattern.compile("/([a-fA-F0-9]{64})");
@@ -130,6 +131,9 @@ public class KemonoParty extends PluginForHost {
             final String postid = link.getStringProperty(PROPERTY_POST_ID);
             if (this.isTextFile(link)) {
                 fid = UNIQUE_ID_PREFIX + "textfile/portal/" + portal + "/user/" + userid + "/post/" + postid;
+            } else if (this.isThumbnail(link)) {
+                final String path = new URL(link.getPluginPatternMatcher()).getPath();
+                fid = UNIQUE_ID_PREFIX + "path/thumb/" + path;
             } else {
                 final String path = new URL(link.getPluginPatternMatcher()).getPath();
                 final String sha256Hash = getSha256HashFromPath(path);
@@ -168,11 +172,11 @@ public class KemonoParty extends PluginForHost {
     }
 
     private boolean isTextFile(final DownloadLink link) {
-        if (link.hasProperty(PROPERTY_TEXT)) {
-            return true;
-        } else {
-            return false;
-        }
+        return link.hasProperty(PROPERTY_TEXT);
+    }
+
+    private boolean isThumbnail(final DownloadLink link) {
+        return link.hasProperty(PROPERTY_IS_THUMBNAIL);
     }
 
     /** Returns sha256 hash if it is present in the given url. */
@@ -207,13 +211,17 @@ public class KemonoParty extends PluginForHost {
             link.setDownloadSize(textContent.getBytes("UTF-8").length);
         } else {
             /* Image file */
-            final String sha256 = getSha256HashFromURL(link.getPluginPatternMatcher());
-            if (sha256 != null) {
-                link.setSha256Hash(sha256);
+            /* The file hash can only be used for CRC check for original file downloads, not for thumbnail downloads. */
+            final String contenturl = link.getPluginPatternMatcher();
+            if (!this.isThumbnail(link)) {
+                final String sha256 = getSha256HashFromURL(contenturl);
+                if (sha256 != null) {
+                    link.setSha256Hash(sha256);
+                }
             }
             String betterFilename = link.getStringProperty(PROPERTY_BETTER_FILENAME);
             if (betterFilename == null) {
-                betterFilename = KemonoPartyCrawler.getBetterFilenameFromURL(link.getPluginPatternMatcher());
+                betterFilename = KemonoPartyCrawler.getBetterFilenameFromURL(contenturl);
             }
             if (betterFilename != null) {
                 link.setFinalFileName(betterFilename);
@@ -221,7 +229,7 @@ public class KemonoParty extends PluginForHost {
             if (this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD) {
                 final Browser brc = br.cloneBrowser();
                 brc.setFollowRedirects(true);
-                basicLinkCheck(brc, brc.createHeadRequest(link.getPluginPatternMatcher()), link, betterFilename, null, FILENAME_SOURCE.prefer(FILENAME_SOURCE.values(), FILENAME_SOURCE.FORCED, FILENAME_SOURCE.CUSTOM));
+                basicLinkCheck(brc, brc.createHeadRequest(contenturl), link, betterFilename, null, FILENAME_SOURCE.prefer(FILENAME_SOURCE.values(), FILENAME_SOURCE.FORCED, FILENAME_SOURCE.CUSTOM));
             }
         }
         return AvailableStatus.TRUE;

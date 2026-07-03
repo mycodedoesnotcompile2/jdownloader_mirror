@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52937 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52945 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -170,8 +170,7 @@ public class PixhostTo extends PluginForHost {
         }
         String ext = null;
         if (filename != null) {
-            filename = Encoding.htmlDecode(filename);
-            filename = filename.trim();
+            filename = Encoding.htmlDecode(filename).trim();
             if (!StringUtils.isEmpty(dllink)) {
                 ext = getFileNameExtensionFromString(dllink, default_extension);
             } else {

@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 52940 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52941 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -424,15 +424,16 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String publishedDateStr = StringUtils.valueOfOrNull(postmap.get("published"));
         /* Not all items have a "edited" date */
         final String editedDateStr = StringUtils.valueOfOrNull(postmap.get("edited"));
-        final ArrayList<DownloadLink> kemonoResults = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> directResults = new ArrayList<DownloadLink>();
         int numberofResultsSimpleCount = 0;
         int index = 0;
+        final Boolean has_full = (Boolean) postmap.get("has_full");
         final Map<String, Object> filemap = (Map<String, Object>) postmap.get("file");
         if (!filemap.isEmpty() && filemap.get("path") != null) {
-            final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, filemap, index);
+            final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, filemap, index, has_full);
             /* null = item is a duplicate */
             if (media != null) {
-                kemonoResults.add(media);
+                directResults.add(media);
                 index++;
             }
             numberofResultsSimpleCount++;
@@ -441,18 +442,19 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         if (attachments != null) {
             for (final Map<String, Object> attachment : attachments) {
                 if (!attachment.isEmpty() && attachment.get("path") == null) {
+                    /* Early-skip invalid items */
                     continue;
                 }
-                final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, attachment, index);
+                final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, attachment, index, has_full);
                 /* null = item is a duplicate */
                 if (media != null) {
-                    kemonoResults.add(media);
+                    directResults.add(media);
                     index++;
                 }
                 numberofResultsSimpleCount++;
             }
         }
-        logger.info("service: " + service + " | UserID: " + usernameOrUserID + " | PostID: " + postID + " | Attachment/File items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + kemonoResults.size());
+        logger.info("service: " + service + " | UserID: " + usernameOrUserID + " | PostID: " + postID + " | Attachment/File items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + directResults.size());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage postFilePackage = getFilePackageForPostCrawler(service, usernameOrUserID, postID, postTitle);
         String postTextContent = (String) postmap.get("content");
@@ -507,7 +509,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 }
             }
             final TextCrawlMode mode = cfg.getTextCrawlMode();
-            if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && kemonoResults.isEmpty())) {
+            if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && directResults.isEmpty())) {
                 ensureInitHosterplugin();
                 final DownloadLink textfile = new DownloadLink(this.hostPlugin, getHost(), posturl);
                 textfile.setProperty(KemonoParty.PROPERTY_TEXT, postTextContent);
@@ -517,7 +519,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 } catch (final UnsupportedEncodingException ignore) {
                     ignore.printStackTrace();
                 }
-                kemonoResults.add(textfile);
+                directResults.add(textfile);
             }
         }
         if (cfg.isCrawlHttpLinksFromPostContent()) {
@@ -555,7 +557,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
         }
         final String username = this.findUsername(service, usernameOrUserID);
-        for (final DownloadLink kemonoResult : kemonoResults) {
+        for (final DownloadLink kemonoResult : directResults) {
             if (!StringUtils.isEmpty(postTitle)) {
                 kemonoResult.setProperty(KemonoParty.PROPERTY_TITLE, postTitle);
             }
@@ -592,7 +594,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index) throws PluginException {
+    private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index, final Boolean has_full) throws PluginException {
         this.ensureInitHosterplugin();
         /**
          * 2025-06-02: Looks like the "name" field is not always given though it missing can also mean that the original file is
@@ -605,8 +607,15 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             /* file map has no downloadable path (e.g. covers/thumbnail-only structure) */
             return null;
         }
+        final boolean has_full_final = Boolean.TRUE.equals(has_full);
         final String filepath = filepathO.toString();
-        String url = "https://" + getHost() + "/data" + filepath;
+        String url;
+        if (has_full_final) {
+            url = getBaseURLData() + filepath;
+        } else {
+            /* 2026-07-02: e.g. pawachive /fanbox/user/3446/post/9792139 */
+            url = getBaseURLThumbnail() + filepath;
+        }
         if (filename != null) {
             final String nameExt = Files.getExtension(filename, true);
             final String pathExt = Files.getExtension(filepath, true);
@@ -614,9 +623,14 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 // both name and path have ImageExtensions so we trust path extension more
                 filename = correctOrApplyFileNameExtension(filename, pathExt, null);
             }
-            url += "?f=" + Encoding.urlEncode(filename);
+            if (has_full_final) {
+                url += "?f=" + Encoding.urlEncode(filename);
+            } else {
+                filename = "thumb_" + filename;
+            }
         }
-        final String sha256hash = KemonoParty.getSha256HashFromURL(url);
+        /* The file hash can only be used for CRC check for original file downloads, not for thumbnail downloads. */
+        final String sha256hash = has_full_final ? KemonoParty.getSha256HashFromURL(url) : null;
         final String dupeCheckString;
         if (advancedDupeCheck && sha256hash != null) {
             dupeCheckString = sha256hash;
@@ -635,6 +649,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         media.setProperty(KemonoParty.PROPERTY_POST_CONTENT_INDEX, index);
         if (sha256hash != null) {
             media.setSha256Hash(sha256hash);
+        }
+        if (!has_full_final) {
+            media.setProperty(KemonoParty.PROPERTY_IS_THUMBNAIL, true);
         }
         return media;
     }
@@ -682,9 +699,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String betterFilename = query.get("f");
         if (betterFilename != null) {
             return Encoding.htmlDecode(betterFilename).trim();
-        } else {
-            return null;
         }
+        return null;
     }
 
     private void ensureInitHosterplugin() throws PluginException {
@@ -697,6 +713,19 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public int getMaxConcurrentProcessingInstances() {
         /* Try to avoid getting blocked by DDOS-GUARD / rate-limited. */
         return 1;
+    }
+
+    private String getBaseURLData() {
+        if ("pawchive.st".equalsIgnoreCase(getHost())) {
+            return "https://file." + getHost() + "/data";
+        }
+        /* Return default value */
+        return "https://" + getHost() + "/data";
+    }
+
+    private String getBaseURLThumbnail() {
+        /* 2026-07-02: Same for coomer, kemono and pawchive */
+        return "https://img." + getHost() + "/thumbnail/data";
     }
 
     protected void getPage(final Browser br, final String url) throws Exception {

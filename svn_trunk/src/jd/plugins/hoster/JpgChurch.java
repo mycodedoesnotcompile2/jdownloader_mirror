@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 52936 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52944 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +88,7 @@ public class JpgChurch extends PluginForHost {
          * 2026-06-30: Looks like they will be gone soon: "JPG6 is closing down, viewing images is disabled." <br>
          * New project looks to be: goonbox.cr
          */
-        ret.add(new String[] { "jpg6.su", "jpg7.cr", "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
+        ret.add(new String[] { "goonbox.cr", "jpg6.su", "jpg7.cr", "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
         /* 2026-06-30: putmega.com displays Cloudflare error 526: Invalid SSL certificate */
         ret.add(new String[] { "putmega.com" });
         return ret;
@@ -102,6 +103,10 @@ public class JpgChurch extends PluginForHost {
         deadDomains.add("jpeg.pet"); // 2024-10-07
         deadDomains.add("jpg1.su"); // 2024-10-07
         deadDomains.add("jpg2.su"); // 2024-10-07)
+        /*
+         * 2026-07-02: Basically all other domains except for goonbox.cr are also unusable but since we are using the goonbox.cr WebAPI now
+         * (= we do not rely on the added URLs anymore), I stopped to update this list.
+         */
         return deadDomains;
     }
 
@@ -114,10 +119,13 @@ public class JpgChurch extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_OLD_LAZY = Pattern.compile("/(?:img|image|video)/([A-Za-z0-9\\-\\.%]+)");
+    private static final Pattern PATTERN_NEW      = Pattern.compile("/(?:img|image|video)/([A-Za-z0-9]+)");
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:img|image|video)/([A-Za-z0-9\\-\\.%]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_OLD_LAZY.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -131,6 +139,7 @@ public class JpgChurch extends PluginForHost {
         /* 2023-12-19: Main domain changed from jpg2.su to jpg3.su */
         /* 2024-09-02: Main domain changed from jpg4.su to jpg5.su */
         /* 2025-07-18: Main domain changed from jpg5.su to jpg6.su (current main) */
+        /* 2026-07-02: Main domain changed from jpg6.su to goonbox.cr */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
@@ -163,6 +172,34 @@ public class JpgChurch extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
+    /**
+     * Some file-ids could contain some kind of index e.g. 08.xxxYYY <br>
+     * The new goonbox API can only work with the plain ids.
+     *
+     * @throws MalformedURLException
+     */
+    private String getFIDCleaned(final DownloadLink link) throws MalformedURLException {
+        final URL url = new URL(link.getPluginPatternMatcher());
+        final String path = url.getPath();
+        String fid = null;
+        if (url.getHost().equalsIgnoreCase("goonbox.cr")) {
+            /*
+             * 2026-07-02: URLs with new domain -> Try stricter regex in hope to get valid id even if added URL contains stuff we don't
+             * want.
+             */
+            fid = new Regex(path, PATTERN_NEW).getMatch(0);
+            if (fid != null) {
+                return fid;
+            }
+        }
+        fid = new Regex(path, PATTERN_OLD_LAZY).getMatch(0);
+        final String[] fid_parts = fid.split("\\.");
+        if (fid_parts != null && fid_parts.length > 1) {
+            return fid_parts[fid_parts.length - 1];
+        }
+        return fid;
+    }
+
     private String getContentURL(final DownloadLink link) {
         String contenturl = link.getPluginPatternMatcher();
         final String addedLinkDomain = Browser.getHost(contenturl, true);
@@ -174,24 +211,31 @@ public class JpgChurch extends PluginForHost {
         return contenturl;
     }
 
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
+    private boolean isVideoURL(final DownloadLink link) {
+        return StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/video/");
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
-        final boolean isVideo = StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/video/");
-        if (!link.isNameSet()) {
-            final String weakTitle = this.getFID(link).replaceAll("-+", " ").trim();
-            final String extFallback;
-            if (isVideo) {
-                extFallback = ".mp4";
-            } else {
-                extFallback = ".jpg";
-            }
-            link.setName(this.applyFilenameExtension(weakTitle, extFallback));
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        final String weakTitle = this.getFID(link).replaceAll("\\-\\+", " ").trim();
+        final String extFallback;
+        if (this.isVideoURL(link)) {
+            extFallback = ".mp4";
+        } else {
+            extFallback = ".jpg";
         }
-        this.setBrowserExclusive();
+        return this.applyFilenameExtension(weakTitle, extFallback);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        /* Nullification */
+        this.dllink = null;
+        if (true) {
+            return requestFileInformationAPI(link);
+        }
+        // TODO: 2026-07-02: Delete this old code soon
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment();
         String title = null;
         String filesizeStr = null;
         /*
@@ -206,7 +250,7 @@ public class JpgChurch extends PluginForHost {
         boolean useWebsite = false;
         if (link.isPasswordProtected()) {
             useWebsite = true;
-        } else if (isVideo) {
+        } else if (this.isVideoURL(link)) {
             /* 2025-10-07: oembed is not supported for video links (tested with imagepond.net) */
             useWebsite = true;
         } else {
@@ -257,7 +301,7 @@ public class JpgChurch extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             Form pwform = JpgChurchCrawler.getPasswordForm(br);
-            if (pwform != null) {
+            handlePassword: if (pwform != null) {
                 logger.info("This item is password protected");
                 link.setPasswordProtected(true);
                 if (!isDownload) {
@@ -330,9 +374,51 @@ public class JpgChurch extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    private AvailableStatus requestFileInformationAPI(final DownloadLink link) throws Exception {
+        final String fid = getFIDCleaned(link);
+        br.getPage("https://goonbox.cr/api/images/" + fid);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String api_redirect = (String) entries.get("redirect");
+        if (api_redirect != null) {
+            logger.info("Following API redirect to: " + api_redirect);
+            br.getPage(api_redirect);
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        }
+        if (Boolean.TRUE.equals(entries.get("is_deleted"))) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> image = (Map<String, Object>) entries.get("image");
+        final Object deletedAt = image.get("deleted_at");
+        if (deletedAt != null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String originalURL = (String) image.get("original_url");
+        if (StringUtils.isEmpty(originalURL)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        this.dllink = image.get("original_url").toString();
+        final String originalFilename = image.get("original_filename").toString();
+        link.setFinalFileName(originalFilename);
+        final Number sizeBytes = (Number) image.get("size_bytes");
+        if (sizeBytes != null) {
+            link.setVerifiedFileSize(sizeBytes.longValue());
+        }
+        final Map<String, Object> uploader = (Map<String, Object>) entries.get("uploader");
+        if (uploader != null) {
+            final String username = (String) uploader.get("username");
+            if (!StringUtils.isEmpty(username)) {
+                link.setProperty(PROPERTY_USER, username);
+            }
+        }
+        return AvailableStatus.TRUE;
+    }
+
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -350,13 +436,15 @@ public class JpgChurch extends PluginForHost {
     }
 
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
-        if (account == null) {
-            synchronized (freeRunning) {
-                final int before = freeRunning.get();
-                final int after = before + num;
-                freeRunning.set(after);
-                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
-            }
+        if (account != null) {
+            /* Do nothing */
+            return;
+        }
+        synchronized (freeRunning) {
+            final int before = freeRunning.get();
+            final int after = before + num;
+            freeRunning.set(after);
+            logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
         }
     }
 
@@ -377,9 +465,5 @@ public class JpgChurch extends PluginForHost {
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

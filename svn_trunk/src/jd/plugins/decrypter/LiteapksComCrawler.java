@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52895 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52946 $", interfaceVersion = 3, names = {}, urls = {})
 public class LiteapksComCrawler extends PluginForDecrypt {
     public LiteapksComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,9 @@ public class LiteapksComCrawler extends PluginForDecrypt {
             link.setAvailable(true);
             if (filesizes != null && links.length == filesizes.length) {
                 String filesizeStr = filesizes[index];
-                if (StringUtils.endsWithCaseInsensitive(filesizeStr, "M")) {
+                if (StringUtils.endsWithCaseInsensitive(filesizeStr, "G")) {
+                    filesizeStr += "b";
+                } else if (StringUtils.endsWithCaseInsensitive(filesizeStr, "M")) {
                     filesizeStr += "b";
                 }
                 link.setDownloadSize(SizeFormatter.getSize(filesizeStr));

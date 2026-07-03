@@ -25,6 +25,15 @@ import java.util.Map.Entry;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.components.config.UpstoReConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
 import jd.http.Browser;
@@ -44,16 +53,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.components.config.UpstoReConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52947 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -200,6 +200,8 @@ public class UpstoRe extends antiDDoSForHost {
         return br.containsHTML(">\\s*File not found<|>File was deleted by owner or due to a violation of service rules\\.|not found|>SmartErrors powered by");
     }
 
+    private String currentIP = null;
+
     @SuppressWarnings({ "unchecked", "deprecation" })
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
@@ -208,7 +210,7 @@ public class UpstoRe extends antiDDoSForHost {
         final int maxchunks = 1;
         final String storedDirecturl = link.getStringProperty(directurlproperty);
         String dllink = null;
-        String currentIP = null;
+        currentIP = null;
         if (storedDirecturl != null) {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
@@ -286,6 +288,7 @@ public class UpstoRe extends antiDDoSForHost {
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(captchaResponse));
                 captchaForm.put("h-captcha-response", Encoding.urlEncode(captchaResponse));
             } else {
+                /* This should never appen, captcha is always needed */
                 logger.warning("No captchaForm present at all");
             }
             if (captchaForm != null) {
@@ -303,25 +306,7 @@ public class UpstoRe extends antiDDoSForHost {
                 dllink = br.getRegex("\"(https?://d\\d+\\.[^/]+/l/[^<>\"]*?)\"").getMatch(0);
             }
             if (dllink == null) {
-                final String reconnectWait = br.getRegex("Please wait (\\d+) minutes before downloading next file").getMatch(0);
-                if (reconnectWait != null) {
-                    final long waitmillis = Long.parseLong(reconnectWait) * 60 * 1000l;
-                    if (currentIP == null) {
-                        currentIP = new BalancedWebIPCheck(br.getProxy()).getExternalIP().getIP();
-                    }
-                    setDownloadStarted(currentIP, link, waitmillis);
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitmillis + FREE_RECONNECTWAIT_ADDITIONAL);
-                }
-                final String error = br.getRegex("<span class=\"error\"[^>]*>([^<]+)</span>").getMatch(0);
-                if (error != null) {
-                    if (error.matches("(?i)No slots for free users in your area at the moment, try again later")) {
-                        /* 2021-07-02 */
-                        throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, error, 10 * 60 * 1000l);
-                    } else {
-                        /* Unknown error */
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, error, 5 * 60 * 1000l);
-                    }
-                }
+                this.handleErrorsHTML(br);
                 handleErrorsJson();
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -348,9 +333,8 @@ public class UpstoRe extends antiDDoSForHost {
             if (storedDirecturl != null) {
                 link.removeProperty(directurlproperty);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
-            } else {
-                throw e;
             }
+            throw e;
         }
         link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
         /* Add a download slot */
@@ -392,7 +376,16 @@ public class UpstoRe extends antiDDoSForHost {
         }
     }
 
-    private void handleErrorsHTML(final Browser br) throws PluginException {
+    private void handleErrorsHTML(final Browser br) throws Exception {
+        final String reconnectWait = br.getRegex("Please wait (\\d+) minutes before downloading next file").getMatch(0);
+        if (reconnectWait != null) {
+            final long waitmillis = Long.parseLong(reconnectWait) * 60 * 1000l;
+            if (currentIP == null) {
+                currentIP = new BalancedWebIPCheck(br.getProxy()).getExternalIP().getIP();
+            }
+            setDownloadStarted(currentIP, this.getDownloadLink(), waitmillis);
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitmillis + FREE_RECONNECTWAIT_ADDITIONAL);
+        }
         /* Example: "<span class="error">File size is larger than 2 GB. Unfortunately, it can be downloaded only with premium</span>" */
         if (isOffline1()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -407,14 +400,16 @@ public class UpstoRe extends antiDDoSForHost {
             // Same server error (displayed differently) also exists for premium users
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Server with file not found'", 60 * 60 * 1000l);
         }
-        /* 2021-11-22: New attempt */
-        final String otherError = br.getRegex("<span class=\"error\">([^<>\"]+)</span>").getMatch(0);
-        if (otherError != null) {
-            /* 2021-11-22 e.g. <span class="error">Under maintenance. Free downloads are not available at the moment.</span> */
-            if (otherError.matches("(?i)Under maintenance.*Free downloads are not available at the moment.*")) {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, otherError, 30 * 60 * 1000l);
+        final String error = br.getRegex("<span class=\"error\"[^>]*>(.*?)</span>").getMatch(0);
+        if (error != null) {
+            if (error.matches("(?i)No slots for free users in your area at the moment, try again later")) {
+                /* 2021-07-02 */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, error, 10 * 60 * 1000l);
+            } else if (error.matches("(?i)Under maintenance.*Free downloads are not available at the moment.*")) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, error, 30 * 60 * 1000l);
             } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, otherError, 5 * 60 * 1000l);
+                /* Unknown error */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, error, 5 * 60 * 1000l);
             }
         }
     }
