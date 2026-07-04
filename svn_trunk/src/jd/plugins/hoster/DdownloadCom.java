@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52890 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52948 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -215,7 +215,7 @@ public class DdownloadCom extends XFileSharingProBasic {
         }
     }
 
-    public int getMaxDownloadSelect() {
+    private int getMaxDownloadSelect() {
         return get(this.getConfigInterface()).getMaxSimultaneousFreeDownloads();
     }
 

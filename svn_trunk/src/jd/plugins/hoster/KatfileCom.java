@@ -25,6 +25,14 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigKatfile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
 import jd.PluginWrapper;
 import jd.controlling.faviconcontroller.FavIcons;
 import jd.http.Browser;
@@ -37,14 +45,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
-@HostPlugin(revision = "$Revision: 52828 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52948 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -222,14 +223,18 @@ public class KatfileCom extends XFileSharingProBasic {
         }
     }
 
+    private int getMaxDownloadSelect() {
+        return get(this.getConfigInterface()).getMaxSimultaneousFreeDownloads();
+    }
+
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return 1;
+        return getMaxDownloadSelect();
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return 1;
+        return getMaxDownloadSelect();
     }
 
     @Override
@@ -255,7 +260,6 @@ public class KatfileCom extends XFileSharingProBasic {
             return super.isOffline(link, br);
         }
     }
-
     // @Override
     // protected boolean isPremiumOnlyURL(final Browser br) {
     // final String url = br != null ? br.getURL() : null;
@@ -288,5 +292,10 @@ public class KatfileCom extends XFileSharingProBasic {
             return Integer.toString(realSeconds);
         }
         return super.regexWaittime(html);
+    }
+
+    @Override
+    public Class<? extends XFSConfigKatfile> getConfigInterface() {
+        return XFSConfigKatfile.class;
     }
 }

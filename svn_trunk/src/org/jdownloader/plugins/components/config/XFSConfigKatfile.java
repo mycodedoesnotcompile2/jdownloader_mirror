@@ -6,11 +6,10 @@ import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.TakeValueFromSubconfig;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "ddownload.com", type = Type.HOSTER)
-public interface XFSConfigDdownloadCom extends XFSConfig {
+@PluginHost(host = "katfile.space", type = Type.HOSTER)
+public interface XFSConfigKatfile extends XFSConfig {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
@@ -23,7 +22,6 @@ public interface XFSConfigDdownloadCom extends XFSConfig {
     @DefaultIntValue(1)
     @SpinnerValidator(min = 1, max = 20, step = 1)
     @Order(40)
-    @TakeValueFromSubconfig("MaxSimultaneousDownloads_LIMIT_2019_06")
     @DescriptionForConfigEntry("Max. simultaneous downloads (Free & Free account)")
     int getMaxSimultaneousFreeDownloads();
 
