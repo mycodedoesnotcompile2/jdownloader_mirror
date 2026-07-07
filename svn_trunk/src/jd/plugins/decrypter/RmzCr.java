@@ -31,7 +31,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50336 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52955 $", interfaceVersion = 3, names = {}, urls = {})
 public class RmzCr extends antiDDoSForDecrypt {
     public RmzCr(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class RmzCr extends antiDDoSForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "rapidmoviez.me", "rapidmoviez.com", "rapidmoviez.cr", "rmz.watch", "rmz.cr", "rapidmoviez.click", "rapidmoviez.website", "rapidmoviez.online", "rmz.lat" });
+        ret.add(new String[] { "rapidmoviez.me", "rapidmoviez.com", "rapidmoviez.cr", "rapidmoviez.lat", "rmz.watch", "rmz.cr", "rapidmoviez.click", "rapidmoviez.website", "rapidmoviez.online", "rmz.lat" });
         return ret;
     }
 
@@ -60,14 +60,15 @@ public class RmzCr extends antiDDoSForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/release/[\\w\\-]+");
+            ret.add("https?://(?:(?:www|v2)\\.)?" + buildHostsPatternPart(domains) + "/release/[\\w\\-]+");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contenturl = param.getCryptedUrl();
+        /* This crawler is designed for website version v1 -> Allow v2 urls but convert them to v1 urls */
+        final String contenturl = param.getCryptedUrl().replaceFirst("^https?://v2\\.", "https://");
         br.setFollowRedirects(true);
         getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {

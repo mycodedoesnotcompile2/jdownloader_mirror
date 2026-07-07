@@ -64,7 +64,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
  *            With reCaptchaV2 (like most): sh2rt.com <br />
  *
  */
-@DecrypterPlugin(revision = "$Revision: 52906 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52955 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     public enum CaptchaType {
         hCaptcha,
@@ -401,7 +401,18 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                     logger.info("Skipping waittime");
                 }
             }
-            submitForm(f2);
+            br.setFollowRedirects(false);
+            try {
+                submitForm(f2);
+                /* Check for direct redirect */
+                final String finallink = br.getRedirectLocation();
+                if (finallink != null) {
+                    ret.add(createDownloadlink(finallink));
+                    return ret;
+                }
+            } finally {
+                br.setFollowRedirects(true);
+            }
         }
         final String finallink = findFinallink(br);
         if (finallink == null) {
@@ -668,9 +679,8 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
             } else {
                 return maybe;
             }
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**

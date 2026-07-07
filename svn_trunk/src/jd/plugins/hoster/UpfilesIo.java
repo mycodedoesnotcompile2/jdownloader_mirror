@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
@@ -42,7 +41,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52351 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52954 $", interfaceVersion = 2, names = {}, urls = {})
 public class UpfilesIo extends PluginForHost {
     public UpfilesIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -159,16 +158,11 @@ public class UpfilesIo extends PluginForHost {
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
         }
-        final String filesize = br.getRegex("<h3>\\s*Download\\s*: [^<]* \\(([0-9\\.]+ [A-Za-z]{1,5})\\)</h3>").getMatch(0);
+        final String filesize = br.getRegex("<h[0-9]>\\s*Download(?:\\s*:)? [^<]* \\(([0-9\\.]+ [A-Za-z]{1,5})\\)</h[0-9]>").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
-            /* Harder way to find filesize */
-            final String directurl = getDownloadFileUrl(link, MethodName.requestFileInformation);
-            if (!StringUtils.isEmpty(directurl)) {
-                basicLinkCheck(br, br.createHeadRequest(directurl), link, null, null, FILENAME_SOURCE.FINAL);
-                link.setProperty(PROPERTY_DIRECTURL, br.getHttpConnection().getURL().toExternalForm());
-            }
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -202,30 +196,10 @@ public class UpfilesIo extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String downloadUrl = getDownloadFileUrl(link, MethodName.handleFree);
-        if (StringUtils.isEmpty(downloadUrl)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, downloadUrl, resume, maxchunks);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        link.setProperty(PROPERTY_DIRECTURL, dl.getConnection().getURL().toExternalForm());
-        dl.startDownload();
-    }
-
-    enum MethodName {
-        requestFileInformation,
-        handleFree
-    }
-
-    private String getDownloadFileUrl(final DownloadLink link, final MethodName methodname) throws Exception {
         final String csrfToken = br.getRegex("csrf-token\" content=\"([^\"]+)\"").getMatch(0);
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("_token", csrfToken);
-        query.appendEncoded("ccp", "1");
-        query.appendEncoded("action", "continue");
+        query.appendEncoded("download_type", "free");
         br.postPage(br.getURL(), query);
         // final Regex fileInfo = br.getRegex("<h3>\\s*Download\\s*:\\s*([^<]+) \\(([^\\)]+)\\)\\s*</h3>");
         // if (fileInfo.matches()) {
@@ -234,15 +208,15 @@ public class UpfilesIo extends PluginForHost {
         // }
         /* The following part is basically a form of SiteTemplate.MightyScript_AdLinkFly */
         final UrlQuery query2 = new UrlQuery();
-        final String json = br.getRegex("var app_vars = (\\{.*?\\});").getMatch(0);
+        final String json = br.getRegex("id=\"app-config\">(\\{.*?\\})</script>").getMatch(0);
         final Map<String, Object> appvars = restoreFromString(json, TypeRef.MAP);
         final String captchaType = (String) appvars.get("captchatype");
         if (captchaType != null || Boolean.TRUE.equals(appvars.get("captcha_download"))) {
-            final boolean allowCaptchaDuringLinkcheck = false;
-            if (methodname == MethodName.requestFileInformation && !allowCaptchaDuringLinkcheck) {
-                /* Do not ask user for captcha during availablecheck */
-                return null;
-            }
+            // final boolean allowCaptchaDuringLinkcheck = false;
+            // if (methodname == MethodName.requestFileInformation && !allowCaptchaDuringLinkcheck) {
+            // /* Do not ask user for captcha during availablecheck */
+            // return null;
+            // }
             final String turnstile_site_key = (String) appvars.get("turnstile_site_key");
             if (turnstile_site_key != null) {
                 /* 2026-02-19: New */
@@ -268,19 +242,20 @@ public class UpfilesIo extends PluginForHost {
         if (view_form_data == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String waitSecondsStr = br.getRegex("class=\"timer\">\\s*(\\d+)\\s*</span>").getMatch(0);
+        final String waitSecondsStr = br.getRegex("class=\"timer-value\"[^>]*>\\s*(\\d+)").getMatch(0);
         final int waitSeconds = Integer.parseInt(waitSecondsStr);
-        if (methodname == MethodName.handleFree) {
-            sleep(waitSeconds * 1001l, link);
-        } else {
-            Thread.sleep(waitSeconds * 1001l);
-        }
+        sleep(waitSeconds * 1001l, link);
         final UrlQuery query3 = new UrlQuery();
         query3.appendEncoded("_token", csrfToken);
         query3.appendEncoded("view_form_data", view_form_data);
-        br.postPage("/file/go", query3);
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        return entries.get("url").toString();
+        // br.postPage("/file/go", query3);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, "/file/go", query3.toString(), resume, maxchunks);
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            br.followConnection(true);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        link.setProperty(PROPERTY_DIRECTURL, dl.getConnection().getURL().toExternalForm());
+        dl.startDownload();
     }
 
     private void checkErrors(final Browser br) throws PluginException {
@@ -289,17 +264,5 @@ public class UpfilesIo extends PluginForHost {
         } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

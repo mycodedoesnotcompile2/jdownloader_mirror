@@ -38,22 +38,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -122,6 +106,22 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
+
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
 public class YoutubeHelper {
     private static final String REGEX_DASHMPD_FROM_JSPLAYER_SETUP          = "\"dashmpd\"\\s*:\\s*(\".*?\")";
@@ -2448,8 +2448,7 @@ public class YoutubeHelper {
         fmtMaps = new LinkedHashSet<StreamMap>();
         subtitleUrls = new LinkedHashSet<String>();
         mpdUrls = new LinkedHashSet<StreamMap>();
-        final String unavailableStatus = map != null ? (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/status") : null;
-        final String unavailableReason = getUnavailableReason(unavailableStatus);
+        final String unavailableReason = getUnavailableReason();
         vid.ageCheck = br.containsHTML("\"status\"\\s*:\\s*\"LOGIN_REQUIRED\"");
         logger.info("Login required:" + vid.ageCheck + "|Reason:" + unavailableReason);
         this.handleContentWarning(br);
@@ -2867,26 +2866,37 @@ public class YoutubeHelper {
     }
 
     /**
+     * possible playabilityStatus/status values: <br />
      * ERROR <br />
      * LOGIN_REQUIRED <br />
      * UNPLAYABLE <br />
      *
-     * @param unavailableStatus
      * @return
      * @author raztoki
      */
-    private String getUnavailableReason(String unavailableStatus) {
-        String result = null;
+    private String getUnavailableReason() {
+        final Map<String, Object> map = getYtInitialPlayerResponse();
+        final String unavailableStatus = map != null ? (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/status") : null;
         if (StringUtils.isEmpty(unavailableStatus) || "OK".equals(unavailableStatus)) {
             return null;
         }
+        String result = null;
+        String fallback = null;
         if ("LOGIN_REQUIRED".equals(unavailableStatus)) {
-            result = (String) JavaScriptEngineFactory.walkJson(getYtInitialPlayerResponse(), "playabilityStatus/errorScreen/playerErrorMessageRenderer/reason/simpleText");
-        } else {
-            // this covers "ERROR" and "UNPLAYABLE", probably covers others too. so make it future proof.
-            result = (String) JavaScriptEngineFactory.walkJson(getYtInitialPlayerResponse(), "playabilityStatus/reason");
+            result = (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/errorScreen/playerErrorMessageRenderer/reason/simpleText");
+            fallback = "Sign in to confirm you’re not a bot";
         }
-        return result;
+        if (result == null) {
+            // this covers "ERROR" and "UNPLAYABLE", probably covers others too. so make it future proof.
+            // also covers newer LOGIN_REQUIRED responses (e.g. ANDROID_VR client "Sign in to confirm you're not a bot") which put the
+            // reason directly here instead of nested under errorScreen.
+            result = (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/reason");
+        }
+        if (result != null) {
+            return result;
+        } else {
+            return fallback;
+        }
     }
 
     private boolean isSegmentLoadingAllowed(YoutubeStreamData match) {

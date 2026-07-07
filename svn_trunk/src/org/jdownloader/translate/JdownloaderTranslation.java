@@ -404,7 +404,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Downloads will start a few seconds..." })
     String Main_run_autostart_msg();
 
-    @Default(lngs = { "en" }, values = { "Start NOW!" })
+    @Default(lngs = { "en" }, values = { "Start now!" })
     String Mainstart_now();
 
     @Default(lngs = { "en" }, values = { "Start Downloads" })

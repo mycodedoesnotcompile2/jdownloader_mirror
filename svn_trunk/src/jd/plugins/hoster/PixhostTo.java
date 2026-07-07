@@ -34,8 +34,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.PixhostToGallery;
 
-@HostPlugin(revision = "$Revision: 52945 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52950 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,6 +143,8 @@ public class PixhostTo extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Picture doesn\\'t exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (PixhostToGallery.isCountryBlocked(br)) {
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "GEO blocked");
         }
         final boolean isPartOfGallery = br.containsHTML("class=\"show-gallery\"");
         /* 2019-01-31: It is better to grab the filename via URL! */

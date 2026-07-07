@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52952 $", interfaceVersion = 3, names = {}, urls = {})
 public class Mp4UploadCom extends XFileSharingProBasic {
     public Mp4UploadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -124,5 +125,14 @@ public class Mp4UploadCom extends XFileSharingProBasic {
             fileInfo[0] = this.getFUIDFromURL(this.getDownloadLink());
         }
         return fileInfo;
+    }
+
+    @Override
+    protected String regexWaittime(final Browser br) {
+        String ret = br.getRegex("class=\"seconds-num seconds\"[^>]*>(\\d+)").getMatch(0);
+        if (ret != null) {
+            return ret;
+        }
+        return regexWaittime(br.getRequest().getHtmlCode());
     }
 }

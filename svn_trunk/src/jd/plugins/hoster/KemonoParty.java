@@ -48,7 +48,7 @@ import jd.plugins.decrypter.KemonoPartyCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 52943 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52953 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -97,6 +97,7 @@ public class KemonoParty extends PluginForHost {
     @Override
     public String rewriteHost(final String host) {
         /* 2023-10-27: Domains have changed in the past. */
+        /* 2026-07-06: pawchive.st changed to pawchive.pw */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

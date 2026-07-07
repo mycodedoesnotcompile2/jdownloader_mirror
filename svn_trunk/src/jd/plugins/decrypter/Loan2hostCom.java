@@ -24,7 +24,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 49326 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52955 $", interfaceVersion = 3, names = {}, urls = {})
 public class Loan2hostCom extends MightyScriptAdLinkFly {
     public Loan2hostCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -33,7 +33,7 @@ public class Loan2hostCom extends MightyScriptAdLinkFly {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "tei.ai", "loan2host.com", "tii.ai", "tii.la", "wishes2.com", "ckk.ai" });
+        ret.add(new String[] { "tei.ai", "loan2host.com", "tii.ai", "tii.la", "tpi.li", "wishes2.com", "ckk.ai" });
         return ret;
     }
 

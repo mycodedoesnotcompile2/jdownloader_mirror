@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52953 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3100,7 +3100,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         ret.remove("method_premium");
         /* Fix/Add "method_free" value if necessary. */
         final String method_free_key = "method_free";
-        if (!ret.hasInputFieldByName(method_free_key) || ret.getInputFieldByName(method_free_key).getValue() == null) {
+        final InputField ifield = ret.getInputFieldByName(method_free_key);
+        /* 2026-07-06: Example for disabled field: mp4upload.com */
+        if (ifield == null || ifield.getValue() == null || ifield.isDisabled()) {
+            ret.removeInputField(ifield);
             String method_free_value = ret.getRegex("\"" + method_free_key + "\" value=\"([^<>\"]+)\"").getMatch(0);
             if (method_free_value == null || method_free_value.equals("")) {
                 method_free_value = "Free Download";

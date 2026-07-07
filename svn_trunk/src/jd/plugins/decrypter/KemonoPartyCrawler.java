@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 52941 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52953 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "coomer.st", "coomer.su", "coomer.party" }); // onlyfans.com content
         ret.add(new String[] { "kemono.cr", "kemono.su", "kemono.party" }); // content of other websites such as patreon.com
-        ret.add(new String[] { "pawchive.st" }); // Fork project of coomer/kemono projects
+        ret.add(new String[] { "pawchive.pw", "pawchive.st" }); // Fork project of coomer/kemono projects
         return ret;
     }
 

@@ -28,6 +28,8 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -37,7 +39,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PixhostTo;
 
-@DecrypterPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52950 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixhostTo.class })
 public class PixhostToGallery extends PluginForDecrypt {
     public PixhostToGallery(PluginWrapper wrapper) {
@@ -89,6 +91,8 @@ public class PixhostToGallery extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Gallery doesn't exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (isCountryBlocked(br)) {
+            throw new DecrypterRetryException(RetryReason.GEO);
         }
         String galleryTitle = br.getRegex("<h2>([^<]+)</h2>").getMatch(0);
         if (galleryTitle == null) {
@@ -116,5 +120,9 @@ public class PixhostToGallery extends PluginForDecrypt {
         fp.setName(galleryTitle);
         fp.addLinks(ret);
         return ret;
+    }
+
+    public static boolean isCountryBlocked(final Browser br) {
+        return br.containsHTML("(<title>Pixhost - Regional Access Notice</title>|>\\s*Pixhost is unavailable in the United Kingdom)");
     }
 }

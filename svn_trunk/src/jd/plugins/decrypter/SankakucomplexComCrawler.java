@@ -21,6 +21,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -39,17 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52422 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52954 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
 
     private static final Pattern TYPE_BOOK                                       = Pattern.compile("/(([a-z]{2,3})/?)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_TAGS_BOOKS                                 = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_TAGS_POSTS                                 = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_POSTS                                 = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?.+", Pattern.CASE_INSENSITIVE);
     public static final String   API_BASE                                        = "https://sankakuapi.com";
     private SankakucomplexCom    hosterplugin                                    = null;
     private final String         ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS = "Account required: Your search query contains too many tags";
@@ -157,32 +157,42 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             logger.info("Stopping because: User disabled posts tag crawler");
             return ret;
         }
+        final String contenturl = param.getCryptedUrl();
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_TAGS_POSTS);
         final String language = urlinfo.getMatch(1);
-        String tags = urlinfo.getMatch(2);
-        if (tags == null) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final UrlQuery query = UrlQuery.parse(contenturl);
+        String tags = query.get("tags");
+        final String pageStr = query.get("page");
+        Integer targetPage = null;
+        if (pageStr != null && pageStr.matches("\\d+")) {
+            final int targetPageCandidate = Integer.parseInt(pageStr);
+            if (targetPageCandidate >= 1) {
+                targetPage = targetPageCandidate;
+            }
+        }
+        if (StringUtils.isEmpty(tags)) {
+            /* User added invalid or unsupported link */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final int tagsCount = tags.replaceAll("[^\\+]*", "").length();
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br> API may return http response code 429 if we
-         * try regardless. <br>
+         * Some items are only visible for logged in users and are never returned via API. </br>
+         * API may return http response code 429 if we try regardless. <br>
          * For this reason, some user may prefer website mode.
          */
         if (tagsCount > 3 && account == null) {
             throw new AccountRequiredException(ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS);
         }
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && hosterplugin.allowUseAPI(account, SankakucomplexCom.API_METHOD.OTHER))) {
-            return crawlTagsPostsAPI(account, param, tags, language);
+            return crawlTagsPostsAPI(account, param, tags, language, targetPage);
         } else {
-            return crawlTagsPostsWebsite(account, param, tags, language);
+            return crawlTagsPostsWebsite(account, param, tags, language, targetPage);
         }
     }
 
-    private ArrayList<DownloadLink> crawlTagsPostsWebsite(final Account account, final CryptedLink param, final String tags, final String language) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsPostsWebsite(final Account account, final CryptedLink param, final String tags, final String language, final Integer targetPage) throws Exception {
         if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -192,7 +202,12 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             langPart = language + "/";
         }
         final String tagsUrlEncoded = URLEncode.encodeURIComponent(tags);
-        br.getPage("https://chan.sankakucomplex.com/" + langPart + "posts?tags=" + tagsUrlEncoded);
+        String startPageURL = "https://chan.sankakucomplex.com/" + langPart + "posts?tags=" + tagsUrlEncoded;
+        if (targetPage != null) {
+            startPageURL += "&page=" + targetPage;
+            logger.info("Directly crawling given target page " + targetPage);
+        }
+        br.getPage(startPageURL);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (StringUtils.containsIgnoreCase(br.getURL(), "/premium")) {
@@ -214,7 +229,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final int maxPageUserLimit = cfg.getPostTagCrawlerMaxPageLimit();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
-        int page = 1;
+        int page = targetPage != null ? targetPage.intValue() : 1;
         String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>([^<]+)</span>").getMatch(0);
         final int numberofItems;
         if (numberofItemsStr == null) {
@@ -289,6 +304,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 throw new InterruptedException();
+            } else if (targetPage != null && targetPage.intValue() == page) {
+                logger.info("Stopping because: Reached given target page " + targetPage);
+                break pagination;
             } else if (page == maxPageUserLimit) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPageUserLimit);
                 this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPageUserLimit + "\r\nYou can adjust this limit in the plugin settings.");
@@ -302,20 +320,19 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             } else if (numberofItems != -1 && ret.size() >= numberofItems) {
                 logger.info("Stopping because: Found all items -> " + numberofItems);
                 break pagination;
-            } else {
-                /* Continue to next page */
-                br.getPage(nextPageURL);
-                page++;
-                continue pagination;
             }
+            /* Continue to next page */
+            br.getPage(nextPageURL);
+            page++;
+            continue pagination;
         } while (true);
-        if (ret.size() < numberofItems) {
+        if (targetPage == null && ret.size() < numberofItems) {
             this.displayBubbleNotification("Missing items!", "Tags: " + tags + "\r\nSome items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
         }
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlTagsPostsAPI(final Account account, final CryptedLink param, final String tags, final String language) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsPostsAPI(final Account account, final CryptedLink param, final String tags, final String language, final Integer targetPage) throws Exception {
         if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -334,7 +351,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
         query.appendEncoded("hide_posts_in_books", "in-larger-tags");
         query.append("tags", tagsUrlEncoded, false);
-        int page = 1;
+        if (targetPage != null) {
+            query.appendEncoded("page", targetPage.toString());
+            logger.info("Directly crawling given target page " + targetPage);
+        }
+        int page = targetPage != null ? targetPage.intValue() : 1;
         int position = 1;
         pagination: do {
             final Browser brc = createNewBrowserInstanceAPI();
@@ -368,6 +389,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
+                break pagination;
+            } else if (targetPage != null && targetPage.intValue() == page) {
+                logger.info("Stopping because: Reached given target page " + targetPage);
                 break pagination;
             } else if (page == maxPage) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
