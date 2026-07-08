@@ -45,10 +45,13 @@
       "node_id":"MDc6TGljZW5zZTEz"
     }],
     "minJRE":"JVM_1_5",
-    "name":"Brotli",
-    "version":"0.1.2"
+    "name":"org.brotli:dec",
+    "signatures":{"brotli.jar":"-----BEGIN PGP SIGNATURE-----\n\niQEzBAABCAAdFiEEOk2GxWypk3O22JU9voTXZGI6NkQFAlkPV7wACgkQvoTXZGI6\nNkQlTAf/cQzlZLgmGHzYPKjpuWU4V3sEnEUHqdcjJOJaMqkw/diFZEL3T7oehMM5\nISReX+S1MMC7v9YF0ENX8mijneWxQ1+B6JH//tWp6n67PwS/pQWy4zF1qUTBTHko\nQzf8L73yMmtlWSdqufDYmpIyHI0FaS3ffQdWXQop/FQUQl76KqR9m/a/rRwvGE4A\nMUr1L3lQ/dlQ06nlpVN1XVFUGuaRR0ZpRxK2i2uztSAYEkFrNafXleXdfU104sVD\nPih2NZWEKUl/JHmqC9UMsNSpiSEcGmMAkZkIuL9CHIJaqFybvzP14gDZ9nNjErj9\n5NwHhDsvlDOrf8z73+2EvZrpgJ1wQw==\n=6xB/\n-----END PGP SIGNATURE-----\n"},
+    "version":"0.1.2",
+    "vulnerabilities":[]
   },
   "minJRE":"1.6",
+  "minReleasedAgeDays":null,
   "provider":"maven",
   "renames":{"dec.jar":"brotli.jar"},
   "requiredBy":[],

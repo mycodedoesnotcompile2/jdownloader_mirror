@@ -20,7 +20,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd"
+      "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de\t: Remove `gov.cu` (#2233)",
@@ -39,7 +40,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de"
+      "version":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.299.0 74e7b32304f2ea2b5fc261a90f01544be267be12\t: update `.io` section (#2236)\r\n2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa\t: Remove `presse.ci` and `md.ci`, other ccTLD stubs not associated w respective registry (#2198)",
@@ -58,7 +60,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa"
+      "version":"2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5\t: chore: remove 2nd level comment for `.sk` (#2238)\n\nCo-authored-by: William Harrison <william@williamdavidharrison.com.au>",
@@ -77,7 +80,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5"
+      "version":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556\t: Add grafana-dev.net to public suffix list (#2188)",
@@ -96,7 +100,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556"
+      "version":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.305.0 a4f696ccb433ab81c5a75d93a8d08a68279f1154\t: Add ip-ddns.com and ddns-ip.net (#2234)\r\n2024.305.1 9d7148986e82f2da0d99cb79fae34303f604d1f7\t: Add `taveusercontent.com` (#2239)\r\n2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc\t: Add home.arpa (#2220)",
@@ -115,7 +120,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc"
+      "version":"2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.305.3 a4a3877056578c2b7225fa10fd144115539f9c64\t: util: gTLD data autopull updates for 2024-10-31T15:17:41 UTC (#2242)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -134,7 +140,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.305.3 a4a3877056578c2b7225fa10fd144115539f9c64"
+      "version":"2024.305.3 a4a3877056578c2b7225fa10fd144115539f9c64",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.310.0 12c593cc533d82b56254972babfed81d8b3d8db5\t: remove `onred.one` (#2244)\r\n2024.310.1 e65bca4146a494d60dd4d3beb4a244376fb3825b\t: remove `bci.dnstrace.pro` (#2245)",
@@ -153,7 +160,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.310.1 e65bca4146a494d60dd4d3beb4a244376fb3825b"
+      "version":"2024.310.1 e65bca4146a494d60dd4d3beb4a244376fb3825b",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.313.0 2733c1c9d0dad52c58e1fd04ea33952751a1f2fb\t: move `wdh.app` to new section (#2246)",
@@ -172,7 +180,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.313.0 2733c1c9d0dad52c58e1fd04ea33952751a1f2fb"
+      "version":"2024.313.0 2733c1c9d0dad52c58e1fd04ea33952751a1f2fb",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.316.0 9258f6f90ccebbe68bd128393e38d3c5d5430d99\t: add `co.bz` (#2249)",
@@ -191,7 +200,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.316.0 9258f6f90ccebbe68bd128393e38d3c5d5430d99"
+      "version":"2024.316.0 9258f6f90ccebbe68bd128393e38d3c5d5430d99",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.316.1 63d662f455c5f9b455681ad62e6da5ec5108823c\t: remove `corpnet.work`, update contact info (#2247)\r\n2024.316.2 ca9b2901aa9ba1a2a4174ba92d036ffeb496e25a\t: Update deploy-site.yml\n\nRename master to main",
@@ -210,7 +220,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.316.2 ca9b2901aa9ba1a2a4174ba92d036ffeb496e25a"
+      "version":"2024.316.2 ca9b2901aa9ba1a2a4174ba92d036ffeb496e25a",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.317.0 e6ba3fdd7ae5b740cb937810965b806aa3c881b3\t: Add pages-research.it.hs-heilbronn.de (#2253)\r\n2024.317.1 20561c38a60aadac5e1b9443131baac6cf2e8809\t: chore(pr_template): remove syntax check (#2252)\r\n2024.317.2 9d782c4e2306cda242e9816a6d5f68496b024024\t: Master to main for the remote action in the website remote\r\n2024.317.3 c5a2c693abe0851e2aad80062f9ef654c05372ca\t: Adding LODMAN regional domains",
@@ -229,7 +240,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.317.3 c5a2c693abe0851e2aad80062f9ef654c05372ca"
+      "version":"2024.317.3 c5a2c693abe0851e2aad80062f9ef654c05372ca",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.323.0 c1dfaf426b6b2f6a84a6e84dedfafbacc6c27960\t: Heyflow GmbHs domains heyflow.page and heyflow.site\r\n2024.323.1 0d59ce568deb6190b711f43ef8cedd8f5f99f79b\t: Update .AU Section (#2267)\n\nRemove info.au\r\n2024.323.2 431c52a34c183c78581cb5daf040cf0c2d210846\t: Update .IS (#2266)\r\n2024.323.3 b00d15ea62059a24d57cac96740c98dcb80b6edc\t: remove `nom.ad` (#2263)",
@@ -248,7 +260,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.323.3 b00d15ea62059a24d57cac96740c98dcb80b6edc"
+      "version":"2024.323.3 b00d15ea62059a24d57cac96740c98dcb80b6edc",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.324.0 13e2f0eea723173585c29804333f8c3e2cf1f065\t: Update 2nd levels for .JO (Jordan) section (#2264)\r\n2024.324.1 368688468b5e6d08acf3ee4714b72ff6ec070b01\t: Update `.SG` Section (#2273)\r\n2024.324.2 6a941f25bc936de365755a2f691c3e7e39d83ee9\t: Update `.PL` comments and fix alphabetical sorting (#2270)\r\n2024.324.3 c4a7622b97f9191402274dee7d1e7ee1d82bf9f5\t: Update `.CO` Section (#2269)\r\n2024.324.4 87f027724d7e0d5890d3901e2f771ceecf77c339\t: Update `.RE` Section (#2271)\r\n2024.324.5 9f0b7d6f886de2cb8443f371544b25ee8f102ea8\t: alphabetise `.tm` section + add confirmation comment (#2268)\n\n* re-order .tm entries\r\n\r\n* update .tm url + add confirmation message\r\n2024.324.6 06514d3a8810e3de15124eef34e2f78723735c87\t: Update `.AZ` comments and fix sorting (#2275)\r\n2024.324.7 db236405deae4ed71e91b7374dd13f651671cc9d\t: remove `betainabox.com` (#2259)\r\n2024.324.8 e14b1e1a25ab0aab3fe7dd5e9850c926e6bfba37\t: update `.tt` section (#2272)\r\n2024.325.0 1548138afc7cee0798fa3140f11353610df7df2f\t: chore: Update `.CW` Section comments (#2281)\r\n2024.325.1 4129e0f71d1ae7be8721bf632f18f59622fc380b\t: chore: Update `.AF` Section link and sorting (#2279)\r\n2024.325.2 204403f44f41a1466f8c4a6dace5596258c86b14\t: Update `.MG` Section (#2274)",
@@ -267,7 +280,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.325.2 204403f44f41a1466f8c4a6dace5596258c86b14"
+      "version":"2024.325.2 204403f44f41a1466f8c4a6dace5596258c86b14",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.325.3 fba15065541d422a313f027a143da078b42c1b8f\t: Update `.DM` Block (#2277)\r\n2024.325.4 ab15d334922d67b6063d0098b6b6ae49e3d34a0f\t: Update `.BO` (#2276)",
@@ -286,7 +300,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.325.4 ab15d334922d67b6063d0098b6b6ae49e3d34a0f"
+      "version":"2024.325.4 ab15d334922d67b6063d0098b6b6ae49e3d34a0f",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.327.0 cb7517da54bfba1bc262c68e5151f6df52a90677\t: Update `.GE` Section (#2283)",
@@ -305,7 +320,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.327.0 cb7517da54bfba1bc262c68e5151f6df52a90677"
+      "version":"2024.327.0 cb7517da54bfba1bc262c68e5151f6df52a90677",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.328.0 931546b3beb45b544d0692aa116b420fb34b9dfa\t: Update company name and email address (#2285)",
@@ -324,7 +340,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.328.0 931546b3beb45b544d0692aa116b420fb34b9dfa"
+      "version":"2024.328.0 931546b3beb45b544d0692aa116b420fb34b9dfa",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.331.0 bf32ba1ae6228a185ebf297d636f1c6541149c45\t: Update `.CV` Section (#2286)",
@@ -343,7 +360,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.331.0 bf32ba1ae6228a185ebf297d636f1c6541149c45"
+      "version":"2024.331.0 bf32ba1ae6228a185ebf297d636f1c6541149c45",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.332.0 408a7b0bdec993884865baaa2f0d14cc9a060885\t: Update `.TW` Section (#2289)\r\n2024.332.1 e17ca930038ced8343e8522be1b078fc03860a04\t: Adding RUB domain (#2292)\r\n2024.332.2 ff91ff2752d5537cec93a2056e8da93a1fe8c226\t: Update `.EG` Section (#2290)\r\n2024.332.3 e1b1608547b24bb84034c1083060e3293e7907d0\t: util: gTLD data autopull updates for 2024-11-27T15:18:00 UTC (#2293)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -362,7 +380,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.332.3 e1b1608547b24bb84034c1083060e3293e7907d0"
+      "version":"2024.332.3 e1b1608547b24bb84034c1083060e3293e7907d0",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.333.0 03c6a36304d4de698aff16f6fa33b9371af58786\t: remove `mcpe.me` (#2294)\r\n2024.334.0 f34b2f1a960238cf765d2e70ca8459ea2de51ec7\t: chore: Fix Alphabetizing for the ICANN section (#2287)\r\n2024.334.1 70df5fb64d3337f49a1cb5e2e9d3bf3aa7a20f0f\t: tools/internal/parser: enforce suffix ordering in the ICANN section (#2295)\n\nThe ordering rule is slightly different from the private section:\r\nsuffix blocks do not get reordered, only the suffixes within each block.\r\nAdditionally, the ICANN section contains many load-bearing inline comments.\r\nTo avoid semantic changes, the sorting does not move suffixes over such\r\ncomments. Unlike in the private section, such movement failures aren't\r\ntreated as errors, because the subsection comments in the ICANN block\r\nhave a reasonably consistent meaning.",
@@ -381,7 +400,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.334.1 70df5fb64d3337f49a1cb5e2e9d3bf3aa7a20f0f"
+      "version":"2024.334.1 70df5fb64d3337f49a1cb5e2e9d3bf3aa7a20f0f",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.337.0 ebe70033757587d9f854c786d10632251e1c2eb6\t: added o365 sub domain (#2291)\n\nCo-authored-by: Jan Jäschke <jan.jaeschke@nospamproxy.com>\r\n2024.337.1 a12cce094e9c97b3ea7ce921faeea606fde7ef98\t: remove `upli.io` (#2302)",
@@ -400,7 +420,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.337.1 a12cce094e9c97b3ea7ce921faeea606fde7ef98"
+      "version":"2024.337.1 a12cce094e9c97b3ea7ce921faeea606fde7ef98",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.339.0 d953b2f57b76ab085598bde05c0b0f287b9506f8\t: Allow 0e.vc to be isolated for all subdomains by adding wildcard (#2299)\r\n2024.339.1 7e9bf740f43749a8d57bc0d577783c8861d2663c\t: Add checkbox for contact method to the PR template (#2305)",
@@ -419,7 +440,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.339.1 7e9bf740f43749a8d57bc0d577783c8861d2663c"
+      "version":"2024.339.1 7e9bf740f43749a8d57bc0d577783c8861d2663c",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.341.0 d94154e5222aa000f70def82b9711df88b4612d9\t: update info + add note regarding 2LDs for `.name` (#2307)\r\n2024.344.0 d20bb7fddc89f1c840b006f19be3c293a9b9aa8a\t: rename `GetLocalCert` to `LocalCert` (#2309)",
@@ -438,7 +460,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.344.0 d20bb7fddc89f1c840b006f19be3c293a9b9aa8a"
+      "version":"2024.344.0 d20bb7fddc89f1c840b006f19be3c293a9b9aa8a",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.344.1 15795fdc02910204c95e7c70f3c7e2136f3f0683\t: Add `netlib.re` (#2308)\r\n2024.344.2 377aff2c47a582f988d288a8928281db2b212210\t: add on-fleek.xyz (#2303)\r\n2024.344.3 4db37886b4d00ad50279d6eca943e91dff1e748e\t: Add email policy (#2296)\r\n2024.344.4 d3ca4d535b3388c7bd6642cc76d579197dc63202\t: remove `test.ru` (#2301)\r\n2024.345.0 8ddd1834323e2e51a5208b6fa235c4750e19138c\t: Update `.PW` (#2314)",
@@ -457,7 +480,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.345.0 8ddd1834323e2e51a5208b6fa235c4750e19138c"
+      "version":"2024.345.0 8ddd1834323e2e51a5208b6fa235c4750e19138c",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.345.1 8df94846e1eb6ee83eda2cc23aa3d4a42421998e\t: update `.us` (#2316)\r\n2024.345.2 3fc7503b25d9aa745245ef324efc966c1baab06c\t: add aiven.app to public suffix (#2315)\r\n2024.345.3 2a0b5bec9e4b5b02ecbbe18224d41e56d1fd1766\t: remove Danger Science section (#2318)\r\n2024.346.0 5bd0f9f684349420b49232f4ef7e3071b3653643\t: remove `aaa.vodka` (#2323)\r\n2024.346.1 dfd9f96a940d952ec0f2a8c3dbb925717e02862b\t: remove `herokussl.com` (#2313)\r\n2024.346.2 55c3cbbaa5d46fb0dddef82a4ae443b50e6fe3a6\t: util: gTLD data autopull updates for 2024-12-10T15:19:18 UTC (#2321)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2024.346.3 50a9a133659df82fd4c411bc9b43aab05eed576b\t: Add addr.tools dynamic dns services (#2320)\r\n2024.346.4 2abdd00bae287291bb92474e9838fefc0dd1138e\t: Update comments for `.it`, `.jp`, `.se`, `.xn--fiqs8s`, `.xn--fiqz9s` (#2325)\r\n2024.346.5 77a1948db10ae4225281856933eb5317463c9377\t: chore(tools/internal/parser): remove unneeded exceptions (#2328)\r\n2024.347.0 6624d3d533ffed7c8b0c0c9ce552f9f05b99d017\t: Remove blogspot ccTLD domains (#2327)\r\n2024.347.1 6cebd5c468975f0971c4e4463cae0d9e389c4223\t: remove `yombo.me` (#2337)\r\n2024.347.2 dbba928143b54b632b622a6beb444a75091da102\t: remove `lelux.site` (#2336)\r\n2024.347.3 44084384a00a93d9ee602b97e379a11e05e681bc\t: add confirmation message to `.am` (#2330)\r\n2024.347.4 cbbab1f6b284cafa62e9b0291f91c52810eab1fc\t: update `.bw` section (#2339)\r\n2024.347.5 52592a8e00cf54616d3e51c7a54f61013b3cfafa\t: update `.az` section (#2331)\r\n2024.347.6 e0797a795a743072107f624f85c794a2f8c63229\t: fix some URLs (#2340)\r\n2024.347.7 d351216c9d8f2e1af9587dbfa285c8202c781bf3\t: remove `shiftedit.io` (#2312)",
@@ -476,7 +500,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.347.7 d351216c9d8f2e1af9587dbfa285c8202c781bf3"
+      "version":"2024.347.7 d351216c9d8f2e1af9587dbfa285c8202c781bf3",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.347.8 54119e116bb0dc5be5b1c0f4218eaa057db17d92\t: util: gTLD data autopull updates for 2024-12-12T15:18:57 UTC (#2341)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2024.350.0 0660ae7ec652fc051b3968c1cb36f03accd2a48c\t: remove `secaas.hk` (#2335)",
@@ -495,7 +520,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.350.0 0660ae7ec652fc051b3968c1cb36f03accd2a48c"
+      "version":"2024.350.0 0660ae7ec652fc051b3968c1cb36f03accd2a48c",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.351.0 0f742fa58b243545e644a3336d50e091b2e73dc9\t: remove `n4t.co`, `001www.com`, `now-dns.top` (#2324)\r\n2024.351.1 bc9a4ea7bea6062240b3b6161125931925283dc1\t: remove `lab.ms` (#2334)",
@@ -514,7 +540,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.351.1 bc9a4ea7bea6062240b3b6161125931925283dc1"
+      "version":"2024.351.1 bc9a4ea7bea6062240b3b6161125931925283dc1",
+      "vulnerabilities":null
     },
     {
       "changes":"2024.355.0 9e89e8b8a64027217dc22dda2e7c9dacd3d6ee6c\t: chore: update website URL (#2344)\r\n2024.358.0 a12a4d2dd9c8d27a4b187a42588f90577858ab5a\t: util: gTLD data autopull updates for 2024-12-23T15:16:32 UTC (#2357)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2024.359.0 60bb8d87995b9423bf55742da5360c68ec33ce84\t: remove `platter-app.com` (#2346)\r\n2024.359.1 f6f89086eb4c1e8d0c654ce5ba4cf425fb62bb96\t: remove `drud.io` and `drud.us` (#2347)\r\n2024.359.2 d2dd5f273d594b1a335fd3aadfc8c182df3ed787\t: remove `spacekit.io` (#2348)\r\n2024.359.3 eaebbab737795c84c6ab6159f8273fb2dfc84d9e\t: update email address (#2354)\r\n2024.359.4 304c0680cdcbc97c93a09a1b2dc387a7c411700a\t: add botdash domains (#2342)\r\n2024.359.5 b29032616d31b532d04092781b9aa61cf54c6fdc\t: remove Diher Solutions section (#2319)\r\n2024.359.6 9001793946007094caf862748aaeb7e5773541a9\t: remove `curv.dev` (#2317)\r\n2024.359.7 f229d7f87051bb6197b315f42adae05cb68e33b5\t: chore: formatting + fixes (#2329)",
@@ -533,7 +560,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2024.359.7 f229d7f87051bb6197b315f42adae05cb68e33b5"
+      "version":"2024.359.7 f229d7f87051bb6197b315f42adae05cb68e33b5",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.5.0 397a13cba5672b1b4eb847995fc91e03fc3893e1\t: remove Hakaran domains (#2361)",
@@ -552,7 +580,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.5.0 397a13cba5672b1b4eb847995fc91e03fc3893e1"
+      "version":"2025.5.0 397a13cba5672b1b4eb847995fc91e03fc3893e1",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.7.0 fde49104ed0d33a0ff10762386bb4a36801b2121\t: Add Code of Conduct (#2364)\r\n2025.7.1 cc970cad8ae7694bd7c080f1f9f5cc7ae0d6a43f\t: Replace broken links (#2360)\r\n2025.7.2 0f5ad14268854e6bff2d2e53a6861e46cdb63dab\t: add PSL Sandbox (#2358)\r\n2025.7.3 17440f51f53e1fb0e53f1d843dceb235a25893cf\t: Add `cloudbeesusercontent.io` (#2298)",
@@ -571,7 +600,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.7.3 17440f51f53e1fb0e53f1d843dceb235a25893cf"
+      "version":"2025.7.3 17440f51f53e1fb0e53f1d843dceb235a25893cf",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.8.0 d1420f641cf8523ae758342e8b5661287718d33f\t: Add Liara (#2365)",
@@ -590,7 +620,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.8.0 d1420f641cf8523ae758342e8b5661287718d33f"
+      "version":"2025.8.0 d1420f641cf8523ae758342e8b5661287718d33f",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.9.0 d283cf7b0d097b0ac17b59e984e25827b91d4e69\t: AWS Submissions to the Public Suffix List - Q4 2024 (#2212)\n\n* Add rules for AWS Transfer Family web apps\r\n\r\n* Add rules for Amazon SageMaker Studio",
@@ -609,7 +640,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.9.0 d283cf7b0d097b0ac17b59e984e25827b91d4e69"
+      "version":"2025.9.0 d283cf7b0d097b0ac17b59e984e25827b91d4e69",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370\t: add `edu.vg` (#2367)",
@@ -628,7 +660,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370"
+      "version":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737\t: Add subsc-pay suffix domain (#2310)",
@@ -647,7 +680,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737"
+      "version":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.20.0 fa6eb4dd7e8dc64ad41133ee23c0f43934d0b615\t: set label on PR based on check result (#2353)\r\n2025.21.0 b371b882f7fe81752866dd895d822b199e2b45dd\t: Bump golang.org/x/net from 0.26.0 to 0.33.0 in /tools (#2370)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.26.0 to 0.33.0.\r\n- [Commits](https://github.com/golang/net/compare/v0.26.0...v0.33.0)\r\n\r\n---\r\nupdated-dependencies:\r\n- dependency-name: golang.org/x/net\r\n  dependency-type: direct:production\r\n...\r\n\r\nSigned-off-by: dependabot[bot] <support@github.com>\r\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2025.21.1 47264b57765919188b9f4144de8d95cf77e1b6dc\t: Update `ml` (#2369)",
@@ -666,7 +700,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.21.1 47264b57765919188b9f4144de8d95cf77e1b6dc"
+      "version":"2025.21.1 47264b57765919188b9f4144de8d95cf77e1b6dc",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.23.0 3bf13d1eddb9298971939d4fa868f94cd3999cb9\t: Revert \"set label on PR based on check result (#2353)\" (#2372)\n\nThis reverts commit fa6eb4dd7e8dc64ad41133ee23c0f43934d0b615.\r\n2025.25.0 2aa65d89a1b96b0065ad5970734200eed5a38713\t: Update ug (#2371)",
@@ -685,7 +720,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.25.0 2aa65d89a1b96b0065ad5970734200eed5a38713"
+      "version":"2025.25.0 2aa65d89a1b96b0065ad5970734200eed5a38713",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.31.0 bcf753f217d791d8f24803430332f2819f20434f\t: Brave Submissions to the Public Suffix List - Q1 2025 (#2375)\r\n2025.31.1 92d3d4cb81b3fce96e4f0918fdd6c6bcf659a9c7\t: Add obj.ag to Public Suffix List (#2374)\r\n2025.31.2 5421ee732b6ad9733220267cd8d3d6b45a63ce05\t: Add localtonet.com and localto.net (#2237)",
@@ -704,7 +740,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.31.2 5421ee732b6ad9733220267cd8d3d6b45a63ce05"
+      "version":"2025.31.2 5421ee732b6ad9733220267cd8d3d6b45a63ce05",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4\t: Add alibabacloudcs.com to Public Suffix List (#2373)",
@@ -723,7 +760,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4"
+      "version":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577\t: Add laravel.cloud to Public Suffix List (#2381)",
@@ -742,7 +780,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577"
+      "version":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8\t: Moved JPRS comment to appropreate position (#2383)",
@@ -761,7 +800,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8"
+      "version":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.43.0 560007a8aea8267f15cad9abcdbcff7848186bd8\t: add bubbleapps.io and cdn.bubble.io to public_suffix_list.dat (#2380)",
@@ -780,7 +820,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.43.0 560007a8aea8267f15cad9abcdbcff7848186bd8"
+      "version":"2025.43.0 560007a8aea8267f15cad9abcdbcff7848186bd8",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.49.0 445e11a2ebe9ef1ff9c1983ed8e1ff6e5b5cda28\t: Add Lovable to public_suffix_list.dat (#2379)",
@@ -799,7 +840,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.49.0 445e11a2ebe9ef1ff9c1983ed8e1ff6e5b5cda28"
+      "version":"2025.49.0 445e11a2ebe9ef1ff9c1983ed8e1ff6e5b5cda28",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.52.0 f83c8b19f351e813eda3ace0cc224ad965b79465\t: util: gTLD data autopull updates for 2025-02-21T15:17:09 UTC (#2390)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -818,7 +860,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.52.0 f83c8b19f351e813eda3ace0cc224ad965b79465"
+      "version":"2025.52.0 f83c8b19f351e813eda3ace0cc224ad965b79465",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.55.0 121df0549c95c3ed0f0db06ba8092a320de5d282\t: Add emprende.ve (#2394)\r\n2025.55.1 a9b0226059e71094e4aa36fb8b6e22c4d381c0d3\t: Add *.square.site for Block, Inc. (#2385)\r\n2025.57.0 77d7c4cda6a5dac13d0dca297b37b9ca561fffc4\t: util: gTLD data autopull updates for 2025-02-26T15:18:44 UTC (#2397)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.57.1 6969b4501b728bf9e2719cb20420d7b662a46da1\t: Add *.zerops.app (#2393)\r\n2025.58.0 23f7ef2b96a01338ac761a395aa5d37572850567\t: Add `zone.id` to the list (#2396)",
@@ -837,7 +880,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.58.0 23f7ef2b96a01338ac761a395aa5d37572850567"
+      "version":"2025.58.0 23f7ef2b96a01338ac761a395aa5d37572850567",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.59.0 efd2e6619780eac110988b3b529c4a88fcd64d96\t: Add cpanel.site to private section (#2398)\r\n2025.59.1 9020852e6fadfeb0ea31f73486ede566de9b3093\t: util: gTLD data autopull updates for 2025-02-28T15:17:59 UTC (#2401)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -856,7 +900,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.59.1 9020852e6fadfeb0ea31f73486ede566de9b3093"
+      "version":"2025.59.1 9020852e6fadfeb0ea31f73486ede566de9b3093",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.64.0 b5aa82bff01b7f9ebd61ab118a224ad8ca57bf43\t: add deno.net (#2400)",
@@ -875,7 +920,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.64.0 b5aa82bff01b7f9ebd61ab118a224ad8ca57bf43"
+      "version":"2025.64.0 b5aa82bff01b7f9ebd61ab118a224ad8ca57bf43",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.65.0 9146b3759249ffccf979205721ab282c44959fee\t: Add oninferno.net (#2402)\r\n2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7\t: Add deus-canvas.com to PSL (#2405)",
@@ -894,7 +940,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7"
+      "version":"2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.70.0 3dc28d7389f45a20dfca36284b84fae9d472c01c\t: Update pro.typeform.com contact (#2404)\r\n2025.71.0 b85018227bf5620427fc719c80fd652d52fd945f\t: Add ai.kr, io.kr, it.kr, me.kr (#2407)\r\n2025.73.0 b47586e8b40785602d1b540e67eef2f297ef794d\t: Update public_suffix_list.dat (#2403)\r\n2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91\t: add inbrowser.link and inbrowser.dev (#2413)",
@@ -913,7 +960,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91"
+      "version":"2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.76.0 7b9b3a0dff84cff9da97d8cab1b67ecc37e6f88d\t: Add devinapps.com (#2412)\r\n2025.76.1 32eb47d07246e98122c64c866ce0a33f09fc49ff\t: Add dpdns.org (#2414)\r\n2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded\t: Remove `router.management` (#2409)",
@@ -932,7 +980,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded"
+      "version":"2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.86.0 0041a72f51491848484deece38e976dc3f04caee\t: Add storacha.link and w3s.link (#2417)\r\n2025.87.0 09be8307bc42500a7c65ac92d0263d2ef854b13f\t: feat: add Appwrite domains to the list (#2410)\r\n2025.87.1 b39e35ef3835c5db7aaf311c179fc1f6d92b92d5\t: util: gTLD data autopull updates for 2025-03-28T15:18:17 UTC (#2423)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -951,7 +1000,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.87.1 b39e35ef3835c5db7aaf311c179fc1f6d92b92d5"
+      "version":"2025.87.1 b39e35ef3835c5db7aaf311c179fc1f6d92b92d5",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.97.0 5fc8d12c1624ddbc56a80e944aca151a8ee466a1\t: Add windsurf.app and windsurf.build (#2428)\r\n2025.100.0 2baccee4d0ac700b98c4d9c1fc4a798122bcd083\t: add `figma.site` (#2429)\r\n2025.100.1 1daef550aab77e1a43d67abd7de78cafa1110468\t: Add rules for Amazon Cognito (#2366)\r\n2025.101.0 61dd55b3527e555beb8c3c11a32340ca5280bc0e\t: Add *.devinapps.com (#2435)\r\n2025.101.1 da7559d9e2f8f107b1afab72e8b5246d7d67f83c\t: Add e2b.app (#2431)\r\n2025.101.2 bb94aa66cd4e03f482a94fcd03b1a240fce1393a\t: Add convex.app and convex.site (#2436)\r\n2025.101.3 54ed390e7c41b363942c07a19b8d456d4ca6aa13\t: Add seg.ar to public_suffix_list.dat (#2433)\n\nThis change adds the TLD seg.ar, which is defined in the official domain policy published by NIC Argentina: https://nic.ar/es/nic-argentina/normativa",
@@ -970,7 +1020,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.101.3 54ed390e7c41b363942c07a19b8d456d4ca6aa13"
+      "version":"2025.101.3 54ed390e7c41b363942c07a19b8d456d4ca6aa13",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.105.0 b1d38256593253c7b333958910661e16234565cb\t: Update public_suffix_list.dat (#2437)\r\n2025.112.0 a88ef4b56cc81d25d7cd19ef053f186c286aadbc\t: Add val.run (#2432)\r\n2025.112.1 f3023100c9846deecf0460c1cd3df0bb5da5f79f\t: Add objectstorage.ch (#2439)\n\n`(rma|lpg).objectstorage.ch` points to the same object storage instance\nas `objects.(rma|lpg).cloudscale.ch` which is already included in the\nlist.\n\nThese domains serve our public S3 compatible object storage. They are\neither used as `<bucket>.(rma|lpg).objectstorage.ch` or\n`(rma|lpg).objectstorage.ch/<bucket>`.\r\n2025.112.2 6aeba31da00f72ffa035a8f1e4cd1b5c27dfaf01\t: Add `luyani.app` (#2440)",
@@ -989,7 +1040,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.112.2 6aeba31da00f72ffa035a8f1e4cd1b5c27dfaf01"
+      "version":"2025.112.2 6aeba31da00f72ffa035a8f1e4cd1b5c27dfaf01",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.114.0 f8413ca3628c8c145945664dddd9b2b7f3989f10\t: add `preview.site` (#2445)\r\n2025.114.1 e02a5bfc67e4a67f2af5473fb701dc9e15b57304\t: dev.project-study.com (#2444)\r\n2025.114.2 c322c834229184ff0161394dfeb8a5d16381228f\t: Add mmv.kr / vki.kr (#2442)\r\n2025.114.3 88f6db627f211ec6d0284b1e7bc6e64516f4c56c\t: Bump golang.org/x/net from 0.33.0 to 0.38.0 in /tools (#2438)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.33.0 to 0.38.0.\n- [Commits](https://github.com/golang/net/compare/v0.33.0...v0.38.0)\n\n---\nupdated-dependencies:\n- dependency-name: golang.org/x/net\n  dependency-version: 0.38.0\n  dependency-type: direct:production\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2025.114.4 e881efa87f5703a2e53d4f83e5e53549c002c969\t: Run go mod tidy\r\n2025.114.5 24dd8c3da41bbc8e479bbe5f3eceed8a4dfd35e9\t: fix: autopin dependencies (#2430)\r\n2025.114.6 8605b91ddd176ffa4333adc3a6b4b6eece59f3b5\t: Add lp.dev to public_suffix_list.dat (#2391)",
@@ -1008,7 +1060,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.114.6 8605b91ddd176ffa4333adc3a6b4b6eece59f3b5"
+      "version":"2025.114.6 8605b91ddd176ffa4333adc3a6b4b6eece59f3b5",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.115.0 7be9636c95503ce3ad400089d5448db28b0c0596\t: util: gTLD data autopull updates for 2025-04-24T15:19:52 UTC (#2446)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -1027,7 +1080,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.115.0 7be9636c95503ce3ad400089d5448db28b0c0596"
+      "version":"2025.115.0 7be9636c95503ce3ad400089d5448db28b0c0596",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.116.0 b69f49c54e2ec6b0ba318f9c17b5881d6316b274\t: util: gTLD data autopull updates for 2025-04-26T15:16:32 UTC (#2447)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.119.0 e6828b0220ba84deedd48cc3477d2209649ca1ca\t: Adding `onid.ca` (#2452)",
@@ -1046,7 +1100,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.119.0 e6828b0220ba84deedd48cc3477d2209649ca1ca"
+      "version":"2025.119.0 e6828b0220ba84deedd48cc3477d2209649ca1ca",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.121.0 acfdc56a9799590c9610e9ccd2b25f5af331e652\t: util: gTLD data autopull updates for 2025-04-30T15:19:32 UTC (#2454)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.122.0 8faa23431a2b9face2e2b54df47a5c75caf58972\t: fix(readme): remove preceding dots (#2456)\r\n2025.122.1 38015c25a1ecd231d411f599248563da3d64289a\t: Add code tags to domains in README",
@@ -1065,7 +1120,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.122.1 38015c25a1ecd231d411f599248563da3d64289a"
+      "version":"2025.122.1 38015c25a1ecd231d411f599248563da3d64289a",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.128.0 793008262a705eebff7db176a9d562200f31ccdc\t: remove `PSL Sandbox` (#2460)\r\n2025.128.1 5cabd6ba381e5e220bc7b29bc4c4e87ed6c0f107\t: remove `localhostcert.net` (#2464)\r\n2025.128.2 897e8928d9fe4bf733533029c22890a694d37abe\t: merge `Harrison Network` into `William Harrison` (#2463)\r\n2025.128.3 0c4a8de420882c00af48602dd104adcb4150bbca\t: update email contact for is-a.dev (#2465)\r\n2025.128.4 0f514676eb334e07cddb8551ac824a5e95f10985\t: chore: move Appwrite domains (#2467)\n\nMove after the Amazon block and place alphabetically.\n\nCo-authored-by: Steven Nguyen <stnguyen90@users.noreply.github.com>",
@@ -1084,7 +1140,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.128.4 0f514676eb334e07cddb8551ac824a5e95f10985"
+      "version":"2025.128.4 0f514676eb334e07cddb8551ac824a5e95f10985",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.132.0 823beb1425def931c8b0b170a6bc33b424c3f9b0\t: Update public_suffix_list.dat (#2462)",
@@ -1103,7 +1160,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.132.0 823beb1425def931c8b0b170a6bc33b424c3f9b0"
+      "version":"2025.132.0 823beb1425def931c8b0b170a6bc33b424c3f9b0",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.137.0 d4f072b4db3db5c0bd6b144b54eba1802b763c96\t: util: gTLD data autopull updates for 2025-05-17T15:16:58 UTC (#2480)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -1122,7 +1180,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.137.0 d4f072b4db3db5c0bd6b144b54eba1802b763c96"
+      "version":"2025.137.0 d4f072b4db3db5c0bd6b144b54eba1802b763c96",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.140.0 e3b814bab0fa25acbcf5fea6d2bde42d1f345a40\t: Add biz.gh and net.gh SLD to Public Suffix List (#2455)\n\nCo-authored-by: Bonnie <bonnie@ghana.com>\r\n2025.140.1 71fb417d6c6c2a2b860fd258239d02144d55af2f\t: remove wildcard from `*.my.canvasite.cn` and `*.my.canva.site` (#2477)\r\n2025.140.2 029ca40de5b71cffc3446495335e7d81825ddb6e\t: Actualización de lista de extensiones del dominio ec en orden alfabético (#2420)\r\n2025.141.0 871165a43743f2944cf1065b4e9869a286d333d8\t: removing cloud66.zone as it is redundant now (#2483)\r\n2025.141.1 5e7035ffa191ae2a06340676287c9c1490288145\t: Add github.app to Public Suffix List (#2482)\r\n2025.141.2 28ea3465ed3a67750c5488686a42f259f78aff67\t: Add eliv-cdn.kr (#2479)\r\n2025.141.3 0ca8eaff2edde9ae0251389a5eee0d806f74d199\t: Add encr.app and lp.dev subdomains (#2450)\r\n2025.142.0 76b8e30f1913de596c835ac65b2efe5b5fe9eb43\t: Add iserv.host (#2461)\r\n2025.146.0 89800dc76a00a48f7b8ad0603e8da8548b6ca97a\t: Add icp0.io /  icp1.io / caffeine.site / caffeine.website for Internet Computer domains (#2424)\r\n2025.147.0 f011d9d9fb6e3a625575440a223ee3167125992d\t: add kop.id (#2489)",
@@ -1141,7 +1200,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.147.0 f011d9d9fb6e3a625575440a223ee3167125992d"
+      "version":"2025.147.0 f011d9d9fb6e3a625575440a223ee3167125992d",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.147.1 ae6d7152aac42d2ad577f980af6ef4317d5828fe\t: Add schuldock.de (#2492)\r\n2025.148.0 faa2e8d226ac537daab3f45b43bed152ee21a2c4\t: Add Cloudflare Subdomain Notice to README.md (#2497)\r\n2025.148.1 9228b7033159f1490bbc9fe45159a5aeb8da62ad\t: Update public_suffix_list.dat (#2498)",
@@ -1160,7 +1220,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.148.1 9228b7033159f1490bbc9fe45159a5aeb8da62ad"
+      "version":"2025.148.1 9228b7033159f1490bbc9fe45159a5aeb8da62ad",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.153.0 c792070bab60deb20e497677bf33e4e198433033\t: request to add `tche.br` (#2487)",
@@ -1179,7 +1240,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.153.0 c792070bab60deb20e497677bf33e4e198433033"
+      "version":"2025.153.0 c792070bab60deb20e497677bf33e4e198433033",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.155.0 ed70fdfd664cb348e0a6c02f953d100baaf6f2e8\t: Add `vercel.run` to the public suffix list (#2490)\r\n2025.155.1 f50ae882e118b57cb241fd377cff99bfc04f31fa\t: Add https://lutra.ai (#2500)\r\n2025.156.0 71c753e4b9f5beaf5dcf69f7d35eccc265e0c4a0\t: add *.mtls.run.app to public_suffix_list.dat (#2485)\r\n2025.157.0 8c55c0f59577c2939919834f88d43d03db8fcdae\t: TECCM-151074: Add webspace-host.com to PSL (#2504)\r\n2025.159.0 8d4a151ff8b0a401fb03d2fcec16c834cd454523\t: util: gTLD data autopull updates for 2025-06-07T15:17:54 UTC (#2507)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.161.0 9f9c1865c17a23edce0491aa6e697cc987fcdafa\t: Add 4.at, my.at, my.de, *.nxa.eu, nx.gw (#2495)\r\n2025.163.0 a01fe523d7359fc523d8b164bcb16834a4f2d8ba\t: Update Adobe entries with aem.network for Adobe Experience Manager (#2505)\r\n2025.167.0 2141aa8a1f634c2b839175c559ceaac6a849592c\t: Update public_suffix_list.dat (#2508)",
@@ -1198,7 +1260,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.167.0 2141aa8a1f634c2b839175c559ceaac6a849592c"
+      "version":"2025.167.0 2141aa8a1f634c2b839175c559ceaac6a849592c",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.177.0 9ae55199aa39694b19b7791d2e7b0b7592b3bdd7\t: update scaleway subdomains (#2503)",
@@ -1217,7 +1280,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.177.0 9ae55199aa39694b19b7791d2e7b0b7592b3bdd7"
+      "version":"2025.177.0 9ae55199aa39694b19b7791d2e7b0b7592b3bdd7",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.186.0 968c2cce548037261cd6b9c41bffc90138ed7e6f\t: Update v.ua in public_suffix_list.dat (#2511)\r\n2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b\t: Add *.oaiusercontent.com to the PSL. (#2516)",
@@ -1236,7 +1300,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b"
+      "version":"2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953\t: util: gTLD data autopull updates for 2025-07-09T15:20:49 UTC (#2526)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -1255,7 +1320,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953"
+      "version":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.197.0 5bf31808ae41eb25ab8e6feba0c0312cdb98c8d9\t: AWS Submissions to the Public Suffix List - Q2 2025 (#2434)\n\n* Add rules for Amazon Cognito\n\n* Add rules for AWS Transfer Family web apps\n\n* Add rules for Amazon Managed Workflows for Apache Airflow\r\n2025.197.1 ec9e649374faeea672d7f599c31d88c0bd3d31e4\t: Add beta.wmcloud.org (#2527)\r\n2025.197.2 f0e36343e894c3094e4a1f6e88d68496c95ab8c3\t: util: gTLD data autopull updates for 2025-07-16T15:22:08 UTC (#2538)\n\nCo-authored-by: GitHub <noreply@github.com>",
@@ -1274,7 +1340,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.197.2 f0e36343e894c3094e4a1f6e88d68496c95ab8c3"
+      "version":"2025.197.2 f0e36343e894c3094e4a1f6e88d68496c95ab8c3",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.199.0 8aeb90f43d76aacad4688524004f1969793ce133\t: Remove *.uberspace.de (#2540)\r\n2025.203.0 66d74ce941749134f5b0c9f0b9ab3393084b0c21\t: Update lovable domains (#2545)\n\n* Update lovable domains\n\n* lovable: correct ordering",
@@ -1293,7 +1360,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.203.0 66d74ce941749134f5b0c9f0b9ab3393084b0c21"
+      "version":"2025.203.0 66d74ce941749134f5b0c9f0b9ab3393084b0c21",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.213.0 758d5d610dffb02f3b38e8ee6783cec7def1c150\t: Add co.de to public suffix list (#2539)\n\n* Add co.de to public suffix list\n\n* Add co.de to public suffix list - www. added to website\n\n* Add co.de to public suffix list - business entry alphabetically sorted\n\n* Add missing abuse report for co.de\n\n* Add missing new line at end of file\n\n---------\n\nCo-authored-by: kv2 <sitouni@kv-gmbh.de>\nCo-authored-by: iliasitouni <sitouni1@uni-bremen.de>\r\n2025.220.0 3b58061c659c98e2dfbf7277eec3de30f85adcae\t: Update public_suffix_list.dat (#2517)\r\n2025.220.1 596a44137f4ae9a4e61a3e5008fb42d5fddb7ef2\t: Add hidns.co and hidns.vip (#2525)\n\nAdd hidns.co and hidns.vip\r\n2025.220.2 9375d3415dea4bfcc974248b676bf0f6e6f2daa8\t: Remove caffeine.ai, icp-api.to, id.ai (#2555)\r\n2025.223.0 d3a7d52e6b5204ab2dd2b17db1553cd4cb538b82\t: Add up.railway.app to the PSL (#2552)\r\n2025.223.1 568a834e835595f125e115cda197ab2ee66cc3db\t: Add on-forge.com and on-vapor.com (#2523)",
@@ -1312,7 +1380,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.223.1 568a834e835595f125e115cda197ab2ee66cc3db"
+      "version":"2025.223.1 568a834e835595f125e115cda197ab2ee66cc3db",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.224.0 0dc563d009443d96627fae0441ec15fab9b4435d\t: Add erp.dev and web.erp.dev (#2551)\r\n2025.224.1 6a3664b3f552dc784849af7f12d3a248bbae2647\t: Add qualyhqpartner.com and qualyhqportal.com (#2563)\r\n2025.225.0 985e2ddc71651804aaf78809174de0c5ae367dd5\t: Add *.icp.net (#2558)\r\n2025.225.1 2d435aebd8a70c0c77891e48516dc97cd7d28b1f\t: Add zabc.net (#2559)",
@@ -1331,7 +1400,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.225.1 2d435aebd8a70c0c77891e48516dc97cd7d28b1f"
+      "version":"2025.225.1 2d435aebd8a70c0c77891e48516dc97cd7d28b1f",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.226.0 2dbbb64390b7087a66e3d126032ab1a2951f35dc\t: Add gov.cz to Public Suffix List (#2554)\n\nCo-authored-by: thala <tomas.hala@nic.cz>\r\n2025.230.0 93a4746d99fae5dd169ad4e3fa2f0343e6fd2b13\t: Remove glitch.me (#2565)\r\n2025.230.1 f6d9f996b248aa92a6fcf7dd739730220f1cbabd\t: Add Million Software domains: same-app.com and same-preview.com (#2544)",
@@ -1350,7 +1420,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.230.1 f6d9f996b248aa92a6fcf7dd739730220f1cbabd"
+      "version":"2025.230.1 f6d9f996b248aa92a6fcf7dd739730220f1cbabd",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5\t: add `hrsn.au` & `vps.hrsn.au` (#2566)",
@@ -1369,7 +1440,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5"
+      "version":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.231.1 0654b20320910922259c7869606f027e6f7789d1\t: Add sourcecraft.site to the PSL (#2547)\r\n2025.231.2 db0dbe5d4852712c1e6b3bf06a053850c3e114c2\t: util: gTLD data autopull updates for 2025-08-19T15:20:18 UTC (#2567)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.232.0 8c9e8b967e7429b4cb0f2fe75f20c2c4b020402f\t: Update 611.to (#2561)\r\n2025.235.0 2b05f1fef3b52831d70b40a05da2614a031557ea\t: Update public_suffix_list.dat to remove schools.nsw.edu.au (#2556)\n\nRemoved schools.nsw.edu.au at the request of Andrew Zografos (NSW DoE) and Amanda Shay (ESA)\r\n2025.238.0 80eac0eba1e8215052b9b67654955e87d84d6141\t: Add api.br, ia.br, social.br, xyz.br to public section for Brazil (#2575)\r\n2025.238.1 44211b0fbb8b4e09b89a553f5b26c6a02f889c4b\t: Removing lib.de.us from PSL (#2572)\r\n2025.239.0 55b9732118f51fa4f14309b475aff6e0671026b3\t: chore: add realtime and storage to the psl (#2570)\r\n2025.239.1 7c7f76b6aef151082767f2f991bf99a824a654df\t: Add wal.app (#2529)\r\n2025.239.2 519af36326939e3b6c07fbbd30806f67a570b2ba\t: util: gTLD data autopull updates for 2025-08-27T15:19:07 UTC (#2578)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.240.0 4103956c4300902436b03d7da482536e757b3601\t: Add jote.cloud to Jotelulu's Public Suffix List (#2532)",
@@ -1388,7 +1460,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.240.0 4103956c4300902436b03d7da482536e757b3601"
+      "version":"2025.240.0 4103956c4300902436b03d7da482536e757b3601",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.247.0 e80dbc5e78c74401484ba68b4d319b740c7cbc2c\t: Add hackclub.app (#2579)\r\n2025.247.1 5fcdf448d2e38174a7078b29c3fffd56411bedca\t: Remove \"lib.ms.us\" from PSL (#2581)\r\n2025.247.2 a818607e99f2016e857e7a9b7cd9956aff9b5305\t: Add shop.brendly.ba (#2582)\r\n2025.253.0 27156a8d603a01acf3f387ebdeae16bee9187f56\t: Remove mydrobo.com (#2591)\r\n2025.253.1 c5d0e29d0d1b094ca1173497ff4e46b998d149c1\t: Remove `servers.run` (#2590)",
@@ -1407,7 +1480,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.253.1 c5d0e29d0d1b094ca1173497ff4e46b998d149c1"
+      "version":"2025.253.1 c5d0e29d0d1b094ca1173497ff4e46b998d149c1",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.261.0 ed98f40371e7cbdfca40be0375542deb8b0b2b81\t: Add support.site (#2594)\r\n2025.261.1 4a97adbc7f153c31b7d0f62a32bf856f0f1ee6c2\t: Add Jotelulu domains (#2587)\n\nCo-authored-by: Javi <javier.nunez@jotelulu.com>",
@@ -1426,7 +1500,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.261.1 4a97adbc7f153c31b7d0f62a32bf856f0f1ee6c2"
+      "version":"2025.261.1 4a97adbc7f153c31b7d0f62a32bf856f0f1ee6c2",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.265.0 08abe791d41986a3841bd981fa5efd5e0b7ff7d3\t: add e.id to public suffix list private domain (#2589)\r\n2025.265.1 fe0ff47a24a5e77fa530703be0a7e378f85e14ac\t: remove airkitapps.com, airkitapps.eu, and airkitapps-au.com (#2571)",
@@ -1445,7 +1520,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.265.1 fe0ff47a24a5e77fa530703be0a7e378f85e14ac"
+      "version":"2025.265.1 fe0ff47a24a5e77fa530703be0a7e378f85e14ac",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.266.0 6defc0e19dbbe27dc2a0798256077d0b82d9c455\t: Add Teleport Cloud domain to isolate tenants (#2580)\r\n2025.268.0 c219a208200b713e056ad62d193672e34a539ab9\t: Add xenonconnect.de as public suffix (#2606)",
@@ -1464,7 +1540,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.268.0 c219a208200b713e056ad62d193672e34a539ab9"
+      "version":"2025.268.0 c219a208200b713e056ad62d193672e34a539ab9",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.269.0 106b086f3ea59059096edba38a758c7a7a1f8664\t: Add `canva.run` and `rice-labs.com` to Public Suffix List (#2605)\r\n2025.272.0 ee656422c241bf06086e487a58cd34d5b22efbce\t: Add bolt.host as public suffix (#2608)\r\n2025.272.1 2af0eac8d8a1e954d32ea11991102e8500de4065\t: Add \"leapcell\" (#2609)\r\n2025.272.2 07f088c3601c917bec4a070e439f03944ebb4227\t: Add cloud-ip.cc and abrdns.com (#2586)",
@@ -1483,7 +1560,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.272.2 07f088c3601c917bec4a070e439f03944ebb4227"
+      "version":"2025.272.2 07f088c3601c917bec4a070e439f03944ebb4227",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.274.0 0673151c3d770cbe2bdd0116ca615f24e73d370e\t: util: gTLD data autopull updates for 2025-10-01T15:18:26 UTC (#2614)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.281.0 ee7dec4a99602baaf51879dd8469b6642881a494\t: consolidate my projects into one section (#2616)\r\n2025.286.0 c9eaff77a5670de21bd00afde95ee6a05002f572\t: chore: adds caffeine.xyz to public suffix list (#2615)\r\n2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993\t: Add Canva Code domains. (#2617)",
@@ -1502,7 +1580,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993"
+      "version":"2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.286.2 c002d19a8ca969110dd8a3838d972ca293bdc48f\t: Added new Plenit domains by region and remove domains by service (#2621)\n\nCo-authored-by: Javi <javier.nunez@jotelulu.com>\r\n2025.289.0 399792921792cacc483219997697443b49b6976f\t: Add website.one to PSL for hosting independent customer websites as subdomains of website.one. (#2625)\n\nThis domain will in the future be used for hosting independent\nwebsites for customers, where each customer will have a name of the\nform <some-name>.website.one.\r\n2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889\t: Add `needle.run` to Public Suffix List (#2627)",
@@ -1521,7 +1600,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889"
+      "version":"2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.297.1 c280d0b7e29a4c829d37ecedb079cb24abaca222\t: Add bearblog.dev to PRIVATE section (#2620)\r\n2025.298.0 7ca3728d124daa3ee5664fb1667f4ae2fc4c1669\t: util: gTLD data autopull updates for 2025-10-24T15:19:14 UTC (#2630)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nICANN Json removed .dunlop\r\n2025.299.0 30f4f4244cfef423c0150cfab53a5d89bc734f65\t: Update `.bd` in ICANN section (#2623)\n\n* Update public_suffix_list.dat\n\n Update .bd section to enable second-level domain registrations\n\n* Update public_suffix_list.dat\n\nMy previous pull request https://github.com/publicsuffix/list/pull/2623 was failed due to unsorted list. Adding this new request with sorted one and modified _psl TXT.\r\n\r\nOrganization Name:\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nOrganization Website:\r\nhttps://btcl.portal.gov.bd/\r\n\r\nSubmitter:\r\nJoyeeta Sen Rimpee\r\nRegistry Operator, .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\n\r\nRole-based Contact:\r\ndgm.domain@btcl.gov.bd\r\n\r\nAbuse Contact:\r\nemail: dgm.domain@btcl.gov.bd\r\n\r\nOrganization Overview:\r\nBangladesh Telecommunications Company Limited (BTCL) is the state-owned national telecommunications provider of Bangladesh and the official operator of the country code top-level domain (ccTLD) .bd, delegated by IANA and managed under the authority of the Government of Bangladesh.\r\nBTCL maintains the authoritative DNS infrastructure for .bd and .বাংলা, ensuring operational stability, DNSSEC deployment, and compliance with global Internet governance standards.\r\n\r\nReason for PSL Inclusion\r\n\r\nBTCL has officially enabled second-level domain registrations directly under .bd (e.g., example.bd) in addition to the existing structured third-level domains (e.g., example.com.bd, example.net.bd).\r\n\r\nThis update ensures that modern Internet infrastructure and hosting services\u2014including browsers, certificate authorities, cPanel, Cloudflare, and Let\u2019s Encrypt\u2014correctly recognize second-level .bd domains as registrable and valid.\r\n\r\nThe previous PSL configuration (*.bd) treated all subdomains as public registrable domains, which caused issues with cookie scope, HTTPS certificate validation, and domain recognition across major platforms.\r\nThe updated section below accurately represents the .bd namespace and preserves compatibility with both second-level and structured third-level registrations.\r\n\r\nProposed .bd Section:\r\n\r\n// Bangladesh : https://btcl.gov.bd\r\nbd\r\ncom.bd\r\nnet.bd\r\norg.bd\r\nedu.bd\r\ngov.bd\r\nac.bd\r\nmil.bd\r\ntv.bd\r\nco.bd\r\nai.bd\r\nsch.bd\r\nid.bd\r\nit.bd\r\ninfo.bd\r\n\r\nNumber of users this request is being made to serve:\r\nCurrently serving approximately 50,000 registered domains under .bd, with continuous growth as BTCL introduces direct second-level registration to encourage local digital presence.\r\n\r\nThird-party impact:\r\nThis submission is not intended to circumvent any third-party limits. However, the change will ensure proper functionality for:\r\n\r\nSSL/TLS certificate issuance (Let\u2019s Encrypt, DigiCert)\r\n\r\nHosting providers (cPanel, Plesk, Cloudflare)\r\n\r\nBrowser cookie scope handling (Chrome, Firefox, Safari)\r\n\r\nDuration of registration:\r\nAll listed second-level and third-level zones are registry-controlled and maintained with long-term renewals exceeding 2 years.\r\n\r\nAdditional Acknowledgements\r\n\r\nBTCL confirms:\r\nResponsibility for ongoing maintenance of .bd and its subzones.\r\nOpen communication with PSL maintainers via dgm.domain@btcl.gov.bd.\r\nActive abuse reporting channel publicly listed on btclportal.gov.bd\r\n\r\nSummary\r\n\r\nThis request aligns .bd with other ccTLDs (such as .uk, .in, .jp) that have transitioned to include second-level domain registrations.\r\nIt enhances domain usability, international compatibility, and DNS integrity across Bangladesh\u2019s national domain space.\r\n\r\nSubmitted by:\r\nDeputy General Manager\r\nRegistry Operator \u2013 .bd Domain\r\nBangladesh Telecommunications Company Limited (BTCL)\r\nEmail: dgm.domain@btcl.gov.bd, joyeetasen06@gmail.com\n\n* Update public_suffix_list.dat\n\nremoved empty line\r\n2025.300.0 b8816d09172f8f9ae8a51b4f8b22b20958291fb1\t: Add directwp.eu (#2600)\r\n2025.300.1 834a6c2e2a17467bb14c1f11c896bbfba9a4dd9e\t: add the ia.ve extension (#2592)\r\n2025.300.2 a20b1aa039dbd307132e61cc9961194cf0175a14\t: Add gitbook.io to the list (#2629)\r\n2025.300.3 95159fc75a06b786e5cc249820b690e494d9f039\t: Add statichost.eu (#2611)\r\n2025.300.4 8515b0cb8b0e2941a37803493c9d68f1c7ceb67e\t: Add reference link to .ve (#2636)\n\nAdded comments and submission information for '.ve' domains.\r\n2025.301.0 edb46e9c5f146e9302eb6f37b0c859b10ca9354c\t: add cloudflare.app to public suffix (#2631)\r\n2025.302.0 8e3b7b7885c7c198a66df3df8c049c066d7c1a6b\t: Add `wasmer.app` to Public Suffix List (#2635)\n\n`wasmer.app` is the eTLD for all apps hosted by Wasmer Edge's\nproduction environment. Each subdomain is its own app.\r\n2025.310.0 8a6908f3823256c5319a38b67ff20e8c1ab2c686\t: add bank.in and fin.in to the public suffix list (#2603)\n\nCo-authored-by: Ambikeshwar Srivastava <sambikeshwar@fortinet.com>\r\n2025.311.0 4a713a8a0606f2c6257aa630c7e1c0cd81306e0c\t: Adding bank.in and fin.in (#2652)\n\nAdded BANK.IN and FIN.IN on 06th of November 2025 by Gaurav Kansal ( GAURAV.KANSAL@NIC.IN)\r\n2025.312.0 9476034f965ca9dcfaf88c337f010e90fdc17795\t: util: gTLD data autopull updates for 2025-11-08T15:16:38 UTC (#2653)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.314.0 66bee43058306ce4ec3fc69b83d32f48ca88c7ce\t: Add Mocha to public suffix list (#2651)\r\n2025.314.1 0fe8347e72fdac046abc658fe9bf0027328fa2b5\t: Update `.no` section (#2648)\n\nRemoved entries for 'bjarkoy.no', 'bjarkøy.no', and 'mosvik.no' from the public suffix list.\r\n2025.314.2 fd029dd331dd5ae0f52495c115b8fece48f65fb4\t: add `figma-gov.site` (#2640)\r\n2025.314.3 27eccb1b6a2e34768f577e915713524e05a51c6e\t: Add Developed Methods LLC to PSL (#2641)\r\n2025.314.4 ac0cca381b7043df7dc4755d9a434ad991302efe\t: Remove Netfy Domains from public suffix list (#2642)\r\n2025.314.5 20d6be8515062d30b385d804c29f5a4f8205be7c\t: add ispmanager.name (#2638)\r\n2025.314.6 9b05e2b87afa0c681fc84688940e871e51d1e3d9\t: Add edu.fj and id.fj to Fiji ccTLD section (#2607)\r\n2025.314.7 c95fd3ae4c0f4ca1e454cbc6a374136f3f5c649a\t: AWS Submissions to the Public Suffix List - Q3 2025 (#2536)\n\n* Add rules for Amazon Relational Database Service\n\n* Add rules for Amazon Managed Workflows for Apache Airflow\n\n* Add rules for AWS Elastic Beanstalk\n\n* Add rules for AWS Lambda Function URLs\r\n2025.315.0 4eb9fbbdea1ba430c5040e7bd6b5ac2748b210be\t: Add tunnelmole.net reverse proxy service (#2646)\r\n2025.315.1 1ecde4048dfda7d3ed99c74b47cf9fccbaa8b985\t: Add de5.net (#2655)\r\n2025.316.0 7fbd910208bc53709cbdb678e136dc40af036190\t: Add co.site (#2633)\r\n2025.318.0 f07e1733675458af3cbd46a4ce3eca90a45680c6\t: Add Umso.co (#2661)\r\n2025.318.1 64ba165cf391818a086139239c8fa223264eebcc\t: Add emergent.cloud and emergent.host (#2662)\r\n2025.321.0 e31cf59c0b3d9de1ecb5001ef329f39b71597749\t: remove `wdh.app` and `hrsn.au` (#2665)\r\n2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48\t: Add prvw.eu (#2658)",
@@ -1540,7 +1620,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":null,
-      "version":"2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48"
+      "version":"2025.321.1 cd0dea17c489886c23f306a1114accb74edcdc48",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.328.0 bf4f2d47e2b6a58eb160df6deba3acb217f7f9a2\t: Add xtooldevice.com (#2613)\r\n2025.328.1 6be64e4d01d9e5dde6afab60154c546e3caecd14\t: add sld ᬩᬮᬶ.id (#2673)\r\n2025.328.2 565e9dc7907cba1b3ae6b6d588120ec54d789806\t: Add grebedoc.dev (#2664)\r\n2025.330.0 d572776986ac2431fe72536339cf23c52d36d9ee\t: Brave Submissions to the Public Suffix List - Q4 2025 (#2668)\r\n2025.330.1 57fe3782c08b97be51672e098c9ccc529538b408\t: Remove `obl.ong` (#2368)\r\n2025.330.2 d74821138fd58ad8caab21d3b91f1a7fa3c09e91\t: Add Microsoft Azure US government cloud service domains (#2660)\n\n* Add US government cloud service domains\r\n2025.330.3 7456e993bf8822a643b3f807234ae2a76f6f6512\t: Add Gadget Software Inc. domains: `gadget.app` and `gadget.host` (#2666)\r\n2025.331.0 d3567de748c61e2de5a3156cc52ef0e0fdc1dc0c\t: Add AgentbaseAI *.auiusercontent.com to public suffix list (#2676)\r\n2025.338.0 f6e59d0fcbf77987d8dff6ba69a7700026a6141b\t: Remove lk3.ru (#1149) (#2682)\r\n2025.338.1 a79ee032efd3a77ed6b107e0be702c4f547d8f29\t: Add new public suffix 'preview.emergentagent.com' (#2681)\r\n2025.338.2 ea600e443a922cd3f1e2f96e1db3f860d0b097ea\t: Add Redpanda Data entries for rdpa.co (#2679)\r\n2025.340.0 24874d0227995dff18964458432da2b987eb4837\t: util: gTLD data autopull updates for 2025-12-06T15:17:26 UTC (#2686)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520\t: Adding co.scot, me.scot, and org.scot (#2683)",
@@ -1559,7 +1640,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520"
+      "version":"2025.342.0 37bc9a5452649ee7627446b4090345c5211c4520",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.350.0 388317f415fdcce0a73433370d7b0ba5f8f3cb36\t: Add sav.case to the Public Suffix List (#2624)\n\nMerging, the sorting and all other aspects of this are fine.\n\n@mukul-sav if you later do a PR to change this to a role account, we're glad to fast-merge it.  Otherwise please request your colleagues to forward your email to your peers in the future should you win the lottery and not continue to work with that company. \n\nPlease say hello and happy holidays to Anthos from Jothan, if you'd be so kind",
@@ -1578,7 +1660,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2025.350.0 388317f415fdcce0a73433370d7b0ba5f8f3cb36"
+      "version":"2025.350.0 388317f415fdcce0a73433370d7b0ba5f8f3cb36",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.351.0 f2d04623b74d787252aa6aa743b7fa498da7a789\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.1 32f4178799a747d18f3a6c99f649edfa0d80e904\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.2 e15afbc8f0a789b28e6ade7b43f3d2e19bdd4860\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.3 3d01fa4aaf7e099837ea9e632fe4e7d2b79b1807\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.351.4 a82f39e9f9265dc959ee1e58ad55bbeab13bd0d5\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.0 d08780d3147529cb13f07d6eccf38d15a0aedc31\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.1 44bf7aac6858882e64ac20440367fac80486a7ce\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.2 b87eacf9e3f88357d6de5b3627b5060b3a7868e7\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.3 2cd181c0767cfc0990aac74928f366de2849a6f3\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.352.4 461e4b0fb95f439932707ef36496f5369292b7d8\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.353.0 b07656aaea78f464241f79cbf346c61bc93dde0d\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.353.1 3be833212471408940c0d59e5e59914b3f35f338\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.355.0 59cdd7656e3fd925392c2a24e2a5007d5d6ed6e0\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.355.1 a0814017572883671d2f48e789e2173bb2a1e57d\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.\r\n2025.356.0 d3070bf6ac0c27fc1f711f13b3ed21a510c8fe50\t: internal/parser: add PublicSuffix and RegisteredDomain methods to List (#2228)\n\nThese calculate the public suffix or registered/registerable domain of some\r\ninput domain, according to the strict PSL algorithm. Aside from being useful\r\nas a reference implementation of the algorithm, it comes in handy in validations\r\nthat need to do stuff like figure out what registry to query for domain info.",
@@ -1597,7 +1680,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2025.356.0 d3070bf6ac0c27fc1f711f13b3ed21a510c8fe50"
+      "version":"2025.356.0 d3070bf6ac0c27fc1f711f13b3ed21a510c8fe50",
+      "vulnerabilities":null
     },
     {
       "changes":"2025.356.1 ff39edc8197bda400b1420b40d40fb5543ad7426\t: Add new public suffix entries for nett.to (#2722)\r\n2025.356.2 0f491e1366180d889b77fb98f51f4b62d1380413\t: Add ae.kg to Public Suffix List (#2711)\r\n2025.362.0 583a1710a5215a1dd9b70001b35577bbdb901391\t: Add gv.uy to public suffix list (#2718)\r\n2025.362.1 1ef6d3bc102c85d12e92be54ec0dad8ee990dd5f\t: Add uk.cc, ec.cc, eu.cc, gu.cc, us.cc to PSL (#2645)",
@@ -1616,7 +1700,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2025.362.1 1ef6d3bc102c85d12e92be54ec0dad8ee990dd5f"
+      "version":"2025.362.1 1ef6d3bc102c85d12e92be54ec0dad8ee990dd5f",
+      "vulnerabilities":null
     },
     {
       "changes":"2026.7.0 1ae64cea692daa5b6a9aa403631f0397e3433203\t: FIXED #2619 / #2729 (#2732)\n\nRemoved and re-added Hercules entries in the public suffix list.\r\n2026.7.1 53cafd4ef52f8121b892c0f7ccece7f163509eb8\t: Update contact information indevs.in (#2730)\r\n2026.7.2 ea80631703315ae9f16a6d95f38262e2afc4edee\t: Remove perso.sn (#2693)\r\n2026.7.3 5a923762fb9bdf498ec3feda0cbf4075ff3749d8\t: Remove AVStack entries from public_suffix_list.dat (#2688)\n\nRemoved entries related to AVStack Pte. Ltd. from the public suffix list.\r\n2026.7.4 9b4c0b6bcb0fafce75b0040a274bd1a9a3713199\t: Remove TwoDNS entries (#2689)\n\nRemoved entries related to TwoDNS from the public suffix list.\r\n2026.7.5 84ec50da2dfc39528e71ac99740800db687e8c78\t: Remove skygearapp.com (#2691)\r\n2026.7.6 6aad681b718fff8d10285e8e12460ef0aa49ddd2\t: Remove Authentick UG entry (#2692)\r\n2026.7.7 c31f9acf86ab34199f11634fea42b1ff6346f4a6\t: Add deuxfleurs.eu and deuxfleurs.page (#2727)\r\n2026.8.0 2218b3633b8bb5121e127a3f23d8dac809018f77\t: added *.bwcloud-os-instance.de (#2728)\r\n2026.9.0 6b35badef402235289e85f09b29b07c651159b68\t: util: gTLD data autopull updates for 2026-01-08T15:25:34 UTC (#2738) `.TOP` RO change\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.9.1 6e5697a037da7d0a848e269cf9a9429b91817f22\t: Add eliv-api.kr (#2735)",
@@ -1635,7 +1720,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2026.9.1 6e5697a037da7d0a848e269cf9a9429b91817f22"
+      "version":"2026.9.1 6e5697a037da7d0a848e269cf9a9429b91817f22",
+      "vulnerabilities":null
     },
     {
       "changes":"2026.13.0 3fe97e93dc111b13d36af21dc538f6a24de8c52d\t: Add base44.app and base44-sandbox.com to Wix.com section (#2736)\r\n2026.16.0 944fb53321606f08740f04ef7c386f64df34ff76\t: Add kiloapps.ai, kiloapps.io to PRIVATE section (#2701)",
@@ -1654,7 +1740,8 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2026.16.0 944fb53321606f08740f04ef7c386f64df34ff76"
+      "version":"2026.16.0 944fb53321606f08740f04ef7c386f64df34ff76",
+      "vulnerabilities":null
     },
     {
       "changes":"2026.20.0 d372af084b07ad6f6d26b3d63abeee1738456c09\t: Add spawnbase.app (#2742)",
@@ -1673,12 +1760,53 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "signatures":{},
-      "version":"2026.20.0 d372af084b07ad6f6d26b3d63abeee1738456c09"
+      "version":"2026.20.0 d372af084b07ad6f6d26b3d63abeee1738456c09",
+      "vulnerabilities":null
+    },
+    {
+      "changes":"2026.23.0 f429d72bab7aadaed365fed57afe7bb38906a029\t: Add shiptoday to Public Suffix List (#2753)\r\n2026.23.1 17c84fbc603f0990073b83f5b73e7fed5680da31\t: Add discourse.diy (#2748)\r\n2026.23.2 d090f4ea5c77195d0c82c08cd5c773ea9fb21af6\t: Add `corespeed.app` (#2743)\r\n2026.23.3 2bb8b06cc2e02a81121552f8edccb045f0e3040b\t: Add miren.app and miren.systems (#2749)\r\n2026.25.0 6c40921fc61160568b101aff506d548ba3300ba6\t: AWS Submissions to the Public Suffix List - Q4 2025 (#2656)\r\n2026.29.0 f7f358a9fd6e42b21578dd850e5355e726174e0d\t: Add sol.site (#2746)\r\n2026.29.1 2c58444d6538c6f8d8b8ed7816809938a6ccba2f\t: Add crm.dev subdomains (#2734)\r\n2026.29.2 89871fd9b00edccf2cbbf6d33f3b7f6b2fc99536\t: util: gTLD data autopull updates for 2026-01-29T15:35:05 UTC (#2758)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.29.3 b3b679163072581b2c8afcc8b94c79772fa5c679\t: Add Keenetic KeenDNS domains (#2713)\r\n2026.33.0 0655e33693931345844eb05b97a851d85b9233bd\t: remove 12chars block (#2760)\r\n2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919\t: Add new public suffixes for US Government cloud Azure services (#2700)\n\n* Add new public suffixes for Azure services\n\nAdding usgovtrafficmanager.net and blob.core.usgovcloudapi.net to Public Suffix List\n\n* Add new public suffixes for Azure services",
+      "date":"2026-02-03T10:19:59.523+01:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"342593764635f7a1a886fd2725ed585a13cd517f0f1936c50baf8a6fca77983f"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919",
+      "vulnerabilities":null
+    },
+    {
+      "changes":"2026.34.1 5d7f026e0319a502616af9e3f5127f1ffb2ca599\t: Fix sorting of MSFT section (#2763)\r\n2026.34.2 861415c92b65ca607a83cbef8ba273600114fa02\t: removing no longer in use joyent subdomain (#2757)\r\n2026.37.0 d6c92f1bbb7433e5db7b8405c25d4035fb8ff376\t: add domains to Dynu.com section (#2750)\r\n2026.38.0 3abb845342efb8caed59b631f847b7194be11695\t: -`.goo` util: gTLD data autopull updates for 2026-02-07T15:24:45 UTC (#2769)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nAutomation pull from ICANN JSON (trusted authoritative source) \n\nDescription:\n#NTT Docomo withdrew .goo \n\n\n\nAPPROVED, \nMERGING\r\n2026.41.0 f2b093f80563b1e038ae80448822da6b68e3da61\t: Add sandbox.deno.net (#2770)\r\n2026.41.1 7b922f914827180229e3840e7a94f67f036b439f\t: Add hue.vn to public suffix list for .vn ccTLD (#2756)\r\n2026.43.0 99fa4a4ce3ea919a85fa0537797d44819c97e2fc\t: Add Imagine domains to the list (#2762)\r\n2026.43.1 704aa6adac3774314c4ec96179648a0c14d56c98\t: Add convex.cloud and convex.site regional domains (#2772)\r\n2026.46.0 1e7d25f31fa3b180951d9a9567e4148e105d1fdd\t: util: gTLD data autopull updates for 2026-02-15T15:24:49 UTC (#2776)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.47.0 b152b5984dcc72ebae1b43f7cdc286f3d04de4f0\t: Added kdns.fr to the private section (#2755)\r\n2026.49.0 dfc780b86d5da2f178a1d944f5d7c10c42839c5f\t: util: gTLD data autopull updates for 2026-02-18T15:51:43 UTC (#2786)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nTrusted source: ICANN Json file / automated pull from project side\n\nComment-only changes for .onl and .wein\r\n2026.53.0 eec9da6693468b13c59b5fccf8fa17e21d3da2d7\t: Add drive-platform.com and drive-platform.io (#2788)\r\n2026.53.1 35aa65b9d2ea34cdfa7ece1432603181cf2258de\t: Add begetcdn.cloud (#2752)\r\n2026.55.0 05f4a76fdee25bf064e7bfe317273afd3cc98f7f\t: Add mybox shared domains to private section (#2774)",
+      "date":"2026-02-25T15:12:56.985+01:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"9fa0f0d03b0d02d9802630a196472e539f75c5406046e2fcec82d609d5f4b25c"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.55.0 05f4a76fdee25bf064e7bfe317273afd3cc98f7f",
+      "vulnerabilities":null
     }
   ],
   "installed":{
-    "changes":"2026.23.0 f429d72bab7aadaed365fed57afe7bb38906a029\t: Add shiptoday to Public Suffix List (#2753)\r\n2026.23.1 17c84fbc603f0990073b83f5b73e7fed5680da31\t: Add discourse.diy (#2748)\r\n2026.23.2 d090f4ea5c77195d0c82c08cd5c773ea9fb21af6\t: Add `corespeed.app` (#2743)\r\n2026.23.3 2bb8b06cc2e02a81121552f8edccb045f0e3040b\t: Add miren.app and miren.systems (#2749)\r\n2026.25.0 6c40921fc61160568b101aff506d548ba3300ba6\t: AWS Submissions to the Public Suffix List - Q4 2025 (#2656)\r\n2026.29.0 f7f358a9fd6e42b21578dd850e5355e726174e0d\t: Add sol.site (#2746)\r\n2026.29.1 2c58444d6538c6f8d8b8ed7816809938a6ccba2f\t: Add crm.dev subdomains (#2734)\r\n2026.29.2 89871fd9b00edccf2cbbf6d33f3b7f6b2fc99536\t: util: gTLD data autopull updates for 2026-01-29T15:35:05 UTC (#2758)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.29.3 b3b679163072581b2c8afcc8b94c79772fa5c679\t: Add Keenetic KeenDNS domains (#2713)\r\n2026.33.0 0655e33693931345844eb05b97a851d85b9233bd\t: remove 12chars block (#2760)\r\n2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919\t: Add new public suffixes for US Government cloud Azure services (#2700)\n\n* Add new public suffixes for Azure services\n\nAdding usgovtrafficmanager.net and blob.core.usgovcloudapi.net to Public Suffix List\n\n* Add new public suffixes for Azure services",
-    "date":"2026-02-03T10:19:59.523+01:00",
+    "changes":"2026.58.0 ccc3b53a1f52c921fb89f0119389b21829f9a2d1\t: Cambodia (.kh): allow direct second-level registrations (#2740)\r\n2026.61.0 614eb0bd420104a2ebc052c86e6897d58f6eb207\t: Add my.be to PRIVATE (#2792)\r\n2026.61.1 7ef6384612e1b48bb8b6023716cc9a493ac25d8a\t: Add ms.show and ms.fun (#2791)\r\n2026.65.0 a7621207f34b3a739a5cfb2c47a518b0b9054fe6\t: removing mazeplay.com (#2797)\r\n2026.68.0 dc20dd4e6f520cd2a44fadfa9213bbef892d38fe\t: update *.triton.zone comment block, fix sorting for TritonDataCenter org (#2765)\r\n2026.68.1 3c5eb8e70837e15570608f2cb5abe8579e09c9b9\t: Add on.expo.app, staging.on.expo.app (#2790)\r\n2026.76.0 951f84aa074074cbebd8e277d5c59f082564363e\t: Add exe.xyz (#2810)\n\nExe (https://exe.dev) provides persistent Linux VMs, each with a\nunique subdomain under exe.xyz. PSL inclusion provides cookie isolation\nbetween mutually-untrusting tenants.\r\n2026.85.0 d333b72b39575da1ce6932b01d7c421a4107c620\t: Revise user count section in PR template\n\nUpdated the user count field in the pull request template to specify 'THOUSANDS of distinct users' and added clarification regarding the user count criteria for PSL inclusion.\r\n2026.92.0 97af0880507999ae47f63e31be57e0430e7c9f90\t: Add pplx.app (#2821)\r\n2026.92.1 ba7dbf3ec5e7d7024a32ea7fa724a3a2b2c7d56f\t: add payload dev (#2824)\r\n2026.97.0 847f2ef37f84b5dc8d5c6ef186bd30d7e2625aac\t: Add seprox.hooc.me (#2775)\r\n2026.97.1 cab160c19a74c8845da868c584f82670102139f3\t: Added sryze.cc to the list (#2777)\r\n2026.97.2 6eaf1b08ebd26b3579144a43cf1077d9957e15f4\t: Add opentunnel.xyz to Public Suffix List (#2835)\r\n2026.98.0 4866d1bf4239755aa32cd15c9cd272ed9f6b9a0a\t: Fix typo in pull request template (#2839)\r\n2026.98.1 990747f4550efcc31520cb020c4e6b316ff00546\t: Remove PageXL entry from public_suffix_list.dat (#2842)\r\n2026.100.0 1b09f2fbfbb6b3149ad91a72c8e1610bfdd467b6\t: Add vivenu shop domains to private section (#2796)\n\nThis includes two domains:\n- vivenushop.com\n- vivenushop.dev\r\n2026.100.1 f022acada579b538e3764e9a74dfe66a2c5d2fb2\t: Add Northwest Nexus domains under private section (#2724)\r\n2026.100.2 6df733d6d12e0ba229047cf9b6de8419cc93b2c0\t: Add deployagent.com (#2830)\r\n2026.100.3 723b80d295926656be92b2304e401adfeda15e72\t: Add K2 Cloud domains to the PRIVATE section (#2838)\r\n2026.100.4 393652f0bc5763a7664146b4e6f7f92a62577f1e\t: util: gTLD data autopull updates for 2026-04-10T15:53:10 UTC (#2845)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nAutopull - sourced from ICANN JSON \nComment-only changes\nsorting according to guidelines\ntests pass\r\n2026.100.5 8f9e04f2be9098ada07aa3cf13592dfe78870985\t: fix: outdated pr reference and small typo (#2844)\n\nLGTM\r\n2026.106.0 d254724e91abd027ba21af72678a69edea76b136\t: util: gTLD data autopull updates for 2026-04-15T16:04:01 UTC (#2855)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.110.0 b6549de7a1a928033e356defd983c7cfc7f892c8\t: Add claude.app to PRIVATE section (Anthropic) (#2815)\r\n2026.110.1 d793ebbb60a2f3ac36750aa28f57b4d675170cdc\t: Remove GOV.UK Platform as a Service entries (#2851)\r\n2026.113.0 be59e079d1cf538d026ec8fd61c21a66ba3be9ba\t: Add *.metaaiusercontent.com to Meta Platforms section (#2856)\r\n2026.113.1 851a507cfd0e7910470f224d1f9487cf3341c0fc\t: Add fspages.org (#2866)\r\n2026.114.0 998fab463d1118ea8ec99a471e80195f83914383\t: Add atlassian-3p.com variants for untrusted content isolation (#2852)\r\n2026.114.1 2cb079be30c1decd89df39914aa4062895d71272\t: Add deployagent.space and piebox.site (#2857)\r\n2026.118.0 b499b9e8ffe613ae58eb02ac39b42582d4c5d2e8\t: Add Shanghai Oray domains to Private Domains (#2869)\r\n2026.120.0 66c9bda3aa96409830cb6fc4396b39eadb889274\t: Fix grammar errors and typos (#2886)\r\n2026.121.0 8b4345f9a2513011b21e6fc7b8a7197a849be52c\t: util: gTLD data autopull updates for 2026-04-30T16:18:08 UTC (#2888)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.126.0 d1e2f63ec30e86a4875577067821ad91b208018b\t: Remove on.crisp.email (Crisp IM SAS) (#2896)\n\n* Add on.crisp.email (Crisp IM SAS)\n\n* Update public_suffix_list.dat\n\n* Remove on.crisp.email\n\n---------\n\nCo-authored-by: Baptiste Jamin <baptiste@crisp.chat>\nCo-authored-by: Baptiste Jamin <baptistejamin@gmail.com>\r\n2026.126.1 7638be4d5b693447ecde605b304ea50e92dad994\t: Update README with important notice to use unaltered template for pr\n\nAdded important notice regarding pull request templates and Cloudflare subdomain setup.\r\n2026.127.0 ee780bcf233174cb23ba8575d54c4154d47508e1\t: Add *-zerops.zone (#2860)\r\n2026.133.0 d5c96c29b013fae631a7f5047bfc3bc0b15d8714\t: Add Hostinger to public_suffix_list.dat (#2907)\r\n2026.133.1 a2cbf55e9931b584594fb0fedf155a265269f1fe\t: Remove nd.us subdomains (#2885)\r\n2026.133.2 e452c7058d6946bd76952b128c12f5ce87a5acb8\t: add t3.storage.dev, t3.storageapi.dev for tigrisdata.com (#2818)\r\n2026.147.0 51ee7637c197c469c2558225e01355cf42523428\t: Add book.online (#2890)\r\n2026.147.1 d61ebea91366dabf4c14e3a17e197d3c9558947e\t: add ai.id (#2922)\r\n2026.148.0 e596036bde712ffb073b948eb8b884c72c94c6e1\t: add khsj.cn and canva.link (#2898)\r\n2026.160.0 303b81a2140a3192d336f22af389a28daf6efab6\t: Add OpenAI private suffixes (#2930)\n\n* Add OpenAI private suffixes\n\n* Update public_suffix_list.dat\n\nadd whitespace to retrigger ci\n\n* Remove whitespace to retrigger CI\n\n* Update public_suffix_list.dat\n\nRemove chatgpt-team.site\r\n2026.161.0 8239d0891aa88bee07083d581e59cb3be27a82a0\t: Add vibehost.space for cross-tenant cookie isolation (#2932)\r\n2026.164.0 9186eeeda85cef35b1551d00731464939c765cab\t: util: gTLD data autopull updates for 2026-06-13T16:12:40 UTC (#2958)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.173.0 27a7b5d881b91def306422e6cc243f05c49f3a58\t: Add mkm.fan to private domains (#2937)\r\n2026.174.0 62ff605c4424de74e2df62219ae761b27e6f6318\t: Add puter.site puter.app puter.work (#2914)\r\n2026.175.0 18ecca5d54471f21918798da451dd8d03a18f3c7\t:  Add multiple dnsHome.de domains (#2916)\r\n2026.182.0 d67b6cb8e70e9c76b0803809b66e7ffdd09484bd\t: remove mayfirst.org (#2994)\n\nMay First has completed the transition to using mayfirst.info for\nmember domains and no longer needs mayfirst.org listed.\r\n2026.187.0 134337095def1645a28737802cd2d0afb93b62b7\t: Remove info.at, biz.at (#2995)\r\n2026.187.1 5ae2220ad86eab1364821329ff58d28828bddb19\t: Add grok.me (xAI) to PRIVATE section (#2993)",
+    "date":"2026-07-07T10:17:48.742+02:00",
     "dependencies":null,
     "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
     "files":[
@@ -1783,7 +1911,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"342593764635f7a1a886fd2725ed585a13cd517f0f1936c50baf8a6fca77983f"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"64f1110d49ede2ee61a3bbe40449ef4f585c29b905baa3e4573a3f845a72f242"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1794,9 +1922,11 @@
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
     "signatures":{},
-    "version":"2026.34.0 1b31ebb3ddae54e4d239ab7a872c511627e3d919"
+    "version":"2026.187.1 5ae2220ad86eab1364821329ff58d28828bddb19",
+    "vulnerabilities":null
   },
   "minJRE":null,
+  "minReleasedAgeDays":null,
   "provider":"github-clone",
   "renames":{"public_suffix_list.dat":"../src/org/appwork/utils/net/effective_tld_names.dat"},
   "requiredBy":[],

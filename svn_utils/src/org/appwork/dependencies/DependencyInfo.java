@@ -47,6 +47,8 @@ public class DependencyInfo {
     private String                    provider = "maven";
     @StorableDoc("Desired Version - this may be a concrete version 1.0.0 or a placeholder from the meta.json files (like 'latest' or 'mvnLatest' or 'jre1.6Latest')")
     private String                    version  = null;
+    @StorableDoc("Do not sync or select releases newer than this many days (security: avoid very recent artifacts). Default 60 (~2 months) when omitted. Use 0 to disable.")
+    private Integer                   minReleasedAgeDays;
     private HashMap<String, String>   renames;
     private ArrayList<String>         filter;
     @StorableDoc("Allowed dependencies")
@@ -94,6 +96,25 @@ public class DependencyInfo {
 
     public String getVersion() {
         return this.version;
+    }
+
+    public Integer getMinReleasedAgeDays() {
+        return this.minReleasedAgeDays;
+    }
+
+    public void setMinReleasedAgeDays(final Integer minReleasedAgeDays) {
+        this.minReleasedAgeDays = minReleasedAgeDays;
+    }
+
+    /**
+     * @return minimum release age in days; {@code null} property means 60; {@code 0} or negative disables the check
+     */
+    public int getMinReleasedAgeDaysEffective() {
+        if (this.minReleasedAgeDays == null) {
+            return 60;
+        }
+        final int v = this.minReleasedAgeDays.intValue();
+        return v <= 0 ? 0 : v;
     }
 
     public boolean isConfirm() {

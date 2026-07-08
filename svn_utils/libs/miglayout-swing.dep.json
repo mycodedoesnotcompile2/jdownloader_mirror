@@ -19,9 +19,11 @@
     "minJRE":"JVM_1_5",
     "name":"MiGLayout Swing",
     "signatures":{"miglayout.jar":"-----BEGIN PGP SIGNATURE-----\r\n\r\niJUEABMJAB0WIQS6wcvrODSrHRYT3Q8MjH3EEkRaDwUCaTql/AAKCRAMjH3EEkRa\r\nD2NyAX90Xa/k6rhQK82Aj6VZKFh/sBOF0sxWBiK+mriesulSj3rCn7FXRlLAlO6j\r\nOQt67OgBgL92VFS2GJlM4r+VPWFHVfOX42nfNyn+scX+BX8D9heWTcMOV343lNSb\r\nELWDAhlpCg==\r\n=TXvw\r\n-----END PGP SIGNATURE-----\r\n"},
-    "version":"4.0"
+    "version":"4.0",
+    "vulnerabilities":[]
   },
   "minJRE":"1.6",
+  "minReleasedAgeDays":null,
   "provider":"maven",
   "renames":null,
   "requiredBy":[],

@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -22,35 +23,27 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.http.Cookies;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
-import jd.parser.html.HTMLSearch;
 import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -61,8 +54,6 @@ public class JpgChurchCrawler extends PluginForDecrypt {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        /* Prefer English */
-        br.setCookie(getHost(), "USER_SELECTED_LANG", "en");
         return br;
     }
 
@@ -79,283 +70,111 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         return buildSupportedNames(getPluginDomains());
     }
 
-    public static String[] getAnnotationUrls() {
-        return buildAnnotationUrls(getPluginDomains());
-    }
+    /**
+     * Matches both the new/short album urls (id only) and the old/long ones (slug + id, separated by a dot). <br>
+     * New: https://goonbox.cr/a/4WrAA <br>
+     * Old/long: https://goonbox.cr/a/annfigma-reddit.4WrAA
+     */
+    private static final Pattern PATTERN_ALBUM = Pattern.compile("/(?:album|a)/([\\w\\-\\.]+)", Pattern.CASE_INSENSITIVE);
 
-    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+    public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : pluginDomains) {
-            /* 2025-07-28: Negative-lookahead regex which excludes image-directlinks */
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images?|video|search|explore)/).+");
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_ALBUM.pattern());
         }
         return ret.toArray(new String[0]);
     }
 
+    private String getAlbumIDCleaned(final CryptedLink param) throws PluginException {
+        final String addedurl = param.getCryptedUrl();
+        String path;
+        try {
+            path = new URL(addedurl).getPath();
+        } catch (final Exception e) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid url", e);
+        }
+        String id = new Regex(path, PATTERN_ALBUM).getMatch(0);
+        if (id == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find album id");
+        }
+        final int dotIndex = id.lastIndexOf(".");
+        if (dotIndex >= 0 && dotIndex < id.length() - 1) {
+            /* Old/long format e.g. "annfigma-reddit.4WrAA" -> API can only work with the plain id "4WrAA". */
+            id = id.substring(dotIndex + 1);
+        }
+        return id;
+    }
+
+    @SuppressWarnings("unchecked")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        /* Modify URL so we will always start crawling from first page */
-        final String addedurl = param.getCryptedUrl();
-        final UrlQuery firstQuery = UrlQuery.parse(addedurl);
-        final String pageParamInAddedURL = firstQuery.get("page");
-        if (pageParamInAddedURL != null) {
-            logger.info("Changed page param inside URL from " + pageParamInAddedURL + " to 1");
-            firstQuery.addAndReplace("page", "1");
-        }
-        firstQuery.remove("peek");
-        firstQuery.remove("seek");
-        String contentURLCleaned = addedurl;
-        /* Unsupported tab "Embed-Codes" */
-        contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
-        if (firstQuery.toString().length() > 0) {
-            contentURLCleaned += "?" + firstQuery.toString();
-        }
-        contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
-        final boolean isProfileAlbumsOverview = contentURLCleaned.matches("(?i).+/albums/?$");
-        final Pattern pattern_album = Pattern.compile("/(album|a)/[\\w.]+", Pattern.CASE_INSENSITIVE);
-        /* Always use main domain */
-        final String domainInURL = Browser.getHost(contentURLCleaned, true);
-        contentURLCleaned = contentURLCleaned.replace(domainInURL, this.getHost());
-        br.getPage(contentURLCleaned);
-        if (br.getHttpConnection().getResponseCode() == 400) {
-            /* invalid URLs such as: https://putmega.com/%MEDIUM_URL% */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
-        } else if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getURL().matches("(?i)^https?://[^/]+/?$")) {
-            /* Redirect to main page -> Content offline */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("data-params-hidden=\"list=images\">\\s*<div class=\"content-empty\">")) {
-            /* <h2>There's nothing to show here.</h2> */
-            /* Example: https://putmega.com/search/images/?q={q} */
+        final String albumID = getAlbumIDCleaned(param);
+        br.getPage("https://" + this.getHost() + "/api/albums/" + albumID);
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String passCode = null;
-        Form pwform = getPasswordForm(br);
-        if (pwform != null) {
-            logger.info("This album is password protected");
-            int counter = 0;
-            boolean success = false;
-            do {
-                passCode = getUserInput("Password?", param);
-                pwform.put("content-password", Encoding.urlEncode(passCode));
-                br.submitForm(pwform);
-                // if (!this.canHandle(br.getURL())) {
-                // br.getPage(contentURLCleaned);
-                // }
-                pwform = getPasswordForm(br);
-                if (pwform == null) {
-                    logger.info("User entered valid password: " + passCode);
-                    success = true;
-                    break;
-                } else {
-                    logger.info("User entered invalid password: " + passCode);
-                    counter++;
-                }
-            } while (counter <= 2);
-            if (!success) {
-                throw new DecrypterException(DecrypterException.PASSWORD);
-            }
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> album = (Map<String, Object>) entries.get("album");
+        final String albumDescription = (String) album.get("description");
+        final String albumTitle = (String) album.get("title");
+        final FilePackage fp = FilePackage.getInstance();
+        if (!StringUtils.isEmpty(albumTitle)) {
+            fp.setName(albumTitle.trim());
+        } else {
+            fp.setName(albumID);
         }
-        String seek = br.getRegex("data-action=\"load-more\" data-seek=\"([^\"]+)\"").getMatch(0);
-        if (seek == null) {
-            /* 2024-02-02 */
-            seek = br.getRegex("seek=([^\\&\"]+)").getMatch(0);
+        if (!StringUtils.isEmpty(albumDescription)) {
+            fp.setComment(albumDescription);
         }
-        if (seek != null) {
-            seek = Encoding.htmlDecode(seek);
-        }
-        final String token = br.getRegex("PF\\.obj\\.config\\.auth_token\\s*=\\s*\"([a-f0-9]+)\"").getMatch(0);
-        final String apiurl = br.getRegex("PF\\.obj\\.config\\.json_api\\s*=\\s*\"((https?://|/)[^\"]+)\"").getMatch(0);
-        final String dataparamshidden = br.getRegex("data-params-hidden=\"([^\"]+)").getMatch(0);
-        final String numberofImagesStr = br.getRegex("data-text=\"image-count\">\\s*(\\d+)").getMatch(0);
-        int numberofImages = -1;
-        if (numberofImagesStr != null) {
-            numberofImages = Integer.parseInt(numberofImagesStr);
-        }
-        final UrlQuery query = dataparamshidden != null ? UrlQuery.parse(dataparamshidden) : new UrlQuery();
-        query.appendEncoded("action", "list");
-        query.appendEncoded("list", "images"); // contained in dataparamshidden
-        query.appendEncoded("sort", "date_desc");
-        // query.add("page", "1"); // added later in do-while-loop
-        // query.add("userid", ""); // contained in dataparamshidden
-        // query.add("albumid", ""); // contained in dataparamshidden
-        // query.add("from", "user"); // contained in dataparamshidden
-        final String list = query.get("list");
-        final String from = query.get("from");
-        final String albumid = query.get("albumid");
-        final String userid = query.get("userid");
-        if (list != null) {
-            query.appendEncoded("params_hidden%5Blist%5D", list);
-        }
-        if (userid != null) {
-            query.appendEncoded("params_hidden%5Buserid%5D", userid);
-        }
-        if (from != null) {
-            query.appendEncoded("params_hidden%5Bfrom%5D", from);
-        }
-        if (albumid != null) {
-            query.appendEncoded("params_hidden%5Balbumid%5D", albumid);
-        }
-        query.appendEncoded("params_hidden%5Bparams_hidden%5D", "");
-        if (token != null) {
-            query.appendEncoded("auth_token", token);
-        }
-        String siteTitle = HTMLSearch.searchMetaTag(br, "og:title", "twitter:title");
-        FilePackage fp = null;
-        if (siteTitle != null) {
-            siteTitle = Encoding.htmlDecode(siteTitle).trim();
-            fp = FilePackage.getInstance();
-            fp.setName(siteTitle);
-        }
-        final Set<String> seekEnds = new HashSet<String>();
-        if (seek != null) {
-            seekEnds.add(seek);
-        }
+        fp.setPackageKey("jpgchurch://album/" + albumID);
+        final int imagesCount = ((Number) album.get("images_count")).intValue();
         final Set<String> dupes = new HashSet<String>();
         int page = 1;
-        int imagePosition = 1;
+        int lastPage = 1;
         pagination: do {
-            final String[] htmls = br.getRegex("<div class=\"list-item [^\"]+\"(.*?)class=\"btn-lock fas fa-eye-slash\"[^>]*></div>").getColumn(0);
-            if (page == 1 && (htmls == null || htmls.length == 0) && seek == null && dataparamshidden == null && numberofImagesStr == null) {
-                /* Link is valid but does not lead to any crawlable content e.g. https://putmega.com/?lang=fi */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Link does not lead to any crawlable content");
-            }
-            int numberofNewItems = 0;
-            int numberofNewAlbums = 0;
-            for (final String html : htmls) {
-                if (isProfileAlbumsOverview) {
-                    String url = new Regex(html, pattern_album).getMatch(-1);
-                    if (url == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    /* Convert path to url */
-                    url = br.getURL(url).toExternalForm();
-                    if (!dupes.add(url)) {
-                        logger.info("Skipping dupe: " + url);
-                        continue;
-                    }
-                    numberofNewAlbums++;
-                    final DownloadLink link = this.createDownloadlink(url);
-                    distribute(link);
-                    ret.add(link);
-                } else {
-                    Map<String, Object> dataObjectMap = null;
-                    String dataObject = new Regex(html, "data-object\\s*=\\s*'(.*?)'").getMatch(0);
-                    if (dataObject != null) {
-                        dataObject = URLEncode.decodeURIComponent(dataObject);
-                        dataObjectMap = restoreFromString(dataObject, TypeRef.MAP);
-                    }
-                    String url = new Regex(html, "<a href=\"((https?://|/)[^\"]+)\" class=\"image-container --media\">").getMatch(0);
-                    final String urlThumbnail = new Regex(html, "<img src=\"(https:?//[^\"]+)\"\\s*alt=\"").getMatch(0);
-                    String title = new Regex(html, "data-title=\"([^\"]+)\"").getMatch(0);
-                    if (url == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    } else if (StringUtils.isEmpty(title)) {
-                        title = (String) JavaScriptEngineFactory.walkJson(dataObjectMap, "image/filename");
-                    }
-                    if (StringUtils.isEmpty(title)) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    if (!dupes.add(url)) {
-                        logger.info("Skipping dupe: " + url);
-                        continue;
-                    }
-                    title = Encoding.htmlDecode(title).trim();
-                    final String extFallback;
-                    if (StringUtils.containsIgnoreCase(url, "/video/") || StringUtils.containsIgnoreCase((String) JavaScriptEngineFactory.walkJson(dataObjectMap, "image/mime"), "video")) {
-                        extFallback = ".mp4";
-                    } else {
-                        extFallback = ".jpg";
-                    }
-
-                    url = br.getURL(url).toExternalForm();
-                    imagePosition++;
-                    numberofNewItems++;
-                    final DownloadLink link = this.createDownloadlink(url);
-                    String ext = null;
-                    if (urlThumbnail != null) {
-                        ext = Plugin.getFileNameExtensionFromURL(urlThumbnail);
-                    }
-                    if (ext != null) {
-                        link.setFinalFileName(this.applyFilenameExtension(title, ext));
-                    } else {
-                        /* Fallback */
-                        link.setName(this.applyFilenameExtension(title, extFallback));
-                    }
-                    String filesizeBytesStr = new Regex(html, "data-size=\"(\\d+)\"").getMatch(0);
-                    if (filesizeBytesStr == null) {
-                        filesizeBytesStr = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(dataObjectMap, "image/size"));
-                    }
-                    if (filesizeBytesStr != null) {
-                        link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-                    }
-                    link.setAvailable(true);
-                    if (fp != null) {
-                        link._setFilePackage(fp);
-                    }
-                    if (passCode != null) {
-                        link.setDownloadPassword(passCode, true);
-                        link.setProperty(JpgChurch.PROPERTY_PHPSESSID, br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN));
-                    }
-                    link.setProperty(JpgChurch.PROPERTY_POSITION, imagePosition);
-                    ret.add(link);
-                    distribute(link);
+            final List<Object> images = (List<Object>) entries.get("images");
+            int newItemsThisPage = 0;
+            for (final Object imageO : images) {
+                final Map<String, Object> image = (Map<String, Object>) imageO;
+                final String encodedID = (String) image.get("encoded_id");
+                final String url = "https://" + this.getHost() + "/img/" + encodedID;
+                if (!dupes.add(url)) {
+                    logger.info("Skipping dupe: " + url);
+                    continue;
                 }
+                newItemsThisPage++;
+                final DownloadLink link = this.createDownloadlink(url);
+                final String originalFilename = (String) image.get("original_filename");
+                link.setFinalFileName(originalFilename);
+                final Number sizeBytes = (Number) image.get("size_bytes");
+                link.setVerifiedFileSize(sizeBytes.longValue());
+                link.setAvailable(true);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
             }
-            logger.info("Crawled page " + page + " | Number of new items on current page: " + numberofNewItems + " | Found items so far: " + ret.size() + "/" + numberofImagesStr);
+            final Map<String, Object> paginationMap = (Map<String, Object>) entries.get("pagination");
+            lastPage = ((Number) paginationMap.get("last_page")).intValue();
+            logger.info("Crawled page " + page + "/" + lastPage + " | Found items so far: " + ret.size() + "/" + imagesCount);
             if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break;
-            } else if (ret.size() == numberofImages) {
+                throw new InterruptedException();
+            } else if (ret.size() == imagesCount) {
                 logger.info("Stopping because: Found all items");
                 break pagination;
-            } else if (numberofNewItems == 0 && numberofNewAlbums == 0) {
-                logger.info("Stopping because: Current page contains no new items");
+            } else if (page == lastPage) {
+                logger.info("Stopping because: Reached end");
                 break pagination;
-            } else if (apiurl == null || token == null || seek == null) {
-                /* This should never happen */
-                logger.info("Stopping because: At least one mandatory pagination param is missing | apiurl=" + apiurl + " | token=" + token + " | seek=" + seek);
+            } else if (newItemsThisPage == 0) {
+                logger.info("Stopping because: Found no new items on current page");
                 break pagination;
             }
-            /* Try to continue to next page */
+            /* Fetch next page (first page was already delivered as part of the initial album request) */
             page++;
-            br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
-            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            if (isProfileAlbumsOverview) {
-                // album overview has different pagination, use same as in browser
-                br.getPage("?page=" + Integer.toString(page) + "&seek=" + URLEncode.encodeURIComponent(seek));
-                seek = br.getRegex("page=" + Integer.toString(page + 1) + "&seek=([^\\&\"]+)").getMatch(0);
-                if (seek != null) {
-                    seek = Encoding.htmlDecode(seek);
-                }
-                if (seek != null && !seekEnds.add(seek)) {
-                    seek = null;
-                }
-            } else {
-                query.addAndReplace("page", Integer.toString(page));
-                query.addAndReplace("seek", URLEncode.encodeURIComponent(seek));
-                br.postPage(apiurl, query);
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String html = (String) entries.get("html");
-                if (html != null) {
-                    br.getRequest().setHtmlCode(html);
-                }
-                seek = (String) entries.get("seekEnd");
-                if (seek != null && !seekEnds.add(seek)) {
-                    seek = null;
-                }
-            }
-        } while (true);
+            br.getPage("https://" + this.getHost() + "/api/albums/" + albumID + "/images?page=" + page);
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } while (page <= lastPage);
         if (ret.isEmpty()) {
-            if (StringUtils.equals(numberofImagesStr, "0")) {
-                logger.info("This url contains zero images");
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
-            } else if (br.containsHTML("class=\"content-empty\"") || br.containsHTML(">\\s*There's nothing to show here")) {
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         return ret;
     }

@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "comprarpremium.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = { "comprarpremium.com" }, urls = { "" })
 public class BaixarPremiumNetComprarpremiumCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static AtomicInteger                           maxPrem            = new AtomicInteger(20);
@@ -84,7 +84,7 @@ public class BaixarPremiumNetComprarpremiumCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
-    /** no override to keep plugin compatible to old stable */
+    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         setConstants(account, link);
         synchronized (hostUnavailableMap) {

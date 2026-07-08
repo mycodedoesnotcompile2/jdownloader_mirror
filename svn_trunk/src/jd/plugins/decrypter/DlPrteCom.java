@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
  * @version raz_Template
  * @author raztoki, psp
  */
-@DecrypterPlugin(revision = "$Revision: 51681 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = {}, urls = {})
 public class DlPrteCom extends antiDDoSForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -257,10 +257,14 @@ public class DlPrteCom extends antiDDoSForDecrypt {
             continueForm.put("password", Encoding.urlEncode(passCode));
         }
         this.submitForm(continueForm);
-        String link = br.getRegex("<div class=\"lienet\"><a href=\"(.*?)\">").getMatch(0);
+        String link = br.getRegex("class=\"btn-proceed\"[^>]*href=\"(https?://[^\"]+)").getMatch(0); // 2026-07-07
         if (link == null) {
             /* 2020-10-29 */
             link = br.getRegex("<a href=\"(https?://[^\"]+)\" rel=\"external nofollow\">").getMatch(0);
+            if (link == null) {
+                /* 2022-08-30 */
+                link = br.getRegex("<div class=\"lienet\"><a href=\"(.*?)\">").getMatch(0);
+            }
         }
         if (link == null) {
             if (passCode != null) {

@@ -2518,7 +2518,7 @@ public class YoutubeHelper {
                 logger.warning("Abort Error:" + unavailableReason);
                 vid.error = error;
                 return;
-            } else if (unavailableReason.equals("This video is unavailable.") || unavailableReason.equals(/* 15.12.2014 */"This video is not available.") || unavailableReason.equals("Video unavailable")) {
+            } else if (unavailableReason.equals("This video is unavailable.") || unavailableReason.matches(/* 15.12.2014 */"This video is not available\\.?") || unavailableReason.equals("Video unavailable")) {
                 // currently covering
                 // Sorry about that. .:. 7BN5H7AVHUIE8 invalid uid.
                 logger.warning("Abort Error:" + unavailableReason);
@@ -2885,6 +2885,9 @@ public class YoutubeHelper {
         if ("LOGIN_REQUIRED".equals(unavailableStatus)) {
             result = (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/errorScreen/playerErrorMessageRenderer/reason/simpleText");
             fallback = "Sign in to confirm you’re not a bot";
+        } else if ("UNPLAYABLE".equals(unavailableStatus)) {
+            result = (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/reason");
+            fallback = "This video is not available";
         }
         if (result == null) {
             // this covers "ERROR" and "UNPLAYABLE", probably covers others too. so make it future proof.

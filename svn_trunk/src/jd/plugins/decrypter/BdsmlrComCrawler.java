@@ -17,15 +17,20 @@ package jd.plugins.decrypter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -39,6 +44,8 @@ import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -49,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BdsmlrCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51913 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52961 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BdsmlrCom.class })
 public class BdsmlrComCrawler extends PluginForDecrypt {
     public BdsmlrComCrawler(PluginWrapper wrapper) {
@@ -85,16 +92,18 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://[\\w-]+\\." + buildHostsPatternPart(domains) + "(/.+)?");
+            ret.add("https?://([\\w-]+\\.)?" + buildHostsPatternPart(domains) + "(/.+)?");
         }
         return ret.toArray(new String[0]);
     }
 
-    private static final Pattern PATTERN_USER_PROFILE = Pattern.compile("https?://([\\w-]+)\\.[^/]+(/.+)?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_POST         = Pattern.compile("/post/(\\d+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USER_PROFILE     = Pattern.compile("https?://([\\w-]+)\\.[^/]+(/.+)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USER_PROFILE_NEW = Pattern.compile("/blog/(.+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_POST             = Pattern.compile("/post/(\\d+)", Pattern.CASE_INSENSITIVE);
     /* Direct-URLs typically contain CDN host "cdnXXX." or "ocdnXXX." where "XXX" is numbers. */
-    private static final Pattern PATTERN_DIRECT       = Pattern.compile("https?://[^/]+/uploads/.+", Pattern.CASE_INSENSITIVE);
-    private static final String  PROPERTY_POST_ID     = "post_id";
+    private static final Pattern PATTERN_DIRECT           = Pattern.compile("https?://[^/]+/uploads/.+", Pattern.CASE_INSENSITIVE);
+    private static final String  PROPERTY_POST_ID         = "post_id";
+    private static final String  API_BASE                 = "https://api-prod.bdsmlr.com/v2/api";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final String contenturl = param.getCryptedUrl();
@@ -117,69 +126,210 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
             final BdsmlrCom hostPlugin = (BdsmlrCom) this.getNewPluginForHostInstance(this.getHost());
             hostPlugin.login(account, false);
         }
-        if (new Regex(contenturl, PATTERN_POST).patternFind()) {
-            return crawlPost(param);
+        final String postID = new Regex(contenturl, PATTERN_POST).getMatch(0);
+        if (postID != null) {
+            return crawlPost(param, postID);
         } else {
-            return crawlUser(param, account);
+            String username = new Regex(URLHelper.getUrlWithoutParams(contenturl), PATTERN_USER_PROFILE_NEW).getMatch(0);
+            if (username == null) {
+                username = new Regex(contenturl, PATTERN_USER_PROFILE).getMatch(0);
+            }
+            if (username == null) {
+                /* Developer mistake or user somehow added an unsupported link. */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            return crawlUser(param, account, username);
         }
     }
 
-    private ArrayList<DownloadLink> crawlPost(final CryptedLink param) throws IOException, PluginException {
-        final String contenturl = param.getCryptedUrl();
-        final Regex urlinfo = new Regex(contenturl, PATTERN_POST);
-        final String username = urlinfo.getMatch(0);
-        final String postID = urlinfo.getMatch(1);
-        if (username == null) {
-            /* Developer mistake! */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        br.getPage(contenturl);
+    private ArrayList<DownloadLink> crawlPost(final CryptedLink param, final String postID) throws Exception {
+        final Map<String, Object> postdata = new HashMap<String, Object>();
+        postdata.put("post_id", Long.parseLong(postID));
+        br.getPage(br.createJSonPostRequest(API_BASE + "/get-post-detail", postdata));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getHttpConnection().getResponseCode() == 500) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> post = (Map<String, Object>) response.get("post");
+        final String username = post.get("blogName").toString().toLowerCase(Locale.ROOT);
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username + "_" + postID);
-        return crawlPosts(fp);
+        return crawlPostItems(param, post, fp);
     }
 
-    private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account) throws IOException, PluginException, InterruptedException {
-        String contenturl = param.getCryptedUrl();
-        final String username = new Regex(contenturl, PATTERN_USER_PROFILE).getMatch(0);
-        if (username == null) {
-            /* Developer mistake! */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    /** Builds all downloadable items of a single post (as returned by "get-post-detail" or "list-blog-activity"). */
+    private ArrayList<DownloadLink> crawlPostItems(final CryptedLink param, final Map<String, Object> post, final FilePackage fp) throws PluginException {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String postID = post.get("id").toString();
+        final String username = post.get("blogName").toString().toLowerCase(Locale.ROOT);
+        final String referrerUrl = "https://" + username + "." + this.getHost() + "/";
+        final Map<String, Object> mediaRepresentation = (Map<String, Object>) post.get("mediaRepresentation");
+        final List<Object> items = (List<Object>) mediaRepresentation.get("items");
+        final HashSet<String> dupes = new HashSet<String>();
+        for (final Object itemO : items) {
+            final Map<String, Object> item = (Map<String, Object>) itemO;
+            final Map<String, Object> original = (Map<String, Object>) item.get("original");
+            final String directurl = original.get("url").toString();
+            if (!dupes.add(directurl)) {
+                /* Skip duplicates */
+                logger.info("Skipping dupe: " + directurl);
+                continue;
+            }
+            final Regex dateInfo = new Regex(directurl, "/uploads/(?:photos|videos)/(\\d{4})/(\\d{2})/");
+            final String year = dateInfo.getMatch(0);
+            final String month = dateInfo.getMatch(1);
+            final DownloadLink link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                /* Make direct-urls easier accessible for plugin developers. */
+                link.setContentUrl(directurl);
+            } else {
+                link.setContentUrl(param.getCryptedUrl());
+            }
+            if (dupes.size() > 1) {
+                link.setFinalFileName(username + "_" + year + "_" + month + "_" + postID + "_" + dupes.size() + Plugin.getFileNameExtensionFromURL(directurl));
+            } else {
+                link.setFinalFileName(username + "_" + year + "_" + month + "_" + postID + Plugin.getFileNameExtensionFromURL(directurl));
+            }
+            link.setAvailable(true);
+            link.setProperty(PROPERTY_POST_ID, postID);
+            /* Important! Some URLs cannot be accessed without the expected referrer value and server will return error 403! */
+            link.setReferrerUrl(referrerUrl);
+            link._setFilePackage(fp);
+            ret.add(link);
+            distribute(link);
         }
+        if (ret.isEmpty()) {
+            /* E.g. posts that only link to an external website. */
+            final Map<String, Object> content = (Map<String, Object>) post.get("content");
+            final String externalUrl = content != null ? (String) content.get("url") : null;
+            if (externalUrl != null) {
+                final DownloadLink externalItem = this.createDownloadlink(externalUrl);
+                externalItem._setFilePackage(fp);
+                ret.add(externalItem);
+                distribute(externalItem);
+            }
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account, final String username) throws Exception {
+        final String contenturl = param.getCryptedUrl();
         final String searchKeyword = new Regex(contenturl, "(?i)/search/([^/]+)").getMatch(0);
         if (searchKeyword != null) {
-            logger.info("Crawling all posts from user " + username + " matching search term '" + searchKeyword + "'");
+            if (account == null) {
+                /* 2025-06-03: Accessing search URLs in a logged out state will result in http error 500. */
+                throw new AccountRequiredException("Account required to crawl search URLs");
+            }
+            return crawlUserSearch(param, username, searchKeyword);
         } else {
-            /* Normalize url */
-            contenturl = "https://" + username + "." + getHost() + "/";
-            logger.info("Crawling all posts from user " + username);
+            return crawlUserBlog(param, username);
         }
-        if (searchKeyword != null && account == null) {
-            /* 2025-06-03: Accessing search URLs in a logged out state will result in http error 500. */
-            throw new AccountRequiredException("Account required to crawl search URLs");
-        }
+    }
+
+    private ArrayList<DownloadLink> crawlUserBlog(final CryptedLink param, final String blog_name) throws Exception {
+        logger.info("Crawling all posts from user " + blog_name);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage(contenturl);
+        final Map<String, Object> blogNameData = new HashMap<String, Object>();
+        blogNameData.put("blog_name", blog_name);
+        br.getPage(br.createJSonPostRequest(API_BASE + "/blog-tag-affinity", blogNameData));
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> blogInfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Object blogId = blogInfo.get("blogId");
+        if (blogId == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String username = blogInfo.get("blogName").toString();
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(username);
+        fp.setPackageKey("bdsmlr://blog/" + blogId);
+        /* E.g. "?activity=like,reblog,post,comment" -> crawl only these activity-kinds instead of the default of all four. */
+        final UrlQuery urlQuery = UrlQuery.parse(param.getCryptedUrl());
+        final String activityParam = urlQuery.get("activity");
+        final List<String> activityKinds;
+        if (!StringUtils.isEmpty(activityParam)) {
+            activityKinds = Arrays.asList(activityParam.split(","));
+            logger.info("Crawling with user defined activityKinds: " + activityKinds);
+        } else {
+            activityKinds = Arrays.asList("post", "reblog", "like", "comment");
+        }
+        final HashSet<String> dupes = new HashSet<String>();
+        final Map<String, Object> page = new HashMap<String, Object>();
+        page.put("page_size", 15);
+        int pageNumber = 1;
+        pagination: do {
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("blog_id", blogId);
+            postdata.put("sort_field", 1);
+            postdata.put("order", 2);
+            postdata.put("post_types", Arrays.asList(1, 2, 3, 4, 5, 6, 7));
+            postdata.put("activity_kinds", activityKinds);
+            postdata.put("page", page);
+            postdata.put("page_size", 15);
+            br.getPage(br.createJSonPostRequest(API_BASE + "/list-blog-activity", postdata));
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final Map<String, Object> activityResponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final List<Object> timelineItems = (List<Object>) activityResponse.get("timelineItems");
+            if (timelineItems.isEmpty()) {
+                logger.info("Stopping because: Current page contains no more items");
+                break pagination;
+            }
+            int numberofNewItems = 0;
+            for (final Object timelineItemO : timelineItems) {
+                final Map<String, Object> timelineItem = (Map<String, Object>) timelineItemO;
+                final Map<String, Object> post = (Map<String, Object>) timelineItem.get("post");
+                if (post == null) {
+                    /* Cluster of e.g. likes/comments on other blogs -> not this blog's own content. */
+                    continue;
+                }
+                final String postID = post.get("id").toString();
+                if (!dupes.add(postID)) {
+                    logger.info("Skipping dupe post: " + postID);
+                    continue;
+                }
+                ret.addAll(crawlPostItems(param, post, fp));
+                numberofNewItems++;
+            }
+            logger.info("Crawled page " + pageNumber + " | New items: " + numberofNewItems + " | Total: " + ret.size());
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            } else if (numberofNewItems == 0) {
+                logger.info("Stopping because: Current page contained ONLY duplicates");
+                break pagination;
+            }
+            final Map<String, Object> pageInfo = (Map<String, Object>) activityResponse.get("page");
+            final String nextPageToken = pageInfo != null ? (String) pageInfo.get("nextPageToken") : null;
+            if (nextPageToken == null) {
+                logger.info("Stopping because: nextPageToken is null");
+                break pagination;
+            }
+            page.put("page_token", nextPageToken);
+            pageNumber++;
+        } while (true);
+        if (ret.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
+        }
+        return ret;
+    }
+
+    /**
+     * @deprecated Legacy HTML based crawling, still required for search URLs as the JSON API does not support search (yet).
+     */
+    @Deprecated
+    private ArrayList<DownloadLink> crawlUserSearch(final CryptedLink param, final String username, final String searchKeyword) throws IOException, PluginException, InterruptedException {
+        logger.info("Crawling all posts from user " + username + " matching search term '" + searchKeyword + "'");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("This blog doesn't exist\\.\\s*<br>")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final FilePackage fp = FilePackage.getInstance();
-        if (searchKeyword != null) {
-            fp.setName(username + " search " + URLEncode.decodeURIComponent(searchKeyword));
-        } else {
-            fp.setName(username);
-        }
-        if (account == null && br.containsHTML(">\\s*This blog contains adult content and you're only seeing a review of it")) {
-            /* Inform user that an account may be needed to crawl all items. */
-            this.displayBubbleNotification(fp.getName() + " | Adult content warning", "You may need to add an account to be able to crawl all items.");
-        }
+        fp.setName(username + " search " + URLEncode.decodeURIComponent(searchKeyword));
         /* First check if there is already some downloadable content in the html of the current page. */
         ret.addAll(crawlPosts(fp));
         if (ret.isEmpty()) {
@@ -211,14 +361,10 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         UrlQuery query = new UrlQuery();
         query.appendEncoded("scroll", "5");
         query.appendEncoded("timenow", infinitescrollDate);
-        if (searchKeyword != null) {
-            query.appendEncoded("blogname", username);
-            query.append("keyword", searchKeyword, false);// taken from URL, already encoded
-            query.appendEncoded("last", lastPostID);
-            br.postPage("/infinitesearch", query);
-        } else {
-            br.postPage("/loadfirst", query);
-        }
+        query.appendEncoded("blogname", username);
+        query.append("keyword", searchKeyword, false);// taken from URL, already encoded
+        query.appendEncoded("last", lastPostID);
+        br.postPage("/infinitesearch", query);
         ret.addAll(crawlPosts(fp));
         if (this.isAbort()) {
             throw new InterruptedException();
@@ -232,13 +378,9 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
             query.appendEncoded("scroll", Integer.toString(index));
             query.appendEncoded("timenow", Encoding.urlEncode(infinitescrollDate));
             query.appendEncoded("last", lastPostID);
-            if (searchKeyword != null) {
-                query.appendEncoded("blogname", username);
-                query.append("keyword", searchKeyword, false);// taken from URL, already encoded
-                br.postPage("/infinitesearch", query);
-            } else {
-                br.postPage("/infinitepb2/" + username, query);
-            }
+            query.appendEncoded("blogname", username);
+            query.append("keyword", searchKeyword, false);// taken from URL, already encoded
+            br.postPage("/infinitesearch", query);
             final ArrayList<DownloadLink> results = crawlPosts(fp);
             int numberofNewItems = 0;
             int numberofSkippedDuplicates = 0;
@@ -286,6 +428,10 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
     private int               lastNumberofPosts = 0;
     private ArrayList<String> lastPostIDList    = new ArrayList<String>();
 
+    /**
+     * @deprecated Legacy HTML based post parsing, only used by the deprecated {@link #crawlUserSearch} anymore.
+     */
+    @Deprecated
     private ArrayList<DownloadLink> crawlPosts(final FilePackage fp) throws PluginException, IOException {
         lastPostID = null;
         lastNumberofPosts = 0;

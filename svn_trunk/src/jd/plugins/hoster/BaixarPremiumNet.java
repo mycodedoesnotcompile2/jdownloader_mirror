@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
 public class BaixarPremiumNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            NICE_HOST          = "baixarpremium.net";
@@ -203,7 +203,7 @@ public class BaixarPremiumNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (br.toString().equals("autenticacao")) {
-            // account isn't logged in? or so they claim see: jdlog://4236969150841
+            // account isn't logged in? or so they claim see
             account.clearCookies("");
             throw new PluginException(LinkStatus.ERROR_RETRY);
         }

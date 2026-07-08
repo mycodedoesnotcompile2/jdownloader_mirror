@@ -17,7 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PixhostToGallery;
 
-@HostPlugin(revision = "$Revision: 52950 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,8 +117,23 @@ public class PixhostTo extends PluginForHost {
     private String getFullsizeImageContenturl(final DownloadLink link) throws MalformedURLException {
         final String url = link.getPluginPatternMatcher();
         final Regex urlinfo = new Regex(url, this.getSupportedLinks());
-        final String host = new URL(url).getHost();
+        /* Important: Use domain without subdomain! */
+        final String host = Browser.getHost(url, false);
         return "https://" + host + "/show/" + urlinfo.getMatch(1) + "/" + urlinfo.getMatch(2) + "_" + urlinfo.getMatch(3);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return getFilenameFromURL(link);
+    }
+
+    private String getFilenameFromURL(DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        // file name from URL should include fileID for
+        // galleries all images may have same name but
+        // different fileID
+        final String filenameFromURL = urlinfo.getMatch(2) + "_" + urlinfo.getMatch(3);
+        return filenameFromURL;
     }
 
     @Override
@@ -129,14 +143,10 @@ public class PixhostTo extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
         dllink = null;
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
         // file name from URL should include fileID for
         // galleries all images may have same name but
         // different fileID
-        final String filenameFromURL = urlinfo.getMatch(2) + "_" + urlinfo.getMatch(3);
-        if (!link.isNameSet()) {
-            link.setName(filenameFromURL);
-        }
+        final String filenameFromURL = getFilenameFromURL(link);
         this.setBrowserExclusive();
         br.getPage(getFullsizeImageContenturl(link));
         if (br.getHttpConnection().getResponseCode() == 404) {

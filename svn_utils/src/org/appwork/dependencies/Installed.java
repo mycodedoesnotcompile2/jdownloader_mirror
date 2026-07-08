@@ -7,6 +7,7 @@ import java.util.List;
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.Storable;
+import org.appwork.storage.StorableDoc;
 
 public class Installed implements Storable {
     public static final SimpleTypeRef<Installed> TYPE = new SimpleTypeRef<Installed>(Installed.class);
@@ -121,4 +122,16 @@ public class Installed implements Storable {
     }
 
     private String name;
+
+    @StorableDoc("Known vulnerabilities reported for this version (OSV/deps.dev)")
+    @AllowNonStorableObjects
+    private List vulnerabilities;
+
+    public List getVulnerabilities() {
+        return this.vulnerabilities;
+    }
+
+    public void setVulnerabilities(final List vulnerabilities) {
+        this.vulnerabilities = vulnerabilities;
+    }
 }
