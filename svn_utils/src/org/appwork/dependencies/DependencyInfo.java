@@ -14,8 +14,11 @@ import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
 
 public class DependencyInfo {
-    public static final org.appwork.storage.TypeRef<DependencyInfo> TYPE = new org.appwork.storage.TypeRef<DependencyInfo>(DependencyInfo.class) {
-                                                                         };
+    public static final int                                         DEFAULT_MIN_RELEASED_AGE_DAYS   = 14;
+    /** Releases younger than this are never offered interactively; the safe version is used instead. */
+    public static final int                                         TOO_RECENT_TO_PROMPT_DAYS       = 3;
+    public static final org.appwork.storage.TypeRef<DependencyInfo> TYPE                          = new org.appwork.storage.TypeRef<DependencyInfo>(DependencyInfo.class) {
+                                                                                                  };
     private List<Installed>                                         history;
 
     public List<Installed> getHistory() {
@@ -47,7 +50,7 @@ public class DependencyInfo {
     private String                    provider = "maven";
     @StorableDoc("Desired Version - this may be a concrete version 1.0.0 or a placeholder from the meta.json files (like 'latest' or 'mvnLatest' or 'jre1.6Latest')")
     private String                    version  = null;
-    @StorableDoc("Do not sync or select releases newer than this many days (security: avoid very recent artifacts). Default 60 (~2 months) when omitted. Use 0 to disable.")
+    @StorableDoc("Used by DependencyUpdater only: prefer releases at least this many days old (security: avoid very recent artifacts). Default 14 days when omitted. Use 0 to disable. MavenSync always syncs all repository versions. Newer releases within this window can still be selected interactively with an explicit warning.")
     private Integer                   minReleasedAgeDays;
     private HashMap<String, String>   renames;
     private ArrayList<String>         filter;
@@ -107,11 +110,11 @@ public class DependencyInfo {
     }
 
     /**
-     * @return minimum release age in days; {@code null} property means 60; {@code 0} or negative disables the check
+     * @return minimum release age in days for version selection; {@code null} property means {@link #DEFAULT_MIN_RELEASED_AGE_DAYS}; {@code 0} or negative disables the check
      */
-    public int getMinReleasedAgeDaysEffective() {
+    public int resolveMinReleasedAgeDays() {
         if (this.minReleasedAgeDays == null) {
-            return 60;
+            return DEFAULT_MIN_RELEASED_AGE_DAYS;
         }
         final int v = this.minReleasedAgeDays.intValue();
         return v <= 0 ? 0 : v;

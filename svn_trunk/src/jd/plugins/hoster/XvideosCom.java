@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 52915 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52974 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -117,7 +117,7 @@ public class XvideosCom extends XvideosCore {
     @Override
     protected String buildNormalContentURL(final DownloadLink link) {
         final String urlHost = Browser.getHost(link.getPluginPatternMatcher(), false);
-        final String videoID = this.getVideoID(link);
+        final String videoID = this.getEncodedVideoID(link);
         if (videoID == null) {
             return null;
         }

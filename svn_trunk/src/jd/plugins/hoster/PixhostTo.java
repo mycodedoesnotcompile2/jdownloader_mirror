@@ -20,9 +20,6 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -35,7 +32,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PixhostToGallery;
 
-@HostPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52972 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,6 +52,7 @@ public class PixhostTo extends PluginForHost {
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
+
     /* DEV NOTES */
     // Tags: pichost
     // protocol: no https
@@ -184,11 +185,7 @@ public class PixhostTo extends PluginForHost {
         String ext = null;
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
-            if (!StringUtils.isEmpty(dllink)) {
-                ext = getFileNameExtensionFromString(dllink, default_extension);
-            } else {
-                ext = default_extension;
-            }
+            ext = getFileNameExtensionFromString(dllink, default_extension);
             filename = applyFilenameExtension(filename, ext);
             link.setFinalFileName(filename);
         }

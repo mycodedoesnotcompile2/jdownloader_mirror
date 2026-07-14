@@ -18,8 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -39,7 +37,9 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PixhostTo;
 
-@DecrypterPlugin(revision = "$Revision: 52950 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 52971 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixhostTo.class })
 public class PixhostToGallery extends PluginForDecrypt {
     public PixhostToGallery(PluginWrapper wrapper) {
@@ -94,7 +94,7 @@ public class PixhostToGallery extends PluginForDecrypt {
         } else if (isCountryBlocked(br)) {
             throw new DecrypterRetryException(RetryReason.GEO);
         }
-        String galleryTitle = br.getRegex("<h2>([^<]+)</h2>").getMatch(0);
+        String galleryTitle = br.getRegex("<h2>\\s*([^<]+)\\s*</h2>").getMatch(0);
         if (galleryTitle == null) {
             /* Fallback */
             logger.warning("Failed to find galleryTitle in html code");
@@ -123,6 +123,6 @@ public class PixhostToGallery extends PluginForDecrypt {
     }
 
     public static boolean isCountryBlocked(final Browser br) {
-        return br.containsHTML("(<title>Pixhost - Regional Access Notice</title>|>\\s*Pixhost is unavailable in the United Kingdom)");
+        return br.containsHTML("(<title>\\s*Pixhost\\s*(-?\\s*)?Regional Access Notice\\s*</title>|>\\s*Pixhost is unavailable in( the United Kingdom)?)");
     }
 }

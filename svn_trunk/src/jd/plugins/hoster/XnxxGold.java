@@ -25,7 +25,7 @@ import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50840 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52974 $", interfaceVersion = 2, names = {}, urls = {})
 public class XnxxGold extends XvideosCore {
     public XnxxGold(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,27 +92,19 @@ public class XnxxGold extends XvideosCore {
     @Override
     protected String buildNormalContentURL(final DownloadLink link) {
         final String urlHost = Browser.getHost(link.getPluginPatternMatcher(), false);
-        final String videoID = this.getVideoidFromURL(link.getPluginPatternMatcher());
-        if (videoID != null) {
-            /* 2021-07-23: This needs to end with a slash otherwise the URL will be invalid! */
-            String newURL = "https://www." + urlHost + "/video-" + videoID;
-            final String urlTitle = getURLTitle(link);
-            if (urlTitle != null) {
-                newURL += "/" + urlTitle;
-            } else {
-                /* URL needs to contain a title otherwise we'll get error 404! */
-                newURL += "/dummytext";
-            }
-            return newURL;
+        final String videoID = this.getEncodedVideoID(link);
+        if (videoID == null) {
+            return null;
         }
-        return null;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        /* 2021-07-23: This needs to end with a slash otherwise the URL will be invalid! */
+        String url = "https://www." + urlHost + "/video-" + videoID;
+        final String urlTitle = getURLTitle(link);
+        if (urlTitle != null) {
+            url += "/" + urlTitle;
+        } else {
+            /* URL needs to contain a title otherwise we'll get error 404! */
+            url += "/dummytext";
+        }
+        return url;
     }
 }

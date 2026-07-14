@@ -54,7 +54,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
+@DecrypterPlugin(revision = "$Revision: 52973 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,7 +89,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
     /* Decrypter variables */
     final ArrayList<DownloadLink>    ret                                          = new ArrayList<DownloadLink>();
     final ArrayList<String>          dupecheckList                                = new ArrayList<String>();
-    private static Map<String, Long> crawledTelecastIDsMap                        = new HashMap<String, Long>();
+    private Map<String, Long>        crawledTelecastIDsMap                        = new HashMap<String, Long>();
     private long                     only_grab_entries_of_specified_timeframe     = 0;
     private long                     tdifference_milliseconds                     = 0;
     private int                      totalLinksNum                                = 0;
@@ -153,10 +153,15 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 dupecheckList.clear();
                 totalAccountsLoggedInSuccessfulNum++;
                 if (only_grab_new_entries) {
-                    /* Load list of saved IDs + timestamp when they were added */
+                    /*
+                     * Load list of saved IDs + timestamp when they were added. Always start with a fresh map here (per account!) so
+                     * that data of a previously processed account cannot leak into this account's filtering/results, e.g. if this
+                     * account has never been crawled with this setting before (crawledIDSMap == null).
+                     */
+                    crawledTelecastIDsMap = new HashMap<String, Long>();
                     final Object crawledIDSMap = acc.getProperty(CRAWLER_PROPERTY_TELECASTIDS_ADDED);
                     if (crawledIDSMap != null && crawledIDSMap instanceof Map) {
-                        crawledTelecastIDsMap = (Map<String, Long>) crawledIDSMap;
+                        crawledTelecastIDsMap.putAll((Map<String, Long>) crawledIDSMap);
                     }
                 } else {
                     tdifference_milliseconds = only_grab_entries_of_specified_timeframe * 24 * 60 * 60 * 1000;
@@ -489,7 +494,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
 
     /** Returns basic parameters for '/records' request. */
     private String getParametersRecordsAPI() {
-        String user_defined_api_parameters = cfg.getStringProperty(jd.plugins.hoster.SaveTv.CUSTOM_API_PARAMETERS_CRAWLER, null);
+        String user_defined_api_parameters = cfg.getStringProperty(jd.plugins.hoster.SaveTv.CUSTOM_API_PARAMETERS_CRAWLER, "");
         final String formattedMinDate;
         if (only_grab_new_entries && timestamp_last_record_started > 0) {
             formattedMinDate = formatMillisecondsToStvDateAPI(timestamp_last_record_started);

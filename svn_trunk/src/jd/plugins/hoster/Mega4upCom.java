@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50608 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52968 $", interfaceVersion = 3, names = {}, urls = {})
 public class Mega4upCom extends XFileSharingProBasic {
     public Mega4upCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -119,9 +119,10 @@ public class Mega4upCom extends XFileSharingProBasic {
         if (download1 != null) {
             download1.remove("method_premium");
             download1.remove("mega_premium");
-            if (download1.hasInputFieldByName("method_free")) {
-                download1.remove("method_free");
-            }
+            /* 2026-07-09: Not required anymore */
+            // if (download1.hasInputFieldByName("method_free")) {
+            // download1.remove("method_free");
+            // }
         }
         return download1;
     }

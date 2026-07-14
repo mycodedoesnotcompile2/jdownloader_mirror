@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 52954 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52973 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -296,8 +296,14 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 position++;
             }
             String nextPageURL = br.getRegex("next-page-url=\"([^\"]+)\"").getMatch(0);
+            if (nextPageURL == null) {
+                // 2026-07-09
+                nextPageURL = br.getRegex("<turbo-frame[^>]*id=\"post-index-\\d+\" src=\"(/[^\"]+)\"").getMatch(0);
+            }
             if (nextPageURL != null) {
-                nextPageURL = nextPageURL + "&auto_page=t";// smaller html response
+                if (!StringUtils.containsIgnoreCase(nextPageURL, "&auto_page=t")) {
+                    nextPageURL = nextPageURL + "&auto_page=t";// smaller html response
+                }
                 nextPageURL = Encoding.htmlOnlyDecode(nextPageURL);
             }
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + numberofItemsStr + " | nextPageURL = " + nextPageURL);
@@ -310,6 +316,13 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             } else if (page == maxPageUserLimit) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPageUserLimit);
                 this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPageUserLimit + "\r\nYou can adjust this limit in the plugin settings.");
+                break pagination;
+            } else if (StringUtils.containsIgnoreCase(br.getURL(), "/premium?state=1")) {
+                /*
+                 * 2026-07-09: Typically page 100 -> URL to page 101 exists but redirects to:
+                 * https://chan.sankakucomplex.com/de/posts/premium?state=1
+                 */
+                logger.info("Stopping because: Reached max number of pages accessible for free users");
                 break pagination;
             } else if (nextPageURL == null) {
                 logger.info("Stopping because: Reached end(?)");

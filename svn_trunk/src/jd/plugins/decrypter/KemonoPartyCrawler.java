@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 52953 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52975 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,6 +97,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         ret.add(new String[] { "kemono.cr", "kemono.su", "kemono.party" }); // content of other websites such as patreon.com
         ret.add(new String[] { "pawchive.pw", "pawchive.st" }); // Fork project of coomer/kemono projects
         return ret;
+    }
+
+    private boolean isPawchive() {
+        return getHost().equals("pawchive.pw");
     }
 
     public static String[] getAnnotationNames() {
@@ -716,7 +720,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private String getBaseURLData() {
-        if ("pawchive.st".equalsIgnoreCase(getHost())) {
+        if (this.isPawchive()) {
             return "https://file." + getHost() + "/data";
         }
         /* Return default value */
@@ -792,7 +796,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public Class<? extends KemonoPartyConfig> getConfigInterface() {
         if ("kemono.party".equalsIgnoreCase(getHost())) {
             return KemonoPartyConfig.class;
-        } else if ("pawchive.st".equalsIgnoreCase(getHost())) {
+        } else if (this.isPawchive()) {
             return KemonoPartyConfigPawchiveSt.class;
         } else {
             return KemonoPartyConfigCoomerParty.class;

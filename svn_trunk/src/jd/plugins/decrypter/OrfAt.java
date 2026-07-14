@@ -10,11 +10,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -26,8 +27,8 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
-import jd.http.Browser.BrowserException;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
@@ -43,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 52898 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52976 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,24 +96,42 @@ public class OrfAt extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private final Pattern                                     PATTERN_TYPE_OLD      = Pattern.compile("(?i)https?://tvthek\\.orf\\.at/(?:index\\.php/)?(?:programs?|topic|profile)/.+");
-    private final Pattern                                     PATTERN_BROADCAST_OLD = Pattern.compile("(?i)https?://([a-z0-9]+)\\.orf\\.at/(?:player|programm)/(\\d+)/([a-zA-Z0-9]+).*");
-    private final Pattern                                     PATTERN_BROADCAST_NEW = Pattern.compile("(?i)https?://radiothek\\.orf\\.at/([a-z0-9]+)/(\\d+)/([a-zA-Z0-9]+).*");
-    private final Pattern                                     PATTERN_BROADCAST_2   = Pattern.compile("(?i)https://[^/]+/radio/([a-z0-9]+)/sendung/(\\d+)/([\\w\\-]+).*");
-    private final Pattern                                     PATTERN_ARTICLE       = Pattern.compile("(?i)https?://([a-z0-9]+)\\.orf\\.at/artikel/(\\d+)/([a-zA-Z0-9]+).*");
-    private final Pattern                                     PATTERN_PODCAST       = Pattern.compile("(?i)https?://[^/]+/podcasts?/([a-z0-9]+)/([A-Za-z0-9\\-]+)(/([a-z0-9\\-]+))?.*");
-    private final Pattern                                     PATTERN_COLLECTION    = Pattern.compile("(?i)^(https?://.*(?:/collection|podcast/highlights))/(\\d+)(/(\\d+)(/[a-z0-9\\-]+)?)?.*");
-    private final Pattern                                     PATTERN_VIDEO         = Pattern.compile("(?i)^https?://[^/]+/program/(\\w+)/(\\w+)\\.html.*");
-    private final Pattern                                     PATTERN_ON_ORF        = Pattern.compile("(?i)https?://on\\.orf\\.at/.+");
-    private final String                                      API_BASE              = "https://audioapi.orf.at";
-    private final String                                      PROPERTY_SLUG         = "slug";
+    private final Pattern                           PATTERN_TYPE_OLD                  = Pattern.compile("(?i)https?://tvthek\\.orf\\.at/(?:index\\.php/)?(?:programs?|topic|profile)/.+");
+    private final Pattern                           PATTERN_BROADCAST_OLD             = Pattern.compile("(?i)https?://([a-z0-9]+)\\.orf\\.at/(?:player|programm)/(\\d+)/([a-zA-Z0-9]+).*");
+    private final Pattern                           PATTERN_BROADCAST_NEW             = Pattern.compile("(?i)https?://radiothek\\.orf\\.at/([a-z0-9]+)/(\\d+)/([a-zA-Z0-9]+).*");
+    private final Pattern                           PATTERN_BROADCAST_2               = Pattern.compile("(?i)https://[^/]+/radio/([a-z0-9]+)/sendung/(\\d+)/([\\w\\-]+).*");
+    private final Pattern                           PATTERN_ARTICLE                   = Pattern.compile("(?i)https?://([a-z0-9]+)\\.orf\\.at/artikel/(\\d+)/([a-zA-Z0-9]+).*");
+    private final Pattern                           PATTERN_PODCAST                   = Pattern.compile("(?i)https?://[^/]+/podcasts?/([a-z0-9]+)/([A-Za-z0-9\\-]+)(/([a-z0-9\\-]+))?.*");
+    private final Pattern                           PATTERN_COLLECTION                = Pattern.compile("(?i)^(https?://.*(?:/collection|podcast/highlights))/(\\d+)(/(\\d+)(/[a-z0-9\\-]+)?)?.*");
+    private final Pattern                           PATTERN_VIDEO                     = Pattern.compile("(?i)^https?://[^/]+/program/(\\w+)/(\\w+)\\.html.*");
+    private final Pattern                           PATTERN_ON_ORF                    = Pattern.compile("(?i)https?://on\\.orf\\.at/.+");
+    private final String                            API_BASE                          = "https://audioapi.orf.at";
+    private final String                            PROPERTY_SLUG                     = "slug";
     /* E.g. https://radiothek.orf.at/ooe --> "ooe" --> Channel == "oe2o" */
-    private static LinkedHashMap<String, Map<String, Object>> CHANNEL_CACHE         = new LinkedHashMap<String, Map<String, Object>>() {
-                                                                                        protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
-                                                                                            return size() > 50;
-                                                                                        };
-                                                                                    };
-    public SubConfiguration                                   cfg                   = null;
+    private static Map<String, Map<String, Object>> CHANNEL_CACHE                     = new LinkedHashMap<String, Map<String, Object>>() {
+                                                                                          protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
+                                                                                              return size() > 50;
+                                                                                          };
+                                                                                      };
+    public SubConfiguration                         cfg                               = null;
+    /**
+     * If true, we assume progressive streams max out at 720p and HLS streams max out at 1080p. This means: if the user wants BEST, they get
+     * HLS regardless of the HLS_STREAM setting, since HLS can offer a higher quality than progressive.
+     */
+    public static final boolean                     PROGRESSIVE_MAX_720P              = true;
+    /**
+     * If true, assume that once we find which HLS "quality" identifier's master playlist actually works for one segment of a video, all
+     * other segments of that same video are available in that same identifier/resolution too, and we can go straight to it instead of
+     * probing every candidate again. Set to false to always probe every candidate for every segment.
+     */
+    public static final boolean                     CACHE_HLS_QUALITY_ACROSS_SEGMENTS = true;
+    /**
+     * If true, only ever do one real (HEAD-request) filesize measurement per progressive quality identifier per video (whichever segment
+     * triggers it first) instead of one per segment. That single sample's bytes/second rate (filesize / that segment's duration_seconds) is
+     * then used to estimate every other segment's filesize of that same quality from its own duration_seconds, instead of measuring it too.
+     * Trades filesize accuracy for far fewer HTTP requests during crawling.
+     */
+    public static final boolean                     FILESIZE_MAGIC_MODE               = true;
 
     /** Wrapper for podcast URLs containing md5 file-hashes inside URL. */
     protected DownloadLink createPodcastDownloadlink(final String directurl) throws MalformedURLException {
@@ -198,6 +217,8 @@ public class OrfAt extends PluginForDecrypt {
             }
         }
         final HashSet<String> allFMTs = new HashSet<String>();
+        /* Collected across all segments (unlike segmentAvailableHeights, which is per-segment) -> sorted, no duplicates. */
+        final TreeSet<Integer> allVideoHeights = new TreeSet<Integer>();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(dateWithoutTime + " - " + mainVideoTitle);
         if (description != null) {
@@ -206,27 +227,26 @@ public class OrfAt extends PluginForDecrypt {
         fp.setPackageKey("orfmediathek://video/" + contentIDSlashPlaylistIDSlashVideoID);
         final boolean has_active_youth_protection = ((Boolean) entries.get("has_active_youth_protection")).booleanValue();
         final ORFMediathek hosterplugin = (ORFMediathek) this.getNewPluginForHostInstance("orf.at");
-        final Map<String, Long> cumulativeFilesizeMap = new HashMap<String, Long>();
-        final List<String> selectedQualities = new ArrayList<String>();
-        final List<String> selectedQualitiesInternal = new ArrayList<String>();
-        /* Collect user desired video qualities. */
-        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_VERYLOW, ORFMediathek.Q_VERYLOW_default)) {
-            selectedQualities.add("VERYLOW");
+        final Map<Integer, Long> cumulativeFilesizeMap = new HashMap<Integer, Long>();
+        /* Selected video qualities by height (in pixels). Progressive delivery only exists for 360/540/720 (Q4A/Q6A/Q8C). */
+        final List<Integer> selectedQualities = new ArrayList<Integer>();
+        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HEIGHT_288, ORFMediathek.Q_HEIGHT_288_default)) {
+            selectedQualities.add(288);
         }
-        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_LOW, ORFMediathek.Q_LOW_default)) {
-            selectedQualities.add("LOW");
+        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HEIGHT_360, ORFMediathek.Q_HEIGHT_360_default)) {
+            selectedQualities.add(360);
         }
-        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_MEDIUM, ORFMediathek.Q_MEDIUM_default)) {
-            selectedQualities.add("MEDIUM");
-            selectedQualitiesInternal.add("Q4A");
+        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HEIGHT_540, ORFMediathek.Q_HEIGHT_540_default)) {
+            selectedQualities.add(540);
         }
-        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HIGH, ORFMediathek.Q_HIGH_default)) {
-            selectedQualities.add("HIGH");
-            selectedQualitiesInternal.add("Q6A");
+        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HEIGHT_576, ORFMediathek.Q_HEIGHT_576_default)) {
+            selectedQualities.add(576);
         }
-        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_VERYHIGH, ORFMediathek.Q_VERYHIGH_default)) {
-            selectedQualities.add("VERYHIGH");
-            selectedQualitiesInternal.add("Q8C");
+        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HEIGHT_720, ORFMediathek.Q_HEIGHT_720_default)) {
+            selectedQualities.add(720);
+        }
+        if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HEIGHT_1080, ORFMediathek.Q_HEIGHT_1080_default)) {
+            selectedQualities.add(1080);
         }
         final int subtitleFormatSettingInt = cfg.getIntegerProperty(ORFMediathek.SETTING_SELECTED_SUBTITLE_FORMAT, ORFMediathek.SETTING_SELECTED_SUBTITLE_FORMAT_default);
         final String subtitle_ext;
@@ -263,31 +283,65 @@ public class OrfAt extends PluginForDecrypt {
         String thumbnailurlFromFirstSegment = null;
         final boolean settingPreferBestVideo = cfg != null ? cfg.getBooleanProperty(ORFMediathek.Q_BEST, ORFMediathek.Q_BEST_default) : false;
         final boolean settingEnableFastCrawl = cfg != null ? cfg.getBooleanProperty(ORFMediathek.SETTING_ENABLE_FAST_CRAWL, ORFMediathek.SETTING_ENABLE_FAST_CRAWL_default) : true;
-        boolean isProgressiveStreamAvailable = false;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final boolean isCrawlGaplessAndVideoChapters;
+        boolean isCrawlGaplessOnly;
+        if (cfg == null) {
+            isCrawlGaplessAndVideoChapters = true;
+            isCrawlGaplessOnly = false;
+        } else {
+            final int videoFormatSettingInt = cfg.getIntegerProperty(ORFMediathek.SETTING_SELECTED_VIDEO_FORMAT, ORFMediathek.SETTING_SELECTED_VIDEO_FORMAT_default);
+            isCrawlGaplessAndVideoChapters = videoFormatSettingInt == 0;
+            isCrawlGaplessOnly = videoFormatSettingInt == 2;
+        }
+        /*
+         * Whether the user wants gapless results at all (either alongside chapters or exclusively) -> also needed below to decide whether
+         * to bother probing HLS qualities per segment.
+         */
+        final boolean userWantsGapless = isCrawlGaplessAndVideoChapters || isCrawlGaplessOnly;
+        /*
+         * Only ever written to when CACHE_HLS_QUALITY_ACROSS_SEGMENTS is true; holds the first segment's discovered HLS heights. Declared
+         * here (outside crawlSegments) so the gapless handling below can reuse it instead of probing the gapless master's HLS qualities all
+         * over again -> the gapless master is just the whole-episode version of the exact same encode ladder.
+         */
+        final HashSet<Integer> cachedAvailableHeights = new HashSet<Integer>();
         crawlSegments: {
             if (segments == null || segments.isEmpty()) {
+                /**
+                 * No segments there to crawl, maybe only one gapless item available? <br>
+                 * Segments should always exist!
+                 */
                 break crawlSegments;
             }
-            final List<String> selectedDeliveryTypes = new ArrayList<String>();
-            final boolean enforceProgressive = true;
             final boolean allowProgressive = cfg != null ? cfg.getBooleanProperty(ORFMediathek.PROGRESSIVE_STREAM, ORFMediathek.PROGRESSIVE_STREAM_default) : true;
-            final boolean hdsServersideBroken = true; // 2024-02-20: https://board.jdownloader.org/showthread.php?t=95259
-            final boolean user_wants_HDS = cfg != null ? cfg.getBooleanProperty(ORFMediathek.HDS_STREAM, ORFMediathek.HDS_STREAM_default) : true;
             final boolean user_wants_HLS = cfg != null ? cfg.getBooleanProperty(ORFMediathek.HLS_STREAM, ORFMediathek.HLS_STREAM_default) : true;
-            if (user_wants_HDS && !hdsServersideBroken) {
-                selectedDeliveryTypes.add("hds");
-            }
-            if (user_wants_HLS) {
-                selectedDeliveryTypes.add("hls");
-            }
-            if (allowProgressive || enforceProgressive) {
-                selectedDeliveryTypes.add("progressive");
-            }
+            /* HDS is permanently broken server-side (since 2024-02-20) -> HDS streams are always skipped, no setting for it anymore. */
+            /*
+             * Progressive is only ever available up to 720p (see PROGRESSIVE_MAX_720P). If the user selected BEST, or explicitly picked a
+             * quality above 720p (currently only 1080p), progressive alone can't satisfy that -> HLS must be used regardless of the HLS
+             * setting. A quality below 720p that happens to only exist via HLS (e.g. 288p) does NOT trigger this -> that case is left to
+             * the normal "return everything if the selection matches nothing" fallback.
+             */
+            final boolean wantsQualityAboveProgressiveCap = containsHeightAbove(selectedQualities, 720);
+            final boolean crawlHLS = user_wants_HLS || userWantsGapless || ((settingPreferBestVideo || wantsQualityAboveProgressiveCap) && PROGRESSIVE_MAX_720P);
+            /*
+             * Once we know which HLS "quality" identifier's playlist actually works for one segment, go straight to that one for all other
+             * segments of this same video instead of probing all candidates again. Once we know whether HLS offers anything above
+             * progressive's cap for one segment, reuse that too and skip the HLS probe entirely for later segments if it doesn't (and the
+             * user didn't explicitly ask for HLS). See CACHE_HLS_QUALITY_ACROSS_SEGMENTS.
+             */
+            String cachedWorkingHlsQuality = null;
+            Boolean cachedFoundHeightAboveProgressiveCap = null;
+            /*
+             * Only ever written to when FILESIZE_MAGIC_MODE is true: bytes/second measured from the one real HEAD request done per
+             * progressive quality, used to estimate (instead of measure) the filesize of every other segment of that same quality.
+             */
+            final Map<Integer, Double> cachedBytesPerSecondByHeight = new HashMap<Integer, Double>();
             int videoPosition = 0;
-            /* null = not yet checked, TRUE/FALSE = result applies to all segments */
-            Boolean q8cHlsAvailable = null;
             for (final Map<String, Object> segment : segments) {
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
                 videoPosition++;
                 final String segmentID = segment.get("id").toString();
                 String thumbnailurl = null;
@@ -299,45 +353,6 @@ public class OrfAt extends PluginForDecrypt {
                     thumbnailurlFromFirstSegment = thumbnailurl;
                 }
                 final List<Map<String, Object>> sources = (List<Map<String, Object>>) segment_embedded_playlist.get("sources");
-                if (videoPosition == 1 && q8cHlsAvailable == null && (settingPreferBestVideo || selectedQualitiesInternal.contains("Q8C"))) {
-                    /**
-                     * Check Q8C HLS availability once on the first segment; result is reused for all subsequent segments. <br>
-                     * Background: Since 2026-06, HLS 1080p audio+video version is often not available anymore thus if we do not check it
-                     * here, it gets declared best while it is not available.
-                     */
-                    String q8cHlsUrl = null;
-                    for (final Map<String, Object> source : sources) {
-                        if ("Q8C".equals(source.get("quality")) && "hls".equalsIgnoreCase((String) source.get("delivery")) && "http".equalsIgnoreCase((String) source.get("protocol"))) {
-                            q8cHlsUrl = (String) source.get("src");
-                            break;
-                        }
-                    }
-                    if (q8cHlsUrl == null) {
-                        logger.info("Q8C HLS not present in sources -> marking as unavailable");
-                        q8cHlsAvailable = Boolean.FALSE;
-                    } else {
-                        logger.info("Q8C HLS availability check for: " + q8cHlsUrl);
-                        q8cHlsAvailable = Boolean.FALSE;
-                        final Browser brc = br.cloneBrowser();
-                        brc.setFollowRedirects(true);
-                        URLConnectionAdapter con = null;
-                        try {
-                            con = brc.openHeadConnection(q8cHlsUrl);
-                            if (!ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
-                                q8cHlsAvailable = Boolean.TRUE;
-                            }
-                        } catch (final Exception e) {
-                            logger.log(e);
-                            logger.info("Q8C HLS availability check failed -> treating as unavailable");
-                        } finally {
-                            try {
-                                con.disconnect();
-                            } catch (final Throwable e) {
-                            }
-                        }
-                    }
-                    logger.info("Q8C HLS available: " + q8cHlsAvailable);
-                }
                 final List<Map<String, Object>> subtitlemaps = (List<Map<String, Object>>) segment_embedded_playlist.get("subtitles");
                 String subtitleurl = null;
                 if (subtitlemaps != null && subtitlemaps.size() > 0) {
@@ -358,166 +373,323 @@ public class OrfAt extends PluginForDecrypt {
                     /* Only one segment -> We can use gapless subtitle as fallback */
                     subtitleurl = gapless_subtitleurl;
                 }
-                int numberofSkippedDRMItems = 0;
-                final Map<String, Long> qualityIdentifierToFilesizeMap = new HashMap<String, Long>();
+                final Map<Integer, Long> qualityHeightToFilesizeMap = new HashMap<Integer, Long>();
                 final List<DownloadLink> videoresults = new ArrayList<DownloadLink>();
-                final HashSet<String> allAvailableQualitiesAsHumanReadableIdentifiers = new HashSet<String>();
-                int sources_index = -1;
-                for (final Map<String, Object> source : sources) {
-                    sources_index++;
-                    final boolean isLastItem = sources_index == sources.size() - 1;
-                    final String src = (String) source.get("src");
-                    final String quality = source.get("quality").toString();
-                    final String quality_string = source.get("quality_string").toString();
-                    final String protocol = source.get("protocol").toString();
-                    final String delivery = source.get("delivery").toString();
-                    // final String subtitleUrl = (String) entry_source.get("SubTitleUrl");
-                    allFMTs.add(quality);
-                    /* Skip stuff we cannot handle */
-                    if (StringUtils.equals(quality, "QXADRM")) {
-                        numberofSkippedDRMItems++;
-                        continue;
-                    } else if (!"http".equalsIgnoreCase(protocol)) {
-                        continue;
-                    } else if ("dash".equalsIgnoreCase(delivery)) {
-                        continue;
-                    } else if ("rtmp".equalsIgnoreCase(delivery)) {
-                        continue;
-                    } else if (quality_string.equalsIgnoreCase("adaptiv")) {
-                        /* Split audio/video HLS items */
-                        continue;
-                    } else if ("rtsp".equals(delivery)) {
-                        continue;
-                    } else if ("Q8C".equals(quality) && "hls".equalsIgnoreCase(delivery) && Boolean.FALSE.equals(q8cHlsAvailable)) {
-                        continue;
-                    }
-                    /* possible protocols: http, rtmp, rtsp, hds, hls */
-                    final boolean isProgressive;
-                    if ("progressive".equals(delivery)) {
-                        isProgressive = true;
-                        isProgressiveStreamAvailable = true;
-                    } else {
-                        isProgressive = false;
-                    }
-                    if (isProgressive && "Q1A".equals(quality) && StringUtils.endsWithCaseInsensitive(src, ".3gp")) {
-                        /**
-                         * 2026-06-12: Skip unavailable very old .3gp progressive video items e.g. <br>
-                         * http://apasfpd.sf.apa.at/cms-worldwide/online/2026/06/03/4c4cac86d1882f3ed00b3ac319e34fda/1781474400/2026-06-03_2149_in_02_Tierisch-promin_____14325457__o__777106136a__s16096980_Q1A.3gp
+                final HashSet<Integer> segmentAvailableHeights = new HashSet<Integer>();
+                /**
+                 * Collect all distinct HLS master playlist ("playlist.m3u8") URLs. Each of these actually contains all quality renditions
+                 * once parsed, so only one needs to be fetched. Q8C is often broken server-side -> its URL is placed last so it is tried
+                 * last/as a last resort.
+                 */
+                boolean skipProgressiveForBest = false;
+                find_hls_qualities: if (crawlHLS) {
+                    if (CACHE_HLS_QUALITY_ACROSS_SEGMENTS && !user_wants_HLS && allowProgressive && Boolean.FALSE.equals(cachedFoundHeightAboveProgressiveCap)) {
+                        /*
+                         * We already established for an earlier segment of this video that HLS doesn't offer anything above progressive's
+                         * cap, and the user didn't explicitly ask for HLS -> it would get discarded anyway, so don't even probe it here.
+                         * Only applies when progressive is actually enabled -> if it's disabled, HLS is our only source and must never be
+                         * skipped.
                          */
-                        continue;
+                        logger.info("Skipping HLS probe for this segment: already known that it offers nothing beyond progressive for this video");
+                        break find_hls_qualities;
                     }
-                    final String fmtHumanReadable = humanReadableQualityIdentifier(quality.toUpperCase(Locale.ENGLISH).trim());
-                    boolean looksLikeQualityIsSelected = false;
-                    if (settingPreferBestVideo) {
-                        if (isLastItem) {
-                            /* Small hack: Assume that last item == best */
-                            looksLikeQualityIsSelected = true;
+                    final LinkedHashMap<String, String> hlsUrlByQuality = new LinkedHashMap<String, String>();
+                    for (final Map<String, Object> source : sources) {
+                        final String srcUrl = (String) source.get("src");
+                        final String srcDelivery = (String) source.get("delivery");
+                        final String srcQuality = (String) source.get("quality");
+                        final String srcQualityString = (String) source.get("quality_string");
+                        allFMTs.add(srcQuality);
+                        if (!"hls".equalsIgnoreCase(srcDelivery)) {
+                            continue;
+                        } else if (StringUtils.equals(srcQuality, "QXADRM") || StringUtils.equalsIgnoreCase(srcQualityString, "adaptiv")) {
+                            /* DRM protected or a split audio/video track -> not a usable master playlist. */
+                            continue;
+                        } else if (!StringUtils.containsIgnoreCase(srcUrl, "playlist.m3u8")) {
+                            /* This should never happen */
+                            logger.warning("Found HLS url that is not a playlist: " + srcUrl);
+                            continue;
                         }
+                        hlsUrlByQuality.put(srcQuality, srcUrl);
+                    }
+                    String hlsMaster = null;
+                    String workingHlsQuality = null;
+                    final Browser brc = br.cloneBrowser();
+                    boolean foundHeightAboveProgressiveCap = false;
+                    /*
+                     * Heights actually used for THIS segment's results. Must be segment-local: reusing cachedAvailableHeights directly as
+                     * the working set would leak heights from earlier segments into every segment's results whenever a fresh probe runs
+                     * (always the case with CACHE_HLS_QUALITY_ACROSS_SEGMENTS=false, since cachedWorkingHlsQuality then never gets set and
+                     * every segment takes the "else" branch below).
+                     */
+                    final HashSet<Integer> availableHeightsThisSegment = new HashSet<Integer>();
+                    if (CACHE_HLS_QUALITY_ACROSS_SEGMENTS && cachedWorkingHlsQuality != null) {
+                        /*
+                         * We already know which quality worked for an earlier segment of this same video -> go straight to it instead of
+                         * probing every candidate again (that probing is where the time-consuming http requests happen). Assume it exists
+                         * for this segment too; if that assumption turns out to be wrong, fail loudly instead of silently falling back.
+                         */
+                        final String cachedUrl = hlsUrlByQuality.get(cachedWorkingHlsQuality);
+                        if (cachedUrl == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Expected cached HLS quality " + cachedWorkingHlsQuality + " to exist for this segment but it doesn't");
+                        }
+                        hlsMaster = cachedUrl;
+                        workingHlsQuality = cachedWorkingHlsQuality;
+                        foundHeightAboveProgressiveCap = cachedFoundHeightAboveProgressiveCap.booleanValue();
+                        availableHeightsThisSegment.addAll(cachedAvailableHeights);
                     } else {
-                        if (selectedQualities.contains(fmtHumanReadable)) {
-                            looksLikeQualityIsSelected = true;
+                        final List<String> hlsQualityTryOrder = new ArrayList<String>(hlsUrlByQuality.keySet());
+                        if (hlsQualityTryOrder.remove("Q8C")) {
+                            /* Q8C is often broken server-side -> tried last/as a last resort. */
+                            hlsQualityTryOrder.add("Q8C");
                         }
-                    }
-                    progressiveStreamFilesizeCheck: if (looksLikeQualityIsSelected && isProgressive && !settingEnableFastCrawl && !qualityIdentifierToFilesizeMap.containsKey(fmtHumanReadable) && !has_active_youth_protection) {
-                        logger.info("Checking progressive URL to find filesize: " + src);
-                        URLConnectionAdapter con = null;
-                        final Browser brc = br.cloneBrowser();
-                        try {
-                            brc.setFollowRedirects(true);
-                            con = brc.openHeadConnection(src);
-                            if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
-                                logger.info("Skipping \"insert_video_not_available\": " + src);
-                                continue;
-                            } else if (!this.looksLikeDownloadableContent(con)) {
-                                logger.info("Skipping broken progressive video quality: " + src);
-                                continue;
-                            } else if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
+                        for (final String hlsQualityTag : hlsQualityTryOrder) {
+                            if (this.isAbort()) {
+                                throw new InterruptedException();
+                            }
+                            /* Try each candidate until we find one that actually works. */
+                            final String hlsPlaylistUrl = hlsUrlByQuality.get(hlsQualityTag);
+                            brc.getPage(hlsPlaylistUrl);
+                            if (ORFMediathek.isGeoBlocked(brc.getURL())) {
                                 /* Item is GEO-blocked */
                                 throw new DecrypterRetryException(RetryReason.GEO);
+                            } else if (!LinkCrawlerDeepInspector.looksLikeMpegURL(brc.getHttpConnection())) {
+                                logger.info("Skipping bad HLS playlist: " + hlsPlaylistUrl);
+                                continue;
                             }
-                            final long filesize = con.getCompleteContentLength();
-                            if (filesize <= 0) {
+                            hlsMaster = hlsPlaylistUrl;
+                            workingHlsQuality = hlsQualityTag;
+                            break;
+                        }
+                        if (hlsMaster == null) {
+                            logger.warning("Found zero usable HLS qualities");
+                            break find_hls_qualities;
+                        }
+                        final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(brc);
+                        for (final HlsContainer hlsQuality : hlsQualities) {
+                            if (!foundHeightAboveProgressiveCap && hlsQuality.getHeight() > 720) {
+                                foundHeightAboveProgressiveCap = true;
+                            }
+                            availableHeightsThisSegment.add(hlsQuality.getHeight());
+                        }
+                        cachedFoundHeightAboveProgressiveCap = Boolean.valueOf(foundHeightAboveProgressiveCap);
+                        if (CACHE_HLS_QUALITY_ACROSS_SEGMENTS) {
+                            cachedWorkingHlsQuality = workingHlsQuality;
+                            cachedAvailableHeights.addAll(availableHeightsThisSegment);
+                        }
+                    }
+                    /*
+                     * If the user doesn't want HLS, only use it anyway when it actually beats progressive (something above 720p vs.
+                     * progressive's assumed 720p cap) and either BEST or a quality above 720p is wanted. If HLS tops out at the same
+                     * quality as progressive here, respect the user's choice and skip it entirely so only progressive gets offered.
+                     */
+                    final boolean useHls = user_wants_HLS || !allowProgressive || (foundHeightAboveProgressiveCap && (settingPreferBestVideo || wantsQualityAboveProgressiveCap) && PROGRESSIVE_MAX_720P);
+                    if (!useHls) {
+                        logger.info("HLS doesn't offer more than progressive here and user doesn't want HLS -> Skipping HLS results for this segment");
+                        break find_hls_qualities;
+                    }
+                    for (final int height : availableHeightsThisSegment) {
+                        final DownloadLink video = super.createDownloadlink(hlsMaster);
+                        video.setDefaultPlugin(hosterplugin);
+                        video.setHost(hosterplugin.getHost());
+                        video.setContentUrl(sourceurl);
+                        video.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_VIDEO);
+                        video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, hlsMaster);
+                        /* We know the real height here -> no need to guess it from an internal quality identifier later. */
+                        video.setProperty(ORFMediathek.PROPERTY_VIDEO_HEIGHT, height);
+                        video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, "http");
+                        video.setProperty(ORFMediathek.PROPERTY_DELIVERY, "hls");
+                        video.setAvailable(true);
+                        videoresults.add(video);
+                        segmentAvailableHeights.add(height);
+                        allVideoHeights.add(height);
+                    }
+                    if (foundHeightAboveProgressiveCap && settingPreferBestVideo && PROGRESSIVE_MAX_720P) {
+                        /*
+                         * HLS already gives us the best possible quality here -> no need to also check progressive (saves a http request).
+                         * Deliberately BEST-only: in non-BEST/checkbox mode the user may still want a progressive-capable quality (e.g.
+                         * 720p) alongside the HLS-only one, so progressive must not be skipped there.
+                         */
+                        logger.info("Found a quality above progressive's cap via HLS and user wants BEST -> Skipping progressive qualities");
+                        skipProgressiveForBest = true;
+                    }
+                }
+                crawl_progressive_videos: {
+                    if (skipProgressiveForBest || !allowProgressive) {
+                        break crawl_progressive_videos;
+                    }
+                    /*
+                     * This loop only handles progressive items now -> HLS is fully handled by find_hls_qualities above. Note: if this whole
+                     * loop is skipped, allFMTs won't contain non-HLS quality identifiers and isProgressiveStreamAvailable stays false,
+                     * which only matters for the gapless crawling below (alreadyFoundGaplessProgressive).
+                     */
+                    final long segmentDurationSeconds = ((Number) segment.get("duration_seconds")).longValue();
+                    for (final Map<String, Object> source : sources) {
+                        final String src = (String) source.get("src");
+                        final String quality = source.get("quality").toString();
+                        final String quality_string = source.get("quality_string").toString();
+                        final String protocol = source.get("protocol").toString();
+                        final String delivery = source.get("delivery").toString();
+                        allFMTs.add(quality);
+                        if (!"progressive".equalsIgnoreCase(delivery)) {
+                            /* HLS is handled separately above; HDS/DASH/RTMP/RTSP are unsupported/broken. */
+                            continue;
+                        }
+                        /* Skip stuff we cannot handle */
+                        if (StringUtils.equals(quality, "QXADRM")) {
+                            continue;
+                        } else if (!"http".equalsIgnoreCase(protocol)) {
+                            continue;
+                        } else if (quality_string.equalsIgnoreCase("adaptiv")) {
+                            /* Split audio/video HLS items -> shouldn't occur for progressive but keep this safety check. */
+                            continue;
+                        }
+                        final Integer qualityHeight = oldQualityIdentifierToHeight(quality);
+                        if (qualityHeight == null) {
+                            /**
+                             * Skip progressive items for which we don't know the height -> no longer selectable. This includes LOW (Q1A),
+                             * which used to be legacy .3gp files (2026-06-12), and ADAPTIV.
+                             */
+                            logger.info("Skipping progressive item with unmapped quality: " + quality);
+                            continue;
+                        }
+                        final DownloadLink video = super.createDownloadlink(src);
+                        final boolean looksLikeQualityIsSelected = selectedQualities.contains(qualityHeight) || (settingPreferBestVideo && qualityHeight == 720);
+                        progressiveStreamFilesizeCheck: if (looksLikeQualityIsSelected && !settingEnableFastCrawl && !has_active_youth_protection) {
+                            final Double cachedBytesPerSecond = FILESIZE_MAGIC_MODE ? cachedBytesPerSecondByHeight.get(qualityHeight) : null;
+                            if (cachedBytesPerSecond != null) {
+                                /*
+                                 * filesizeMagicMode: we already measured this quality once for an earlier segment of this video -> estimate
+                                 * this segment's filesize from that rate instead of spending another HEAD request on it.
+                                 */
+                                final long estimatedFilesize = Math.round(cachedBytesPerSecond.doubleValue() * segmentDurationSeconds);
+                                qualityHeightToFilesizeMap.put(qualityHeight, estimatedFilesize);
+                                final Long filesizeSumForAllSegmentsOfThisQuality = cumulativeFilesizeMap.get(qualityHeight);
+                                if (filesizeSumForAllSegmentsOfThisQuality != null) {
+                                    cumulativeFilesizeMap.put(qualityHeight, filesizeSumForAllSegmentsOfThisQuality + estimatedFilesize);
+                                } else {
+                                    cumulativeFilesizeMap.put(qualityHeight, estimatedFilesize);
+                                }
                                 break progressiveStreamFilesizeCheck;
                             }
-                            qualityIdentifierToFilesizeMap.put(fmtHumanReadable, filesize);
-                            final Long filesizeSumForAllSegmentsOfThisQuality = cumulativeFilesizeMap.get(fmtHumanReadable);
-                            if (filesizeSumForAllSegmentsOfThisQuality != null) {
-                                cumulativeFilesizeMap.put(fmtHumanReadable, filesizeSumForAllSegmentsOfThisQuality + filesize);
-                            } else {
-                                cumulativeFilesizeMap.put(fmtHumanReadable, filesize);
-                            }
-                        } catch (final Exception e) {
-                            if (e instanceof DecrypterRetryException) {
-                                throw e;
-                            } else {
+                            logger.info("Checking progressive URL to find filesize: " + src);
+                            URLConnectionAdapter con = null;
+                            final Browser brc = br.cloneBrowser();
+                            try {
+                                brc.setFollowRedirects(true);
+                                con = brc.openHeadConnection(src);
+                                if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
+                                    logger.info("Skipping \"insert_video_not_available\": " + src);
+                                    continue;
+                                } else if (!this.looksLikeDownloadableContent(con)) {
+                                    logger.info("Skipping broken progressive video quality: " + src);
+                                    continue;
+                                } else if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
+                                    /* Item is GEO-blocked */
+                                    throw new DecrypterRetryException(RetryReason.GEO);
+                                }
+                                final long filesize = con.getCompleteContentLength();
+                                if (filesize <= 0) {
+                                    /* This should never happen */
+                                    logger.info("Found progressive stream with unknown file size: " + src);
+                                    break progressiveStreamFilesizeCheck;
+                                }
+                                /* Set verified filesize on this particular element as we know its' precise file size. */
+                                video.setVerifiedFileSize(filesize);
+                                qualityHeightToFilesizeMap.put(qualityHeight, filesize);
+                                final Long filesizeSumForAllSegmentsOfThisQuality = cumulativeFilesizeMap.get(qualityHeight);
+                                if (filesizeSumForAllSegmentsOfThisQuality != null) {
+                                    cumulativeFilesizeMap.put(qualityHeight, filesizeSumForAllSegmentsOfThisQuality + filesize);
+                                } else {
+                                    cumulativeFilesizeMap.put(qualityHeight, filesize);
+                                }
+                                if (FILESIZE_MAGIC_MODE && segmentDurationSeconds > 0) {
+                                    /*
+                                     * Derive the bytes/second rate for this quality from this one real measurement -> used for all its
+                                     * other segments.
+                                     */
+                                    cachedBytesPerSecondByHeight.put(qualityHeight, Double.valueOf(filesize / (double) segmentDurationSeconds));
+                                }
+                            } catch (final Exception e) {
+                                if (e instanceof DecrypterRetryException) {
+                                    throw e;
+                                }
                                 /* Ignore other Exception types */
                                 logger.log(e);
                                 logger.info("Exception happened during file size check");
-                            }
-                        } finally {
-                            try {
-                                brc.followConnection();
-                            } catch (final Throwable e) {
-                            }
-                            try {
-                                con.disconnect();
-                            } catch (final Throwable e) {
+                            } finally {
+                                try {
+                                    brc.followConnection();
+                                } catch (final Throwable e) {
+                                }
+                                try {
+                                    con.disconnect();
+                                } catch (final Throwable e) {
+                                }
                             }
                         }
+                        segmentAvailableHeights.add(qualityHeight);
+                        allVideoHeights.add(qualityHeight);
+                        video.setDefaultPlugin(hosterplugin);
+                        video.setHost(hosterplugin.getHost());
+                        video.setContentUrl(sourceurl);
+                        video.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_VIDEO);
+                        video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, src);
+                        video.setProperty(ORFMediathek.PROPERTY_INTERNAL_QUALITY, quality);
+                        video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, protocol);
+                        video.setProperty(ORFMediathek.PROPERTY_DELIVERY, delivery);
+                        video.setAvailable(true);
+                        videoresults.add(video);
                     }
-                    allAvailableQualitiesAsHumanReadableIdentifiers.add(fmtHumanReadable);
-                    final DownloadLink video = super.createDownloadlink(src);
-                    video.setDefaultPlugin(hosterplugin);
-                    video.setHost(hosterplugin.getHost());
-                    video.setContentUrl(sourceurl);
-                    video.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_VIDEO);
-                    video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, src);
-                    video.setProperty(ORFMediathek.PROPERTY_QUALITY_HUMAN_READABLE, fmtHumanReadable);
-                    video.setProperty(ORFMediathek.PROPERTY_INTERNAL_QUALITY, quality);
-                    video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, protocol);
-                    video.setProperty(ORFMediathek.PROPERTY_DELIVERY, delivery);
-                    video.setAvailable(true);
-                    videoresults.add(video);
                 }
                 /* Set additional properties */
                 for (final DownloadLink videoresult : videoresults) {
                     /*
-                     * Small trick: Update filesizes of all video items: If filesizes were found from progressive streams we can assume that
-                     * the same file streamed via different streaming method will have a very similar size.
+                     * Small trick: Update file sizes of all video items: If filesizes were found from progressive streams we can assume
+                     * that the same file streamed via different streaming method will have a very similar size.
                      */
-                    final String humanReadableQualityIdentifier = videoresult.getStringProperty(ORFMediathek.PROPERTY_QUALITY_HUMAN_READABLE);
-                    final Long filesize = qualityIdentifierToFilesizeMap.get(humanReadableQualityIdentifier);
+                    if (videoresult.isSizeSet()) {
+                        continue;
+                    }
+                    final Integer height = ORFMediathek.getVideoHeight(videoresult);
+                    final Long filesize = height != null ? qualityHeightToFilesizeMap.get(height) : null;
                     if (filesize != null) {
                         videoresult.setDownloadSize(filesize);
                     }
                 }
-                final String bestAvailableQualityIdentifierHumanReadable = findBestQuality(allAvailableQualitiesAsHumanReadableIdentifiers);
+                final Integer bestAvailableHeight = findBestQuality(segmentAvailableHeights);
                 final List<DownloadLink> selectedVideoQualities = new ArrayList<DownloadLink>();
                 final List<DownloadLink> bestVideos = new ArrayList<DownloadLink>();
                 for (final DownloadLink videoresult : videoresults) {
-                    final String humanReadableQualityIdentifier = videoresult.getStringProperty(ORFMediathek.PROPERTY_QUALITY_HUMAN_READABLE);
-                    final String delivery = videoresult.getStringProperty(ORFMediathek.PROPERTY_DELIVERY);
-                    if (!selectedDeliveryTypes.contains(delivery)) {
-                        /* Skip because user has de-selected this delivery type */
+                    /*
+                     * Items with unknown height (e.g. LOW/Q1A) are never selectable/best -> getVideoHeight returns null for them. No
+                     * delivery-type filter needed here: videoresults only ever contains delivery types that were allowed to be crawled in
+                     * the first place (crawlHLS / allowProgressive above).
+                     */
+                    final Integer resultHeight = ORFMediathek.getVideoHeight(videoresult);
+                    if (resultHeight == null) {
                         continue;
                     }
-                    if (selectedQualities.contains(humanReadableQualityIdentifier)) {
+                    if (selectedQualities.contains(resultHeight)) {
                         selectedVideoQualities.add(videoresult);
                     }
-                    if (StringUtils.equals(bestAvailableQualityIdentifierHumanReadable, humanReadableQualityIdentifier)) {
+                    if (resultHeight.equals(bestAvailableHeight)) {
                         bestVideos.add(videoresult);
                     }
                 }
                 final List<DownloadLink> chosenVideoResults = new ArrayList<DownloadLink>();
                 if (settingPreferBestVideo) {
-                    /* Assume that we always find best-results. */
+                    /* Assume that we always find best-results. BEST has no fixed set of desired qualities to compare against. */
+                    if (bestVideos.isEmpty()) {
+                        logger.warning("BEST quality requested but no video results were found for this segment at all");
+                    }
                     chosenVideoResults.addAll(bestVideos);
                 } else {
                     if (selectedVideoQualities.size() > 0) {
                         chosenVideoResults.addAll(selectedVideoQualities);
                     } else {
                         /* Fallback */
-                        logger.info("User selection would return no video results -> Returning all");
+                        logger.info("None of the desired qualities " + selectedQualities + " were found for this segment -> Returning all available qualities instead");
                         chosenVideoResults.addAll(videoresults);
                     }
                 }
@@ -532,11 +704,6 @@ public class OrfAt extends PluginForDecrypt {
                 if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default) && !StringUtils.isEmpty(thumbnailurl)) {
                     finalresults.add(createThumbnailLink(thumbnailurl, hosterplugin));
                 }
-                if (videoresults.isEmpty() && numberofSkippedDRMItems > 0) {
-                    /* Seems like all available video streams are DRM protected. */
-                    final DownloadLink dummy = this.createOfflinelink(br.getURL(), "DRM_" + segment_embedded_playlist_title, "This video is DRM protected and cannot be downloaded with JDownloader.");
-                    finalresults.add(dummy);
-                }
                 /* Add more properties which are the same for all results of this segment */
                 for (final DownloadLink result : finalresults) {
                     result.setProperty(ORFMediathek.PROPERTY_VIDEO_POSITION, videoPosition);
@@ -547,31 +714,20 @@ public class OrfAt extends PluginForDecrypt {
                 }
             }
         }
-        final boolean isCrawlGaplessAndVideoChapters;
-        boolean isCrawlGaplessOnly;
-        if (cfg == null) {
-            isCrawlGaplessAndVideoChapters = true;
-            isCrawlGaplessOnly = false;
-        } else {
-            final int videoFormatSettingInt = cfg.getIntegerProperty(ORFMediathek.SETTING_SELECTED_VIDEO_FORMAT, ORFMediathek.SETTING_SELECTED_VIDEO_FORMAT_default);
-            isCrawlGaplessAndVideoChapters = videoFormatSettingInt == 0;
-            isCrawlGaplessOnly = videoFormatSettingInt == 2;
-        }
-        final boolean alreadyFoundGaplessProgressive = segments.size() == 1 && isProgressiveStreamAvailable;
-        final boolean gaplessNeeded = isCrawlGaplessAndVideoChapters || isCrawlGaplessOnly;
+        logger.info("Available video qualities (height in px) across all segments of this video: " + allVideoHeights);
         final boolean allowCrawlGapless;
         if (has_active_youth_protection) {
             /* With a bit of luck, this can skip age protection */
-            logger.info("Trying to crawl gapless items only to avoid youth protection");
+            logger.info("Allowing to crawl gapless items to avoid youth protection");
             allowCrawlGapless = true;
             /* Non-gapless items remain youth-blocked so let's discard them if we find gapless items. */
             isCrawlGaplessOnly = true;
         } else if (ret.isEmpty()) {
             /* Found nothing -> Try to crawl gapless items */
-            logger.info("Found nothing -> Trying to crawl gapless version as fallback");
+            logger.info("Found nothing -> Allow to crawl gapless version as fallback");
             allowCrawlGapless = true;
-        } else if (gaplessNeeded && !alreadyFoundGaplessProgressive) {
-            logger.info("User prefers gapless and already crawled items don't looke like gapless");
+        } else if (userWantsGapless && segments.size() > 1) {
+            logger.info("User prefers gapless and gapless handling is needed because we got more than one segment: " + segments.size());
             allowCrawlGapless = true;
         } else {
             /* Do not crawl gapless streams */
@@ -579,13 +735,22 @@ public class OrfAt extends PluginForDecrypt {
         }
         int numberofGaplessItems = 0;
         crawlGapless: {
-            if (!allowCrawlGapless || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                // 2026-05-29 gapless workaround no longer working
+            if (!allowCrawlGapless) {
                 break crawlGapless;
             }
-            /* Gapless video handling */
-            logger.info("Crawling gapless video streams");
-            /* Check if any gapless sources are available. */
+            /*
+             * Gapless video handling: Unlike the per-segment sources above (one chunk per chapter), the episode-level HLS sources QXA/QXB
+             * are each a single continuous, non-chaptered adaptive stream covering the whole episode -> that's what makes them "gapless".
+             * QXA and QXB are equivalent mirrors of the same content, so which one we use doesn't matter -> pick one at random. Which
+             * qualities (heights) that master offers is already known from cachedAvailableHeights (probed per-segment above) -> no need to
+             * fetch and parse this master's playlist again just to find that out.
+             */
+            if (cachedAvailableHeights.isEmpty()) {
+                /* This should never happen */
+                logger.info("No cached HLS qualities available -> Gapless not possible");
+                break crawlGapless;
+            }
+            logger.info("Crawling gapless video stream");
             final Map<String, Object> sourcesForGaplessVideo = (Map<String, Object>) entries.get("sources");
             if (sourcesForGaplessVideo == null || sourcesForGaplessVideo.isEmpty()) {
                 logger.info("No gapless sources available -> Returning items we found so far");
@@ -596,124 +761,74 @@ public class OrfAt extends PluginForDecrypt {
                 logger.info("No gapless HLS sources available -> Returning items we found so far");
                 break crawlGapless;
             }
-            final String[] possibleGaplessAudioAndVideoQualityIdentifiers = new String[] { "Q8C", "Q6A", "Q4A" };
-            final List<String> availableAudioAndVideoGaplessQualities = new ArrayList<String>();
-            final List<String> availableAndSelectedAudioAndVideoGaplessQualities = new ArrayList<String>();
-            for (final String possibleGaplessAudioAndVideoQualityIdentifier : possibleGaplessAudioAndVideoQualityIdentifiers) {
-                if (allFMTs.contains(possibleGaplessAudioAndVideoQualityIdentifier)) {
-                    availableAudioAndVideoGaplessQualities.add(possibleGaplessAudioAndVideoQualityIdentifier);
-                    if (selectedQualitiesInternal.contains(possibleGaplessAudioAndVideoQualityIdentifier)) {
-                        availableAndSelectedAudioAndVideoGaplessQualities.add(possibleGaplessAudioAndVideoQualityIdentifier);
-                    }
-                }
-            }
-            if (availableAudioAndVideoGaplessQualities.isEmpty()) {
-                logger.info("No gapless audio/video combined HLS sources available -> Returning items we found so far");
-                break crawlGapless;
-            }
-            if (!settingPreferBestVideo && availableAndSelectedAudioAndVideoGaplessQualities.size() > 0) {
-                /* Process only the items we want && are available -> Speeds up things */
-                logger.info("Crawling only selected && available gapless items: " + availableAndSelectedAudioAndVideoGaplessQualities);
-                availableAudioAndVideoGaplessQualities.clear();
-                availableAudioAndVideoGaplessQualities.addAll(availableAndSelectedAudioAndVideoGaplessQualities);
-            }
-            final List<String> sources_hls_modified = new ArrayList<String>();
-            for (final Map<String, Object> hlssource : sources_hls) {
-                final String hlsMaster = hlssource.get("src").toString();
-                final String urlpart = new Regex(hlsMaster, "_QX(A|B)\\.mp4").getMatch(-1);
-                if (urlpart == null) {
-                    logger.info("Skipping hlsMaster which we cannot modify: " + hlsMaster);
+            final List<Map<String, Object>> gaplessMasterCandidates = new ArrayList<Map<String, Object>>();
+            for (final Map<String, Object> source : sources_hls) {
+                final String qualityKey = (String) source.get("quality_key");
+                if (!"QXA".equals(qualityKey) && !"QXB".equals(qualityKey)) {
+                    /* Not a whole-episode adaptive master -> not usable for gapless. */
+                    continue;
+                } else if (Boolean.TRUE.equals(source.get("is_drm_protected"))) {
+                    logger.info("Skipping DRM protected gapless master: " + qualityKey);
                     continue;
                 }
-                /* 2024-08-01: Workaround to enforce special gapless HLS version where audio and video are streamed together. */
-                for (final String availableAudioAndVideoGaplessQuality : availableAudioAndVideoGaplessQualities) {
-                    final String hlsMasterVideoAudioTogether = hlsMaster.replaceFirst(Pattern.quote(urlpart), "_" + availableAudioAndVideoGaplessQuality + ".mp4");
-                    if (!sources_hls_modified.contains(hlsMasterVideoAudioTogether)) {
-                        sources_hls_modified.add(hlsMasterVideoAudioTogether);
-                    }
-                }
+                gaplessMasterCandidates.add(source);
             }
-            if (sources_hls_modified.isEmpty()) {
-                logger.info("No gapless audio/video combined HLS sources available because: Failed to find modifyable original links -> Returning items we found so far");
+            if (gaplessMasterCandidates.isEmpty()) {
+                logger.info("No usable (non DRM protected) QXA/QXB gapless master found -> Returning items we found so far");
                 break crawlGapless;
             }
+            final Map<String, Object> chosenGaplessMaster = gaplessMasterCandidates.get(new Random().nextInt(gaplessMasterCandidates.size()));
+            final String hlsMaster = chosenGaplessMaster.get("src").toString();
             final List<DownloadLink> gaplessresults = new ArrayList<DownloadLink>();
-            DownloadLink best = null;
-            for (final String hlsMaster : sources_hls_modified) {
-                /* Every HLS master leads to exactly one quality. */
-                try {
-                    br.getPage(hlsMaster);
-                    if (ORFMediathek.isInsertVideoNotAvailable(br.getRequest())) {
-                        logger.info("Skipping \"insert_video_not_available\": " + hlsMaster);
-                        continue;
-                    }
-                } catch (BrowserException e) {
-                    if (ORFMediathek.isInsertVideoNotAvailable(br.getRequest())) {
-                        logger.info("Skipping \"insert_video_not_available\": " + hlsMaster);
-                        continue;
-                    }
-                    throw e;
+            for (final int height : cachedAvailableHeights) {
+                final DownloadLink video = this.createDownloadlink(hlsMaster);
+                video.setDefaultPlugin(hosterplugin);
+                video.setHost(hosterplugin.getHost());
+                video.setContentUrl(sourceurl);
+                video.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_VIDEO);
+                video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, hlsMaster);
+                video.setProperty(ORFMediathek.PROPERTY_VIDEO_HEIGHT, height);
+                video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, "http");
+                video.setProperty(ORFMediathek.PROPERTY_DELIVERY, "hls");
+                final Long guessedFilesize = cumulativeFilesizeMap.get(height);
+                if (guessedFilesize != null) {
+                    video.setDownloadSize(guessedFilesize);
                 }
-                if (ORFMediathek.isGeoBlocked(br.getURL())) {
-                    /* Item is GEO-blocked. If one quality is GEO-blocked, all qualities are. */
-                    throw new DecrypterRetryException(RetryReason.GEO);
-                }
-                int heigthMax = 0;
-                final List<HlsContainer> hlscontainers = HlsContainer.getHlsQualities(br);
-                for (final HlsContainer hlscontainer : hlscontainers) {
-                    final String fmt = heightToOldQualityIdentifier(hlscontainer.getHeight());
-                    final String fmtHumanReadable = heightToHumanReadableQualityIdentifier(hlscontainer.getHeight());
-                    if (fmtHumanReadable == null) {
-                        logger.info("Skipping unknown HLS quality: " + hlscontainer.getResolution());
-                        continue;
-                    }
-                    final DownloadLink video = this.createDownloadlink(hlscontainer.getDownloadurl());
-                    video.setDefaultPlugin(hosterplugin);
-                    video.setHost(hosterplugin.getHost());
-                    video.setContentUrl(sourceurl);
-                    video.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_VIDEO);
-                    video.setProperty(ORFMediathek.PROPERTY_DIRECTURL, hlscontainer.getDownloadurl());
-                    video.setProperty(ORFMediathek.PROPERTY_QUALITY_HUMAN_READABLE, fmtHumanReadable);
-                    video.setProperty(ORFMediathek.PROPERTY_INTERNAL_QUALITY, fmt);
-                    video.setProperty(ORFMediathek.PROPERTY_STREAMING_TYPE, "http");
-                    video.setProperty(ORFMediathek.PROPERTY_DELIVERY, "hls");
-                    final Long guessedFilesize = cumulativeFilesizeMap.get(fmtHumanReadable);
-                    if (guessedFilesize != null) {
-                        video.setDownloadSize(guessedFilesize);
-                    }
-                    gaplessresults.add(video);
-                    if (best == null || hlscontainer.getHeight() > heigthMax) {
-                        heigthMax = hlscontainer.getHeight();
-                        best = video;
-                    }
-                }
-                if (settingPreferBestVideo) {
-                    /* First = best */
-                    break;
-                }
-            }
-            if (gaplessresults.isEmpty()) {
-                /**
-                 * All possible results were skipped? -> This should never happen / very very rare case. </br>
-                 * Either all available video resolutions are unsupported resolutions or GEO-blocked detection failed or something super
-                 * unexpected happened.
-                 */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                gaplessresults.add(video);
             }
             /*
-             * Quality selection is already done here so now we just need to add subtitles and thumbnail depending on users' plugin
-             * settings.
+             * Same quality selection already used for the non-gapless (chapters) results above: BEST, else the user's selected qualities,
+             * else fallback to everything found.
              */
+            final Integer bestGaplessHeight = findBestQuality(cachedAvailableHeights);
+            final List<DownloadLink> chosenGaplessVideoResults = new ArrayList<DownloadLink>();
+            if (settingPreferBestVideo) {
+                for (final DownloadLink gaplessVideoResult : gaplessresults) {
+                    final Integer resultHeight = ORFMediathek.getVideoHeight(gaplessVideoResult);
+                    if (resultHeight != null && resultHeight.equals(bestGaplessHeight)) {
+                        chosenGaplessVideoResults.add(gaplessVideoResult);
+                    }
+                }
+            } else {
+                for (final DownloadLink gaplessVideoResult : gaplessresults) {
+                    final Integer resultHeight = ORFMediathek.getVideoHeight(gaplessVideoResult);
+                    if (resultHeight != null && selectedQualities.contains(resultHeight)) {
+                        chosenGaplessVideoResults.add(gaplessVideoResult);
+                    }
+                }
+                if (chosenGaplessVideoResults.isEmpty()) {
+                    logger.info("None of the desired qualities " + selectedQualities + " were found in the gapless master -> Returning all available gapless qualities instead");
+                    chosenGaplessVideoResults.addAll(gaplessresults);
+                }
+            }
+            /* Add subtitles and thumbnail depending on users' plugin settings. */
             final ArrayList<DownloadLink> gaplessFinalResults = new ArrayList<DownloadLink>();
-            /* Select all chosen results and add subtitle if user wants to download subtitle. */
-            for (final DownloadLink chosenVideoResult : gaplessresults) {
+            for (final DownloadLink chosenVideoResult : chosenGaplessVideoResults) {
                 gaplessFinalResults.add(chosenVideoResult);
-                /* Add a subtitle-result for each chosen video quality */
                 if ((cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_SUBTITLES, ORFMediathek.Q_SUBTITLES_default)) && !StringUtils.isEmpty(gapless_subtitleurl)) {
                     gaplessFinalResults.add(createSubtitleLink(gapless_subtitleurl, subtitle_ext, chosenVideoResult, hosterplugin, null));
                 }
             }
-            /* Add teaser/thumbnail image */
             if ((cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default)) && !StringUtils.isEmpty(thumbnailurlFromFirstSegment)) {
                 gaplessFinalResults.add(createThumbnailLink(thumbnailurlFromFirstSegment, hosterplugin));
             }
@@ -721,7 +836,6 @@ public class OrfAt extends PluginForDecrypt {
                 /* Discard previously found results as we want gapless items only. */
                 ret.clear();
             }
-            /* Add properties and add results to final list */
             for (final DownloadLink result : gaplessFinalResults) {
                 result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
                 result.setProperty(ORFMediathek.PROPERTY_SEGMENT_ID, "gapless");
@@ -764,21 +878,45 @@ public class OrfAt extends PluginForDecrypt {
         return ret;
     }
 
-    private static String findBestQuality(final HashSet<String> available) {
-        final String[] qualities = { "VERYHIGH", "HIGH", "MEDIUM", "LOW", "VERYLOW" };
-        for (final String qual : qualities) {
-            if (available.contains(qual)) {
-                return qual;
+    /** Returns the largest (best) of the given heights, or null if the set is empty. LOW (Q1A) is never part of this set. */
+    private static Integer findBestQuality(final HashSet<Integer> availableHeights) {
+        Integer best = null;
+        for (final Integer height : availableHeights) {
+            if (best == null || height > best) {
+                best = height;
             }
         }
-        return null;
+        return best;
     }
+
+    /** Returns true if any of the given heights is greater than thresholdExclusive. */
+    private static boolean containsHeightAbove(final List<Integer> heights, final int thresholdExclusive) {
+        for (final Integer height : heights) {
+            if (height != null && height > thresholdExclusive) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Properties that getFormattedVideoFilename/getVideoHeight actually read for a subtitle result too (subtitles are named/keyed the same
+     * way as their associated video quality, just with a different extension) -> these are worth copying from the video onto its subtitle.
+     * Everything else (in particular DownloadLink.PROPERTY_VERIFIEDFILESIZE, which setVerifiedFileSize() sets on the video) must NOT be
+     * copied -> a blanket videoResult.getProperties() copy would otherwise make the subtitle report the video's filesize as its own.
+     */
+    private static final String[] SUBTITLE_INHERITED_PROPERTIES = new String[] { ORFMediathek.PROPERTY_STREAMING_TYPE, ORFMediathek.PROPERTY_DELIVERY, ORFMediathek.PROPERTY_VIDEO_HEIGHT, ORFMediathek.PROPERTY_INTERNAL_QUALITY };
 
     private DownloadLink createSubtitleLink(final String subtitleUrl, final String subtitleExt, final DownloadLink videoResult, final ORFMediathek hosterplugin, final String contentUrl) {
         final DownloadLink subtitle = createDownloadlink(subtitleUrl);
         subtitle.setDefaultPlugin(hosterplugin);
         subtitle.setHost(hosterplugin.getHost());
-        subtitle.setProperties(videoResult.getProperties());
+        for (final String propertyKey : SUBTITLE_INHERITED_PROPERTIES) {
+            final Object value = videoResult.getProperty(propertyKey);
+            if (value != null) {
+                subtitle.setProperty(propertyKey, value);
+            }
+        }
         subtitle.setProperty(ORFMediathek.PROPERTY_DIRECTURL, subtitleUrl);
         subtitle.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_SUBTITLE);
         subtitle.setProperty(ORFMediathek.CONTENT_EXT_HINT, subtitleExt);
@@ -862,48 +1000,24 @@ public class OrfAt extends PluginForDecrypt {
         return url;
     }
 
-    private static String heightToHumanReadableQualityIdentifier(final int height) {
-        if (height == 360) {
-            return "MEDIUM";
-        } else if (height == 540) {
-            return "HIGH";
-        } else if (height == 720) {
-            return "VERYHIGH";
-        } else {
-            return null;
-        }
-    }
-
-    private static String heightToOldQualityIdentifier(final int height) {
-        if (height == 360) {
-            return "Q4A";
-        } else if (height == 540) {
-            return "Q6A";
-        } else if (height == 720) {
-            return "Q8C";
-        } else {
-            return null;
-        }
-    }
-
-    public static String humanReadableQualityIdentifier(String internal_identifier) {
-        final String humanreabable;
+    /** Maps the internal (old-style) quality identifier to the height (in pixels) of the corresponding video stream. */
+    public static Integer oldQualityIdentifierToHeight(final String internal_identifier) {
         if ("Q0A".equals(internal_identifier)) {
-            humanreabable = "VERYLOW";
-        } else if ("Q1A".equals(internal_identifier)) {
-            humanreabable = "LOW";
+            /* VERYLOW */
+            return 288;
         } else if ("Q4A".equals(internal_identifier)) {
-            humanreabable = "MEDIUM";
+            /* MEDIUM */
+            return 360;
         } else if ("Q6A".equals(internal_identifier)) {
-            humanreabable = "HIGH";
+            /* HIGH */
+            return 540;
         } else if ("Q8C".equals(internal_identifier)) {
-            humanreabable = "VERYHIGH";
-        } else if ("QXA".equals(internal_identifier) || "QXB".equals(internal_identifier)) {
-            humanreabable = "ADAPTIV";
+            /* VERYHIGH */
+            return 720;
         } else {
-            humanreabable = internal_identifier;
+            /* No known height for Q1A (LOW) or anything else (e.g. ADAPTIV). */
+            return null;
         }
-        return humanreabable;
     }
 
     private ArrayList<DownloadLink> crawlArticle(final CryptedLink param) throws Exception {
@@ -983,7 +1097,7 @@ public class OrfAt extends PluginForDecrypt {
                 }
             }
             if (StringUtils.isEmpty(directurl)) {
-                /* Most likely unsupported streaming type */
+                /* This should never happen -> Most likely unsupported streaming type */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final String episodeSlug = episode.get("slug").toString();

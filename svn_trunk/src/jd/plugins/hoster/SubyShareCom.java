@@ -46,7 +46,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52965 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -234,14 +234,22 @@ public class SubyShareCom extends XFileSharingProBasic {
     }
 
     @Override
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        /* 2026-07-08 */
+        if (br.containsHTML(">\\s*Please Upgrade to premium account to download this file")) {
+            return "Please Upgrade to premium account to download this file";
+        }
+        return super.getPremiumOnlyErrorMessage(br);
+    }
+
+    @Override
     protected String regexWaittime(Browser br) {
         /* 2018-07-19: Special */
-        String waitStr = new Regex(br.getRequest().getHtmlCode(), "id=\"countdown\"[^>]*>[^<]*<[^>]*>(\\d+)</span>").getMatch(0);
+        final String waitStr = new Regex(br.getRequest().getHtmlCode(), "id=\"countdown\"[^>]*>[^<]*<[^>]*>(\\d+)</span>").getMatch(0);
         if (waitStr != null) {
             return waitStr;
-        } else {
-            return super.regexWaittime(br);
         }
+        return super.regexWaittime(br);
     }
 
     @Override

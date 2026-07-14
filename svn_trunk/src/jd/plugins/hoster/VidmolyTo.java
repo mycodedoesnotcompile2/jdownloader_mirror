@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52967 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -229,6 +229,9 @@ public class VidmolyTo extends XFileSharingProBasic {
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
         if (br.containsHTML("/notice\\.php")) {
+            return true;
+        } else if (br.containsHTML("<title>\\s*Video not found")) {
+            /* 2026-07-08 */
             return true;
         } else {
             return super.isOffline(link, br);

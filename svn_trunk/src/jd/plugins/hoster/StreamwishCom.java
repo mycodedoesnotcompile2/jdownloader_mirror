@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52965 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +88,16 @@ public class StreamwishCom extends XFileSharingProBasic {
         deadDomains.add("hgcloud.to"); // 2026-02-17
         deadDomains.add("habetar.com"); // 2026-02-17
         deadDomains.add("huntrexus.com"); // 2026-04-15
+        deadDomains.add("auvexiug.com"); // 2026-07-08
+        deadDomains.add("dumbalag.com"); // 2026-07-08
+        deadDomains.add("dwish.pro"); // 2026-07-08
+        deadDomains.add("guxhag.hg"); // 2026-07-08
+        deadDomains.add("haxloppd.com"); // 2026-07-08
+        deadDomains.add("kravaxxa.com"); // 2026-07-08
+        deadDomains.add("tryzendm.com"); // 2026-07-08
+        deadDomains.add("xenolyzb.com"); // 2026-07-08
+        deadDomains.add("yuguaab.com"); // 2026-07-08
+        deadDomains.add("zuvioeb.com"); // 2026-07-08
         return deadDomains;
     }
 

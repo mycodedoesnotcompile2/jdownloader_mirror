@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52965 $", interfaceVersion = 2, names = {}, urls = {})
 public class NfScRlCm extends PluginForDecrypt {
     public NfScRlCm(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,16 +58,16 @@ public class NfScRlCm extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/folder/[a-f0-9]{32}");
+            ret.add("https?://nfo\\." + buildHostsPatternPart(domains) + "/view/([0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
-        br.setFollowRedirects(false);
-        br.getPage(parameter);
+        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl();
+        br.setFollowRedirects(true);
+        br.getPage(contenturl);
         /* Error handling */
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -75,7 +75,7 @@ public class NfScRlCm extends PluginForDecrypt {
         /* 2022-01-17: They've added one extra step */
         Form continueForm = null;
         for (final Form form : br.getForms()) {
-            if (form.containsHTML("Click to Show Links")) {
+            if (form.containsHTML("Click to Show Links") || form.containsHTML(">\\s*Download Links")) {
                 continueForm = form;
                 break;
             }
@@ -83,17 +83,18 @@ public class NfScRlCm extends PluginForDecrypt {
         if (continueForm != null) {
             br.submitForm(continueForm);
         }
-        final String[] links = HTMLParser.getHttpLinks(br.toString(), "");
+        final String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), "");
         /* avoid recursion */
         for (int i = 0; i < links.length; i++) {
             final String dlLink = links[i];
             if (!this.canHandle(dlLink)) {
-                decryptedLinks.add(createDownloadlink(dlLink));
+                ret.add(createDownloadlink(dlLink));
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

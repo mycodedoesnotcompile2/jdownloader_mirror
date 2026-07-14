@@ -54,7 +54,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 52419 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52974 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -330,10 +330,10 @@ public class XvideosComProfile extends PluginForDecrypt {
                 final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Map<String, Object>> videos = (List<Map<String, Object>>) entries.get("videos");
                 int numberofNewItemsThisPage = 0;
-                for (final Map<String, Object> video : videos) {
-                    final String singleLink = video.get("url").toString();
-                    final String videoID = video.get("id").toString();
-                    final String title = (String) video.get("title");
+                for (final Map<String, Object> videomap : videos) {
+                    final String singleLink = videomap.get("url").toString();
+                    final String videoID = videomap.get("id").toString();
+                    final String title = (String) videomap.get("title");
                     if (!dupes.add(videoID)) {
                         /* Skip dupes */
                         continue;
@@ -348,25 +348,25 @@ public class XvideosComProfile extends PluginForDecrypt {
                             logger.warning("Detected URL goes into nirvana: " + videourl);
                         }
                     }
-                    final DownloadLink dl = createDownloadlink(videourl);
+                    final DownloadLink video = createDownloadlink(videourl);
                     /* Usually we will crawl a lot of URLs at this stage --> Set onlinestatus right away! */
-                    dl.setAvailable(true);
-                    fp.add(dl);
+                    video.setAvailable(true);
+                    fp.add(video);
                     final String nameTemp;
                     if (!StringUtils.isEmpty(title)) {
                         nameTemp = (correctVideoID != null ? correctVideoID[0] : videoID) + "_" + title;
                     } else {
                         nameTemp = (correctVideoID != null ? correctVideoID[0] : videoID);
                     }
-                    dl.setName(nameTemp + ".mp4");
+                    video.setName(nameTemp + ".mp4");
                     /* Packagizer properties */
                     if (correctVideoID != null) {
-                        dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID[0]);
+                        video.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID[0]);
                     }
-                    dl.setProperty(XvideosCore.PROPERTY_USERNAME, username);
-                    dl._setFilePackage(fp);
-                    ret.add(dl);
-                    distribute(dl);
+                    video.setProperty(XvideosCore.PROPERTY_USERNAME, username);
+                    video._setFilePackage(fp);
+                    ret.add(video);
+                    distribute(video);
                     numberofNewItemsThisPage++;
                 }
                 logger.info("Crawled quickies page " + page + " | New items this page: " + numberofNewItemsThisPage + " | Total: " + ret.size());

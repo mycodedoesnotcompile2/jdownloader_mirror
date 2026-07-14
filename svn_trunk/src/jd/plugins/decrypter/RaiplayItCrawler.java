@@ -27,6 +27,17 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.RaiplayItConfig;
+import org.jdownloader.plugins.components.config.RaiplayItConfig.QualitySelectionMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -45,18 +56,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.RaiplayItConfig;
-import org.jdownloader.plugins.components.config.RaiplayItConfig.QualitySelectionMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52965 $", interfaceVersion = 3, names = {}, urls = {})
 public class RaiplayItCrawler extends PluginForDecrypt {
     public RaiplayItCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,6 @@ public class RaiplayItCrawler extends PluginForDecrypt {
     private static final String TYPE_RAIPLAY_PROGRAMMI = "https?://[^/]+/programmi/([^/]+).*";
     // private static final String TYPE_RAIPLAY_IT = "https?://.+raiplay\\.it/.+";
     private static final String TYPE_CONTENTITEM       = ".+/dl/[^<>\"]+/ContentItem\\-[a-f0-9\\-]+\\.html$";
-
     // private final String PROPERTY_TITLE = "title";
     // private final String PROPERTY_TITLE_SHOW = "title_show";
     // private final String PROPERTY_DATE = "date";
@@ -579,7 +578,7 @@ public class RaiplayItCrawler extends PluginForDecrypt {
         }
         final String middleBitrate = brc.getRegex("<bitrate>(\\d+)</bitrate>").getMatch(0);
         final String[] staticBitrateList = new String[] { "10000", "5000", "3600", "3200", "2400", "1800", "1200", "700", "400", "250" };
-        final QualitySelectionMode mode = PluginJsonConfig.get(this.getConfigInterface()).getQualitySelectionMode();
+        final QualitySelectionMode mode = PluginJsonConfig.get(getConfigInterface()).getQualitySelectionMode();
         final String httpBitratesFromMPDStreamingMinusSeparated = new Regex(dllink, "filter=[A-Za-z0-9]+_([0-9\\-]+)").getMatch(0);
         if (StringUtils.containsIgnoreCase(dllink, ".m3u8") || httpBitratesFromMPDStreamingMinusSeparated != null) {
             // https?:\/\/[^\/]+\/i\/VOD\/(teche_root\/YT_ITALIA_TECHE_HD\/[0-9]*_)([0-9,]+)\.mp4(?:.csmil)?\/index_[0-9]+_av.m3u8\?null=[0-9]+&id=[A-Za-z0-9]+%3d%3d&hdntl=exp=[0-9]+~acl=%2f\*~data=hdntl~hmac=[A-Za-z0-9]+

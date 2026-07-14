@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52940 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52974 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexCakeCom extends PluginForHost {
     public SexCakeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,24 +58,16 @@ public class SexCakeCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xnxxvideos.win" });
-        ret.add(new String[] { "pizdegoale.cc" });
         ret.add(new String[] { "bluevideos.net" });
         ret.add(new String[] { "filmexnxx.net" });
         ret.add(new String[] { "pornoxnxx.video" });
-        ret.add(new String[] { "pompini.org" });
-        ret.add(new String[] { "pornhubfilme.gratis" });
-        ret.add(new String[] { "qorno.video" });
         ret.add(new String[] { "rubias19.red" });
         ret.add(new String[] { "sexyfilm.blue" });
         /* 2026-07-01: porncomixone.net also redirects to this one RE forum 90642 */
         ret.add(new String[] { "redporn.video" });
         ret.add(new String[] { "voglioporno.gratis" });
-        ret.add(new String[] { "voglioporno.cc" });
         ret.add(new String[] { "xnxxvideos.gratis" });
-        ret.add(new String[] { "xxx-haus.net" });
         ret.add(new String[] { "xxxbucetas.net" });
-        ret.add(new String[] { "sambaporno.cc" });
         return ret;
     }
 
@@ -91,7 +83,7 @@ public class SexCakeCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/.+\\.html");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/.+\\.html");
         }
         return ret.toArray(new String[0]);
     }
@@ -127,7 +119,7 @@ public class SexCakeCom extends PluginForHost {
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         dllink = null;
         final String path = new URL(link.getPluginPatternMatcher()).getPath();
-        final String title = Encoding.htmlDecode(path).substring(1).replace("-", " ").trim().replaceFirst("\\.html$", "");
+        final String title = Encoding.htmlDecode(path).substring(1).replace("-", " ").trim().replaceFirst("\\.html?$", "");
         link.setFinalFileName(title + ".mp4");
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
@@ -160,26 +152,13 @@ public class SexCakeCom extends PluginForHost {
             br.followConnection(true);
             if (br.containsHTML("deleted")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                super.handleConnectionErrors(br, con);
             }
+            super.handleConnectionErrors(br, con);
         }
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

@@ -17,10 +17,10 @@ import org.jdownloader.updatev2.UpdateController;
 public class FFMpegInstallThread extends Thread {
     private static enum ExtensionPackages {
         MAC_BIG_SUR_AS("ffmpeg_as_11+") {
+            // https://ffmpeg.martin-riedl.de/
             @Override
             protected boolean isSupported() {
-                // no pre compiled binaries available yet
-                return false && CrossSystem.getOS().isMinimum(OperatingSystem.MAC_BIG_SUR) && CrossSystem.ARCHFamily.ARM.equals(CrossSystem.getARCHFamily());
+                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_BIG_SUR) && CrossSystem.ARCHFamily.ARM.equals(CrossSystem.getARCHFamily());
             }
 
             @Override
@@ -30,6 +30,7 @@ public class FFMpegInstallThread extends Thread {
             }
         },
         MAC_YOSEMITE("ffmpeg_10.10+") {
+            // https://ffmpeg.martin-riedl.de/
             @Override
             protected boolean isSupported() {
                 // intel package is compatible to apple silicon because of rosetta 2 support
@@ -43,6 +44,7 @@ public class FFMpegInstallThread extends Thread {
             }
         },
         MAC_SNOW_LEOPOARD("ffmpeg_10.6+") {
+            // no longer updated/maintained
             @Override
             protected boolean isSupported() {
                 return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_SNOW_LEOPOARD);
@@ -55,6 +57,7 @@ public class FFMpegInstallThread extends Thread {
             }
         },
         MAC_LEOPOARD("ffmpeg_10.5.x-") {
+            // no longer updated/maintained
             @Override
             protected boolean isSupported() {
                 return CrossSystem.isMac() && ((!CrossSystem.getOS().isMinimum(OperatingSystem.MAC_SNOW_LEOPOARD) || !CrossSystem.is64BitOperatingSystem()));
@@ -78,6 +81,9 @@ public class FFMpegInstallThread extends Thread {
             }
         },
         WINDOWS("ffmpeg") {
+            // https://www.ffmpeg.download/
+            // https://www.gyan.dev/ffmpeg/builds/
+            // https://github.com/defisym/FFmpeg-Builds-Win32
             @Override
             protected boolean isSupported() {
                 // Windows XP is no longer supported by bundled ffmpeg version
@@ -167,6 +173,7 @@ public class FFMpegInstallThread extends Thread {
                 return null;
             }
         };
+
         protected abstract boolean isSupported();
 
         protected abstract File getBundledBinaryPath(BINARY binary);

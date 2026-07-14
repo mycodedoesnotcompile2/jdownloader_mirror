@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52915 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52974 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XvideosCore extends PluginForHost {
     public XvideosCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -169,25 +169,92 @@ public abstract class XvideosCore extends PluginForHost {
         }
     }
 
+    /**
+     * Returns the internal, purely numeric video ID of the given link, or null if it has no ID or only an
+     * {@link #getEncodedVideoID(DownloadLink)}.
+     */
+    protected String getInternalVideoID(final DownloadLink link) {
+        final String storedVideoID = link.getStringProperty(PROPERTY_VIDEOID);
+        if (storedVideoID != null && storedVideoID.matches("\\d+")) {
+            return storedVideoID;
+        }
+        return getInternalVideoID(link.getPluginPatternMatcher());
+    }
+
+    /**
+     * Returns the encoded (non-numeric) video ID of the given link, or null if it has no ID or only an
+     * {@link #getInternalVideoID(DownloadLink)}.
+     */
+    protected String getEncodedVideoID(final DownloadLink link) {
+        final String storedVideoID = link.getStringProperty(PROPERTY_VIDEOID);
+        if (storedVideoID != null && !storedVideoID.matches("\\d+")) {
+            return storedVideoID;
+        }
+        return getEncodedVideoID(link.getPluginPatternMatcher());
+    }
+
     protected String getVideoidFromURL(final String url) {
         if (url == null) {
             return null;
         }
         String id;
+        id = new Regex(url, TYPE_EMBED_ONLY_NUMBERS).getMatch(0);
+        if (id != null) {
+            return id;
+        }
         id = new Regex(url, TYPE_EMBED).getMatch(0);
-        if (id != null) return id;
-        id = new Regex(url, type_normal).getMatch(0);
-        if (id != null) return id;
+        if (id != null) {
+            return id;
+        }
+        id = new Regex(url, TYPE_NORMAL_OLD).getMatch(0);
+        if (id != null) {
+            return id;
+        }
         id = new Regex(url, TYPE_NORMAL_DOT).getMatch(0);
-        if (id != null) return id;
+        if (id != null) {
+            return id;
+        }
         id = new Regex(url, type_normal_dash).getMatch(0);
-        if (id != null) return id;
+        if (id != null) {
+            return id;
+        }
         id = new Regex(url, TYPE_SPECIAL1).getMatch(0);
-        if (id != null) return id;
+        if (id != null) {
+            return id;
+        }
         id = new Regex(url, TYPE_SPECIAL2).getMatch(2);
-        if (id != null) return id;
+        if (id != null) {
+            return id;
+        }
         id = new Regex(url, TYPE_CLICK).getMatch(1);
-        if (id != null) return id;
+        if (id != null) {
+            return id;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the internal, purely numeric video ID contained in the given URL, or null if the URL contains no ID or only an
+     * {@link #getEncodedVideoID(String)}. </br>
+     * Relevant e.g. for embedframe URLs which exist in both, numbers-only and encoded ID flavor.
+     */
+    protected String getInternalVideoID(final String url) {
+        final String id = getVideoidFromURL(url);
+        if (id != null && id.matches("\\d+")) {
+            return id;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the encoded (non-numeric) video ID contained in the given URL, or null if the URL contains no ID or only an
+     * {@link #getInternalVideoID(String)}.
+     */
+    protected String getEncodedVideoID(final String url) {
+        final String id = getVideoidFromURL(url);
+        if (id != null && !id.matches("\\d+")) {
+            return id;
+        }
         return null;
     }
 
@@ -211,22 +278,30 @@ public abstract class XvideosCore extends PluginForHost {
         }
         String title;
         title = new Regex(url, TYPE_SPECIAL1).getMatch(1);
-        if (title != null) return title;
+        if (title != null) {
+            return title;
+        }
         title = new Regex(url, TYPE_SPECIAL2).getMatch(1);
-        if (title != null) return title;
+        if (title != null) {
+            return title;
+        }
         title = new Regex(url, TYPE_CLICK).getMatch(2);
-        if (title != null) return title;
+        if (title != null) {
+            return title;
+        }
         /* Not all URLs have titles */
         return null;
     }
 
     /* xvideos.com */
-    protected static final String  type_normal                     = "(?i)https?://[^/]+/video(\\d+)(/(.+))?$";
+    protected static final String  TYPE_NORMAL_OLD                 = "(?i)https?://[^/]+/video(\\d+)(/(.+))?$";
     protected static final Pattern TYPE_NORMAL_DOT                 = Pattern.compile("/video\\.([a-z0-9\\-]+)(.*?/[^/]+)?$", Pattern.CASE_INSENSITIVE);
     protected static final Pattern TYPE_CLICK                      = Pattern.compile("/prof-video-click/upload/([a-z0-9\\-_]+)/([a-z0-9\\-]+)/([a-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
     /* xnxx.gold */
-    protected static final String  type_normal_dash                = "(?i)https?://[^/]+/video-([a-z0-9\\-]+)(/[^/]+)?$";                                                                 // xnxx.com& xnxx.gold
+    protected static final String  type_normal_dash                = "(?i)https?://[^/]+/video-([a-z0-9\\-]+)(/[^/]+)?$";                                                                 // xnxx.com&
+                                                                                                                                                                                          // xnxx.gold
     protected static final Pattern TYPE_EMBED                      = Pattern.compile("/embedframe/([a-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    protected static final Pattern TYPE_EMBED_ONLY_NUMBERS         = Pattern.compile("/embedframe/(\\d+)$", Pattern.CASE_INSENSITIVE);
     protected static final Pattern TYPE_SPECIAL1                   = Pattern.compile("/[^/]+/upload/[^/]+/(\\d+)/([^/]+)", Pattern.CASE_INSENSITIVE);
     protected static final Pattern TYPE_SPECIAL2                   = Pattern.compile("/[^/]+/(upload|pornstar|model)/([a-z0-9\\-_]+)/(\\d+)", Pattern.CASE_INSENSITIVE);
     protected static final String  NOCHUNKS                        = "NOCHUNKS";
@@ -240,7 +315,9 @@ public abstract class XvideosCore extends PluginForHost {
 
     protected String getContentURL(final DownloadLink link) {
         String url = link.getPluginPatternMatcher();
-        if (!url.matches(type_normal) && !url.matches(type_normal_dash) && !new Regex(url, TYPE_NORMAL_DOT).patternFind()) {
+        final String encodedVideoID = getEncodedVideoID(link);
+        if (encodedVideoID != null) {
+            /* We need an encoded videoID to be able to build "normal" content-urls, otherwise we can only generate embed URLs. */
             final String normalContentURL = buildNormalContentURL(link);
             if (normalContentURL != null) {
                 url = normalContentURL;
@@ -278,33 +355,32 @@ public abstract class XvideosCore extends PluginForHost {
     private boolean isValidVideoURL(final DownloadLink link, final String url, final boolean setFilesize) throws Exception {
         if (StringUtils.isEmpty(url)) {
             return false;
-        } else {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                con = br2.openHeadConnection(url);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0 && setFilesize) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
+        }
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            br2.setFollowRedirects(true);
+            con = br2.openHeadConnection(url);
+            if (this.looksLikeDownloadableContent(con)) {
+                if (con.getCompleteContentLength() > 0 && setFilesize) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                    return true;
-                } else {
-                    throw new IOException();
                 }
-            } catch (final IOException e) {
-                logger.log(e);
-                return false;
-            } finally {
-                if (con != null) {
-                    try {
-                        con.disconnect();
-                    } catch (Throwable e) {
-                    }
+                return true;
+            } else {
+                throw new IOException();
+            }
+        } catch (final IOException e) {
+            logger.log(e);
+            return false;
+        } finally {
+            if (con != null) {
+                try {
+                    con.disconnect();
+                } catch (Throwable e) {
                 }
             }
         }
@@ -312,6 +388,15 @@ public abstract class XvideosCore extends PluginForHost {
 
     protected boolean looksLikeSupportedLink(final String url) {
         return this.canHandle(url);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final String urlTitle = getURLTitle(link);
+        if (urlTitle != null) {
+            return urlTitle + ".mp4";
+        }
+        return super.getDefaultFileName(link);
     }
 
     @Override
@@ -334,10 +419,6 @@ public abstract class XvideosCore extends PluginForHost {
     private AvailableStatus requestFileInformation(final DownloadLink link, Account account, final boolean isDownload) throws Exception {
         try {
             final String contentURL = this.getContentURL(link);
-            final String urlTitle = getURLTitle(link);
-            if (!link.isNameSet() && urlTitle != null) {
-                link.setName(urlTitle + ".mp4");
-            }
             br.setFollowRedirects(false);
             br.getHeaders().put("Accept-Encoding", "gzip");
             /* 2021-07-07: They seem to ignore this header and set language randomly or by IP or by user-choice! */
@@ -376,7 +457,10 @@ public abstract class XvideosCore extends PluginForHost {
                 br.getPage(redirect);
                 counter += 1;
             }
-            if (br.containsHTML("(This video has been deleted|Page not found|>\\s*Sorry, this video is not available|>We received a request to have this video deleted|class=\"inlineError\")")) {
+            if (br.containsHTML(">\\s*This video has been deleted")) {
+                /* e.g. pattern TYPE_EMBED_ONLY_NUMBERS */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML("(Page not found|>\\s*Sorry, this video is not available|>We received a request to have this video deleted|class=\"inlineError\")")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">\\s*Sorry but the page you requested was not found")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -385,6 +469,22 @@ public abstract class XvideosCore extends PluginForHost {
             } else if (!this.looksLikeSupportedLink(br.getURL())) {
                 /* 2020-12-15: E.g. redirect to mainpage */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (new Regex(br._getURL().getPath(), TYPE_EMBED_ONLY_NUMBERS).patternFind()) {
+                /* We are on an embed URL but we need the "normal" video link to continue */
+                final String normalVideoURL = br.getRegex("setVideoURL\\('(/video\\.[a-z0-9\\-]+/[^']+)'\\)").getMatch(0);
+                if (normalVideoURL == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                br.getPage(normalVideoURL);
+            }
+            if (!link.hasProperty(PROPERTY_VIDEOID)) {
+                final String internal_video_id = br.getRegex("'html5video',\\s*'?(\\d+)").getMatch(0);
+                if (internal_video_id != null) {
+                    link.setProperty(PROPERTY_VIDEOID, internal_video_id);
+                } else {
+                    logger.warning("Failed to find internal video_id");
+                }
             }
             /* Original title (independent from selected language) */
             String filename = br.getRegex("\"video_title_ori\"\\s*:\\s*\"(.*?)\"").getMatch(0);
@@ -395,7 +495,7 @@ public abstract class XvideosCore extends PluginForHost {
                     filename = br.getRegex("(?i)<title>([^<>\"]*?)\\- XVIDEOS\\.COM</title>").getMatch(0);
                 }
             }
-            {
+            set_packagizer_properties: {
                 /* Set packagizer properties */
                 final String uploadername = PluginJSonUtils.getJson(br, "uploader");
                 if (StringUtils.isEmpty(link.getStringProperty(PROPERTY_USERNAME)) && !StringUtils.isEmpty(uploadername)) {
@@ -638,8 +738,7 @@ public abstract class XvideosCore extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception {
-        final String contentURL = this.getContentURL(link);
-        if (Browser.getHost(contentURL).equalsIgnoreCase(this.getPremiumDomain(account)) && (account == null || account.getType() != AccountType.PREMIUM) && this.streamURL == null && this.hlsContainer == null) {
+        if (Browser.getHost(link.getPluginPatternMatcher()).equalsIgnoreCase(this.getPremiumDomain(account)) && (account == null || account.getType() != AccountType.PREMIUM) && this.streamURL == null && this.hlsContainer == null) {
             throw new AccountRequiredException();
         }
         if (streamURL != null) {

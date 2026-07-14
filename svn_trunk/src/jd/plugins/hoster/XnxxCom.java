@@ -27,7 +27,7 @@ import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50841 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52974 $", interfaceVersion = 2, names = {}, urls = {})
 public class XnxxCom extends XvideosCore {
     public XnxxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +104,7 @@ public class XnxxCom extends XvideosCore {
             return link.getPluginPatternMatcher();
         }
         final String urlHost = Browser.getHost(link.getPluginPatternMatcher(), false);
-        final String videoID = this.getVideoidFromURL(link.getPluginPatternMatcher());
+        final String videoID = this.getEncodedVideoID(link);
         if (videoID != null) {
             /* 2021-07-23: This needs to end with a slash otherwise the URL will be invalid! */
             String newURL = "https://www." + urlHost + "/video-" + videoID;
@@ -129,13 +129,5 @@ public class XnxxCom extends XvideosCore {
             return true;
         }
         return this.canHandle(url);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

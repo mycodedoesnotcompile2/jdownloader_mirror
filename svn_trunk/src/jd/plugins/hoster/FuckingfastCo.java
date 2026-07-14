@@ -16,8 +16,14 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -32,9 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 51880 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52973 $", interfaceVersion = 3, names = {}, urls = {})
 public class FuckingfastCo extends PluginForHost {
     public FuckingfastCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +56,7 @@ public class FuckingfastCo extends PluginForHost {
         return "https://" + getHost();
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "fuckingfast.co" });
@@ -68,10 +72,16 @@ public class FuckingfastCo extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_FILE = Pattern.compile("/([a-z0-9]{12})(#([^/]+))?");
+
     public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9]{12})(#([^/]+))?");
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -87,7 +97,19 @@ public class FuckingfastCo extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final URL url = getURL(link);
+        if (url == null) {
+            return null;
+        }
+        return new Regex(url.getPath(), PATTERN_FILE).getMatch(0);
+    }
+
+    private URL getURL(final DownloadLink link) {
+        try {
+            return new URL(link.getPluginPatternMatcher());
+        } catch (final MalformedURLException e) {
+            return null;
+        }
     }
 
     @Override
@@ -100,18 +122,18 @@ public class FuckingfastCo extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            final Regex urlregex = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-            final String fid = urlregex.getMatch(0);
-            final String filenameFromURL = urlregex.getMatch(2);
-            if (filenameFromURL != null) {
-                link.setName(Encoding.htmlDecode(filenameFromURL).trim());
-            } else {
-                link.setName(fid);
-            }
+    protected String getDefaultFileName(DownloadLink link) {
+        final URL url = getURL(link);
+        final String filenameFromURL = url != null ? url.getRef() : null;
+        if (filenameFromURL != null) {
+            return Encoding.htmlDecode(filenameFromURL).trim();
+        } else {
+            return getFID(link);
         }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -121,9 +143,11 @@ public class FuckingfastCo extends PluginForHost {
         this.throwConnectionExceptions(br, br.getHttpConnection());
         String filename = HTMLSearch.searchMetaTagName(br.getRequest(), "title");
         final String filesize = br.getRegex(">\\s*Size\\s*(?::|-)\\s*([^<]+)\\s*\\|").getMatch(0);
-        if (filename != null) {
+        if (!StringUtils.isEmpty(filename)) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -141,8 +165,16 @@ public class FuckingfastCo extends PluginForHost {
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         final String fid = this.getFID(link);
-        final String dllink = br.getRegex("window\\.open\\(\"(https?://[^\"]+)").getMatch(0);
-        if (dllink == null) {
+        String dllink = br.getRegex("window\\.open\\(\"(https?://[^\"]+)").getMatch(0);
+        final String golink = "/f/" + fid + "/go";
+        if (dllink == null && br.containsHTML(golink)) {
+            // 2026-07-09
+            final Browser brc = br.cloneBrowser();
+            /* Should respond with plaintext "OK" and the header down below that we need. */
+            brc.postPage(golink, "");
+            dllink = brc.getRequest().getResponseHeader("Hx-Redirect");
+        }
+        if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final boolean signalServerThatDownloadWasStarted = false;
@@ -169,13 +201,5 @@ public class FuckingfastCo extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
