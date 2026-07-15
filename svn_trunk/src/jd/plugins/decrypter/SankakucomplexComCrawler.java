@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 52973 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52980 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -370,6 +370,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         int page = targetPage != null ? targetPage.intValue() : 1;
         int position = 1;
+        final HashSet<String> usedNextPageHashes = new HashSet<String>();
         pagination: do {
             final Browser brc = createNewBrowserInstanceAPI();
             final Request request = hosterplugin.addAPIToken(brc.createGetRequest(API_BASE + "/posts/keyset?" + query.toString()), account);
@@ -413,15 +414,18 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             } else if (StringUtils.isEmpty(nextPageHash)) {
                 logger.info("Stopping because: Reached end(?)");
                 break pagination;
-            } else if (data.size() < maxItemsPerPage) {
-                logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
+            } else if (!usedNextPageHashes.add(nextPageHash)) {
+                logger.info("Stopping because: nextPageHash was already used before -> possible infinite pagination loop -> " + nextPageHash);
                 break pagination;
-            } else {
-                /* Continue to next page */
-                page++;
-                query.addAndReplace("next", Encoding.urlEncode(nextPageHash));
-                continue pagination;
             }
+            /* Continue to next page */
+            if (data.size() < maxItemsPerPage) {
+                /* Log seemingly incomplete pages */
+                logger.info("Pagination looks incomplete: Current page only contains " + data.size() + "/" + maxItemsPerPage + " items");
+            }
+            page++;
+            query.addAndReplace("next", Encoding.urlEncode(nextPageHash));
+            continue pagination;
         } while (true);
         if (ret.isEmpty()) {
             logger.info("Looks like users' given tag does not lead to any search results");

@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 52976 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52980 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -225,7 +225,11 @@ public class OrfAt extends PluginForDecrypt {
             fp.setComment(description);
         }
         fp.setPackageKey("orfmediathek://video/" + contentIDSlashPlaylistIDSlashVideoID);
+        /* 2026-07-14: Age restriction used to be skippable via gapless streams but not anymore. */
         final boolean has_active_youth_protection = ((Boolean) entries.get("has_active_youth_protection")).booleanValue();
+        if (has_active_youth_protection) {
+            throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
+        }
         final ORFMediathek hosterplugin = (ORFMediathek) this.getNewPluginForHostInstance("orf.at");
         final Map<Integer, Long> cumulativeFilesizeMap = new HashMap<Integer, Long>();
         /* Selected video qualities by height (in pixels). Progressive delivery only exists for 360/540/720 (Q4A/Q6A/Q8C). */
@@ -450,7 +454,10 @@ public class OrfAt extends PluginForDecrypt {
                             /* Try each candidate until we find one that actually works. */
                             final String hlsPlaylistUrl = hlsUrlByQuality.get(hlsQualityTag);
                             brc.getPage(hlsPlaylistUrl);
-                            if (ORFMediathek.isGeoBlocked(brc.getURL())) {
+                            if (ORFMediathek.isAgeRestricted(brc.getURL())) {
+                                /* Item is GEO-blocked */
+                                throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
+                            } else if (ORFMediathek.isGeoBlocked(brc.getURL())) {
                                 /* Item is GEO-blocked */
                                 throw new DecrypterRetryException(RetryReason.GEO);
                             } else if (!LinkCrawlerDeepInspector.looksLikeMpegURL(brc.getHttpConnection())) {
@@ -488,7 +495,17 @@ public class OrfAt extends PluginForDecrypt {
                         logger.info("HLS doesn't offer more than progressive here and user doesn't want HLS -> Skipping HLS results for this segment");
                         break find_hls_qualities;
                     }
+                    /*
+                     * If the user didn't explicitly ask for HLS and progressive is still available, HLS is only here to supplement
+                     * progressive's cap -> only take the heights progressive can't offer (above 720p). Otherwise (HLS explicitly wanted, or
+                     * progressive fully disabled) HLS is a full alternative source -> take every height it offers.
+                     */
+                    final boolean hlsCoversEverything = user_wants_HLS || !allowProgressive;
                     for (final int height : availableHeightsThisSegment) {
+                        if (!hlsCoversEverything && height <= 720) {
+                            logger.info("Skipping HLS height " + height + "p: already covered by progressive and user doesn't want HLS");
+                            continue;
+                        }
                         final DownloadLink video = super.createDownloadlink(hlsMaster);
                         video.setDefaultPlugin(hosterplugin);
                         video.setHost(hosterplugin.getHost());
@@ -581,12 +598,12 @@ public class OrfAt extends PluginForDecrypt {
                                 if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
                                     logger.info("Skipping \"insert_video_not_available\": " + src);
                                     continue;
-                                } else if (!this.looksLikeDownloadableContent(con)) {
-                                    logger.info("Skipping broken progressive video quality: " + src);
-                                    continue;
                                 } else if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
                                     /* Item is GEO-blocked */
                                     throw new DecrypterRetryException(RetryReason.GEO);
+                                } else if (!this.looksLikeDownloadableContent(con)) {
+                                    logger.info("Skipping broken progressive video quality: " + src);
+                                    continue;
                                 }
                                 final long filesize = con.getCompleteContentLength();
                                 if (filesize <= 0) {
@@ -717,7 +734,10 @@ public class OrfAt extends PluginForDecrypt {
         logger.info("Available video qualities (height in px) across all segments of this video: " + allVideoHeights);
         final boolean allowCrawlGapless;
         if (has_active_youth_protection) {
-            /* With a bit of luck, this can skip age protection */
+            /**
+             * With a bit of luck, this can skip age protection <br>
+             * 2026-07-14: Not possible anymore, see upper comments.
+             */
             logger.info("Allowing to crawl gapless items to avoid youth protection");
             allowCrawlGapless = true;
             /* Non-gapless items remain youth-blocked so let's discard them if we find gapless items. */
@@ -774,7 +794,7 @@ public class OrfAt extends PluginForDecrypt {
                 gaplessMasterCandidates.add(source);
             }
             if (gaplessMasterCandidates.isEmpty()) {
-                logger.info("No usable (non DRM protected) QXA/QXB gapless master found -> Returning items we found so far");
+                logger.info("No usable (non DRM protected) QXA/QXB gapless master found -> Returning [non-gapless] items we found so far");
                 break crawlGapless;
             }
             final Map<String, Object> chosenGaplessMaster = gaplessMasterCandidates.get(new Random().nextInt(gaplessMasterCandidates.size()));

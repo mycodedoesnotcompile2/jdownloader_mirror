@@ -21,6 +21,7 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -28,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52979 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52980 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilezzCloud extends XFileSharingProBasic {
     public FilezzCloud(final PluginWrapper wrapper) {
         super(wrapper);
@@ -110,10 +111,27 @@ public class FilezzCloud extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilename = new Regex(html, "<title>\\s*Download\\s*([^<]+)\\s*</title>").getMatch(0);
+        String betterFilename = new Regex(html, "class=\"fas fa-file me-2\"[^>]*></i>([^<]+)</a>").getMatch(0);
+        if (betterFilename == null) {
+            betterFilename = new Regex(html, "<title>\\s*Download\\s*([^<]+)\\s*</title>").getMatch(0);
+        }
         if (betterFilename != null) {
             fileInfo[0] = Encoding.htmlDecode(betterFilename).trim();
         }
         return fileInfo;
+    }
+
+    @Override
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex(">[^<]*(You don't have sufficient funds in your account to cover this file price)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+            final String filePrice = br.getRegex("(File Price:\\s*\\$\\d+\\.\\d+)").getMatch(0);
+            if (filePrice != null) {
+                msg += "\r\n" + filePrice;
+            }
+            return msg;
+        }
+        return super.getPremiumOnlyErrorMessage(br);
     }
 }

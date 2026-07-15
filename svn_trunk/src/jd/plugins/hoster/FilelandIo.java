@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51232 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52980 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilelandIo extends XFileSharingProBasic {
     public FilelandIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -122,8 +122,7 @@ public class FilelandIo extends XFileSharingProBasic {
                 msg += "\r\n" + filePrice;
             }
             return msg;
-        } else {
-            return super.getPremiumOnlyErrorMessage(br);
         }
+        return super.getPremiumOnlyErrorMessage(br);
     }
 }
