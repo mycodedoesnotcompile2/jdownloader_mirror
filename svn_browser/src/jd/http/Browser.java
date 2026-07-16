@@ -114,9 +114,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     sb.append(message);
                 }
                 return sb.toString();
-            } else {
-                return super.getMessage();
             }
+            return super.getMessage();
         }
 
         public Request removeRequest() {
@@ -252,9 +251,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final IPVERSION ipVersion = this.ipVersion;
         if (ipVersion != null) {
             return ipVersion;
-        } else {
-            return Browser.getGlobalIPVersion();
         }
+        return Browser.getGlobalIPVersion();
     }
 
     public void setIPVersion(IPVERSION ipVersion) {
@@ -335,11 +333,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 ret = ret.substring(indexPoint + 1);
             }
         }
-        if (ret != null) {
-            return ret.toLowerCase(Locale.ENGLISH);
-        } else {
+        if (ret == null) {
             return url;
         }
+        return ret.toLowerCase(Locale.ENGLISH);
     }
 
     public static String getSubdomain(final URL uri, final boolean removeTrailingDelimiter) {
@@ -347,9 +344,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final String withSubdomain = Browser.getHost(uri, true);
         if (StringUtils.equals(withoutSubdomain, withSubdomain)) {
             return null;
-        } else {
-            return withSubdomain.replaceFirst((removeTrailingDelimiter ? "\\." : "") + Pattern.quote(withoutSubdomain) + "$", "");
         }
+        return withSubdomain.replaceFirst((removeTrailingDelimiter ? "\\." : "") + Pattern.quote(withoutSubdomain) + "$", "");
     }
 
     public static String getSubdomain(final String url, final boolean removeTrailingDelimiter) throws MalformedURLException {
@@ -380,11 +376,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 ret = ret.substring(indexPoint + 1);
             }
         }
-        if (ret != null) {
-            return ret.toLowerCase(Locale.ENGLISH);
-        } else {
+        if (ret == null) {
             return ret;
         }
+        return ret.toLowerCase(Locale.ENGLISH);
     }
 
     /**
@@ -593,9 +588,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
             final Object value = map.get(host);
             if (value != null) {
                 return new Object[] { host, value };
-            } else {
-                host = host.replaceFirst("(.*?)\\.", "");
             }
+            host = host.replaceFirst("(.*?)\\.", "");
         }
         return null;
     }
@@ -781,14 +775,15 @@ public class Browser implements HTTPConnectionFactoryInterface {
      * @throws BrowserException
      */
     private void checkContentLengthLimit(final Request request) throws BrowserException {
-        if (request != null && request.getHttpConnection() != null && !(request instanceof HeadRequest)) {
-            final int limit = this.getLoadLimit();
-            request.setReadLimit(limit);
-            final long length = request.getHttpConnection().getLongContentLength();
-            if (length >= 0 && length > limit) {
-                request.disconnect();
-                throw new BrowserException("Content-length too big:" + length + ">" + limit, request, null);
-            }
+        if (request == null || request.getHttpConnection() == null || request instanceof HeadRequest) {
+            return;
+        }
+        final int limit = this.getLoadLimit();
+        request.setReadLimit(limit);
+        final long length = request.getHttpConnection().getLongContentLength();
+        if (length >= 0 && length > limit) {
+            request.disconnect();
+            throw new BrowserException("Content-length too big:" + length + ">" + limit, request, null);
         }
     }
 
@@ -806,17 +801,17 @@ public class Browser implements HTTPConnectionFactoryInterface {
         synchronized (map) {
             if (url == null) {
                 map.clear();
-            } else {
-                final String host = Browser.getHost(url);
-                final Iterator<Entry<String, Cookies>> it = map.entrySet().iterator();
-                while (it.hasNext()) {
-                    final Entry<String, Cookies> next = it.next();
-                    if (next.getKey() == null) {
-                        it.remove();
-                    } else if (StringUtils.equalsIgnoreCase(next.getKey(), host)) {
-                        next.getValue().clear();
-                        break;
-                    }
+                return;
+            }
+            final String host = Browser.getHost(url);
+            final Iterator<Entry<String, Cookies>> it = map.entrySet().iterator();
+            while (it.hasNext()) {
+                final Entry<String, Cookies> next = it.next();
+                if (next.getKey() == null) {
+                    it.remove();
+                } else if (StringUtils.equalsIgnoreCase(next.getKey(), host)) {
+                    next.getValue().clear();
+                    break;
                 }
             }
         }
@@ -860,9 +855,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final List<BlockedTypeInterface> ret = this.blockedTypeInterfaces;
         if (ret == null) {
             return new ArrayList<BlockedTypeInterface>(Arrays.asList(GenericSupportedBlockTypes.values()));
-        } else {
-            return ret;
         }
+        return ret;
     }
 
     public List<BlockedTypeInterface> setBlockedTypeInterfaces(List<BlockedTypeInterface> blockedTypeInterfaces) {
@@ -1007,16 +1001,15 @@ public class Browser implements HTTPConnectionFactoryInterface {
         case POST:
             if (form.getEncoding() == null || !form.getEncoding().toLowerCase().endsWith("form-data")) {
                 return this.createPostRequest(formAction, this.toKeyValueStringEntries(form, requestVariables), form.getEncoding());
-            } else {
-                final PostFormDataRequest request = this.createPostFormDataRequest(formAction);
-                if (form.getEncoding() != null) {
-                    request.setEncodeType(form.getEncoding());
-                }
-                for (final FormData variable : requestVariables) {
-                    request.addFormData(variable);
-                }
-                return request;
             }
+            final PostFormDataRequest request = this.createPostFormDataRequest(formAction);
+            if (form.getEncoding() != null) {
+                request.setEncodeType(form.getEncoding());
+            }
+            for (final FormData variable : requestVariables) {
+                request.addFormData(variable);
+            }
+            return request;
         default:
             throw new IOException("Unsupported method:" + form.getMethod());
         }
@@ -1076,7 +1069,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      *
@@ -1132,7 +1125,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     public boolean probeJSonContent(final byte post[]) {
-        return post != null && post.length >= 2 && post[0] == '{' && post[post.length - 1] == '{';
+        return post != null && post.length >= 2 && post[0] == '{' && post[post.length - 1] == '}';
     }
 
     /**
@@ -1141,9 +1134,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     public PostRequest createPostRequest(final String url, final String post) throws MalformedURLException, IOException {
         if (this.probeJSonContent(post)) {
             return this.createJSonPostRequest(url, post);
-        } else {
-            return this.createPostRequest(url, Request.parseQuery(post), null);
         }
+        return this.createPostRequest(url, Request.parseQuery(post), null);
     }
 
     /** Follows a single redirect. */
@@ -1155,17 +1147,18 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final Request lRequest = this.getRequest();
         if (lRequest == null) {
             throw new IllegalStateException("Request is null");
-        } else if (lRequest.getLocation() != null) {
+        }
+        if (lRequest.getLocation() != null) {
             if (lRequest.getHtmlCode() == null) {
                 this.loadConnection(lRequest.getHttpConnection());
             }
             final Request redirectRequest = this.createRedirectFollowingRequest(this.request);
             return this.loadConnection(this.openRequestConnection(redirectRequest, followAllRedirects)).getHTMLSource();
-        } else if (lRequest.getHtmlCode() != null) {
-            return lRequest.getHTMLSource();
-        } else {
-            return this.loadConnection(lRequest.getHttpConnection()).getHTMLSource();
         }
+        if (lRequest.getHtmlCode() != null) {
+            return lRequest.getHTMLSource();
+        }
+        return this.loadConnection(lRequest.getHttpConnection()).getHTMLSource();
     }
 
     /**
@@ -1267,27 +1260,26 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final Request request = this.getRequest();
         if (request == null) {
             throw new IllegalStateException("Request is null");
-        } else if (request.getHtmlCode() != null) {
+        }
+        if (request.getHtmlCode() != null) {
             final LogInterface logger = this.getLogger();
             if (logger != null) {
                 logger.warning("Request has already been read");
             }
             return request.getHTMLSource();
-        } else {
-            final URLConnectionAdapter httpConnection = request.getHttpConnection();
-            if (httpConnection == null || !httpConnection.isConnected()) {
-                final LogInterface logger = this.getLogger();
-                if (logger != null) {
-                    logger.warning("Request has already been read");
-                }
-                return request.toString();
-            } else {
-                if (ignoreResponseCode) {
-                    httpConnection.setAllResponseCodesAllowed(true);
-                }
-                return this.loadConnection(httpConnection).getHTMLSource();
-            }
         }
+        final URLConnectionAdapter httpConnection = request.getHttpConnection();
+        if (httpConnection == null || !httpConnection.isConnected()) {
+            final LogInterface logger = this.getLogger();
+            if (logger != null) {
+                logger.warning("Request has already been read");
+            }
+            return request.toString();
+        }
+        if (ignoreResponseCode) {
+            httpConnection.setAllResponseCodesAllowed(true);
+        }
+        return this.loadConnection(httpConnection).getHTMLSource();
     }
 
     public String followConnection() throws IOException {
@@ -1295,16 +1287,18 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     public void forwardCookies(final Request request) {
-        if (request != null) {
-            final String host = Browser.getHost(request.getURL());
-            final Cookies cookies = this.getCookies(host);
-            if (cookies != null) {
-                final Cookies requestCookies = request.getCookies();
-                for (final Cookie cookie : cookies.getCookies()) {
-                    if (!cookie.isExpired()) {
-                        requestCookies.add(cookie);
-                    }
-                }
+        if (request == null) {
+            return;
+        }
+        final String host = Browser.getHost(request.getURL());
+        final Cookies cookies = this.getCookies(host);
+        if (cookies == null) {
+            return;
+        }
+        final Cookies requestCookies = request.getCookies();
+        for (final Cookie cookie : cookies.getCookies()) {
+            if (!cookie.isExpired()) {
+                requestCookies.add(cookie);
             }
         }
     }
@@ -1324,9 +1318,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final Request lRequest = this.getRequest();
         if (lRequest != null) {
             return URLHelper.getBaseURL(lRequest.getURL());
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**
@@ -1579,9 +1572,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final Form[] results = this.getFormsByRegex(regex);
         if (results != null && results.length > 0) {
             return results[0];
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**
@@ -1628,9 +1620,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final Request lRequest = this.getRequest();
         if (lRequest == null) {
             return null;
-        } else {
-            return lRequest.getHttpConnection();
         }
+        return lRequest.getHttpConnection();
     }
 
     /**
@@ -1643,9 +1634,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final int ret = this.limit;
         if (ret == -1) {
             return this.getDefaultLoadLimit();
-        } else {
-            return ret;
         }
+        return ret;
     }
 
     public LogInterface getLogger() {
@@ -1770,34 +1760,30 @@ public class Browser implements HTTPConnectionFactoryInterface {
         try {
             if (location.matches("^(https?|ftp)://.+")) {
                 return URLHelper.fixPathTraversal(URLHelper.createURL(location.replaceAll(" ", "%20")));
-            } else {
-                final Request lRequest = this.getRequest();
-                if (lRequest == null) {
-                    throw new IOException("No request available:" + location);
-                } else {
-                    final URL url = URLHelper.createURL(URLHelper.parseLocation(lRequest.getURL(), location));
-                    synchronized (this.LOCATION_MAP) {
-                        // clean
-                        this.getSourceLocationForURL(null);
-                        this.LOCATION_MAP.add(new Object[] { new WeakReference<URL>(url), location });
-                    }
-                    return url;
-                }
             }
+            return this.resolveRelativeURL(location, null);
         } catch (final MalformedURLException e) {
-            final Request lRequest = this.getRequest();
-            if (lRequest == null) {
-                throw new IOException("No request available:" + location, e);
+            return this.resolveRelativeURL(location, e);
+        }
+    }
+
+    /** Resolves location against the URL of the current request. cause is attached to the thrown IOException, if any. */
+    private URL resolveRelativeURL(final String location, final Throwable cause) throws IOException {
+        final Request lRequest = this.getRequest();
+        if (lRequest == null) {
+            if (cause == null) {
+                throw new IOException("No request available:" + location);
             } else {
-                final URL url = URLHelper.createURL(URLHelper.parseLocation(lRequest.getURL(), location));
-                synchronized (this.LOCATION_MAP) {
-                    // clean
-                    this.getSourceLocationForURL(null);
-                    this.LOCATION_MAP.add(new Object[] { new WeakReference<URL>(url), location });
-                }
-                return url;
+                throw new IOException("No request available:" + location, cause);
             }
         }
+        final URL url = URLHelper.createURL(URLHelper.parseLocation(lRequest.getURL(), location));
+        synchronized (this.LOCATION_MAP) {
+            // clean
+            this.getSourceLocationForURL(null);
+            this.LOCATION_MAP.add(new Object[] { new WeakReference<URL>(url), location });
+        }
+        return url;
     }
 
     public String getSourceLocationForURL(final URL url) {
@@ -1871,39 +1857,38 @@ public class Browser implements HTTPConnectionFactoryInterface {
         try {
             if (requ == null) {
                 throw new IOException("No request available");
-            } else {
-                this.checkContentLengthLimit(requ);
-                this.prepareBlockDetectionBeforeLoadConnection(requ);
+            }
+            this.checkContentLengthLimit(requ);
+            this.prepareBlockDetectionBeforeLoadConnection(requ);
+            try {
                 try {
-                    try {
-                        requ.read(this.isKeepResponseContentBytes());
-                    } catch (HTTPResponseCodeException e) {
-                        final URLConnectionAdapter con = requ.getHttpConnection();
-                        if (con != null) {
+                    requ.read(this.isKeepResponseContentBytes());
+                } catch (HTTPResponseCodeException e) {
+                    final URLConnectionAdapter con = requ.getHttpConnection();
+                    if (con != null) {
+                        try {
+                            con.setAllResponseCodesAllowed(true);
                             try {
-                                con.setAllResponseCodesAllowed(true);
-                                try {
-                                    requ.read(this.isKeepResponseContentBytes());
-                                } finally {
-                                    con.setAllResponseCodesAllowed(false);
-                                }
-                            } catch (IOException e2) {
-                                Exceptions.addSuppressed(e, e2);
+                                requ.read(this.isKeepResponseContentBytes());
+                            } finally {
+                                con.setAllResponseCodesAllowed(false);
                             }
+                        } catch (IOException e2) {
+                            Exceptions.addSuppressed(e, e2);
                         }
-                        throw e;
                     }
-                } finally {
-                    if (this.isVerbose() && requ != null) {
-                        final LogInterface llogger = this.getLogger();
-                        if (llogger != null) {
-                            llogger.finest("\r\nBrowserID:" + requ.getBrowserID() + "|RequestID:" + requ.getRequestID() + "|URL:" + requ.getURL() + "\r\n----------------Request Content-------------\r\n" + requ.getHTMLSource() + "\r\n");
-                        }
+                    throw e;
+                }
+            } finally {
+                if (this.isVerbose() && requ != null) {
+                    final LogInterface llogger = this.getLogger();
+                    if (llogger != null) {
+                        llogger.finest("\r\nBrowserID:" + requ.getBrowserID() + "|RequestID:" + requ.getRequestID() + "|URL:" + requ.getURL() + "\r\n----------------Request Content-------------\r\n" + requ.getHTMLSource() + "\r\n");
                     }
                 }
-                this.checkForBlockedByAfterLoadConnection(requ);
-                return requ;
             }
+            this.checkForBlockedByAfterLoadConnection(requ);
+            return requ;
         } catch (final BrowserException e) {
             throw e;
         } catch (final IOException e) {
@@ -1931,34 +1916,36 @@ public class Browser implements HTTPConnectionFactoryInterface {
      * facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
-        if (request != null) {
-            final RequestHeader requestHeaders = request.getHeaders();
-            if (requestHeaders.getValue("Sec-Fetch-Site") == null) {
-                boolean addSecFetchSite = false;
-                final String firefoxVersionString = new Regex(requestHeaders.getValue("User-Agent"), "FireFox/(\\d+)").getMatch(0);
-                final int firefoxVersion = firefoxVersionString != null ? Integer.parseInt(firefoxVersionString) : -1;
-                if (firefoxVersion >= 90) {
-                    addSecFetchSite = true;
-                }
-                final String chromeVersionString = new Regex(requestHeaders.getValue("User-Agent"), "Chrome/(\\d+)").getMatch(0);
-                final int chromeVersion = chromeVersionString != null ? Integer.parseInt(chromeVersionString) : -1;
-                if (chromeVersion >= 76) {
-                    addSecFetchSite = true;
-                }
-                final String operaVersionString = new Regex(requestHeaders.getValue("User-Agent"), "OPR/(\\d+)").getMatch(0);
-                final int operaVersion = operaVersionString != null ? Integer.parseInt(operaVersionString) : -1;
-                if (operaVersion >= 63) {
-                    addSecFetchSite = true;
-                }
-                final String edgeVersionString = new Regex(requestHeaders.getValue("User-Agent"), "Edg/(\\d+)").getMatch(0);
-                final int edgeVersion = edgeVersionString != null ? Integer.parseInt(edgeVersionString) : -1;
-                if (edgeVersion >= 79) {
-                    addSecFetchSite = true;
-                }
-                if (addSecFetchSite) {
-                    requestHeaders.put(new HTTPHeader("Sec-Fetch-Site", "same-origin"));
-                }
-            }
+        if (request == null) {
+            return;
+        }
+        final RequestHeader requestHeaders = request.getHeaders();
+        if (requestHeaders.getValue("Sec-Fetch-Site") != null) {
+            return;
+        }
+        boolean addSecFetchSite = false;
+        final String firefoxVersionString = new Regex(requestHeaders.getValue("User-Agent"), "FireFox/(\\d+)").getMatch(0);
+        final int firefoxVersion = firefoxVersionString != null ? Integer.parseInt(firefoxVersionString) : -1;
+        if (firefoxVersion >= 90) {
+            addSecFetchSite = true;
+        }
+        final String chromeVersionString = new Regex(requestHeaders.getValue("User-Agent"), "Chrome/(\\d+)").getMatch(0);
+        final int chromeVersion = chromeVersionString != null ? Integer.parseInt(chromeVersionString) : -1;
+        if (chromeVersion >= 76) {
+            addSecFetchSite = true;
+        }
+        final String operaVersionString = new Regex(requestHeaders.getValue("User-Agent"), "OPR/(\\d+)").getMatch(0);
+        final int operaVersion = operaVersionString != null ? Integer.parseInt(operaVersionString) : -1;
+        if (operaVersion >= 63) {
+            addSecFetchSite = true;
+        }
+        final String edgeVersionString = new Regex(requestHeaders.getValue("User-Agent"), "Edg/(\\d+)").getMatch(0);
+        final int edgeVersion = edgeVersionString != null ? Integer.parseInt(edgeVersionString) : -1;
+        if (edgeVersion >= 79) {
+            addSecFetchSite = true;
+        }
+        if (addSecFetchSite) {
+            requestHeaders.put(new HTTPHeader("Sec-Fetch-Site", "same-origin"));
         }
     }
 
@@ -2016,25 +2003,26 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     protected void setRequestProperties(final Request nextRequest) throws IOException {
-        if (nextRequest != null) {
-            nextRequest.setSSLSocketStreamOptions(this.getSSLSocketStreamOptions());
-            if (nextRequest.isSSLTrustALLSet() == null) {
-                nextRequest.setSSLTrustALL(this.getDefaultSSLTrustALL());
-            }
-            this.forwardCookies(nextRequest);
-            if (nextRequest.getCustomCharset() == null) {
-                nextRequest.setCustomCharset(this.customCharset);
-            }
-            if (!nextRequest.getHeaders().contains(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE)) {
-                nextRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE, this.getAcceptLanguage());
-            }
-            nextRequest.setConnectTimeout(this.getConnectTimeout());
-            nextRequest.setReadTimeout(this.getReadTimeout());
-            final String requestReferrer = this.getRefererURL(nextRequest);
-            this.setReferrer(this.getNextRequestReferrerPolicy(), requestReferrer, nextRequest);
-            this.mergeHeaders(nextRequest);
-            this.autoCompleteHeaders(nextRequest);
+        if (nextRequest == null) {
+            return;
         }
+        nextRequest.setSSLSocketStreamOptions(this.getSSLSocketStreamOptions());
+        if (nextRequest.isSSLTrustALLSet() == null) {
+            nextRequest.setSSLTrustALL(this.getDefaultSSLTrustALL());
+        }
+        this.forwardCookies(nextRequest);
+        if (nextRequest.getCustomCharset() == null) {
+            nextRequest.setCustomCharset(this.customCharset);
+        }
+        if (!nextRequest.getHeaders().contains(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE)) {
+            nextRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE, this.getAcceptLanguage());
+        }
+        nextRequest.setConnectTimeout(this.getConnectTimeout());
+        nextRequest.setReadTimeout(this.getReadTimeout());
+        final String requestReferrer = this.getRefererURL(nextRequest);
+        this.setReferrer(this.getNextRequestReferrerPolicy(), requestReferrer, nextRequest);
+        this.mergeHeaders(nextRequest);
+        this.autoCompleteHeaders(nextRequest);
     }
 
     /**
@@ -2067,11 +2055,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
                 return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
-            } else {
-                // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves
-                // (HTTP→HTTP,HTTP→HTTPS, HTTPS→HTTPS)
-                return this.setReferrer(REFERRER_POLICY.UNSAFE_URL, requestReferrer, nextRequest);
             }
+            // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves
+            // (HTTP→HTTP,HTTP→HTTPS, HTTPS→HTTPS)
+            return this.setReferrer(REFERRER_POLICY.UNSAFE_URL, requestReferrer, nextRequest);
         }
         case ORIGIN: {
             // Send only the origin in the Referer header. For example, a document at https://example.com/page.html will send the referrer
@@ -2091,10 +2078,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (!REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest) || REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Send only the origin for cross origin requests and requests to less secure destinations (HTTPS→HTTP).
                 return this.setReferrer(REFERRER_POLICY.ORIGIN, requestReferrer, nextRequest);
-            } else {
-                // When performing a same-origin request, send the origin, path, and query string
-                return this.setReferrer(REFERRER_POLICY.SAME_ORIGIN, requestReferrer, nextRequest);
             }
+            // When performing a same-origin request, send the origin, path, and query string
+            return this.setReferrer(REFERRER_POLICY.SAME_ORIGIN, requestReferrer, nextRequest);
         }
         case SAME_ORIGIN: {
             // Send the origin, path, and query string for same-origin requests. Don't send the Referer header for cross-origin requests.
@@ -2105,10 +2091,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
                 // Send the origin, path, and query string for same-origin requests.
                 return this.setReferrer(REFERRER_POLICY.UNSAFE_URL, requestReferrer, nextRequest);
-            } else {
-                // Don't send the Referer header for cross-origin requests.
-                return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
             }
+            // Don't send the Referer header for cross-origin requests.
+            return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
         }
         case STRICT_ORIGIN: {
             // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS). Don't send the Referer header to less
@@ -2120,10 +2105,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Don't send the Referer header to less secure destinations (HTTPS→HTTP).
                 return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
-            } else {
-                // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS)
-                return this.setReferrer(REFERRER_POLICY.ORIGIN, requestReferrer, nextRequest);
             }
+            // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS)
+            return this.setReferrer(REFERRER_POLICY.ORIGIN, requestReferrer, nextRequest);
         }
         case STRICT_ORIGIN_WHEN_CROSS_ORIGIN: {
             // Send the origin, path, and query string when performing a same-origin request. For cross-origin requests send the origin
@@ -2136,13 +2120,13 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
                 // Send the origin, path, and query string when performing a same-origin request.
                 return this.setReferrer(REFERRER_POLICY.UNSAFE_URL, requestReferrer, nextRequest);
-            } else if (REFERRER_POLICY.isSecureProtocol(currentRequest, nextRequest)) {
+            }
+            if (REFERRER_POLICY.isSecureProtocol(currentRequest, nextRequest)) {
                 // For cross-origin requests send the origin (only) when the protocol security level stays same (HTTPS→HTTPS).
                 return this.setReferrer(REFERRER_POLICY.STRICT_ORIGIN, requestReferrer, nextRequest);
-            } else {
-                // Don't send the Referer header to less secure destinations(HTTPS→HTTP).
-                return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
             }
+            // Don't send the Referer header to less secure destinations(HTTPS→HTTP).
+            return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
         }
         case UNSAFE_URL: {
             // Send the origin, path, and query string when performing any request, regardless of security.
@@ -2191,9 +2175,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final AuthenticationFactory ret = this.getCustomAuthenticationFactory();
         if (ret != null) {
             return ret;
-        } else {
-            return Browser.getDefaultAuthenticationFactory();
         }
+        return Browser.getDefaultAuthenticationFactory();
     }
 
     public void setCustomAuthenticationFactory(AuthenticationFactory authenticationFactory) {
@@ -2227,9 +2210,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     public boolean addAuthentication(Authentication authentication) {
         if (authentication != null) {
             return this.authentications.addIfAbsent(authentication);
-        } else {
-            return false;
         }
+        return false;
     }
 
     public boolean removeAuthentication(Authentication remove) {
@@ -2248,24 +2230,24 @@ public class Browser implements HTTPConnectionFactoryInterface {
 
     protected Authentication applyAuthentication(Request request) throws IOException {
         final Authentication authentication = request.getAuthentication();
-        if (authentication == null) {
-            final AuthenticationFactory authenticationFactory = this.getAuthenticationFactory();
-            if (authenticationFactory != null) {
-                final Authentication authenticationByFactory = authenticationFactory.authorize(this, request);
-                if (authenticationByFactory != null) {
-                    request.setAuthentication(authenticationByFactory);
-                    return authenticationByFactory;
-                }
-            }
-            for (final Authentication browserAuthentication : this.getAuthentications()) {
-                if (browserAuthentication.authorize(this, request)) {
-                    request.setAuthentication(browserAuthentication);
-                    return browserAuthentication;
-                }
-            }
-        } else {
+        if (authentication != null) {
             if (authentication.authorize(this, request)) {
                 return authentication;
+            }
+            return null;
+        }
+        final AuthenticationFactory authenticationFactory = this.getAuthenticationFactory();
+        if (authenticationFactory != null) {
+            final Authentication authenticationByFactory = authenticationFactory.authorize(this, request);
+            if (authenticationByFactory != null) {
+                request.setAuthentication(authenticationByFactory);
+                return authenticationByFactory;
+            }
+        }
+        for (final Authentication browserAuthentication : this.getAuthentications()) {
+            if (browserAuthentication.authorize(this, request)) {
+                request.setAuthentication(browserAuthentication);
+                return browserAuthentication;
             }
         }
         return null;
@@ -2277,10 +2259,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
         if (requestAuthentication != null) {
             if (authenticationFactory != null) {
                 return authenticationFactory.retry(requestAuthentication, this, request);
-            } else {
-                return requestAuthentication.retry(this, request);
             }
-        } else if (requestAuthentication == null && authenticationFactory != null) {
+            return requestAuthentication.retry(this, request);
+        }
+        if (authenticationFactory != null) {
             final Authentication authentication = authenticationFactory.buildAuthentication(this, request);
             if (authentication != null) {
                 request.setAuthentication(authentication);
@@ -2968,9 +2950,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (Browser.getCloudflareBlock(browser, request) == this) {
                     return this;
-                } else {
-                    return null;
                 }
+                return null;
             }
 
             @Override
@@ -2998,9 +2979,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (Browser.getCloudflareBlock(browser, request) == this) {
                     return this;
-                } else {
-                    return null;
                 }
+                return null;
             }
 
             @Override
@@ -3028,9 +3008,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (Browser.getCloudflareBlock(browser, request) == this) {
                     return this;
-                } else {
-                    return null;
                 }
+                return null;
             }
 
             @Override
@@ -3058,9 +3037,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (Browser.getCloudflareBlock(browser, request) == this) {
                     return this;
-                } else {
-                    return null;
                 }
+                return null;
             }
 
             @Override
@@ -3170,12 +3148,12 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else {
-                    if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "ddos-guard")) {
-                        if (request.containsHTML("<title>\\s*DDoS-Guard\\s*</title>") || request.containsHTML("link\\s*=\\s*\"https?://ddos-guard\\.net/")) {
-                            return this;
-                        }
-                    }
+                }
+                if (con.getResponseCode() != 403 || !StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "ddos-guard")) {
+                    return null;
+                }
+                if (request.containsHTML("<title>\\s*DDoS-Guard\\s*</title>") || request.containsHTML("link\\s*=\\s*\"https?://ddos-guard\\.net/")) {
+                    return this;
                 }
                 return null;
             }
@@ -3206,12 +3184,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else {
-                    if (con.getResponseCode() == 200 && request.getResponseHeader("X-Iinfo") != null && browser.containsHTML("src=\"/_Incapsula_Resource")) {
-                        for (final Cookie cookie : browser.getCookies(browser.getHost()).getCookies()) {
-                            if (StringUtils.startsWithCaseInsensitive(cookie.getKey(), "visid_incap_")) {
-                                return this;
-                            }
+                }
+                if (con.getResponseCode() == 200 && request.getResponseHeader("X-Iinfo") != null && browser.containsHTML("src=\"/_Incapsula_Resource")) {
+                    for (final Cookie cookie : browser.getCookies(browser.getHost()).getCookies()) {
+                        if (StringUtils.startsWithCaseInsensitive(cookie.getKey(), "visid_incap_")) {
+                            return this;
                         }
                     }
                 }
@@ -3277,11 +3254,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (request == null || !request.isLoaded() || request.getHttpConnection() == null) {
                     return null;
-                } else if (request.containsHTML("<title>Browser Check - DNSProxy\\.org</title>") && request.containsHTML("DNSProxy\\.org\\. All rights reserved\\.?<")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (request.containsHTML("<title>Browser Check - DNSProxy\\.org</title>") && request.containsHTML("DNSProxy\\.org\\. All rights reserved\\.?<")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3311,11 +3288,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (request == null || !request.isLoaded() || request.getHttpConnection() == null) {
                     return null;
-                } else if (request.getURL().getHost().matches(regex)) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (request.getURL().getHost().matches(regex)) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3344,7 +3321,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 404) {
+                }
+                if (con.getResponseCode() == 404) {
                     /**
                      * <h1>AVVISO</h1>
                      * <p>
@@ -3390,25 +3368,23 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
                 if (request == null || !request.isRequested()) {
                     return null;
-                } else {
-                    if (request.getURL().getHost().matches(regex)) {
-                        /* If we were originally NOT coming from cuii.info, we were blocked. */
-                        Request redirectOrigin = request.getRedirectOrigin();
-                        while (redirectOrigin != null) {
-                            if (!redirectOrigin.getURL().getHost().matches(regex)) {
-                                return this;
-                            } else {
-                                redirectOrigin = redirectOrigin.getRedirectOrigin();
-                            }
-                        }
-                    }
-                    if (request.containsHTML("Diese Webseite ist aus urheberrechtlichen Gr(&uuml;|ü)nden nicht verf(&uuml;|ü)gbar") && request.containsHTML("https://cuii.info/ueber-uns")) {
-                        // Diese Webseite ist aus urheberrechtlichen Gr&uuml;nden nicht verf&uuml;gbar. <br>
-                        // Zu den Hintergr&uuml;nden informieren Sie sich bitte <a href="https://cuii.info/ueber-uns/">hier</a>.
-                        return this;
-                    }
-                    return null;
                 }
+                if (request.getURL().getHost().matches(regex)) {
+                    /* If we were originally NOT coming from cuii.info, we were blocked. */
+                    Request redirectOrigin = request.getRedirectOrigin();
+                    while (redirectOrigin != null) {
+                        if (!redirectOrigin.getURL().getHost().matches(regex)) {
+                            return this;
+                        }
+                        redirectOrigin = redirectOrigin.getRedirectOrigin();
+                    }
+                }
+                if (request.containsHTML("Diese Webseite ist aus urheberrechtlichen Gr(&uuml;|ü)nden nicht verf(&uuml;|ü)gbar") && request.containsHTML("https://cuii.info/ueber-uns")) {
+                    // Diese Webseite ist aus urheberrechtlichen Gr&uuml;nden nicht verf&uuml;gbar. <br>
+                    // Zu den Hintergr&uuml;nden informieren Sie sich bitte <a href="https://cuii.info/ueber-uns/">hier</a>.
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3437,7 +3413,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403) {
+                }
+                if (con.getResponseCode() == 403) {
                     // <html><head><script type="text/javascript">location.replace("https://block.opendns.com/?url=
                     if (request.containsHTML("(?i)block\\.opendns\\.com/\\?url=")) {
                         return this;
@@ -3472,7 +3449,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 200) {
+                }
+                if (con.getResponseCode() == 200) {
                     if (request.containsHTML("(?i)<title>\\s*ShieldSquare Captcha\\s*</title>")) {
                         return this;
                     }
@@ -3506,7 +3484,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403) {
+                }
+                if (con.getResponseCode() == 403) {
                     // <title>Fortinet Secure DNS Service Portal</title>
                     // <h2>Web Page Blocked!</h2>
                     // You have tried to access a web page which belongs to a category that is blocked.
@@ -3543,7 +3522,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403) {
+                }
+                if (con.getResponseCode() == 403) {
                     // <title>Web Filter Violation</title>
                     // <h1>FortiGuard Intrusion Prevention - Access Blocked</h1>
                     // <h3>Web Page Blocked</h3>
@@ -3581,7 +3561,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 200 && browser.getURL().contains("cloudfilt.com/stop-")) {
+                }
+                if (con.getResponseCode() == 200 && browser.getURL().contains("cloudfilt.com/stop-")) {
                     return this;
                 }
                 return null;
@@ -3614,11 +3595,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "Protected by WireFilter")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "Protected by WireFilter")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3647,11 +3628,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "Zscaler/")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "Zscaler/")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3680,11 +3661,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403 && request.getResponseHeader("X-Sucuri-Block") != null && request.getHtmlCode() != null && request.getHtmlCode().contains("sucuri.net")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 403 && request.getResponseHeader("X-Sucuri-Block") != null && request.getHtmlCode() != null && request.getHtmlCode().contains("sucuri.net")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3713,11 +3694,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 429 && StringUtils.equalsIgnoreCase(request.getResponseHeader("server"), "Vercel")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 429 && StringUtils.equalsIgnoreCase(request.getResponseHeader("server"), "Vercel")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3746,13 +3727,14 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 499 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Request has been forbidden by antivirus")) {
-                    return this;
-                } else if (con.getResponseCode() == 499 && request.isLoaded() && request.containsHTML("<title>\\s*Kaspersky Internet Security\\s*</title>")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 499 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Request has been forbidden by antivirus")) {
+                    return this;
+                }
+                if (con.getResponseCode() == 499 && request.isLoaded() && request.containsHTML("<title>\\s*Kaspersky Internet Security\\s*</title>")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3781,11 +3763,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Blocked by Bitdefender")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Blocked by Bitdefender")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3819,11 +3801,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                  */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
-                } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3852,11 +3834,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Blocked by ESET Security")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(con.getResponseMessage(), "Blocked by ESET Security")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3885,11 +3867,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "WebGuard")) {
-                    return this;
-                } else {
-                    return null;
                 }
+                if (con.getResponseCode() == 403 && StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "WebGuard")) {
+                    return this;
+                }
+                return null;
             }
 
             @Override
@@ -3918,7 +3900,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final HTTPConnection con;
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
-                } else if (con.getResponseCode() == 200 && request.getResponseHeader("x-ce-page") != null) {
+                }
+                if (con.getResponseCode() == 200 && request.getResponseHeader("x-ce-page") != null) {
                     if (request.containsHTML("(?i)<title>\\s*Domain Blocked:")) {
                         return this;
                     }
@@ -3984,17 +3967,55 @@ public class Browser implements HTTPConnectionFactoryInterface {
             public Boolean prepareBlockDetection(Browser browser, Request request) {
                 return null;
             }
+        },
+        ANUBIS {
+            @Override
+            public String getLabel() {
+                return "Anubis by Techaro (techaro.lol)";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                if (request == null || !request.isLoaded() || request.getHttpConnection() == null) {
+                    return null;
+                }
+                /**
+                 * Anti "AI-scraper" JS proof-of-work challenge, see https://github.com/TecharoHQ/anubis <br>
+                 * Response-code varies (seen: 401, also known: 403/200), so we rely on the challenge markup instead. <br>
+                 * e.g. hentai-foundry.com
+                 */
+                if (request.containsHTML("id\\s*=\\s*\"anubis_challenge\"\\s*type\\s*=\\s*\"application/json\"") && request.containsHTML("/\\.within\\.website/x/cmd/anubis/")) {
+                    return this;
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
         }
     }
 
     public BlockedTypeInterface getBlockedType(final Request request) {
         final List<BlockedTypeInterface> blockedTypeInterfaces = request != null ? this.getBlockedTypeInterfaces() : null;
-        if (blockedTypeInterfaces != null) {
-            for (final BlockedTypeInterface blockedTypeInterface : blockedTypeInterfaces) {
-                final BlockedTypeInterface block = blockedTypeInterface.isBlocked(this, request);
-                if (block != null) {
-                    return block;
-                }
+        if (blockedTypeInterfaces == null) {
+            return null;
+        }
+        for (final BlockedTypeInterface blockedTypeInterface : blockedTypeInterfaces) {
+            final BlockedTypeInterface block = blockedTypeInterface.isBlocked(this, request);
+            if (block != null) {
+                return block;
             }
         }
         return null;
@@ -4029,26 +4050,24 @@ public class Browser implements HTTPConnectionFactoryInterface {
         final URL url = URLHelper.getURL(request.getURL(), true, false, false);
         if (proxy == null) {
             return new URLConnectionAdapterDirectImpl(url);
-        } else {
-            if (proxy.isPreferNativeImplementation()) {
-                return new URLConnectionAdapterNative(url, proxy);
-            } else {
-                switch (proxy.getType()) {
-                case NONE:
-                case DIRECT:
-                    return new URLConnectionAdapterDirectImpl(url, proxy);
-                case HTTP:
-                case HTTPS:
-                    return new URLConnectionAdapterHTTPProxyImpl(url, proxy);
-                case SOCKS4:
-                case SOCKS4A:
-                    return new URLConnectionAdapterSocks4Impl(url, proxy);
-                case SOCKS5:
-                    return new URLConnectionAdapterSocks5Impl(url, proxy);
-                default:
-                    throw new RuntimeException("unsupported proxy type: " + proxy.getType().name());
-                }
-            }
+        }
+        if (proxy.isPreferNativeImplementation()) {
+            return new URLConnectionAdapterNative(url, proxy);
+        }
+        switch (proxy.getType()) {
+        case NONE:
+        case DIRECT:
+            return new URLConnectionAdapterDirectImpl(url, proxy);
+        case HTTP:
+        case HTTPS:
+            return new URLConnectionAdapterHTTPProxyImpl(url, proxy);
+        case SOCKS4:
+        case SOCKS4A:
+            return new URLConnectionAdapterSocks4Impl(url, proxy);
+        case SOCKS5:
+            return new URLConnectionAdapterSocks5Impl(url, proxy);
+        default:
+            throw new RuntimeException("unsupported proxy type: " + proxy.getType().name());
         }
     }
 }

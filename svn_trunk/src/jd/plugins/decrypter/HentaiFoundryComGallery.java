@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
@@ -34,13 +35,42 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import jd.utils.JDUtilities;
+import jd.plugins.hoster.HentaiFoundryCom;
 
-@DecrypterPlugin(revision = "$Revision: 48101 $", interfaceVersion = 3, names = { "hentai-foundry.com" }, urls = { "https?://(?:www\\.)?hentai-foundry\\.com/pictures/user/[A-Za-z0-9\\-_]+(?:/scraps)?(?:/\\d+)?|https?://(?:www\\.)?hentai-foundry\\.com/user/[A-Za-z0-9\\-_]+/(profile|faves/pictures)" })
+@DecrypterPlugin(revision = "$Revision: 52988 $", interfaceVersion = 3, names = {}, urls = {})
 public class HentaiFoundryComGallery extends PluginForDecrypt {
     public HentaiFoundryComGallery(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "hentai-foundry.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_GALLERY = Pattern.compile("/pictures/user/[A-Za-z0-9\\-_]+(?:/scraps)?(?:/(\\d+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_PROFILE = Pattern.compile("/user/[A-Za-z0-9\\-_]+/(profile|faves/pictures)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_GALLERY.pattern().substring(1) + "|" + PATTERN_PROFILE.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -56,9 +86,9 @@ public class HentaiFoundryComGallery extends PluginForDecrypt {
         String parameter = param.toString();
         if (new Regex(parameter, Pattern.compile(".+/user/[A-Za-z0-9\\-_]+/profile", Pattern.CASE_INSENSITIVE)).matches()) {
             final String userID = new Regex(parameter, Pattern.compile(".+/user/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
-            decryptedLinks.add(createDownloadlink("http://www.hentai-foundry.com/pictures/user/" + userID));
-            decryptedLinks.add(createDownloadlink("http://www.hentai-foundry.com/pictures/user/" + userID + "/scraps"));
-            decryptedLinks.add(createDownloadlink("http://www.hentai-foundry.com/stories/user/" + userID));
+            decryptedLinks.add(createDownloadlink("https://www." + getHost() + "/pictures/user/" + userID));
+            decryptedLinks.add(createDownloadlink("https://www." + getHost() + "/pictures/user/" + userID + "/scraps"));
+            decryptedLinks.add(createDownloadlink("https://www." + getHost() + "/stories/user/" + userID));
             return decryptedLinks;
         }
         if (new Regex(parameter, Pattern.compile(".+/pictures/user/[A-Za-z0-9\\-_]+/\\d+", Pattern.CASE_INSENSITIVE)).matches()) {
@@ -127,14 +157,14 @@ public class HentaiFoundryComGallery extends PluginForDecrypt {
     /** Log in the account of the hostplugin */
     @SuppressWarnings("deprecation")
     private boolean getUserLogin(final boolean force) throws Exception {
-        final PluginForHost hostPlugin = JDUtilities.getPluginForHost(this.getHost());
+        final HentaiFoundryCom hostPlugin = (HentaiFoundryCom) this.getNewPluginForHostInstance(getHost());
         final Account aa = AccountController.getInstance().getValidAccount(hostPlugin);
         if (aa == null) {
             logger.warning("There is no account available, continuing without logging in (if possible)");
             return false;
         }
         try {
-            jd.plugins.hoster.HentaiFoundryCom.login(br, aa, force);
+            hostPlugin.login(aa, force);
         } catch (final PluginException e) {
             logger.warning("Login failed - continuing without login");
             aa.setValid(false);

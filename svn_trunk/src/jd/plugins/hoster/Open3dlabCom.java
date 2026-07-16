@@ -39,8 +39,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52608 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52983 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -219,7 +220,12 @@ public class Open3dlabCom extends PluginForHost {
     }
 
     private String findDirecturl(final Browser br) {
-        return br.getRegex("window\\.location = \"(https?://[^\"]+)").getMatch(0);
+        String url = br.getRegex("window\\.location = \"(https?://[^\"]+)").getMatch(0);
+        if (url == null) {
+            return null;
+        }
+        url = PluginJSonUtils.unescape(url);
+        return url;
     }
 
     @Override
@@ -254,14 +260,6 @@ public class Open3dlabCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

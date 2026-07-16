@@ -31,6 +31,7 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
+import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
@@ -38,7 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52680 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52983 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -132,10 +133,19 @@ public class DatanodesTo extends XFileSharingProBasic {
     public Form findFormDownload1Free(final Browser br) throws Exception {
         final Form ret = br == null ? null : br.getFormbyProperty("id", "downloadForm");
         if (ret != null) {
+            final String method_free_key = "method_free";
+            final InputField ifield = ret.getInputFieldByName(method_free_key);
+            if (ifield == null || ifield.getValue() == null || ifield.isDisabled()) {
+                ret.removeInputField(ifield);
+                String method_free_value = ret.getRegex("\"" + method_free_key + "\" value=\"([^<>\"]+)\"").getMatch(0);
+                if (method_free_value == null || method_free_value.equals("")) {
+                    method_free_value = "Free Download";
+                }
+                ret.put(method_free_key, Encoding.urlEncode(method_free_value));
+            }
             return ret;
-        } else {
-            return super.findFormDownload1Free(br);
         }
+        return super.findFormDownload1Free(br);
     }
 
     @Override

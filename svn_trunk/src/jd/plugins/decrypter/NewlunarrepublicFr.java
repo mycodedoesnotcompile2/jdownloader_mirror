@@ -27,42 +27,61 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 46972 $", interfaceVersion = 3, names = { "newlunarrepublic.fr" }, urls = { "https?://(?:www\\.)?newlunarrepublic\\.fr/(episodes|films)/.+" })
+@DecrypterPlugin(revision = "$Revision: 52991 $", interfaceVersion = 3, names = { "newlunarrepublic.fr" }, urls = { "https?://(?:www\\.)?newlunarrepublic\\.fr/(episodes|films)/.+" })
 public class NewlunarrepublicFr extends PluginForDecrypt {
     public NewlunarrepublicFr(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        br.getPage(parameter);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 500) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String fpName = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
-        final String[] links = br.getRegex("\"([^<>\"]*?\\.(?:webm|mkv|srt))\"").getColumn(0);
-        if (links == null || links.length == 0) {
-            logger.warning("Decrypter broken for link: " + parameter);
+        String title = br.getRegex("<title>([^<]*?)</title>").getMatch(0);
+        final String[] videourls = br.getRegex("\"([^\"]*\\.(?:webm|mkv))\"").getColumn(0);
+        if (videourls == null || videourls.length == 0) {
+            logger.warning("Decrypter broken for link: " + contenturl);
             return null;
         }
-        for (String singleLink : links) {
+        for (String url : videourls) {
             /* For subtitles */
-            singleLink = br.getURL(singleLink).toString();
-            final DownloadLink dl = createDownloadlink("directhttp://" + singleLink);
+            url = br.getURL(url).toString();
+            final DownloadLink direct = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
             /* IMPORTANT: Their .webm urls won't work without correct Referer */
-            dl.setReferrerUrl(this.br.getURL());
+            direct.setReferrerUrl(this.br.getURL());
             /* It makes no sense to leave the direct urls in these case as they won't work in browser without the correct Referer. */
-            dl.setContentUrl(parameter);
-            decryptedLinks.add(dl);
+            direct.setContentUrl(contenturl);
+            direct.setAvailable(true);
+            ret.add(direct);
         }
-        if (fpName != null) {
+        final String[] subtitleurls = br.getRegex("\"(/files/[^\"]*\\.(srt|vtt))\"").getColumn(0);
+        if (subtitleurls == null || subtitleurls.length == 0) {
+            logger.warning("Decrypter broken for link: " + contenturl);
+            return null;
+        }
+        for (String url : subtitleurls) {
+            /* For subtitles */
+            url = br.getURL(url).toString();
+            final DownloadLink direct = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+            direct.setReferrerUrl(this.br.getURL());
+            /* It makes no sense to leave the direct urls in these case as they won't work in browser without the correct Referer. */
+            direct.setContentUrl(contenturl);
+            direct.setAvailable(true);
+            ret.add(direct);
+        }
+        if (title != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName.trim()));
-            fp.addLinks(decryptedLinks);
+            fp.setName(Encoding.htmlDecode(title.trim()));
+            fp.addLinks(ret);
         }
-        return decryptedLinks;
+        return ret;
     }
 }

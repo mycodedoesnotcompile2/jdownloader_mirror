@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -44,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 52980 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52982 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,6 +133,8 @@ public class OrfAt extends PluginForDecrypt {
      * Trades filesize accuracy for far fewer HTTP requests during crawling.
      */
     public static final boolean                     FILESIZE_MAGIC_MODE               = true;
+    /** Heights (in pixels) that are ever available as progressive downloads. Everything else (288/1080p) only ever exists via HLS. */
+    public static final List<Integer>               PROGRESSIVE_QUALITY_HEIGHTS       = Arrays.asList(360, 540, 720);
 
     /** Wrapper for podcast URLs containing md5 file-hashes inside URL. */
     protected DownloadLink createPodcastDownloadlink(final String directurl) throws MalformedURLException {
@@ -319,6 +322,7 @@ public class OrfAt extends PluginForDecrypt {
             }
             final boolean allowProgressive = cfg != null ? cfg.getBooleanProperty(ORFMediathek.PROGRESSIVE_STREAM, ORFMediathek.PROGRESSIVE_STREAM_default) : true;
             final boolean user_wants_HLS = cfg != null ? cfg.getBooleanProperty(ORFMediathek.HLS_STREAM, ORFMediathek.HLS_STREAM_default) : true;
+            final boolean findProgressiveFilesizeEvenIfDisabled = cfg != null ? cfg.getBooleanProperty(ORFMediathek.SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED, ORFMediathek.SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED_default) : false;
             /* HDS is permanently broken server-side (since 2024-02-20) -> HDS streams are always skipped, no setting for it anymore. */
             /*
              * Progressive is only ever available up to 720p (see PROGRESSIVE_MAX_720P). If the user selected BEST, or explicitly picked a
@@ -385,7 +389,7 @@ public class OrfAt extends PluginForDecrypt {
                  * once parsed, so only one needs to be fetched. Q8C is often broken server-side -> its URL is placed last so it is tried
                  * last/as a last resort.
                  */
-                boolean skipProgressiveForBest = false;
+                boolean skipProgressiveForBest_HLS = false;
                 find_hls_qualities: if (crawlHLS) {
                     if (CACHE_HLS_QUALITY_ACROSS_SEGMENTS && !user_wants_HLS && allowProgressive && Boolean.FALSE.equals(cachedFoundHeightAboveProgressiveCap)) {
                         /*
@@ -528,11 +532,19 @@ public class OrfAt extends PluginForDecrypt {
                          * 720p) alongside the HLS-only one, so progressive must not be skipped there.
                          */
                         logger.info("Found a quality above progressive's cap via HLS and user wants BEST -> Skipping progressive qualities");
-                        skipProgressiveForBest = true;
+                        skipProgressiveForBest_HLS = true;
                     }
                 }
                 crawl_progressive_videos: {
-                    if (skipProgressiveForBest || !allowProgressive) {
+                    /*
+                     * If progressive is disabled, we normally have nothing to do here at all. But if the user still wants filesizes for
+                     * qualities that would be progressive (used to size the corresponding HLS result of the same height, see the "Small
+                     * trick" below), do the HEAD-request filesize check anyway without producing an actual progressive result.
+                     */
+                    final boolean onlyProbeFilesize = !allowProgressive;
+                    if (skipProgressiveForBest_HLS) {
+                        break crawl_progressive_videos;
+                    } else if (onlyProbeFilesize && !findProgressiveFilesizeEvenIfDisabled) {
                         break crawl_progressive_videos;
                     }
                     /*
@@ -541,6 +553,17 @@ public class OrfAt extends PluginForDecrypt {
                      * which only matters for the gapless crawling below (alreadyFoundGaplessProgressive).
                      */
                     final long segmentDurationSeconds = ((Number) segment.get("duration_seconds")).longValue();
+                    /*
+                     * Heights for which the progressive filesize check is allowed: either the user explicitly selected that quality, or
+                     * they want BEST and 720p is the best progressive can offer (if HLS already found something better,
+                     * skipProgressiveForBest is true and we never reach this point).
+                     */
+                    final List<Integer> allowedProgressiveFilesizeCheckHeights = new ArrayList<Integer>();
+                    for (final Integer progressiveHeight : PROGRESSIVE_QUALITY_HEIGHTS) {
+                        if (selectedQualities.contains(progressiveHeight) || (settingPreferBestVideo && progressiveHeight == 720)) {
+                            allowedProgressiveFilesizeCheckHeights.add(progressiveHeight);
+                        }
+                    }
                     for (final Map<String, Object> source : sources) {
                         final String src = (String) source.get("src");
                         final String quality = source.get("quality").toString();
@@ -570,9 +593,13 @@ public class OrfAt extends PluginForDecrypt {
                             logger.info("Skipping progressive item with unmapped quality: " + quality);
                             continue;
                         }
-                        final DownloadLink video = super.createDownloadlink(src);
-                        final boolean looksLikeQualityIsSelected = selectedQualities.contains(qualityHeight) || (settingPreferBestVideo && qualityHeight == 720);
-                        progressiveStreamFilesizeCheck: if (looksLikeQualityIsSelected && !settingEnableFastCrawl && !has_active_youth_protection) {
+                        if (onlyProbeFilesize && !allowedProgressiveFilesizeCheckHeights.contains(qualityHeight)) {
+                            /* Progressive is disabled and this quality's filesize isn't needed either -> skip entirely, no HEAD request. */
+                            continue;
+                        }
+                        final boolean qualityIsSelected = allowedProgressiveFilesizeCheckHeights.contains(qualityHeight);
+                        Long filesizeFromThisCheck = null;
+                        progressiveStreamFilesizeCheck: if (qualityIsSelected && !settingEnableFastCrawl && !has_active_youth_protection) {
                             final Double cachedBytesPerSecond = FILESIZE_MAGIC_MODE ? cachedBytesPerSecondByHeight.get(qualityHeight) : null;
                             if (cachedBytesPerSecond != null) {
                                 /*
@@ -611,8 +638,7 @@ public class OrfAt extends PluginForDecrypt {
                                     logger.info("Found progressive stream with unknown file size: " + src);
                                     break progressiveStreamFilesizeCheck;
                                 }
-                                /* Set verified filesize on this particular element as we know its' precise file size. */
-                                video.setVerifiedFileSize(filesize);
+                                filesizeFromThisCheck = filesize;
                                 qualityHeightToFilesizeMap.put(qualityHeight, filesize);
                                 final Long filesizeSumForAllSegmentsOfThisQuality = cumulativeFilesizeMap.get(qualityHeight);
                                 if (filesizeSumForAllSegmentsOfThisQuality != null) {
@@ -645,8 +671,19 @@ public class OrfAt extends PluginForDecrypt {
                                 }
                             }
                         }
+                        if (onlyProbeFilesize) {
+                            /*
+                             * We only wanted the filesize side-effect above -> no actual progressive result since progressive is disabled.
+                             */
+                            continue;
+                        }
                         segmentAvailableHeights.add(qualityHeight);
                         allVideoHeights.add(qualityHeight);
+                        final DownloadLink video = super.createDownloadlink(src);
+                        if (filesizeFromThisCheck != null) {
+                            /* Set verified filesize on this particular element as we know its' precise file size. */
+                            video.setVerifiedFileSize(filesizeFromThisCheck.longValue());
+                        }
                         video.setDefaultPlugin(hosterplugin);
                         video.setHost(hosterplugin.getHost());
                         video.setContentUrl(sourceurl);

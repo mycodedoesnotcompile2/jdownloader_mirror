@@ -20,20 +20,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 52486 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52985 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagetwistCom extends XFileSharingProBasic {
     public ImagetwistCom(final PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium(super.getPremiumLink());
     }
 
     /**
@@ -47,6 +46,8 @@ public class ImagetwistCom extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "imagetwist.com", "croea.com", "imageshimage.com", "imagexport.com", "imagenpic.com" });
+        /** 2026-07-15: Dedicated subdomain. Files hosted there cannot be accessed via "imagetwist.com" main domain! */
+        ret.add(new String[] { "phun.imagetwist.com" });
         return ret;
     }
 

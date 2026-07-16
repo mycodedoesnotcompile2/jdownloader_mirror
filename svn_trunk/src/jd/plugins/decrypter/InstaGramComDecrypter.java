@@ -79,7 +79,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 52825 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52983 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -881,26 +881,70 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         logger.info("crawlUser=crawlStory:" + crawlStory + "|crawlStoryHighlights:" + crawlStoryHighlights + "|crawlProfilePosts:" + crawlProfilePosts + "|crawlProfilePicture:" + crawlProfilePicture);
         /* Now do the actual crawling. */
+        int elementsToCrawl = 0;
         if (crawlStory) {
-            if (userSelectedCrawlTypes == 1) {
-                ret.addAll(this.crawlStory(param, account, loggedIN, username, true));
-            } else {
-                ret.addAll(this.crawlStory(param, account, loggedIN, username, false));
+            elementsToCrawl++;
+        }
+        if (crawlStoryHighlights) {
+            elementsToCrawl++;
+        }
+        if (crawlProfilePicture || crawlProfilePosts) {
+            elementsToCrawl++;
+        }
+        int elementIndex = 0;
+        if (crawlStory) {
+            elementIndex++;
+            try {
+                if (userSelectedCrawlTypes == 1) {
+                    ret.addAll(this.crawlStory(param, account, loggedIN, username, true));
+                } else {
+                    ret.addAll(this.crawlStory(param, account, loggedIN, username, false));
+                }
+            } catch (final InterruptedException e) {
+                throw e;
+            } catch (final Exception e) {
+                if (elementIndex == elementsToCrawl) {
+                    throw e;
+                }
+                logger.log(e);
+                logger.info("Crawling story failed but continuing because other elements are still to be crawled: " + username);
             }
         }
         if (crawlStoryHighlights) {
-            if (userSelectedCrawlTypes == 1) {
-                ret.addAll(this.crawlAllHighlightStories(username, account, loggedIN, true));
-            } else {
-                ret.addAll(this.crawlAllHighlightStories(username, account, loggedIN, false));
+            elementIndex++;
+            try {
+                if (userSelectedCrawlTypes == 1) {
+                    ret.addAll(this.crawlAllHighlightStories(username, account, loggedIN, true));
+                } else {
+                    ret.addAll(this.crawlAllHighlightStories(username, account, loggedIN, false));
+                }
+            } catch (final InterruptedException e) {
+                throw e;
+            } catch (final Exception e) {
+                if (elementIndex == elementsToCrawl) {
+                    throw e;
+                }
+                logger.log(e);
+                logger.info("Crawling story highlights failed but continuing because other elements are still to be crawled: " + username);
             }
         }
         if (crawlProfilePicture || crawlProfilePosts) {
-            if (loggedIN.get() || account != null) {
-                final String userID = findUserID(param, account, loggedIN, username);
-                ret.addAll(this.crawlUserAltAPI(param, account, loggedIN, username, userID, crawlProfilePicture, crawlProfilePosts));
-            } else {
-                ret.addAll(this.crawlUserWebsite(param, username, account, loggedIN, crawlProfilePicture, crawlProfilePosts));
+            elementIndex++;
+            try {
+                if (loggedIN.get() || account != null) {
+                    final String userID = findUserID(param, account, loggedIN, username);
+                    ret.addAll(this.crawlUserAltAPI(param, account, loggedIN, username, userID, crawlProfilePicture, crawlProfilePosts));
+                } else {
+                    ret.addAll(this.crawlUserWebsite(param, username, account, loggedIN, crawlProfilePicture, crawlProfilePosts));
+                }
+            } catch (final InterruptedException e) {
+                throw e;
+            } catch (final Exception e) {
+                if (elementIndex == elementsToCrawl) {
+                    throw e;
+                }
+                logger.log(e);
+                logger.info("Crawling profile posts/picture failed but continuing because other elements are still to be crawled: " + username);
             }
         }
         return ret;

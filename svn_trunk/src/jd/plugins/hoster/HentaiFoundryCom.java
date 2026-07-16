@@ -15,38 +15,74 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.ConfigEntry;
-import jd.config.Property;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "hentai-foundry.com" }, urls = { "https?://www\\.hentai-foundry\\.com/pictures/user/[A-Za-z0-9\\-_]+/\\d+|https?://www\\.hentai-foundry\\.com/stories/user/[A-Za-z0-9\\-_]+/\\d+/[A-Za-z0-9\\-_]+\\.pdf" })
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.ConfigEntry;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.HentaiFoundryComGallery;
+
+@HostPlugin(revision = "$Revision: 52987 $", interfaceVersion = 2, names = {}, urls = {})
+@PluginDependencies(dependencies = { HentaiFoundryComGallery.class })
 public class HentaiFoundryCom extends PluginForHost {
     public HentaiFoundryCom(PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
-        this.enablePremium("https://www.hentai-foundry.com/users/create");
+        this.enablePremium(getBaseURL() + "/users/create");
+    }
+
+    public static List<String[]> getPluginDomains() {
+        return HentaiFoundryComGallery.getPluginDomains();
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_PICTURE   = Pattern.compile("/pictures/user/([A-Za-z0-9\\-_]+)/(\\d+)(/([A-Za-z0-9\\-_]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_STORY_PDF = Pattern.compile("/stories/user/([A-Za-z0-9\\-_]+)/(\\d+)/([A-Za-z0-9\\-_]+\\.pdf)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://www\\." + buildHostsPatternPart(domains) + "/(" + PATTERN_PICTURE.pattern().substring(1) + "|" + PATTERN_STORY_PDF.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private String getBaseURL() {
+        return "https://www." + getHost();
     }
 
     @Override
@@ -54,17 +90,11 @@ public class HentaiFoundryCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
 
-    /* DEV NOTES */
-    // Tags:
-    // protocol: no https
-    // other: connections & downloads limites cause we re downloading small files
-    private static final String type_direct_pdf = "https?://www\\.hentai\\-foundry\\.com/stories/user/[A-Za-z0-9\\-_]+/\\d+/[A-Za-z0-9\\-_]+\\.pdf";
-    private static final String type_picture    = "https?://www\\.hentai\\-foundry\\.com/pictures/user/[A-Za-z0-9\\-_]+/\\d+";
-    private String              dllink          = null;
+    private String dllink = null;
 
     @Override
     public String getAGBLink() {
-        return "https://www.hentai-foundry.com/";
+        return getBaseURL() + "/";
     }
 
     private void setConfigElements() {
@@ -72,7 +102,25 @@ public class HentaiFoundryCom extends PluginForHost {
     }
 
     public static String getFID(final String url) {
-        return new Regex(url, "/user/[A-Za-z0-9\\-_]+/(\\d+)").getMatch(0);
+        return new Regex(url, "(?i)/user/[A-Za-z0-9\\-_]+/(\\d+)").getMatch(0);
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link.getPluginPatternMatcher());
+        if (fid != null) {
+            return getHost() + "://" + fid;
+        }
+        return super.getLinkID(link);
+    }
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        if (PATTERN_STORY_PDF.matcher(link.getPluginPatternMatcher()).find()) {
+            return getFID(link.getPluginPatternMatcher()) + ".pdf";
+        } else {
+            return getFID(link.getPluginPatternMatcher()) + ".jpg";
+        }
     }
 
     @Override
@@ -85,12 +133,12 @@ public class HentaiFoundryCom extends PluginForHost {
         dllink = null;
         String title = null;
         String ext = null;
-        final String fid = getFID(link.getDownloadURL());
+        final String fid = getFID(link.getPluginPatternMatcher());
         br.setFollowRedirects(true);
         if (account != null) {
-            login(br, account, false);
+            login(account, false);
         }
-        if (link.getDownloadURL().matches(type_direct_pdf)) {
+        if (PATTERN_STORY_PDF.matcher(link.getPluginPatternMatcher()).find()) {
             dllink = link.getDownloadURL() + "?enterAgree=1&size=0";
             ext = ".pdf";
             title = fid + "_" + new Regex(link.getDownloadURL(), "([A-Za-z0-9\\-_]+\\.pdf)$").getMatch(0);
@@ -99,8 +147,8 @@ public class HentaiFoundryCom extends PluginForHost {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            title = br.getRegex("<title>([^<>]*?) - Hentai Foundry</title>").getMatch(0);
-            dllink = br.getRegex("(//pictures\\.hentai-foundry\\.com/{1,}[^<>\"\\[\\]]+)\"").getMatch(0);
+            title = new Regex(br.getURL(), PATTERN_PICTURE).getMatch(3);
+            dllink = br.getRegex("\"(//pictures\\.hentai-foundry\\.com/{1,}/[^\"]+)\"").getMatch(0);
             if (title == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -129,7 +177,7 @@ public class HentaiFoundryCom extends PluginForHost {
         if (title != null) {
             link.setFinalFileName(this.applyFilenameExtension(title, ext));
         }
-        if (!StringUtils.isEmpty(dllink)) {
+        if (!StringUtils.isEmpty(dllink) && !link.isSizeSet()) {
             basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, title, ext);
         }
         return AvailableStatus.TRUE;
@@ -155,72 +203,52 @@ public class HentaiFoundryCom extends PluginForHost {
         return 5;
     }
 
-    @SuppressWarnings("unchecked")
-    public static void login(final Browser br, final Account account, final boolean force) throws Exception {
+    public void login(final Account account, final boolean validate) throws Exception {
         synchronized (account) {
-            try {
-                // Load cookies
-                br.setCookiesExclusive(true);
-                final Object ret = account.getProperty("cookies", null);
-                boolean acmatch = Encoding.urlEncode(account.getUser()).equals(account.getStringProperty("name", Encoding.urlEncode(account.getUser())));
-                if (acmatch) {
-                    acmatch = Encoding.urlEncode(account.getPass()).equals(account.getStringProperty("pass", Encoding.urlEncode(account.getPass())));
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                br.setCookies(cookies);
+                if (!validate) {
+                    return;
                 }
-                if (acmatch && ret != null && ret instanceof Map<?, ?> && !force) {
-                    final Map<String, String> cookies = (Map<String, String>) ret;
-                    if (account.isValid()) {
-                        for (final Map.Entry<String, String> cookieEntry : cookies.entrySet()) {
-                            final String key = cookieEntry.getKey();
-                            final String value = cookieEntry.getValue();
-                            br.setCookie(account.getHoster(), key, value);
-                        }
-                        return;
-                    }
+                br.getPage("https://www." + getHost() + "/");
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
                 }
-                br.setFollowRedirects(true);
-                br.getPage("https://www.hentai-foundry.com/?enterAgree=1&size=0");
-                final String csrftoken = br.getRegex("value=\"([^\"]+)\" name=\"YII_CSRF_TOKEN\"").getMatch(0);
-                if (csrftoken == null) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlugin defekt, bitte den JDownloader Support kontaktieren!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else if ("pl".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBłąd wtyczki, skontaktuj się z Supportem JDownloadera!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlugin broken, please contact the JDownloader Support!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                br.postPage("/site/login", "LoginForm%5BrememberMe%5D=1&YII_CSRF_TOKEN=" + csrftoken + "&LoginForm%5Busername%5D=" + Encoding.urlEncode(account.getUser()) + "&LoginForm%5Bpassword%5D=" + Encoding.urlEncode(account.getPass()));
-                if (!br.containsHTML("site/logout'>Logout</a>")) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                // Save cookies
-                final HashMap<String, String> cookies = new HashMap<String, String>();
-                final Cookies add = br.getCookies(br.getHost());
-                for (final Cookie c : add.getCookies()) {
-                    cookies.put(c.getKey(), c.getValue());
-                }
-                account.setProperty("name", Encoding.urlEncode(account.getUser()));
-                account.setProperty("pass", Encoding.urlEncode(account.getPass()));
-                account.setProperty("cookies", cookies);
-            } catch (final PluginException e) {
-                account.setProperty("cookies", Property.NULL);
-                throw e;
+                logger.info("Cookie login failed");
             }
+            br.setFollowRedirects(true);
+            br.getPage("https://www." + getHost() + "/site/login?enterAgree=1&size=0");
+            final Form loginform = br.getFormbyActionRegex("/site/login.*");
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            loginform.put("LoginForm[username]", Encoding.urlEncode(account.getUser()));
+            loginform.put("LoginForm[password]", Encoding.urlEncode(account.getPass()));
+            loginform.put("LoginForm[rememberMe]", "1");
+            br.submitForm(loginform);
+            if (!this.isLoggedin(br)) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("site/logout'>\\s*Logout\\s*</a>");
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(br, account, true);
+        login(account, true);
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
         /* free accounts can still have captcha */
-        account.setMaxSimultanDownloads(5);
+        account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
         account.setConcurrentUsePossible(false);
         return ai;
     }
@@ -228,17 +256,5 @@ public class HentaiFoundryCom extends PluginForHost {
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         this.handleDownload(link, account);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

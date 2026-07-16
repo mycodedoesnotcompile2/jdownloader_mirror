@@ -52,59 +52,63 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 52976 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 52982 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
-    private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
+    private static final String TYPE_AUDIO                                                 = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
-    public static final String  Q_SUBTITLES                                    = "Q_SUBTITLES";
-    public static final boolean Q_SUBTITLES_default                            = true;
-    public final static String  SETTING_SELECTED_SUBTITLE_FORMAT               = "selected_subtitle_format";
-    public static final int     SETTING_SELECTED_SUBTITLE_FORMAT_default       = 3;
-    public static final String  Q_THUMBNAIL                                    = "Q_THUMBNAIL";
-    public static final boolean Q_THUMBNAIL_default                            = true;
-    public static final String  Q_BEST                                         = "Q_BEST_2";
-    public static final boolean Q_BEST_default                                 = true;
+    public static final String  Q_SUBTITLES                                                = "Q_SUBTITLES";
+    public static final boolean Q_SUBTITLES_default                                        = true;
+    public final static String  SETTING_SELECTED_SUBTITLE_FORMAT                           = "selected_subtitle_format";
+    public static final int     SETTING_SELECTED_SUBTITLE_FORMAT_default                   = 3;
+    public static final String  Q_THUMBNAIL                                                = "Q_THUMBNAIL";
+    public static final boolean Q_THUMBNAIL_default                                        = true;
+    public static final String  Q_BEST                                                     = "Q_BEST_2";
+    public static final boolean Q_BEST_default                                             = true;
     /** Quality settings are keyed by video height (in pixels). LOW (Q1A) has no known height and is no longer selectable. */
-    public static final String  Q_HEIGHT_288                                   = "Q_HEIGHT_288_2026_07";
-    public static final boolean Q_HEIGHT_288_default                           = true;
-    public static final String  Q_HEIGHT_360                                   = "Q_HEIGHT_360_2026_07";
-    public static final boolean Q_HEIGHT_360_default                           = true;
-    public static final String  Q_HEIGHT_540                                   = "Q_HEIGHT_540_2026_07";
-    public static final boolean Q_HEIGHT_540_default                           = true;
-    public static final String  Q_HEIGHT_576                                   = "Q_HEIGHT_576_2026_07";
-    public static final boolean Q_HEIGHT_576_default                           = true;
-    public static final String  Q_HEIGHT_720                                   = "Q_HEIGHT_720_2026_07";
-    public static final boolean Q_HEIGHT_720_default                           = true;
-    public static final String  Q_HEIGHT_1080                                  = "Q_HEIGHT_1080_2026_07";
-    public static final boolean Q_HEIGHT_1080_default                          = true;
-    public static final String  PROGRESSIVE_STREAM                             = "PROGRESSIVE_STREAM";
-    public static final boolean PROGRESSIVE_STREAM_default                     = true;
-    public static final String  HLS_STREAM                                     = "HLS_STREAM_2024_02_22";
-    public static final boolean HLS_STREAM_default                             = false;
-    public final static String  SETTING_SELECTED_VIDEO_FORMAT                  = "selected_video_format";
-    public static final int     SETTING_SELECTED_VIDEO_FORMAT_default          = 0;
-    public static final String  SETTING_ENABLE_FAST_CRAWL                      = "enable_fast_crawl_2026_07";
-    public static final boolean SETTING_ENABLE_FAST_CRAWL_default              = false;
+    public static final String  Q_HEIGHT_288                                               = "Q_HEIGHT_288_2026_07";
+    public static final boolean Q_HEIGHT_288_default                                       = true;
+    public static final String  Q_HEIGHT_360                                               = "Q_HEIGHT_360_2026_07";
+    public static final boolean Q_HEIGHT_360_default                                       = true;
+    public static final String  Q_HEIGHT_540                                               = "Q_HEIGHT_540_2026_07";
+    public static final boolean Q_HEIGHT_540_default                                       = true;
+    public static final String  Q_HEIGHT_576                                               = "Q_HEIGHT_576_2026_07";
+    public static final boolean Q_HEIGHT_576_default                                       = true;
+    public static final String  Q_HEIGHT_720                                               = "Q_HEIGHT_720_2026_07";
+    public static final boolean Q_HEIGHT_720_default                                       = true;
+    public static final String  Q_HEIGHT_1080                                              = "Q_HEIGHT_1080_2026_07";
+    public static final boolean Q_HEIGHT_1080_default                                      = true;
+    public static final String  PROGRESSIVE_STREAM                                         = "PROGRESSIVE_STREAM";
+    public static final boolean PROGRESSIVE_STREAM_default                                 = true;
+    public static final String  HLS_STREAM                                                 = "HLS_STREAM_2024_02_22";
+    public static final boolean HLS_STREAM_default                                         = false;
+    public final static String  SETTING_SELECTED_VIDEO_FORMAT                              = "selected_video_format";
+    public static final int     SETTING_SELECTED_VIDEO_FORMAT_default                      = 0;
+    public final static String  SETTING_SELECTED_AUDIO_TRACK                               = "selected_audio_track";
+    public static final int     SETTING_SELECTED_AUDIO_TRACK_default                       = 0;
+    public static final String  SETTING_ENABLE_FAST_CRAWL                                  = "enable_fast_crawl_2026_07";
+    public static final boolean SETTING_ENABLE_FAST_CRAWL_default                          = false;
+    public static final String  SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED         = "find_progressive_filesize_even_if_disabled";
+    public static final boolean SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED_default = true;
     /* DownloadLink properties */
-    public static final String  PROPERTY_TITLE                                 = "title";
-    public static final String  PROPERTY_VIDEO_POSITION                        = "video_position";
-    public static final String  PROPERTY_VIDEO_POSITION_MAX                    = "video_position_max";
+    public static final String  PROPERTY_TITLE                                             = "title";
+    public static final String  PROPERTY_VIDEO_POSITION                                    = "video_position";
+    public static final String  PROPERTY_VIDEO_POSITION_MAX                                = "video_position_max";
     @Deprecated
-    public static final String  PROPERTY_INTERNAL_QUALITY                      = "directQuality";
-    public static final String  PROPERTY_VIDEO_HEIGHT                          = "video_height";
-    public static final String  PROPERTY_STREAMING_TYPE                        = "streamingType";
-    public static final String  PROPERTY_CONTENT_TYPE                          = "contentType";
-    public static final String  PROPERTY_SEGMENT_ID                            = "segment_id";
-    public static final String  PROPERTY_VIDEO_ID                              = "video_id";
-    public static final String  PROPERTY_DELIVERY                              = "delivery";
-    public static final String  PROPERTY_DIRECTURL                             = "directURL";
-    public static final String  PROPERTY_SOURCEURL                             = "mainlink";
-    public static final String  PROPERTY_AGE_RESTRICTED                        = "age_restricted";
-    public static final String  PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP = "age_restricted_last_recrawl_timestamp";
-    public static String        CONTENT_TYPE_IMAGE                             = "image";
-    public static String        CONTENT_TYPE_SUBTITLE                          = "subtitle";
-    public static String        CONTENT_TYPE_VIDEO                             = "video";
-    public static String        CONTENT_EXT_HINT                               = "ext_hint";
+    public static final String  PROPERTY_INTERNAL_QUALITY                                  = "directQuality";
+    public static final String  PROPERTY_VIDEO_HEIGHT                                      = "video_height";
+    public static final String  PROPERTY_STREAMING_TYPE                                    = "streamingType";
+    public static final String  PROPERTY_CONTENT_TYPE                                      = "contentType";
+    public static final String  PROPERTY_SEGMENT_ID                                        = "segment_id";
+    public static final String  PROPERTY_VIDEO_ID                                          = "video_id";
+    public static final String  PROPERTY_DELIVERY                                          = "delivery";
+    public static final String  PROPERTY_DIRECTURL                                         = "directURL";
+    public static final String  PROPERTY_SOURCEURL                                         = "mainlink";
+    public static final String  PROPERTY_AGE_RESTRICTED                                    = "age_restricted";
+    public static final String  PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP             = "age_restricted_last_recrawl_timestamp";
+    public static String        CONTENT_TYPE_IMAGE                                         = "image";
+    public static String        CONTENT_TYPE_SUBTITLE                                      = "subtitle";
+    public static String        CONTENT_TYPE_VIDEO                                         = "video";
+    public static String        CONTENT_EXT_HINT                                           = "ext_hint";
 
     public ORFMediathek(PluginWrapper wrapper) {
         super(wrapper);
@@ -313,6 +317,7 @@ public class ORFMediathek extends PluginForHost {
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 1", 10 * 60 * 1000l);
         }
+        /* 2026-07-15: TODO: Check if the recrawl handling down below still makes sense. */
         /*
          * E.g. progressive: https://apasfpd.sf.apa.at/gp/online/14ed5a0157632458580f9bc7bfd1feba/1708297200/Jugendschutz0600b2000_Q8C.mp4
          */
@@ -428,15 +433,32 @@ public class ORFMediathek extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final HLSContent hlsContent = new HLSContent(m3u8.get(0));
+            /*
+             * Find audio track; important: 2026-07-15: Atm our system can only handle one audio track, adding multiple audio tracks will
+             * lead to error "Segment X not loaded" right before download completion.
+             */
             final List<MEDIA> audioMedias = selected.getMedia(TYPE.AUDIO, selected.getAudioGroupID());
-            for (MEDIA audioMedia : audioMedias) {
-                final List<M3U8Playlist> audioM3U8 = audioMedia.loadM3U8(brc.cloneBrowser());
+            /* Default/Deutsch = the first entry; Audiodeskription must be looked up by name and isn't always available. */
+            MEDIA defaultAudioMedia = null;
+            MEDIA audiodeskriptionAudioMedia = null;
+            for (final MEDIA audioMedia : audioMedias) {
+                if (defaultAudioMedia == null) {
+                    defaultAudioMedia = audioMedia;
+                }
+                if (audiodeskriptionAudioMedia == null && StringUtils.containsIgnoreCase(audioMedia.getName(), "Audiodeskription")) {
+                    audiodeskriptionAudioMedia = audioMedia;
+                }
+            }
+            final boolean wantsAudiodeskription = getPluginConfig().getIntegerProperty(SETTING_SELECTED_AUDIO_TRACK, SETTING_SELECTED_AUDIO_TRACK_default) == 1;
+            final MEDIA selectedAudioMedia = wantsAudiodeskription && audiodeskriptionAudioMedia != null ? audiodeskriptionAudioMedia : defaultAudioMedia;
+            if (selectedAudioMedia != null) {
+                final List<M3U8Playlist> audioM3U8 = selectedAudioMedia.loadM3U8(brc.cloneBrowser());
                 if (audioM3U8 == null) {
-                    continue;
+                    logger.info("Failed to load selected audio track: " + selectedAudioMedia);
                 } else if (audioM3U8.size() != 1) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                logger.info("Add media:" + audioMedia);
+                logger.info("Add media:" + selectedAudioMedia);
                 hlsContent.addAudioTrack(audioM3U8.get(0));
             }
             final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
@@ -609,6 +631,7 @@ public class ORFMediathek extends PluginForHost {
 
     private static final String[] VIDEO_FORMATS    = new String[] { "All formats", "Multiple video chapters", "Single video (\"gapless\")" };
     private static final String[] SUBTITLE_FORMATS = new String[] { "SAMI (.smi)", "SRT (.srt)", "TTML (.ttml)", "WebVTT (.vtt)", "XML (.xml)" };
+    private static final String[] AUDIO_TRACKS     = new String[] { "Deutsch", "Deutsch mit Audiodeskription" };
 
     private void setConfigElements() {
         final ConfigEntry subtitle = new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), Q_SUBTITLES, "Download subtitle").setDefaultValue(Q_SUBTITLES_default);
@@ -630,12 +653,15 @@ public class ORFMediathek extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Video stream type settings"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), PROGRESSIVE_STREAM, "Load progressive streams").setDefaultValue(PROGRESSIVE_STREAM_default).setEnabled(false));
+        final ConfigEntry progressiveStream = new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), PROGRESSIVE_STREAM, "Load progressive streams").setDefaultValue(PROGRESSIVE_STREAM_default);
+        getConfig().addEntry(progressiveStream);
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HLS_STREAM, "Load hls streams").setDefaultValue(HLS_STREAM_default));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED, "If progressive is disabled: Find estimated HLS file size via progressive streams anyways").setDefaultValue(SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED_default).setEnabledCondidtion(progressiveStream, false));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Video format settings"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, VIDEO_FORMATS, "Preferred video format").setDefaultValue(SETTING_SELECTED_VIDEO_FORMAT_default));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_AUDIO_TRACK, AUDIO_TRACKS, "Preferred audio track").setDefaultValue(SETTING_SELECTED_AUDIO_TRACK_default));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Crawl behavior settings"));
         /* 2026-07-08: Hardcoded-disabled this setting since progressive video streams are often not available */

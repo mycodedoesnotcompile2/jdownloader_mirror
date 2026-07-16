@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +70,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 52981 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 52982 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -128,6 +129,14 @@ public class SaveTv extends PluginForHost {
     public static final String    PROPERTY_downloadable_via_username           = "downloadable_via";
     public static final String    PROPERTY_refresh_token                       = "refresh_token";
     public static final String    PROPERTY_expires_in                          = "expires_in";
+    /**
+     * Format-ID and ads-free state which were actually used to request the currently running/resumable download. <br />
+     * Set right before a download really starts, read (with priority over current settings) when a download resumes so that a resumed
+     * filestream is always continued with the exact same format it was started with - even if the user changes his settings in the
+     * meantime.
+     */
+    public static final String    PROPERTY_download_format_id                  = "download_format_id";
+    public static final String    PROPERTY_download_ads_free                   = "download_ads_free";
     /* Settings stuff */
     private static final String   PROPERTY_USEORIGINALFILENAME                 = "USEORIGINALFILENAME";
     public static final String    PROPERTY_PREFERADSFREE                       = "PREFERADSFREE";
@@ -190,11 +199,6 @@ public class SaveTv extends PluginForHost {
     }
 
     @Override
-    public void correctDownloadLink(final DownloadLink link) {
-        link.setContentUrl(buildExternalDownloadURL(link, this));
-    }
-
-    @Override
     public String getLinkID(final DownloadLink link) {
         final String telecast_id = getTelecastId(link);
         if (telecast_id != null) {
@@ -207,6 +211,39 @@ public class SaveTv extends PluginForHost {
     @Override
     public String getAGBLink() {
         return "https://" + getHost() + "/STV/S/misc/terms.cfm";
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "save.tv" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    /* Website URLs, e.g. https://www.save.tv/STV/M/obj/archive/VideoArchiveDetails.cfm?TelecastID=12345678 */
+    private static final Pattern PATTERN_TELECAST = Pattern.compile("/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=(\\d+).*");
+    /* Direct video-CDN URLs served from an arbitrary subdomain, e.g. https://xyz123.save.tv/1_12345678_something */
+    private static final Pattern PATTERN_DIRECT   = Pattern.compile("/\\d+_(\\d+)_.+");
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_TELECAST.pattern() + "|https?://[A-Za-z0-9\\-]+\\." + buildHostsPatternPart(domains) + PATTERN_DIRECT.pattern());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -222,6 +259,13 @@ public class SaveTv extends PluginForHost {
     @Override
     public boolean isProxyRotationEnabledForLinkChecker() {
         return false;
+    }
+
+    @Override
+    public void resetDownloadlink(final DownloadLink link) {
+        /* Forget which format was used for a previous download attempt so it can be freshly re-evaluated from current settings. */
+        link.removeProperty(PROPERTY_download_format_id);
+        link.removeProperty(PROPERTY_download_ads_free);
     }
 
     @SuppressWarnings("deprecation")
@@ -323,7 +367,7 @@ public class SaveTv extends PluginForHost {
             /* Offline#1 - offline */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
         final Object aRRALLOWDDOWNLOADFORMATS = entries.get("ARRALLOWDDOWNLOADFORMATS");
         final Object sTRRECORDORDER = entries.get("STRRECORDORDER");
         if (aRRALLOWDDOWNLOADFORMATS == null || sTRRECORDORDER == null) {
@@ -1171,7 +1215,7 @@ public class SaveTv extends PluginForHost {
         }
         final boolean downloadAdsFreeValue = verifyAdsFreeUserSelection(link, preferAdsFree, isAdsFreeAvailable);
         /* Set download options (ads-free or with ads) and get download url */
-        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
         final List<Object> sourcelist = jsonGetVideoSourcelist(entries);
         final int best_quality_id = jsonGetBestQualityIdWebsite(sourcelist);
         int stv_request_selected_format_id_value = getConfiguredVideoFormatID(link);
@@ -1183,7 +1227,7 @@ public class SaveTv extends PluginForHost {
         String dllink = checkDirectLink(link, stv_request_selected_format_id_value, downloadAdsFreeValue);
         if (StringUtils.isEmpty(dllink)) {
             requestDownloadWebsite(link, stv_request_selected_format_id_value, downloadAdsFreeValue);
-            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
             /* 2016-07-06: Collecting errors: */
             /*
              * {"ERROR":
@@ -1201,6 +1245,12 @@ public class SaveTv extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Download aus unbekannten Gründen zurzeit nicht möglich", 10 * 60 * 1000l);
             }
         }
+        /*
+         * Remember the format that is actually being downloaded so that a resumed filestream always continues with the exact same format,
+         * even if the user changes his settings in the meantime.
+         */
+        link.setProperty(PROPERTY_download_format_id, stv_request_selected_format_id_value);
+        link.setProperty(PROPERTY_download_ads_free, downloadAdsFreeValue);
         handleDownload(link, account, dllink);
     }
 
@@ -1243,6 +1293,12 @@ public class SaveTv extends PluginForHost {
             server_filename = server_filename.substring(0, server_filename.lastIndexOf("."));
             link.setProperty(PROPERTY_server_filename, server_filename);
         }
+        /*
+         * Remember the format that is actually being downloaded so that a resumed filestream always continues with the exact same format,
+         * even if the user changes his settings in the meantime.
+         */
+        link.setProperty(PROPERTY_download_format_id, formatIDselected);
+        link.setProperty(PROPERTY_download_ads_free, downloadAdsFreeValue);
         handleDownload(link, account, dllink);
     }
 
@@ -1422,6 +1478,14 @@ public class SaveTv extends PluginForHost {
      * Parameters inside the user-added URL can override his basic plugin settings. This function respects that.
      */
     public static boolean getPreferAdsFree(final DownloadLink link) {
+        final Boolean preferAdsFreeStored = link.getBooleanProperty(PROPERTY_download_ads_free);
+        if (preferAdsFreeStored != null) {
+            /*
+             * A download using this ads-free setting has already been started before --> Keep using it so a resumed filestream never
+             * continues with a different setting than it was started with, even if the user changes his settings in the meantime.
+             */
+            return preferAdsFreeStored.booleanValue();
+        }
         final String preferAdsFreeUrl = new Regex(link.getDownloadURL(), "adsfree=(true|false)").getMatch(0);
         final boolean preferAdsFree;
         if (preferAdsFreeUrl != null) {
@@ -1462,7 +1526,7 @@ public class SaveTv extends PluginForHost {
      */
     private AccountInfo fetchAccountInfoAPI(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        api_GET(br, "/user?fields=contract.hasxlpackage%2C%20contract.hasxxlpackage%2C%20contract.islocked%2C%20contract.isrunning%2C%20contract.packagename%2C%20recordformat.id");
+        api_GET(br, "/user?fields=contract.isrunning%2C%20contract.packagename");
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> contract = (Map<String, Object>) entries.get("contract");
         String package_name = (String) contract.get("packageName");
@@ -1565,7 +1629,6 @@ public class SaveTv extends PluginForHost {
     }
 
     /** Performs login respecting api setting */
-    @SuppressWarnings("deprecation")
     private void login(final Browser br, final Account account, final boolean force) throws Exception {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
@@ -1687,7 +1750,7 @@ public class SaveTv extends PluginForHost {
          */
         final boolean isInErrorState = br.containsHTML("\\d+\\.\\d+E\\d+,\"NOK\",\"");
         if (isInErrorState) {
-            final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+            final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
             final List<Object> errorlist = (List) entries.get("ARRVIDEOURL");
             final String errormessage = (String) errorlist.get(2);
             if (errormessage.contains("Aufnahme zu betrachten, laden Sie bitte die ungeschnittene Version")) {
@@ -1992,18 +2055,19 @@ public class SaveTv extends PluginForHost {
      * This is only that complicated because the user selection can be overridden via parameters inside the URL.
      */
     public static int getConfiguredVideoFormatID(final DownloadLink link) {
-        int videoformat;
+        final int videoformatStored = link.getIntegerProperty(PROPERTY_download_format_id, -1);
+        if (videoformatStored != -1) {
+            /*
+             * A download using this format has already been started before --> Keep using it so a resumed filestream never continues with a
+             * different format than it was started with, even if the user changes his settings in the meantime.
+             */
+            return videoformatStored;
+        }
         final int videoformatURL = getConfiguredVideoFormatUrl(link);
-        if (videoformatURL != -1) {
-            videoformat = videoformatURL;
-        } else {
-            videoformat = getConfiguredVideoFormatConfig();
+        if (videoformatURL != -1 && isKnownFormatID(videoformatURL)) {
+            return videoformatURL;
         }
-        if (!isKnownFormatID(videoformat)) {
-            /* E.g. wrong formatID given via URL --> Fallback to default formatID */
-            videoformat = getDefaultFormatID();
-        }
-        return videoformat;
+        return getConfiguredVideoFormatConfig();
     }
 
     /** Returns default formatID. 2017-08-11: Returns ID for HQ format --> Website-default */
@@ -2053,7 +2117,6 @@ public class SaveTv extends PluginForHost {
      *
      * @return Either formatID from inside URL or -1 if nothing found.
      */
-    @SuppressWarnings("deprecation")
     public static int getConfiguredVideoFormatUrl(final DownloadLink link) {
         if (link == null) {
             /* Fallback - upper functions should now use formatID which user has selected in plugin settings. */
@@ -2221,7 +2284,7 @@ public class SaveTv extends PluginForHost {
     private static String api_POST(final Browser br, String url, final String postdata) throws Exception {
         url = correctURLAPI(url);
         br.postPage(url, postdata);
-        return br.toString();
+        return br.getRequest().getHtmlCode();
     }
 
     /**
@@ -2233,7 +2296,7 @@ public class SaveTv extends PluginForHost {
         url = correctURLAPI(url);
         br.getPage(url);
         handleErrorsAPI(br, this.currAcc);
-        return br.toString();
+        return br.getRequest().getHtmlCode();
     }
 
     public static String correctURLAPI(String url) {
@@ -2645,7 +2708,7 @@ public class SaveTv extends PluginForHost {
                 return buildNotYetRecordedOrOfflineDownloadURL(link);
             }
         } else {
-            return link.getDownloadURL();
+            return link.getPluginPatternMatcher();
         }
     }
 

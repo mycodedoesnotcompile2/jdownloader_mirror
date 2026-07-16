@@ -25,6 +25,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.BearerAuthentication;
@@ -41,6 +52,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -50,18 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 52983 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -200,22 +201,22 @@ public class SankakucomplexCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        if (downloadLink != null) {
-            if (!"s".equals(downloadLink.getStringProperty(PROPERTY_RATING, "s")) && account == null) {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
+        if (link != null) {
+            if (!"s".equals(link.getStringProperty(PROPERTY_RATING, "s")) && account == null) {
                 // e(explicit) and q(questionable) rating require an account
                 return false;
             }
-            if (downloadLink.hasProperty(PROPERTY_IS_ACCOUNT_REQUIRED) && account == null) {
+            if (link.hasProperty(PROPERTY_IS_ACCOUNT_REQUIRED) && account == null) {
                 // account required, rating unknown
                 return false;
             }
-            if (downloadLink.hasProperty(PROPERTY_IS_PREMIUMONLY) && !AccountType.PREMIUM.is(account)) {
+            if (link.hasProperty(PROPERTY_IS_PREMIUMONLY) && !AccountType.PREMIUM.is(account)) {
                 // premium account required
                 return false;
             }
         }
-        return super.canHandle(downloadLink, account);
+        return super.canHandle(link, account);
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
@@ -253,20 +254,28 @@ public class SankakucomplexCom extends PluginForHost {
         } else {
             br.getPage(contenturl);
         }
+        if (StringUtils.endsWithCaseInsensitive(br.getURL(), "posts/show_empty")) {
+            /* E.g. redirect to https://chan.sankakucomplex.com/de/posts/show_empty */
+            if (account == null) {
+                return requestFileInformationAPI(link, null);
+            }
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("<title>\\s*404: Page Not Found\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getURL().contains("login.sankakucomplex.com")) {
+            if (account != null) {
+                /* We should be logged in but we are not. */
+                throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000l);
+            } else {
+                link.setProperty(PROPERTY_IS_PREMIUMONLY, true);
+                throw new AccountRequiredException();
+            }
         } else if (!this.canHandle(br.getURL())) {
             /* E.g. redirect to https://chan.sankakucomplex.com/de/posts */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "posts/show_empty")) {
-            /* E.g. redirect to https://chan.sankakucomplex.com/de/posts/show_empty */
-            if (account == null) {
-                return requestFileInformationAPI(link, null);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
         }
         if (br.containsHTML(">\\s*You lack the access rights required to view this content") || br.containsHTML(">\\s*Nothing is visible to you here")) {
             /* Content can only be downloaded by premium users or mature content which can only be downloaded by logged in users. */
@@ -520,8 +529,8 @@ public class SankakucomplexCom extends PluginForHost {
 
     private static void prepareDownloadHeaders(final Browser br) {
         /**
-         * 2024-11-12: Do not send a referer header! </br> This is really important else we may get redirected to a dummy image. Looks to be
-         * some kind of pseudo protection.
+         * 2024-11-12: Do not send a referer header! </br>
+         * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
@@ -551,8 +560,8 @@ public class SankakucomplexCom extends PluginForHost {
         final String errortext = "Broken or temporarily unavailable file";
         if (System.currentTimeMillis() - timestampLastTimeFileMaybeBroken <= 5 * 60 * 1000l) {
             /**
-             * Failed again in a short time even with fresh direct URL: </br> Wait longer time before retry as we've just recently tried and
-             * it failed again.
+             * Failed again in a short time even with fresh direct URL: </br>
+             * Wait longer time before retry as we've just recently tried and it failed again.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, 5 * 60 * 1000l);
         } else {
@@ -848,14 +857,6 @@ public class SankakucomplexCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return freeRunning.get() + 1;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 
     @Override

@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52953 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52984 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -698,7 +698,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected String getNormalizedDownloadURL(final DownloadLink link) {
         final String fuid = this.getFUIDFromURL(link);
-        final String base = this.getMainPage(br);
+        final String base;
+        if (this.br != null && this.br.getRequest() != null) {
+            /* A request has already been made -> Prefer that host. */
+            base = this.getMainPage(br);
+        } else {
+            /* No request has been made yet -> Derive host from link so that a subdomain in the original URL is preserved. */
+            base = this.getMainPage(link);
+        }
         if (fuid == null) {
             /* Without a fuid we cannot build URLs. */
             return this.getContentURL(link);
