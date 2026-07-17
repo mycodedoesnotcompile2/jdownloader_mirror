@@ -52,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 52981 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
+@DecrypterPlugin(revision = "$Revision: 52997 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -184,7 +184,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 account.setProperty(CRAWLER_PROPERTY_LASTCRAWL, System.currentTimeMillis());
             }
             logger.info("save.tv: total links found: " + ret.size() + " of " + totalLinksNum);
-        } catch (final Throwable e) {
+        } catch (final Exception e) {
             logger.info("save.tv: total links found: " + ret.size() + " of " + totalLinksNum);
             if (ret.size() >= totalLinksNum) {
                 /* This can happen if the user aborts but the crawler already found all links. */
@@ -688,7 +688,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         final long crawl_duration = System.currentTimeMillis() - timestamp_crawl_started;
         String message = "\r\n";
         message += "Dauer des Crawlvorganges: " + TimeFormatter.formatMilliSeconds(crawl_duration, 0);
-        message += "\r\n\r\nGenervt von diesen Info-Dialogen? In den Plugin Einstellungen kannst du sie deaktivieren ;)";
+        message += "\r\n\r\nGenervt von diesen Info-Dialogen? In den SaveTV Plugin Einstellungen kannst du sie abschalten.";
         return message;
     }
 

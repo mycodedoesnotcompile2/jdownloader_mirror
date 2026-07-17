@@ -15,7 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -25,16 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -54,32 +43,40 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52311 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 52994 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
-    private static final int     STATUSCODE_APIDISABLED                             = 400;
-    private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
-    private static final int     STATUSCODE_DOWNLOADTEMPORARILYDISABLED             = 500;
-    private static final String  ERRORMESSAGE_DOWNLOADTEMPORARILYDISABLEDTEXT       = "Download temporarily disabled!";
-    private static final int     STATUSCODE_UNKNOWNERROR                            = 599;
-    private static final String  ERRORMESSAGE_UNKNOWNERRORTEXT                      = "Unknown file error";
-    private static final String  DIRECT_WEB                                         = "directlinkWeb";
-    private static final String  PREMIUM_ONLY                                       = "premium_only";
-    private static final String  DIRECT_API                                         = "directlinkApi";
+    private static final int    STATUSCODE_APIDISABLED                             = 400;
+    private static final String ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
+    private static final int    STATUSCODE_DOWNLOADTEMPORARILYDISABLED             = 500;
+    private static final String ERRORMESSAGE_DOWNLOADTEMPORARILYDISABLEDTEXT       = "Download temporarily disabled!";
+    private static final int    STATUSCODE_UNKNOWNERROR                            = 599;
+    private static final String ERRORMESSAGE_UNKNOWNERRORTEXT                      = "Unknown file error";
+    private static final String DIRECT_WEB                                         = "directlinkWeb";
+    private static final String PREMIUM_ONLY                                       = "premium_only";
+    private static final String DIRECT_API                                         = "directlinkApi";
     /* Plugin settings */
-    private static final String  DISABLE_HTTPS                                      = "DISABLE_HTTPS_2";
-    private static final boolean defaultSETTING_DISABLE_HTTPS                       = false;
-    private static final String  SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS        = "WAIT_MINUTES_ON_NO_FREE_SLOTS";
-    private static final int     defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS = 10;
-    private static final String  SETTING_WAIT_MINUTES_ON_ERROR_CODE_415             = "SETTING_WAIT_MINUTES_ON_ERROR_CODE_415";
-    private static final int     defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415      = 5;
+
+    private static final String SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS        = "WAIT_MINUTES_ON_NO_FREE_SLOTS";
+    private static final int    defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS = 10;
+    private static final String SETTING_WAIT_MINUTES_ON_ERROR_CODE_415             = "SETTING_WAIT_MINUTES_ON_ERROR_CODE_415";
+    private static final int    defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415      = 5;
     /* API Docs: https://filer.net/api */
-    public static final String   API_BASE                                           = "https://filer.net/api";
-    public static final String   WEBSITE_BASE                                       = "https://filer.net";
-    private static final double  RECAPTCHA_ENTERPRISE_MIN_SCORE                     = 0.5d;
+    public static final String  API_BASE                                           = "https://filer.net/api";
+    public static final String  WEBSITE_BASE                                       = "https://filer.net";
+    private static final double RECAPTCHA_ENTERPRISE_MIN_SCORE                     = 0.5d;
 
     @SuppressWarnings("deprecation")
     public FilerNet(PluginWrapper wrapper) {
@@ -95,29 +92,7 @@ public class FilerNet extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new PluginBrowser<FilerNet>(this) {
-            @Override
-            public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
-                /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
-                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
-                 * this, http protocol would be used even if user preferred https. <br>
-                 * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
-                 * Asked support about this, waiting for feedback
-                 */
-                final String host = request.getURL().getHost();
-                if (!"api.filer.net".equalsIgnoreCase(host) && !"filer.net".equalsIgnoreCase(host)) {
-                    // api and website always redirect to https
-                    request.setURL(new URL(rewriteProtocol(request.getURL().toExternalForm())));
-                }
-                return super.openRequestConnection(request, followRedirects);
-            }
-
-            @Override
-            public Browser createNewBrowserInstance() {
-                return FilerNet.this.createNewBrowserInstance();
-            }
-        };
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.getHeaders().put("User-Agent", "JDownloader");
         br.setAllowedResponseCodes(400, 502);
@@ -155,14 +130,6 @@ public class FilerNet extends PluginForHost {
     public String getAPI_BASE() {
         // api always redirects to https
         return API_BASE;
-    }
-
-    public String rewriteProtocol(String url) {
-        if (this.getPluginConfig().getBooleanProperty(DISABLE_HTTPS, defaultSETTING_DISABLE_HTTPS)) {
-            return url.replaceFirst("^https://", "http://");
-        } else {
-            return url.replaceFirst("^http://", "https://");
-        }
     }
 
     private final String getFileID(DownloadLink link) {
@@ -820,7 +787,6 @@ public class FilerNet extends PluginForHost {
     }
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DISABLE_HTTPS, "Use HTTP instead of HTTPS").setDefaultValue(defaultSETTING_DISABLE_HTTPS));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS, "Wait minutes on error 'No free slots available'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_CODE_415, "Wait minutes on error 'Error 415'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415));
     }

@@ -16,7 +16,14 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -29,25 +36,51 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "rokfin.com" }, urls = { "https?://(www\\.)?rokfin.com/(post|stream)/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 52998 $", interfaceVersion = 3, names = {}, urls = {})
 public class RokfinCom extends PluginForDecrypt {
     public RokfinCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "rokfin.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_POST   = Pattern.compile("/post/(\\d+)");
+    private static final Pattern PATTERN_STREAM = Pattern.compile("/stream/(\\d+)");
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_POST.pattern().substring(1) + "|" + PATTERN_STREAM.pattern().substring(1) + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         br.getPage(param.getCryptedUrl());
         br.followRedirect();
-        final String postID = new Regex(param.getCryptedUrl(), "/post/(\\d+)").getMatch(0);
-        final String streamID = new Regex(param.getCryptedUrl(), "/stream/(\\d+)").getMatch(0);
+        final String postID = new Regex(param.getCryptedUrl(), PATTERN_POST).getMatch(0);
+        final String streamID = new Regex(param.getCryptedUrl(), PATTERN_STREAM).getMatch(0);
         Browser brc = br.cloneBrowser();
         final Map<String, Object> map;
         if (postID != null) {
@@ -57,22 +90,30 @@ public class RokfinCom extends PluginForDecrypt {
             if (!"video".equalsIgnoreCase(type) && !"audio".equalsIgnoreCase(type)) {
                 logger.info("Unsupported type:" + type);
                 return new ArrayList<DownloadLink>();
+            }
+            final String title = (String) JavaScriptEngineFactory.walkJson(map, "content/contentTitle");
+            if (StringUtils.isEmpty(title)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String premiumPlan = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(map, "premiumPlan"));
+            if ("true".equalsIgnoreCase(premiumPlan) || "1".equalsIgnoreCase(premiumPlan)) {
+                throw new AccountRequiredException(title);
+            }
+            final String videourl = (String) JavaScriptEngineFactory.walkJson(map, "content/contentUrl");
+            if (StringUtils.isEmpty(videourl) || StringUtils.equalsIgnoreCase("fake.m3u8", videourl)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            if (StringUtils.containsIgnoreCase(videourl, ".mp4")) {
+                final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+                final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl));
+                video.setFinalFileName(title + ".mp4");
+                video.setAvailable(true);
+                ret.add(video);
+                return ret;
             } else {
-                final String title = (String) JavaScriptEngineFactory.walkJson(map, "content/contentTitle");
-                if (StringUtils.isEmpty(title)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String premiumPlan = StringUtils.valueOfOrNull(JavaScriptEngineFactory.walkJson(map, "premiumPlan"));
-                if ("true".equalsIgnoreCase(premiumPlan) || "1".equalsIgnoreCase(premiumPlan)) {
-                    throw new AccountRequiredException(title);
-                }
-                final String m3u8 = (String) JavaScriptEngineFactory.walkJson(map, "content/contentUrl");
-                if (StringUtils.isEmpty(m3u8) || StringUtils.equalsIgnoreCase("fake.m3u8", m3u8)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
                 brc = br.cloneBrowser();
-                brc.getPage(m3u8);
-                final ArrayList<DownloadLink> ret = GenericM3u8Decrypter.parseM3U8(this, m3u8, brc, null, null, title);
+                brc.getPage(videourl);
+                final ArrayList<DownloadLink> ret = GenericM3u8Decrypter.parseM3U8(this, videourl, brc, null, null, title);
                 if (ret.size() > 1) {
                     final FilePackage fp = FilePackage.getInstance();
                     fp.setName(title);

@@ -669,7 +669,15 @@ public class CompiledFiletypeFilter {
                 return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
             }
         },
-        AAC,
+        AAC {
+            private final Pattern pattern = Pattern.compile("(?i)audio/(x-)?aac");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
+
         WAV {
             private final Pattern pattern = Pattern.compile("(?i)audio/wav");
 
@@ -679,7 +687,7 @@ public class CompiledFiletypeFilter {
             }
         },
         FLAC {
-            private final Pattern pattern = Pattern.compile("(?i)audio/x-flac");
+            private final Pattern pattern = Pattern.compile("(?i)audio/(x-)?flac");
 
             @Override
             public int matchesMimeType(String mimeType) {

@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.Open3dlabComConfig;
-import org.jdownloader.plugins.components.config.Open3dlabComConfigSfmlabCom;
-import org.jdownloader.plugins.components.config.Open3dlabComConfigSmutbaSe;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -41,7 +35,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52983 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.Open3dlabComConfig;
+import org.jdownloader.plugins.components.config.Open3dlabComConfigSfmlabCom;
+import org.jdownloader.plugins.components.config.Open3dlabComConfigSmutbaSe;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+
+@HostPlugin(revision = "$Revision: 52992 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -220,7 +220,7 @@ public class Open3dlabCom extends PluginForHost {
     }
 
     private String findDirecturl(final Browser br) {
-        String url = br.getRegex("window\\.location = \"(https?://[^\"]+)").getMatch(0);
+        String url = br.getRegex("window\\.location\\s*=\\s*\"(https?://[^\"]+)").getMatch(0);
         if (url == null) {
             return null;
         }

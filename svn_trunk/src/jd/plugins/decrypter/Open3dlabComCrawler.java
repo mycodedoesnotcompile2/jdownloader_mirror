@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.Open3dlabCom;
 
-@DecrypterPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52998 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { Open3dlabCom.class })
 public class Open3dlabComCrawler extends PluginForDecrypt {
     public Open3dlabComCrawler(PluginWrapper wrapper) {
@@ -126,6 +126,10 @@ public class Open3dlabComCrawler extends PluginForDecrypt {
         }
         final String[] htmls = br.getRegex("(<tr>\\s*<td class=\"text-wrap-word js-edit-input\"[^>]*>.*?</tr>\\s*<tr[^>]*>.*?</tr>)").getColumn(0);
         if (htmls == null || htmls.length == 0) {
+            if (!br.containsHTML("class=\"download-tier\"")) {
+                /* Item with external downloads which we cannot handle e.g. /project/207b4924-77f8-40a1-b189-01cf565baede/ */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         String title = br.getRegex("\"name\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);

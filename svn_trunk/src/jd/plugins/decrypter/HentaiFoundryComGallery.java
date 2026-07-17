@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.HentaiFoundryCom;
 
-@DecrypterPlugin(revision = "$Revision: 52988 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 52998 $", interfaceVersion = 3, names = {}, urls = {})
 public class HentaiFoundryComGallery extends PluginForDecrypt {
     public HentaiFoundryComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,40 +79,39 @@ public class HentaiFoundryComGallery extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         getUserLogin(false);
-        br.setReadTimeout(3 * 60 * 1000);
         br.setFollowRedirects(true);
-        String parameter = param.toString();
-        if (new Regex(parameter, Pattern.compile(".+/user/[A-Za-z0-9\\-_]+/profile", Pattern.CASE_INSENSITIVE)).matches()) {
-            final String userID = new Regex(parameter, Pattern.compile(".+/user/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
-            decryptedLinks.add(createDownloadlink("https://www." + getHost() + "/pictures/user/" + userID));
-            decryptedLinks.add(createDownloadlink("https://www." + getHost() + "/pictures/user/" + userID + "/scraps"));
-            decryptedLinks.add(createDownloadlink("https://www." + getHost() + "/stories/user/" + userID));
-            return decryptedLinks;
+        String contenturl = param.getCryptedUrl();
+        if (new Regex(contenturl, Pattern.compile(".+/user/[A-Za-z0-9\\-_]+/profile", Pattern.CASE_INSENSITIVE)).matches()) {
+            final String userID = new Regex(contenturl, Pattern.compile(".+/user/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
+            ret.add(createDownloadlink("https://www." + getHost() + "/pictures/user/" + userID));
+            ret.add(createDownloadlink("https://www." + getHost() + "/pictures/user/" + userID + "/scraps"));
+            ret.add(createDownloadlink("https://www." + getHost() + "/stories/user/" + userID));
+            return ret;
         }
-        if (new Regex(parameter, Pattern.compile(".+/pictures/user/[A-Za-z0-9\\-_]+/\\d+", Pattern.CASE_INSENSITIVE)).matches()) {
-            decryptedLinks.add(createDownloadlink(parameter));
-            return decryptedLinks;
+        if (new Regex(contenturl, Pattern.compile(".+/pictures/user/[A-Za-z0-9\\-_]+/\\d+", Pattern.CASE_INSENSITIVE)).matches()) {
+            ret.add(createDownloadlink(contenturl));
+            return ret;
         }
-        br.getPage(parameter + "?enterAgree=1&size=0");
+        br.getPage(contenturl + "?enterAgree=1&size=0");
         if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            ret.add(this.createOfflinelink(contenturl));
+            return ret;
         } else if (br.containsHTML("class=\"empty\"")) {
             /* User has not uploaded any content */
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            ret.add(this.createOfflinelink(contenturl));
+            return ret;
         }
-        final String fpName = new Regex(parameter, "/user/(.+)").getMatch(0);
+        final String fpName = new Regex(contenturl, "/user/(.+)").getMatch(0);
         int page = 1;
         String next = null;
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(Encoding.htmlDecode(fpName.trim()));
         do {
             if (this.isAbort()) {
-                logger.info("Decryption aborted by user: " + parameter);
-                return decryptedLinks;
+                logger.info("Decryption aborted by user: " + contenturl);
+                return ret;
             }
             logger.info("Decrypting page " + page);
             if (page > 1) {
@@ -126,7 +125,7 @@ public class HentaiFoundryComGallery extends PluginForDecrypt {
                 String title = new Regex(link, "thumbTitle\"><[^<>]*?>([^<>]+)<").getMatch(0);
                 final String url = new Regex(link, "\"(/pictures/user/[A-Za-z0-9\\-_]+/\\d+[^<>\"]*?)\"").getMatch(0);
                 if (url == null) {
-                    logger.warning("Decrypter broken for link: " + parameter);
+                    logger.warning("Decrypter broken for link: " + contenturl);
                     logger.info("link: " + link);
                     logger.info("title: " + title + "url: " + url);
                     return null;
@@ -141,7 +140,7 @@ public class HentaiFoundryComGallery extends PluginForDecrypt {
                 dl.setName(title);
                 dl.setMimeHint(CompiledFiletypeFilter.ImageExtensions.BMP);
                 dl.setAvailable(true);
-                decryptedLinks.add(dl);
+                ret.add(dl);
                 fp.add(dl);
                 distribute(dl);
             }
@@ -151,7 +150,7 @@ public class HentaiFoundryComGallery extends PluginForDecrypt {
             }
             page++;
         } while (next != null);
-        return decryptedLinks;
+        return ret;
     }
 
     /** Log in the account of the hostplugin */

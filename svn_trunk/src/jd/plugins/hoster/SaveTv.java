@@ -70,7 +70,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 52982 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 52997 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -152,6 +152,7 @@ public class SaveTv extends PluginForHost {
     public static final String    CRAWLER_ENABLE_FAST_LINKCHECK                = "CRAWLER_ENABLE_FASTER_2";
     public static final String    CRAWLER_ENABLE_DIALOGS                       = "CRAWLER_ENABLE_DIALOGS";
     public static final String    CRAWLER_GRAB_TIMEFRAME_COUNT                 = "CRAWLER_GRAB_TIMEFRAME_COUNT";
+    public static final String    SYNC_TOOLBAR_ENABLE_DIALOG                   = "SYNC_TOOLBAR_ENABLE_DIALOG";
     private static final String   DELETE_TELECAST_ID_AFTER_DOWNLOAD            = "DELETE_TELECAST_ID_AFTER_DOWNLOAD";
     private static final String   DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS    = "DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS";
     /* Custom filename settings stuff */
@@ -189,7 +190,6 @@ public class SaveTv extends PluginForHost {
     public static Object          LOCK                                         = new Object();
     private Account               currAcc                                      = null;
     private DownloadLink          currDownloadlink                             = null;
-    private SubConfiguration      cfg                                          = null;
 
     @SuppressWarnings("deprecation")
     public SaveTv(PluginWrapper wrapper) {
@@ -268,11 +268,9 @@ public class SaveTv extends PluginForHost {
         link.removeProperty(PROPERTY_download_ads_free);
     }
 
-    @SuppressWarnings("deprecation")
     private void setConstants(final Account account, final DownloadLink link) {
         this.currAcc = account;
         this.currDownloadlink = link;
-        this.cfg = this.getPluginConfig();
     }
 
     public static String getAPIClientID() {
@@ -1323,6 +1321,7 @@ public class SaveTv extends PluginForHost {
              * change but probably won't -> If defined by user, force version with ads after a user defined amount of retries.
              */
             logger.info("Ad-free version is unavailable");
+            final SubConfiguration cfg = SubConfiguration.getConfig(getHost());
             final long userDefinedWaitHours = cfg.getLongProperty(ADS_FREE_UNAVAILABLE_HOURS, SaveTv.defaultADS_FREE_UNAVAILABLE_HOURS);
             final long timestamp_releasedate = link.getLongProperty(PROPERTY_originaldate_end, 0);
             final long timestamp_with_ads_allowed = getTimestampWhenDownloadWithAdsIsAllowed(link);
@@ -1365,6 +1364,7 @@ public class SaveTv extends PluginForHost {
 
     /** Handles download for API- and website mode */
     private void handleDownload(final DownloadLink link, final Account account, final String dllink) throws Exception {
+        final SubConfiguration cfg = SubConfiguration.getConfig(getHost());
         if (StringUtils.isEmpty(dllink)) {
             /* This should never happen! */
             logger.warning("Final downloadlink is null");
@@ -1372,16 +1372,19 @@ public class SaveTv extends PluginForHost {
         }
         logger.info("Final downloadlink = " + dllink + " starting download...");
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverfehler 404", 15 * 60 * 1000l);
-            }
-            /* Handle (known) errors */
+        final boolean looksLikeDownloadableContent = this.looksLikeDownloadableContent(dl.getConnection());
+        if (!looksLikeDownloadableContent && dl.getConnection().getResponseCode() == 404) {
+            /* Guard: server told us straight up that this is gone. */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverfehler 404", 15 * 60 * 1000l);
+        }
+        if (!looksLikeDownloadableContent) {
+            /* Guard: server sent HTML/an error page instead of the actual file --> Handle (known) errors. */
             logger.warning("Received HTML code instead of the file!");
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unbekannter Serverfehler 1 - bitte dem JDownloader Support mit Log melden!", 60 * 60 * 1000l);
-        } else if (dl.getConnection().getCompleteContentLength() <= 1048576l) {
-            /* Avoid downloading (too small) trash data */
+        }
+        if (dl.getConnection().getCompleteContentLength() <= 1048576l) {
+            /* Guard: avoid downloading (too small) trash data. */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverfehler: Datei vom Server zu klein: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), dl.getConnection().getCompleteContentLength()), 60 * 60 * 1000l);
         }
         /* This is for checking server speed. */
@@ -1399,35 +1402,27 @@ public class SaveTv extends PluginForHost {
         link.setFinalFileName(final_filename);
         try {
             if (!this.dl.startDownload()) {
-                try {
-                    if (dl.externalDownloadStop()) {
-                        return;
-                    }
-                } catch (final Throwable e) {
-                }
-            } else {
-                if (cfg.getBooleanProperty(DELETE_TELECAST_ID_AFTER_DOWNLOAD, defaultDELETE_TELECAST_ID_AFTER_DOWNLOAD)) {
-                    logger.info("Download finished --> User WANTS telecastID " + getTelecastId(link) + " deleted");
-                    killTelecastID(link);
-                } else {
-                    logger.info("Download finished --> User does NOT want telecastID " + getTelecastId(link) + " deleted");
-                }
-                markTelecastIdAsDownloaded(link);
+                /* Download did not finish (stopped/cancelled by user or connection loss) --> Nothing more to do here. */
+                return;
             }
+            /* Download finished successfully --> Handle optional telecastID cleanup. */
+            if (cfg.getBooleanProperty(DELETE_TELECAST_ID_AFTER_DOWNLOAD, defaultDELETE_TELECAST_ID_AFTER_DOWNLOAD)) {
+                logger.info("Download finished --> User WANTS telecastID " + getTelecastId(link) + " deleted");
+                killTelecastID(link);
+            }
+            markTelecastIdAsDownloaded(link);
         } catch (final PluginException e) {
-            try {
-                if (e.getLinkStatus() == LinkStatus.ERROR_ALREADYEXISTS) {
-                    if (cfg.getBooleanProperty(DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS, defaultDELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS)) {
-                        logger.info("ERROR_ALREADYEXISTS --> User WANTS telecastID " + getTelecastId(link) + " deleted");
-                        killTelecastID(link);
-                    } else {
-                        logger.info("ERROR_ALREADYEXISTS --> User does NOT want telecastID " + getTelecastId(link) + " deleted");
-                    }
-                    throw e;
+            if (e.getLinkStatus() == LinkStatus.ERROR_ALREADYEXISTS && cfg.getBooleanProperty(DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS, defaultDELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS)) {
+                /*
+                 * Best-effort cleanup only - if it fails for whatever reason we must still rethrow the original ERROR_ALREADYEXISTS below
+                 * instead of a new/different exception.
+                 */
+                try {
+                    logger.info("ERROR_ALREADYEXISTS --> User WANTS telecastID " + getTelecastId(link) + " deleted");
+                    killTelecastID(link);
+                } catch (final Throwable ignore) {
+                    /* Do not fail here, throw Exception which happened previously */
                 }
-            } catch (final Throwable efail) {
-                /* Do not fail here, throw Exception which happened previously */
-                throw e;
             }
             throw e;
         }
@@ -1909,16 +1904,16 @@ public class SaveTv extends PluginForHost {
     private void markTelecastIdAsDownloaded(final DownloadLink link) throws Exception {
         if (!this.apiActive()) {
             logger.info("API is not available --> Cannot mark telecastID as downloaded");
+            return;
+        }
+        logger.info("Mark telecastID as downloaded ...");
+        final String telecastID = getTelecastId(link);
+        api_POST(this.br, "/records/" + telecastID + "/tags/download-completed", "id=" + telecastID);
+        final int responsecode = this.br.getHttpConnection().getResponseCode();
+        if (responsecode == 200) {
+            logger.info("Successfully marked telecastID as downloaded");
         } else {
-            logger.info("Mark telecastID as downloaded ...");
-            final String telecastID = getTelecastId(link);
-            api_POST(this.br, "/records/" + telecastID + "/tags/download-completed", "id=" + telecastID);
-            final int responsecode = this.br.getHttpConnection().getResponseCode();
-            if (responsecode == 200) {
-                logger.info("Successfully marked telecastID as downloaded");
-            } else {
-                logger.info("Unknown status: Not sure whether telecastID has been marked as downloaded or not");
-            }
+            logger.info("Unknown status: Not sure whether telecastID has been marked as downloaded or not");
         }
     }
 
@@ -1996,6 +1991,7 @@ public class SaveTv extends PluginForHost {
     }
 
     private long getTimestampWhenDownloadWithAdsIsAllowed(final DownloadLink link) {
+        final SubConfiguration cfg = SubConfiguration.getConfig(getHost());
         final long userDefinedWaitHours = cfg.getLongProperty(ADS_FREE_UNAVAILABLE_HOURS, SaveTv.defaultADS_FREE_UNAVAILABLE_HOURS);
         final long timestamp_releasedate = link.getLongProperty(PROPERTY_originaldate_end, 0);
         final long timestamp_with_ads_allowed = timestamp_releasedate + userDefinedWaitHours * 60 * 60 * 1000;
@@ -2744,6 +2740,7 @@ public class SaveTv extends PluginForHost {
     public static final boolean  defaultCRAWLER_ONLY_ADD_NEW_IDS                  = false;
     public static final int      defaultCRAWLER_GRAB_TIMEFRAME_COUNT              = 0;
     public static final boolean  defaultCRAWLER_ENABLE_DIALOGS                    = true;
+    public static final boolean  defaultSYNC_TOOLBAR_ENABLE_DIALOG                = true;
     public static final boolean  defaultCRAWLER_ENABLE_FAST_LINKCHECK             = true;
     private final static int     defaultADS_FREE_UNAVAILABLE_HOURS                = 24;
     private static final boolean defaultPROPERTY_PREFERADSFREE                    = true;
@@ -2765,8 +2762,10 @@ public class SaveTv extends PluginForHost {
         final ConfigEntry crawlerAddNew = new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.CRAWLER_ONLY_ADD_NEW_IDS, "Nur <b>neue</b> abgeschlossene Aufnahmen crawlen?<br />JDownloader gleicht dein save.tv Archiv ab mit den Einträgen, die du bereits eingefügt hast und zeigt immer nur neue Einträge an!<br /><html><b>Wichtig:</b> JDownloader kann nicht wissen, welche Sendungen du bereits außerhalb von JDownloader geladen hast - nur, welche bereits in JDownloader eingefügt wurden!<br /></html>").setDefaultValue(defaultCRAWLER_ONLY_ADD_NEW_IDS).setEnabledCondidtion(crawlerActivate, true);
         getConfig().addEntry(crawlerAddNew);
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SaveTv.CRAWLER_GRAB_TIMEFRAME_COUNT, "Nur Aufnahmen der letzten X Tage crawlen??\r\nAnzahl der Tage, die gecrawlt werden sollen [0 = komplettes Archiv]:", 0, 62, 1).setDefaultValue(defaultCRAWLER_GRAB_TIMEFRAME_COUNT).setEnabledCondidtion(crawlerAddNew, false));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SaveTv.CRAWLER_GRAB_TIMEFRAME_COUNT, "Nur Aufnahmen der letzten X Tage crawlen?\r\nAnzahl der Tage, die gecrawlt werden sollen [0 = komplettes Archiv]:", 0, 62, 1).setDefaultValue(defaultCRAWLER_GRAB_TIMEFRAME_COUNT).setEnabledCondidtion(crawlerAddNew, false));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.CRAWLER_ENABLE_DIALOGS, "<html>Info Dialoge des Archiv-Crawlers aktivieren?<br />[Erscheinen nach dem Crawlen oder im Fehlerfall] </html>").setDefaultValue(defaultCRAWLER_ENABLE_DIALOGS).setEnabledCondidtion(crawlerActivate, true));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.SYNC_TOOLBAR_ENABLE_DIALOG, "<html>Info Dialog beim Klick auf den save.tv Toolbar-Button anzeigen?<br />[Weist darauf hin, dass dabei das komplette Videoarchiv gecrawlt wird] </html>").setDefaultValue(defaultSYNC_TOOLBAR_ENABLE_DIALOG));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         /* Format & Quality settings */
@@ -2873,8 +2872,13 @@ public class SaveTv extends PluginForHost {
 
     /** Shows a purely informational dialog which closes itself automatically after DIALOG_AUTO_CLOSE_SECONDS. */
     public static void showAutoCloseDialog(final String title, final String message) {
+        showAutoCloseDialog(title, message, DIALOG_AUTO_CLOSE_SECONDS);
+    }
+
+    /** Shows a purely informational dialog which closes itself automatically after the given number of seconds. */
+    public static void showAutoCloseDialog(final String title, final String message, final int timeoutSeconds) {
         final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL, title, message);
-        dialog.setTimeout(DIALOG_AUTO_CLOSE_SECONDS * 1000);
+        dialog.setTimeout(timeoutSeconds * 1000);
         UIOManager.I().show(ConfirmDialogInterface.class, dialog);
     }
 
