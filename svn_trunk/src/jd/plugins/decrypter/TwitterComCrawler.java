@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 52818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53005 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -742,6 +742,16 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 if (statuses_count > 0 && account == null) {
                     displayBubbleNotification(bubbleNotifyTitle, "Returning no results because:\r\nAccount required to view Tweets of this profile." + bubbleNotifyTextEnding);
                     throw new AccountRequiredException();
+                } else if (br.containsHTML("TimelineTerminateTimeline")) {
+                    /* e.g. empty likes/media list although according to API there are items (which we previously check). */
+                    if (crawlmode == ProfileCrawlMode.LIKES) {
+                        displayBubbleNotification(bubbleNotifyTitle, "Warning!\nYou are trying to crawl all likes of this profile but it has no liked items.");
+                        throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "PROFILE_HAS_NO_LIKES_" + username, "You are trying to crawl all likes of this profile but it has no liked items.");
+                    } else if (crawlmode == ProfileCrawlMode.MEDIA) {
+                        displayBubbleNotification(bubbleNotifyTitle, "Warning!\nYou are trying to crawl all media items of this profile but it has no media items.");
+                        throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "PROFILE_HAS_NO_MEDIA_ITEMS_" + username, "You are trying to crawl all media items of this profile but it has no media items.");
+                    }
+                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
                 } else {
                     /* No results and we don't know why. */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -1126,8 +1136,13 @@ public class TwitterComCrawler extends PluginForDecrypt {
         }
         legacyVideoJson: if (mediaLists.isEmpty() && card != null) {
             /* 2025-10-21: Alternative/new source for media items */
+            final Map<String, Object> legacy = (Map<String, Object>) card.get("legacy");
+            if (legacy == null) {
+                /* No legacy info available -> Not a video item */
+                break legacyVideoJson;
+            }
             try {
-                final List<Map<String, Object>> binding_values = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(card, "legacy/binding_values");
+                final List<Map<String, Object>> binding_values = (List<Map<String, Object>>) legacy.get("values");
                 String legacyVideoJson = null;
                 for (final Map<String, Object> binding_value : binding_values) {
                     final String key = binding_value.get("key").toString();

@@ -107,9 +107,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             final LinkCollectingJob job = link.getSourceJob();
             if (job == null) {
                 return pat.matcher(input).replaceAll(Matcher.quoteReplacement(""));
-            } else {
-                return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, job.getUniqueAlltimeID().toString())));
             }
+            return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, job.getUniqueAlltimeID().toString())));
         }
     };
     private final static PackagizerReplacer       JOB_SOURCE_REPLACER            = new PackagizerReplacer() {
@@ -123,9 +122,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             final LinkCollectingJob job = link.getSourceJob();
             if (job == null) {
                 return pat.matcher(input).replaceAll(Matcher.quoteReplacement(""));
-            } else {
-                return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, job.getOrigin().getOrigin().name())));
             }
+            return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, job.getOrigin().getOrigin().name())));
         }
     };
     private final static PackagizerReplacer       DATE_REPLACER                  = new PackagizerReplacer() {
@@ -149,19 +147,19 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         }
 
         public String replace(REPLACEVARIABLE replaceVariable, String modifiers, CrawledLink link, String input, PackagizerRuleWrapper lgr) {
-            if (StringUtils.isNotEmpty(modifiers)) {
-                String value = env.get(modifiers);
-                if (value == null) {
-                    for (Entry<String, String> entry : env.entrySet()) {
-                        if (StringUtils.containsIgnoreCase(entry.getKey(), modifiers)) {
-                            value = entry.getValue();
-                            break;
-                        }
+            if (StringUtils.isEmpty(modifiers)) {
+                return input;
+            }
+            String value = env.get(modifiers);
+            if (value == null) {
+                for (Entry<String, String> entry : env.entrySet()) {
+                    if (StringUtils.containsIgnoreCase(entry.getKey(), modifiers)) {
+                        value = entry.getValue();
+                        break;
                     }
                 }
-                return Pattern.compile("<jd:env:" + Pattern.quote(modifiers) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, StringUtils.valueOrEmpty(value))));
             }
-            return input;
+            return Pattern.compile("<jd:env:" + Pattern.quote(modifiers) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, StringUtils.valueOrEmpty(value))));
         }
     };
     private final static PackagizerReplacer       SUBFOLDERBYPLUGIN_REPLACER     = new PackagizerReplacer() {
@@ -192,9 +190,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             }
             if (StringUtils.isEmpty(subFolder)) {
                 return pat.matcher(input).replaceAll(Matcher.quoteReplacement(""));
-            } else {
-                return pat.matcher(input).replaceAll(Matcher.quoteReplacement(subFolder));
             }
+            return pat.matcher(input).replaceAll(Matcher.quoteReplacement(subFolder));
         }
 
         public String getID() {
@@ -236,22 +233,21 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         ArrayList<PackagizerRule> list = new ArrayList<PackagizerRule>();
         if (config == null) {
             return list;
-        } else {
-            try {
-                list = config.getRuleList();
-            } catch (Throwable e) {
-                // restoring list may fail.
-                LogController.CL(false).log(e);
-            }
-            final int sizeLoaded = list != null ? list.size() : 0;
-            list = addDefaultRules(list);
-            final int sizeNow = list != null ? list.size() : 0;
-            if (sizeLoaded != sizeNow) {
-                /* Default rules were missing before -> Save config with added default rules. */
-                save(list);
-            }
-            return list;
         }
+        try {
+            list = config.getRuleList();
+        } catch (Throwable e) {
+            // restoring list may fail.
+            LogController.CL(false).log(e);
+        }
+        final int sizeLoaded = list != null ? list.size() : 0;
+        list = addDefaultRules(list);
+        final int sizeNow = list != null ? list.size() : 0;
+        if (sizeLoaded != sizeNow) {
+            /* Default rules were missing before -> Save config with added default rules. */
+            save(list);
+        }
+        return list;
     }
 
     private ArrayList<PackagizerRule> addDefaultRules(List<PackagizerRule> list) {
@@ -439,9 +435,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                     final Pattern pattern = lgr.getFileNameRule()._getPattern();
                     final String rep = StringUtils.valueOrEmpty(new Regex(name, pattern).getMatch(Integer.parseInt(modifiers) - 1));
                     return Pattern.compile("<jd:" + ORGFILENAME + ":" + Pattern.quote(modifiers) + "\\s*/?\\s*>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, rep)));
-                } else {
-                    return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, name)));
                 }
+                return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, name)));
             }
 
             public String getID() {
@@ -481,9 +476,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 }
                 if (StringUtils.isNotEmpty(modifiers)) {
                     return Pattern.compile("<jd:orgfiletype:" + Pattern.quote(modifiers) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, StringUtils.valueOrEmpty(new Regex(fileType, lgr.getFileNameRule()._getPattern()).getRow(0)[Integer.parseInt(modifiers) - 1]))));
-                } else {
-                    return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, fileType)));
                 }
+                return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, fileType)));
             }
 
             public String getID() {
@@ -498,11 +492,10 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 final String filenameFull = link.getName();
                 if (filenameFull == null) {
                     return pat.matcher(input).replaceAll("");
-                } else {
-                    final ParsedFilename pfname = ParsedFilename.parse(filenameFull);
-                    final String filenameWithoutExt = pfname.getFilenameWithoutExtensionAdvanced();
-                    return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, filenameWithoutExt)));
                 }
+                final ParsedFilename pfname = ParsedFilename.parse(filenameFull);
+                final String filenameWithoutExt = pfname.getFilenameWithoutExtensionAdvanced();
+                return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, filenameWithoutExt)));
             }
 
             public String getID() {
@@ -528,13 +521,12 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                     url = link.getURL();
                 }
                 final Regex regex = new Regex(url, lgr.getHosterRule()._getPattern());
-                if (regex.patternFind()) {
-                    final String[] values = regex.getRow(0);
-                    final String value = URLEncode.decodeURIComponent(StringUtils.valueOrEmpty(values[id - 1]));
-                    return Pattern.compile("<jd:hoster:" + Pattern.quote(String.valueOf(id)) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, value)));
-                } else {
+                if (!regex.patternFind()) {
                     return input;
                 }
+                final String[] values = regex.getRow(0);
+                final String value = URLEncode.decodeURIComponent(StringUtils.valueOrEmpty(values[id - 1]));
+                return Pattern.compile("<jd:hoster:" + Pattern.quote(String.valueOf(id)) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, value)));
             }
 
             public String getID() {
@@ -552,9 +544,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 final Object propertyValue = defaultPlugin != null ? defaultPlugin.getPluginProperty(dlLink, null, propertyKey, null) : dlLink.getProperty(propertyKey);
                 if (propertyValue == null || (!(propertyValue instanceof String) && !(propertyValue instanceof Number))) {
                     return Pattern.compile("<jd:prop:" + Pattern.quote(propertyKey) + "/?>").matcher(input).replaceAll("");
-                } else {
-                    return Pattern.compile("<jd:prop:" + Pattern.quote(propertyKey) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, propertyValue.toString())));
                 }
+                return Pattern.compile("<jd:prop:" + Pattern.quote(propertyKey) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, propertyValue.toString())));
             }
 
             public String getID() {
@@ -570,9 +561,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 final Object property = getGlobalProperty(key);
                 if (property == null || (!(property instanceof String) && !(property instanceof Number))) {
                     return Pattern.compile("<jd:globprop:" + Pattern.quote(key) + "/?>").matcher(input).replaceAll("");
-                } else {
-                    return Pattern.compile("<jd:globprop:" + Pattern.quote(key) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, property.toString())));
                 }
+                return Pattern.compile("<jd:globprop:" + Pattern.quote(key) + "/?>").matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, property.toString())));
             }
 
             public String getID() {
@@ -615,14 +605,12 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 }
                 if (StringUtils.isEmpty(append)) {
                     return pat.matcher(input).replaceAll("");
-                } else {
-                    final String ret = pat.matcher(input).replaceAll(Matcher.quoteReplacement(append));
-                    if (REPLACEVARIABLE.DIRECTORY.equals(replaceVariable)) {
-                        return CrossSystem.fixPathSeparators(ret);
-                    } else {
-                        return ret;
-                    }
                 }
+                final String ret = pat.matcher(input).replaceAll(Matcher.quoteReplacement(append));
+                if (REPLACEVARIABLE.DIRECTORY.equals(replaceVariable)) {
+                    return CrossSystem.fixPathSeparators(ret);
+                }
+                return ret;
             }
 
             public String getID() {
@@ -634,13 +622,12 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     private static String preprocessReplacement(REPLACEVARIABLE replaceVariable, final String string) {
         if (replaceVariable == null) {
             return string;
-        } else {
-            switch (replaceVariable) {
-            case DIRECTORY:
-                return CrossSystem.alleviatePathParts(string);
-            default:
-                return string;
-            }
+        }
+        switch (replaceVariable) {
+        case DIRECTORY:
+            return CrossSystem.alleviatePathParts(string);
+        default:
+            return string;
         }
     }
 
@@ -673,15 +660,15 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     public void update() {
         if (isTestInstance()) {
             updateInternal();
-        } else {
-            TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    updateInternal();
-                    return null;
-                }
-            });
+            return;
         }
+        TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                updateInternal();
+                return null;
+            }
+        });
     }
 
     private void updateInternal() {
@@ -719,11 +706,12 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     }
 
     public void add(PackagizerRule linkFilter) {
-        if (linkFilter != null) {
-            final List<PackagizerRule> addAll = new ArrayList<PackagizerRule>();
-            addAll.add(linkFilter);
-            addAll(addAll);
+        if (linkFilter == null) {
+            return;
         }
+        final List<PackagizerRule> addAll = new ArrayList<PackagizerRule>();
+        addAll.add(linkFilter);
+        addAll(addAll);
     }
 
     public void addAll(java.util.List<PackagizerRule> all) {
@@ -866,28 +854,40 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         List<PackagizerRuleWrapper> ret = null;
         nextRule: for (final PackagizerRuleWrapper lgr : rules) {
             final BooleanFilter alwaysFilter = lgr.getAlwaysFilter();
-            if (alwaysFilter != null && alwaysFilter.isEnabled()) {
-                // always apply this rule
-            } else if (!lgr.checkHoster(link)) {
-                continue nextRule;
-            } else if (!lgr.checkPluginStatus(link)) {
-                continue nextRule;
-            } else if (!lgr.checkOrigin(link)) {
-                continue nextRule;
-            } else if (!lgr.checkConditions(link)) {
-                continue nextRule;
-            } else if (!lgr.checkSource(link)) {
-                continue nextRule;
-            } else if (!lgr.checkPackageName(link)) {
-                continue nextRule;
-            } else if (!lgr.checkFileType(link)) {
-                continue nextRule;
-            } else if (!lgr.checkOnlineStatus(link)) {
-                continue nextRule;
-            } else if (!lgr.checkFileName(link)) {
-                continue nextRule;
-            } else if (!lgr.checkFileSize(link)) {
-                continue nextRule;
+            if (alwaysFilter == null || !alwaysFilter.isEnabled()) {
+                if (!lgr.checkHoster(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkPluginStatus(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkOrigin(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkConditions(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkSource(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkPackageName(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkComment(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkFileType(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkOnlineStatus(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkFileName(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkFileSize(link)) {
+                    continue nextRule;
+                }
             }
             if (set(link, lgr)) {
                 if (ret == null) {
@@ -949,7 +949,7 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             fileNameValue = replaceVariables(REPLACEVARIABLE.FILENAME, lgr.getRule().getFilename(), link, lgr);
         }
         if (!StringUtils.isEmpty(lgr.getRule().getComment())) {
-            /* customize filename */
+            /* customize comment */
             link.setComment(replaceVariables(REPLACEVARIABLE.COMMENT, lgr.getRule().getComment(), link, lgr));
         }
         if (StringUtils.isNotEmpty((packageKey = lgr.getRule().getPackageKey()))) {
@@ -1053,21 +1053,26 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     private final static int padLength(final int size) {
         if (size < 10) {
             return 1;
-        } else if (size < 100) {
-            return 2;
-        } else if (size < 1000) {
-            return 3;
-        } else if (size < 10000) {
-            return 4;
-        } else if (size < 100000) {
-            return 5;
-        } else if (size < 1000000) {
-            return 6;
-        } else if (size < 10000000) {
-            return 7;
-        } else {
-            return 8;// hello djmakinera
         }
+        if (size < 100) {
+            return 2;
+        }
+        if (size < 1000) {
+            return 3;
+        }
+        if (size < 10000) {
+            return 4;
+        }
+        if (size < 100000) {
+            return 5;
+        }
+        if (size < 1000000) {
+            return 6;
+        }
+        if (size < 10000000) {
+            return 7;
+        }
+        return 8;// hello djmakinera
     }
 
     private static String replaceDynamicTags(REPLACEVARIABLE type, String input, String tag, PackagizerReplacer replacer, AtomicBoolean modifyFlag) {
@@ -1079,23 +1084,22 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             } else {
                 start = input.indexOf(tag, lastStart);
             }
-            if (start > lastStart) {
-                if (modifyFlag != null) {
-                    modifyFlag.set(true);
-                }
-                lastStart = start;
-                int end = start + tag.length();
-                while (end < input.length() && input.charAt(end) != '>') {
-                    end++;
-                }
-                final String modifier = input.substring(start + tag.length(), end);
-                try {
-                    input = replacer.replace(type, modifier, null, input, null);
-                } catch (final Throwable e) {
-                    LogController.CL().log(e);
-                }
-            } else {
+            if (start <= lastStart) {
                 break;
+            }
+            if (modifyFlag != null) {
+                modifyFlag.set(true);
+            }
+            lastStart = start;
+            int end = start + tag.length();
+            while (end < input.length() && input.charAt(end) != '>') {
+                end++;
+            }
+            final String modifier = input.substring(start + tag.length(), end);
+            try {
+                input = replacer.replace(type, modifier, null, input, null);
+            } catch (final Throwable e) {
+                LogController.CL().log(e);
             }
         }
         return input;
@@ -1267,70 +1271,76 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         for (PackagizerRuleWrapper lgr : rules) {
             String renameRule = lgr.getRule().getRename();
             String moveRule = lgr.getRule().getMoveto();
-            if (!StringUtils.isEmpty(renameRule) || !StringUtils.isEmpty(moveRule)) {
-                if (lgr.getAlwaysFilter() == null || !lgr.getAlwaysFilter().isEnabled()) {
-                    if (!lgr.checkHoster(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkPluginStatus(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkOrigin(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkConditions(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkSource(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkPackageName(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkFileType(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkFileName(dummyLink)) {
-                        continue;
-                    }
-                    if (!lgr.checkFileSize(dummyLink)) {
-                        continue;
-                    }
+            if (StringUtils.isEmpty(renameRule) && StringUtils.isEmpty(moveRule)) {
+                continue;
+            }
+            final BooleanFilter alwaysFilter = lgr.getAlwaysFilter();
+            if (alwaysFilter == null || !alwaysFilter.isEnabled()) {
+                if (!lgr.checkHoster(dummyLink)) {
+                    continue;
                 }
-                if (!StringUtils.isEmpty(renameRule)) {
-                    renameRule = renameRule.replace(PACKAGETAG, ORGPACKAGETAG);
-                    dummyLink.setName(replaceVariables(REPLACEVARIABLE.FILENAME, renameRule, dummyLink, lgr));
+                if (!lgr.checkPluginStatus(dummyLink)) {
+                    continue;
                 }
-                if (!StringUtils.isEmpty(moveRule)) {
-                    moveRule = moveRule.replace(PACKAGETAG, ORGPACKAGETAG);
-                    moveToFolder = replaceVariables(REPLACEVARIABLE.DIRECTORY, moveRule, dummyLink, lgr);
+                if (!lgr.checkOrigin(dummyLink)) {
+                    continue;
                 }
+                if (!lgr.checkConditions(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkSource(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkPackageName(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkComment(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkFileType(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkFileName(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkFileSize(dummyLink)) {
+                    continue;
+                }
+            }
+            if (!StringUtils.isEmpty(renameRule)) {
+                renameRule = renameRule.replace(PACKAGETAG, ORGPACKAGETAG);
+                dummyLink.setName(replaceVariables(REPLACEVARIABLE.FILENAME, renameRule, dummyLink, lgr));
+            }
+            if (!StringUtils.isEmpty(moveRule)) {
+                moveRule = moveRule.replace(PACKAGETAG, ORGPACKAGETAG);
+                moveToFolder = replaceVariables(REPLACEVARIABLE.DIRECTORY, moveRule, dummyLink, lgr);
             }
         }
-        if (!originalFolder.equals(moveToFolder) || !originalFileName.equals(dummyLink.getName())) {
-            final File newFile = new File(moveToFolder, dummyLink.getName());
-            if (newFile.getParentFile().exists() == false && FileCreationManager.getInstance().mkdir(newFile.getParentFile()) == false) {
-                LogController.CL(false).warning("Packagizer could not create " + newFile.getParentFile());
-                return;
+        if (originalFolder.equals(moveToFolder) && originalFileName.equals(dummyLink.getName())) {
+            return;
+        }
+        final File newFile = new File(moveToFolder, dummyLink.getName());
+        if (newFile.getParentFile().exists() == false && FileCreationManager.getInstance().mkdir(newFile.getParentFile()) == false) {
+            LogController.CL(false).warning("Packagizer could not create " + newFile.getParentFile());
+            return;
+        }
+        boolean successful = false;
+        if ((successful = file.renameTo(newFile)) == false) {
+            final LogSource log = LogController.CL(false);
+            log.warning("Packagizer rename failed " + file + " to" + newFile);
+            try {
+                log.warning("Packagizer try copy " + file + " to" + newFile);
+                IO.copyFile(file, newFile);
+                FileCreationManager.getInstance().delete(file, null);
+                successful = true;
+            } catch (final Throwable e) {
+                FileCreationManager.getInstance().delete(newFile, null);
+                log.warning("Packagizer could not move/rename " + file + " to" + newFile);
             }
-            boolean successful = false;
-            if ((successful = file.renameTo(newFile)) == false) {
-                final LogSource log = LogController.CL(false);
-                log.warning("Packagizer rename failed " + file + " to" + newFile);
-                try {
-                    log.warning("Packagizer try copy " + file + " to" + newFile);
-                    IO.copyFile(file, newFile);
-                    FileCreationManager.getInstance().delete(file, null);
-                    successful = true;
-                } catch (final Throwable e) {
-                    FileCreationManager.getInstance().delete(newFile, null);
-                    log.warning("Packagizer could not move/rename " + file + " to" + newFile);
-                }
-            }
-            if (successful) {
-                LogController.CL(false).info("Packagizer moved/renamed " + file + " to " + newFile);
-                FileCreationManager.getInstance().getEventSender().fireEvent(new FileCreationEvent(PackagizerController.this, FileCreationEvent.Type.NEW_FILES, new File[] { newFile }));
-            }
+        }
+        if (successful) {
+            LogController.CL(false).info("Packagizer moved/renamed " + file + " to " + newFile);
+            FileCreationManager.getInstance().getEventSender().fireEvent(new FileCreationEvent(PackagizerController.this, FileCreationEvent.Type.NEW_FILES, new File[] { newFile }));
         }
     }
 

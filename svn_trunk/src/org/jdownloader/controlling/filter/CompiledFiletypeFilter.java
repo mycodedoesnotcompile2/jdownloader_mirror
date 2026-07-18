@@ -12,13 +12,13 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.plugins.LinkInfo;
-
 import org.appwork.utils.ByteArrayUtils;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.FiletypeFilter.TypeMatchType;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.plugins.LinkInfo;
 
 public class CompiledFiletypeFilter {
     private final Pattern[]                   list;
@@ -677,7 +677,6 @@ public class CompiledFiletypeFilter {
                 return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
             }
         },
-
         WAV {
             private final Pattern pattern = Pattern.compile("(?i)audio/wav");
 
@@ -1142,7 +1141,6 @@ public class CompiledFiletypeFilter {
 
     public static enum ImageExtensions implements CompiledFiletypeExtension {
         JXL {
-
             private final Pattern pattern = Pattern.compile("(?i)image/jxl");
 
             @Override
@@ -1151,7 +1149,6 @@ public class CompiledFiletypeFilter {
             }
         },
         JPG("(jpe|jpe?g|jfif)") {
-
             public boolean matchesMagic(InputStream inputStream) throws IOException {
                 final byte[] read = new byte[3];
                 new DataInputStream(inputStream).readFully(read);
@@ -1206,7 +1203,6 @@ public class CompiledFiletypeFilter {
             }
         },
         PNG {
-
             @Override
             public boolean matchesMagic(InputStream inputStream) throws IOException {
                 final byte[] read = new byte[4];
@@ -1254,7 +1250,6 @@ public class CompiledFiletypeFilter {
             }
         },
         ICO {
-
             public boolean matchesMagic(InputStream inputStream) throws IOException {
                 final byte[] read = new byte[4];
                 new DataInputStream(inputStream).readFully(read);
@@ -1420,54 +1415,63 @@ public class CompiledFiletypeFilter {
     }
 
     public boolean matches(final String extension, final LinkInfo linkInfo) {
-        boolean matches = false;
-        final String ext;
-        if (StringUtils.isNotEmpty(extension)) {
-            ext = extension;
-        } else {
-            ext = linkInfo.getExtension().name();
-        }
-        for (final ExtensionsFilterInterface filterInterfaces : this.filterInterfaces) {
-            if (!matches) {
-                if (linkInfo.getExtension().isSameExtensionGroup(filterInterfaces)) {
-                    matches = true;
-                    break;
-                } else {
-                    for (final ExtensionsFilterInterface filterInterface : filterInterfaces.listSameGroup()) {
-                        final Pattern pattern = filterInterface.getPattern();
-                        try {
-                            if (pattern != null && pattern.matcher(ext).matches()) {
-                                matches = true;
-                                break;
-                            }
-                        } catch (Throwable e) {
-                            e.printStackTrace();
-                        }
-                    }
+        final ExtensionsFilterInterface linkExtension = linkInfo.getExtension();
+        final String ext = StringUtils.isNotEmpty(extension) ? extension : linkExtension.name();
+        for (final ExtensionsFilterInterface enabledGroup : this.filterInterfaces) {
+            if (linkExtension.isSameExtensionGroup(enabledGroup)) {
+                switch (matchType) {
+                case IS:
+                    return true;
+                case IS_NOT:
+                    return false;
+                default:
+                    return false;
                 }
-            } else {
-                break;
             }
-        }
-        if (matches == false) {
-            for (final Pattern pattern : this.list) {
+            for (final ExtensionsFilterInterface groupMember : enabledGroup.listSameGroup()) {
+                final Pattern pattern = groupMember.getPattern();
+                if (pattern == null) {
+                    continue;
+                }
                 try {
-                    if (pattern != null && pattern.matcher(ext).matches()) {
-                        matches = true;
-                        break;
+                    if (pattern.matcher(ext).matches()) {
+                        switch (matchType) {
+                        case IS:
+                            return true;
+                        case IS_NOT:
+                            return false;
+                        default:
+                            return false;
+                        }
                     }
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
             }
         }
-        switch (matchType) {
-        case IS:
-            return matches;
-        case IS_NOT:
-            return !matches;
+        for (final Pattern pattern : this.list) {
+            if (pattern == null) {
+                continue;
+            }
+            try {
+                if (pattern.matcher(ext).matches()) {
+                    switch (matchType) {
+                    case IS:
+                        return true;
+                    case IS_NOT:
+                        return false;
+                    default:
+                        return false;
+                    }
+                }
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
         }
-        return false;
+        switch (matchType) {
+        default:
+            return false;
+        }
     }
 
     public Pattern[] getList() {

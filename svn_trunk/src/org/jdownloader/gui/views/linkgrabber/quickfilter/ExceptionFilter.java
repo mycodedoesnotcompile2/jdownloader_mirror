@@ -63,6 +63,9 @@ public class ExceptionFilter extends Filter {
         if (!wrapperRule.checkPackageName(link)) {
             return false;
         }
+        if (!wrapperRule.checkComment(link)) {
+            return false;
+        }
         if (!wrapperRule.checkFileSize(link)) {
             return false;
         }

@@ -20,25 +20,49 @@ public class FFMpegInstallThread extends Thread {
             // https://ffmpeg.martin-riedl.de/
             @Override
             protected boolean isSupported() {
+                if (MAC_CATALINA.isSupported()) {
+                    // MAC_CATALINA is installed, no need to install (while Rosetta 2(to be removed with macOS27) support still exists)
+                    // Apple Silicon again
+                    final File file = MAC_CATALINA.getBundledBinaryPath(BINARY.FFMPEG);
+                    if (isFile(file)) {
+                        return false;
+                    }
+                }
+                // MAC_BIG_SUR is first Apple Silicon
                 return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_BIG_SUR) && CrossSystem.ARCHFamily.ARM.equals(CrossSystem.getARCHFamily());
             }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
                 final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
                 return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
             }
         },
-        MAC_YOSEMITE("ffmpeg_10.10+") {
+        MAC_CATALINA("ffmpeg_10.10+") {
+            // old extension/folder extensionID kept for compatibility
             // https://ffmpeg.martin-riedl.de/
             @Override
             protected boolean isSupported() {
                 // intel package is compatible to apple silicon because of rosetta 2 support
-                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_YOSEMITE);
+                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_CATALINA);
             }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
+                final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
+                return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
+            }
+        },
+        MAC_HIGH_SIERRA_MOJAVE("ffmpeg_10.13-14") {
+            // https://evermeet.cx/ffmpeg/
+            // https://evermeet.cx/ffmpeg/note-2026-03-29
+            @Override
+            protected boolean isSupported() {
+                return CrossSystem.getOS().isMaximum(OperatingSystem.MAC_MOJAVE) && CrossSystem.getOS().isMinimum(OperatingSystem.MAC_HIGH_SIERRA);
+            }
+
+            @Override
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
                 final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
                 return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
             }
@@ -51,7 +75,7 @@ public class FFMpegInstallThread extends Thread {
             }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
                 final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
                 return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
             }
@@ -64,7 +88,7 @@ public class FFMpegInstallThread extends Thread {
             }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
                 final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
                 return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
             }
@@ -72,111 +96,118 @@ public class FFMpegInstallThread extends Thread {
         LINUX("ffmpeg") {
             @Override
             protected boolean isSupported() {
-                return CrossSystem.isLinux() && CrossSystem.ARCHFamily.X86.equals(CrossSystem.getARCHFamily());
+                return CrossSystem.isLinux() && CrossSystem.ARCHFamily.X86.equals(CrossSystem.getARCHFamily()) && CrossSystem.is64BitOperatingSystem();
             }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
-                return GENERIC.getBundledBinaryPath(binary);
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
+                return GENERIC.getBundledBinaryPath(this, binary);
             }
         },
-        WINDOWS("ffmpeg") {
+        WINDOWS_7_to_11("ffmpeg") {
             // https://www.ffmpeg.download/
             // https://www.gyan.dev/ffmpeg/builds/
             // https://github.com/defisym/FFmpeg-Builds-Win32
             @Override
             protected boolean isSupported() {
-                // Windows XP is no longer supported by bundled ffmpeg version
-                return CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_VISTA);
-            }
-
-            @Override
-            protected File getBundledBinaryPath(BINARY binary) {
-                final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
-                switch (CrossSystem.getARCHFamily()) {
-                case ARM:
-                    if (CrossSystem.is64BitOperatingSystem()) {
-                        final File arm64Path = Application.getResource("tools/Windows/ffmpeg/arm64/" + binaryName + ".exe");
-                        if (arm64Path.isFile()) {
-                            return arm64Path;
-                        }
-                    }
-                case X86:
-                    if (CrossSystem.is64BitOperatingSystem()) {
-                        final File x64Path = Application.getResource("tools/Windows/ffmpeg/x64/" + binaryName + ".exe");
-                        if (x64Path.isFile()) {
-                            return x64Path;
-                        }
-                    }
-                    return Application.getResource("tools/Windows/ffmpeg/i386/" + binaryName + ".exe");
-                default:
-                    return null;
+                final OperatingSystem os = CrossSystem.getOS();
+                if (os.isMinimum(OperatingSystem.WINDOWS_10)) {
+                    // Windows 10 ,Windows 11
+                    // for 32/64/arm64
+                    return true;
+                } else if (os.isMaximum(OperatingSystem.WINDOWS_8) && os.isMinimum(OperatingSystem.WINDOWS_7) && CrossSystem.is64BitOperatingSystem()) {
+                    // Windows 7, Windows 8
+                    // for 64bit (required UCRT installed)
+                    return true;
+                } else {
+                    // older Windows (XP, Vista, 7, 8) are no longer supported by newer ffmpeg builds
+                    return false;
                 }
             }
-        },
-        WINDOWS_XP(null) {
-            @Override
-            protected boolean isSupported() {
-                return CrossSystem.getOS().equals(OperatingSystem.WINDOWS_XP);
-            }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
-                return WINDOWS.getBundledBinaryPath(binary);
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
+                return GENERIC.getBundledBinaryPath(this, binary);
             }
         },
         GENERIC(null) {
             @Override
             protected boolean isSupported() {
-                return CrossSystem.isLinux() || CrossSystem.isBSD();
+                switch (CrossSystem.getOSFamily()) {
+                case LINUX:
+                    return true;
+                case MAC:
+                    return true;
+                case WINDOWS:
+                    return true;
+                case BSD:
+                    return true;
+                default:
+                    return false;
+                }
             }
 
             @Override
-            protected File getBundledBinaryPath(BINARY binary) {
-                final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
-                if (CrossSystem.isLinux() || CrossSystem.isBSD()) {
-                    final String os;
-                    if (CrossSystem.isLinux()) {
-                        os = "linux";
-                    } else {
-                        os = "bsd";
-                    }
-                    switch (CrossSystem.getARCHFamily()) {
-                    case X86:
-                        if (CrossSystem.is64BitOperatingSystem()) {
-                            return Application.getResource("tools/" + os + "/ffmpeg/x64/" + binaryName);
-                        } else {
-                            return Application.getResource("tools/" + os + "/ffmpeg/i386/" + binaryName);
-                        }
-                    case ARM:
-                        if (CrossSystem.is64BitOperatingSystem()) {
-                            return Application.getResource("tools/" + os + "/ffmpeg/arm64/" + binaryName);
-                        } else {
-                            return Application.getResource("tools/" + os + "/ffmpeg/arm/" + binaryName);
-                        }
-                    case PPC:
-                        if (CrossSystem.is64BitOperatingSystem()) {
-                            return Application.getResource("tools/" + os + "/ffmpeg/ppc64/" + binaryName);
-                        } else {
-                            return Application.getResource("tools/" + os + "/ffmpeg/ppc/" + binaryName);
-                        }
-                    case RISCV:
-                        if (CrossSystem.is64BitOperatingSystem()) {
-                            return Application.getResource("tools/" + os + "/ffmpeg/riscv64/" + binaryName);
-                        } else {
-                            return Application.getResource("tools/" + os + "/ffmpeg/riscv32/" + binaryName);
-                        }
-                    default:
-                        return null;
-                    }
+            protected File getBundledBinaryPath(ExtensionPackages extension, BINARY binary) {
+                String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
+                final String os;
+                switch (CrossSystem.getOSFamily()) {
+                case LINUX:
+                    os = "linux";
+                    break;
+                case MAC:
+                    os = "mac";
+                    break;
+                case WINDOWS:
+                    os = "Windows";// legacy uppercase W, but doesn't really matter
+                    binaryName = binaryName + ".exe";
+                    break;
+                case BSD:
+                    os = "bsd";
+                    break;
+                default:
+                    return null;
                 }
-                return null;
+                final boolean is64BitOperatingSystem = CrossSystem.is64BitOperatingSystem();
+                final String extensionID = (extension != null && extension.extensionID != null) ? extension.extensionID : "ffmpeg";
+                switch (CrossSystem.getARCHFamily()) {
+                case X86:
+                    if (is64BitOperatingSystem) {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/x64/" + binaryName);
+                    } else {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/i386/" + binaryName);
+                    }
+                case ARM:
+                    if (is64BitOperatingSystem) {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/arm64/" + binaryName);
+                    } else {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/arm/" + binaryName);
+                    }
+                case PPC:
+                    if (is64BitOperatingSystem) {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/ppc64/" + binaryName);
+                    } else {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/ppc/" + binaryName);
+                    }
+                case RISCV:
+                    if (is64BitOperatingSystem) {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/riscv64/" + binaryName);
+                    } else {
+                        return Application.getResource("tools/" + os + "/" + extensionID + "/riscv32/" + binaryName);
+                    }
+                default:
+                    return null;
+                }
             }
         };
 
         protected abstract boolean isSupported();
 
-        protected abstract File getBundledBinaryPath(BINARY binary);
+        protected File getBundledBinaryPath(BINARY binary) {
+            return getBundledBinaryPath(this, binary);
+        }
+
+        protected abstract File getBundledBinaryPath(ExtensionPackages extension, BINARY binary);
 
         public static ExtensionPackages getExtension() {
             for (final ExtensionPackages extension : values()) {
@@ -220,7 +251,7 @@ public class FFMpegInstallThread extends Thread {
         return progress;
     }
 
-    private boolean isFile(File file) {
+    private static boolean isFile(File file) {
         if (CrossSystem.isMac()) {
             // File.isFile may fail on MacOS
             return file != null && file.exists() && !file.isDirectory();

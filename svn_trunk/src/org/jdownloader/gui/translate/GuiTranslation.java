@@ -1102,6 +1102,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "\r\n%s1 %s2" })
     String FilterRule_toString_package2(String name, String string);
 
+    @Default(lngs = { "en" }, values = { "Comment %s1" })
+    String FilterRule_toString_comment(String string);
+
+    @Default(lngs = { "en" }, values = { "\r\n%s1 %s2" })
+    String FilterRule_toString_comment2(String name, String string);
+
     @Default(lngs = { "en" }, values = { "Hoster URL %s1" })
     String FilterRule_toString_hoster(String string);
 
@@ -1605,6 +1611,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Plugin property" })
     String PackagizerFilterRuleDialog_createVariablesMenu_plugin_property();
+
+    @Default(lngs = { "en" }, values = { "Comment" })
+    String PackagizerFilterRuleDialog_createVariablesMenu_comment();
 
     @Default(lngs = { "en" }, values = { "Priority" })
     String settings_linkgrabber_filter_columns_exepriority();
@@ -4036,6 +4045,15 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Package Name Wildcard(*) #%s1" })
     String PackagizerFilterRuleDialog_createVariablesMenu_package(int i);
+
+    @Default(lngs = { "en" }, values = { "Enter comment matcher... (Use * as Wildcard)" })
+    String FilterRuleDialog_layoutDialogContent_ht_comment();
+
+    @Default(lngs = { "en" }, values = { "Comment" })
+    String FilterRuleDialog_layoutDialogContent_lbl_comment();
+
+    @Default(lngs = { "en" }, values = { "Comment" })
+    String ConditionDialog_getPopupMenu_Comment_();
 
     @Default(lngs = { "en" }, values = { "Unknown" })
     String lit_unknown();

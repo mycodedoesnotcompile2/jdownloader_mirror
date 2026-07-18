@@ -106,58 +106,59 @@ public class LinkFilterController implements LinkCrawlerFilter {
 
     private ArrayList<LinkgrabberFilterRule> readConfig() {
         final ArrayList<LinkgrabberFilterRule> newList = new ArrayList<LinkgrabberFilterRule>();
-        if (config != null) {
-            ArrayList<LinkgrabberFilterRule> filter = config.getFilterList();
-            if (filter == null) {
-                filter = new ArrayList<LinkgrabberFilterRule>();
+        if (config == null) {
+            return newList;
+        }
+        ArrayList<LinkgrabberFilterRule> filter = config.getFilterList();
+        if (filter == null) {
+            filter = new ArrayList<LinkgrabberFilterRule>();
+        }
+        boolean dupesView = false;
+        boolean offlineRule = false;
+        boolean directHttpView = false;
+        HashSet<String> dupefinder = new HashSet<String>();
+        for (LinkgrabberFilterRule rule : filter) {
+            LinkgrabberFilterRule clone = JSonStorage.restoreFromString(JSonStorage.serializeToJson(rule), new TypeRef<LinkgrabberFilterRule>() {
+            });
+            clone.setCreated(-1);
+            if (!dupefinder.add(JSonStorage.serializeToJson(clone))) {
+                //
+                continue;
             }
-            boolean dupesView = false;
-            boolean offlineRule = false;
-            boolean directHttpView = false;
-            HashSet<String> dupefinder = new HashSet<String>();
-            for (LinkgrabberFilterRule rule : filter) {
-                LinkgrabberFilterRule clone = JSonStorage.restoreFromString(JSonStorage.serializeToJson(rule), new TypeRef<LinkgrabberFilterRule>() {
-                });
-                clone.setCreated(-1);
-                if (!dupefinder.add(JSonStorage.serializeToJson(clone))) {
-                    //
-                    continue;
-                }
-                if (OfflineView.ID.equals(rule.getId())) {
-                    OfflineView r;
-                    newList.add(r = new OfflineView());
-                    r.init();
-                    r.setEnabled(rule.isEnabled());
-                    offlineRule = true;
-                    continue;
-                }
-                if (DirectHTTPView.ID.equals(rule.getId())) {
-                    DirectHTTPView r;
-                    newList.add(r = new DirectHTTPView());
-                    r.init();
-                    r.setEnabled(rule.isEnabled());
-                    directHttpView = true;
-                    continue;
-                }
-                if (DupesView.ID.equals(rule.getId())) {
-                    DupesView r;
-                    newList.add(r = new DupesView());
-                    r.init();
-                    r.setEnabled(rule.isEnabled());
-                    dupesView = true;
-                    continue;
-                }
-                newList.add(rule);
+            if (OfflineView.ID.equals(rule.getId())) {
+                OfflineView r;
+                newList.add(r = new OfflineView());
+                r.init();
+                r.setEnabled(rule.isEnabled());
+                offlineRule = true;
+                continue;
             }
-            if (!directHttpView) {
-                newList.add(new DirectHTTPView().init());
+            if (DirectHTTPView.ID.equals(rule.getId())) {
+                DirectHTTPView r;
+                newList.add(r = new DirectHTTPView());
+                r.init();
+                r.setEnabled(rule.isEnabled());
+                directHttpView = true;
+                continue;
             }
-            if (!offlineRule) {
-                newList.add(new OfflineView().init());
+            if (DupesView.ID.equals(rule.getId())) {
+                DupesView r;
+                newList.add(r = new DupesView());
+                r.init();
+                r.setEnabled(rule.isEnabled());
+                dupesView = true;
+                continue;
             }
-            if (!dupesView) {
-                newList.add(new DupesView().init());
-            }
+            newList.add(rule);
+        }
+        if (!directHttpView) {
+            newList.add(new DirectHTTPView().init());
+        }
+        if (!offlineRule) {
+            newList.add(new OfflineView().init());
+        }
+        if (!dupesView) {
+            newList.add(new DupesView().init());
         }
         return newList;
     }
@@ -204,15 +205,15 @@ public class LinkFilterController implements LinkCrawlerFilter {
     public void update() {
         if (isTestInstance()) {
             updateInternal();
-        } else {
-            TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    updateInternal();
-                    return null;
-                }
-            });
+            return;
         }
+        TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                updateInternal();
+                return null;
+            }
+        });
     }
 
     public boolean isTestInstance() {
@@ -226,28 +227,31 @@ public class LinkFilterController implements LinkCrawlerFilter {
     }
 
     public void add(LinkgrabberFilterRule linkFilter) {
-        if (linkFilter != null) {
-            final List<LinkgrabberFilterRule> addAll = new ArrayList<LinkgrabberFilterRule>();
-            addAll.add(linkFilter);
-            addAll(addAll);
+        if (linkFilter == null) {
+            return;
         }
+        final List<LinkgrabberFilterRule> addAll = new ArrayList<LinkgrabberFilterRule>();
+        addAll.add(linkFilter);
+        addAll(addAll);
     }
 
     public void addAll(List<LinkgrabberFilterRule> all) {
-        if (all != null && all.size() > 0) {
-            synchronized (this) {
-                final HashSet<String> dupecheck = createDupeSet();
-                for (LinkgrabberFilterRule rule : all) {
-                    if (!rule.isStaticRule()) {
-                        if (dupecheck.add(JSonStorage.serializeToJson(rule))) {
-                            filter.add(rule);
-                        }
-                    }
-                }
-                save(filter);
-            }
-            update();
+        if (all == null || all.size() == 0) {
+            return;
         }
+        synchronized (this) {
+            final HashSet<String> dupecheck = createDupeSet();
+            for (LinkgrabberFilterRule rule : all) {
+                if (rule.isStaticRule()) {
+                    continue;
+                }
+                if (dupecheck.add(JSonStorage.serializeToJson(rule))) {
+                    filter.add(rule);
+                }
+            }
+            save(filter);
+        }
+        update();
     }
 
     private HashSet<String> createDupeSet() {
@@ -261,26 +265,27 @@ public class LinkFilterController implements LinkCrawlerFilter {
     }
 
     private synchronized final void save(ArrayList<LinkgrabberFilterRule> filter) {
-        if (config != null) {
-            final EventSuppressor<ConfigEvent> eventSuppressor;
-            if (filterListHandler != null) {
-                final Thread thread = Thread.currentThread();
-                eventSuppressor = new EventSuppressor<ConfigEvent>() {
-                    @Override
-                    public boolean suppressEvent(ConfigEvent eventType) {
-                        return Thread.currentThread() == thread;
-                    }
-                };
-                filterListHandler.getEventSender().addEventSuppressor(eventSuppressor);
-            } else {
-                eventSuppressor = null;
-            }
-            try {
-                config.setFilterList(filter);
-            } finally {
-                if (filterListHandler != null) {
-                    filterListHandler.getEventSender().removeEventSuppressor(eventSuppressor);
+        if (config == null) {
+            return;
+        }
+        final EventSuppressor<ConfigEvent> eventSuppressor;
+        if (filterListHandler != null) {
+            final Thread thread = Thread.currentThread();
+            eventSuppressor = new EventSuppressor<ConfigEvent>() {
+                @Override
+                public boolean suppressEvent(ConfigEvent eventType) {
+                    return Thread.currentThread() == thread;
                 }
+            };
+            filterListHandler.getEventSender().addEventSuppressor(eventSuppressor);
+        } else {
+            eventSuppressor = null;
+        }
+        try {
+            config.setFilterList(filter);
+        } finally {
+            if (filterListHandler != null) {
+                filterListHandler.getEventSender().removeEventSuppressor(eventSuppressor);
             }
         }
     }
@@ -307,7 +312,7 @@ public class LinkFilterController implements LinkCrawlerFilter {
             return false;
         }
         for (final LinkgrabberFilterRuleWrapper lgr : denyFilters) {
-            if (matches(link, lgr, false)) {
+            if (matches(link, lgr)) {
                 link.setMatchingFilter(lgr.getRule());
                 return true;
             }
@@ -315,7 +320,7 @@ public class LinkFilterController implements LinkCrawlerFilter {
         return false;
     }
 
-    private boolean matches(CrawledLink link, LinkgrabberFilterRuleWrapper rule, final boolean afterOnlineCheck) {
+    private boolean matches(CrawledLink link, LinkgrabberFilterRuleWrapper rule) {
         if (!rule.checkHoster(link)) {
             return false;
         }
@@ -342,6 +347,9 @@ public class LinkFilterController implements LinkCrawlerFilter {
         if (!rule.checkPackageName(link)) {
             return false;
         }
+        if (!rule.checkComment(link)) {
+            return false;
+        }
         if (!rule.checkFileSize(link)) {
             return false;
         }
@@ -365,7 +373,7 @@ public class LinkFilterController implements LinkCrawlerFilter {
             throw new WTFException();
         }
         for (final LinkgrabberFilterRuleWrapper lgr : denyFilters) {
-            if (matches(link, lgr, true)) {
+            if (matches(link, lgr)) {
                 link.setMatchingFilter(lgr.getRule());
                 return true;
             }

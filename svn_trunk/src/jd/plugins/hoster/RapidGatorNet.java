@@ -73,7 +73,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53009 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -439,6 +439,7 @@ public class RapidGatorNet extends PluginForHost {
             } else {
                 this.dl = new jd.plugins.BrowserAdapter().openDownload(br, link, this.getContentURL(link), true, getMaxChunks(link, account));
                 if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                    finalDownloadURL = dl.getConnection().getURL().toExternalForm();
                     logger.info("Hotlinked file or premium account with direct-download enabled");
                     break findDirecturl;
                 }
@@ -667,12 +668,12 @@ public class RapidGatorNet extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            if (cfg.isExperimentalEnforceSSL() && !StringUtils.startsWithCaseInsensitive(finalDownloadURL, "https")) {
-                logger.info("Enforcing https on final downloadurl");
-                finalDownloadURL = finalDownloadURL.replaceFirst("(?i)^http://", "https://");
-            }
             try {
                 if (this.dl == null) {
+                    if (cfg.isExperimentalEnforceSSL() && !StringUtils.startsWithCaseInsensitive(finalDownloadURL, "https")) {
+                        logger.info("Enforcing https on final downloadurl");
+                        finalDownloadURL = finalDownloadURL.replaceFirst("(?i)^http://", "https://");
+                    }
                     dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finalDownloadURL, isResumeable(link, account), getMaxChunks(link, account));
                 }
                 /* Save directurl (yes, even though we don't yet know if it works) */

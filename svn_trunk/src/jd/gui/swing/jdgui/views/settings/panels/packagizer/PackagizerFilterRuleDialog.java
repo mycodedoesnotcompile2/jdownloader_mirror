@@ -32,13 +32,6 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.text.JTextComponent;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionDialog;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.FilterPanel;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.test.TestWaitDialog;
-import jd.gui.swing.jdgui.views.settings.panels.packagizer.test.PackagizerSingleTestTableModel;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtCheckBox;
@@ -70,6 +63,14 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionDialog;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.FilterPanel;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.test.TestWaitDialog;
+import jd.gui.swing.jdgui.views.settings.panels.packagizer.test.PackagizerSingleTestTableModel;
+import jd.plugins.DownloadLink;
 
 public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> {
     private class PriorityAction extends AbstractAction {
@@ -151,15 +152,15 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 }
                 if (d.isVisible()) {
                     WindowManager.getInstance().setZState(d.getDialog(), FrameState.TO_FRONT);
-                } else {
-                    try {
-                        CloseReason closeReason = UIOManager.I().show(null, d).getCloseReason();
-                        if (CloseReason.OK.equals(closeReason) && doAfterShow != null) {
-                            doAfterShow.run();
-                        }
-                    } catch (final Throwable e) {
-                        e.printStackTrace();
+                    return;
+                }
+                try {
+                    CloseReason closeReason = UIOManager.I().show(null, d).getCloseReason();
+                    if (CloseReason.OK.equals(closeReason) && doAfterShow != null) {
+                        doAfterShow.run();
                     }
+                } catch (final Throwable e) {
+                    e.printStackTrace();
                 }
             }
         }.start();
@@ -285,6 +286,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         // TODO: Add translation
         ret.add(new VariableAction(tc, "Default download path", "<jd:" + PackagizerController.DEFAULT_DOWNLOAD_PATH + ">"));
         ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_plugin_property(), "<jd:prop:putYourDesiredPropertyKeyHere>"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_comment(), "<jd:prop:" + DownloadLink.PROPERTY_COMMENT + ">"));
         if (getFilenameFilter().isEnabled()) {
             for (int i = 0; i < getFilenameFilter().calcPlaceholderCount(); i++) {
                 ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename((i + 1)), "<jd:" + PackagizerController.ORGFILENAME + ":" + (i + 1) + ">"));
@@ -789,6 +791,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
             protected void runInEDT() {
                 rule.setFilenameFilter(getFilenameFilter());
                 rule.setPackagenameFilter(getPackagenameFilter());
+                rule.setCommentFilter(getCommentFilter());
                 rule.setHosterURLFilter(getHosterFilter());
                 rule.setName(getName());
                 rule.setFilesizeFilter(getFilersizeFilter());
@@ -856,6 +859,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         setIconKey(rule.getIconKey());
         setFilenameFilter(rule.getFilenameFilter());
         setPackagenameFilter(rule.getPackagenameFilter());
+        setCommentFilter(rule.getCommentFilter());
         setHosterFilter(rule.getHosterURLFilter());
         setName(rule.getName());
         setFilesizeFilter(rule.getFilesizeFilter());

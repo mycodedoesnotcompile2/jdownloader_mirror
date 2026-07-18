@@ -139,7 +139,7 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
      * @return
      */
     public boolean _isValid() {
-        return getPackagenameFilter().isEnabled() || getMatchAlwaysFilter().isEnabled() || getFilenameFilter().isEnabled() || getFilesizeFilter().isEnabled() || getFiletypeFilter().isEnabled() || getHosterURLFilter().isEnabled() || getSourceURLFilter().isEnabled() || getOriginFilter().isEnabled() || getConditionFilter().isEnabled() || getOnlineStatusFilter().isEnabled() || getPluginStatusFilter().isEnabled();
+        return getPackagenameFilter().isEnabled() || getCommentFilter().isEnabled() || getMatchAlwaysFilter().isEnabled() || getFilenameFilter().isEnabled() || getFilesizeFilter().isEnabled() || getFiletypeFilter().isEnabled() || getHosterURLFilter().isEnabled() || getSourceURLFilter().isEnabled() || getOriginFilter().isEnabled() || getConditionFilter().isEnabled() || getOnlineStatusFilter().isEnabled() || getPluginStatusFilter().isEnabled();
     }
 
     public String toString(CrawledLink link) {
@@ -172,6 +172,13 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                     cond.add(_GUI.T.FilterRule_toString_package2(link.getParentNode().getName(), packagenameFilter.toString()));
                 } else {
                     cond.add(_GUI.T.FilterRule_toString_packagename(packagenameFilter.toString()));
+                }
+            }
+            if (getCommentFilter().isEnabled()) {
+                if (link != null && link.getComment() != null) {
+                    cond.add(_GUI.T.FilterRule_toString_comment2(link.getComment(), commentFilter.toString()));
+                } else {
+                    cond.add(_GUI.T.FilterRule_toString_comment(commentFilter.toString()));
                 }
             }
             if (getFilesizeFilter().isEnabled()) {
@@ -287,6 +294,7 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
     private FiletypeFilter filetypeFilter;
     private RegexFilter    filenameFilter;
     private RegexFilter    packagenameFilter;
+    private RegexFilter    commentFilter;
 
     public RegexFilter getPackagenameFilter() {
         if (packagenameFilter == null) {
@@ -297,6 +305,17 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
 
     public void setPackagenameFilter(RegexFilter packagenameFilter) {
         this.packagenameFilter = packagenameFilter;
+    }
+
+    public RegexFilter getCommentFilter() {
+        if (commentFilter == null) {
+            commentFilter = new RegexFilter();
+        }
+        return commentFilter;
+    }
+
+    public void setCommentFilter(RegexFilter commentFilter) {
+        this.commentFilter = commentFilter;
     }
 
     private boolean enabled;

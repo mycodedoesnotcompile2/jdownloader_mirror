@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52998 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53004 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexCakeCom extends PluginForHost {
     public SexCakeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +58,6 @@ public class SexCakeCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bluevideos.net" });
         ret.add(new String[] { "filmexnxx.net", "bluevideos.net" });
         ret.add(new String[] { "pornoxnxx.video", "videospornograficos.net" });
         ret.add(new String[] { "rubias19.red" });

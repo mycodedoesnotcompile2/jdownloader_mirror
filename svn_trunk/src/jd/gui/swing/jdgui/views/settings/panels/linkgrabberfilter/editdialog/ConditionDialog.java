@@ -136,6 +136,21 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         return new RegexFilter(cbPackage.isSelected(), MatchType.values()[cobPackage.getSelectedIndex()], txtPackage.getText(), cbRegPackage.isSelected());
     }
 
+    public void setCommentFilter(RegexFilter filter) {
+        if (filter == null) {
+            return;
+        }
+        cbCommentFilter.setSelected(filter.isEnabled());
+        cobCommentFilter.setSelectedIndex(filter.getMatchType().ordinal());
+        txtCommentFilter.setText(filter.getRegex());
+        cbRegCommentFilter.setSelected(filter.isUseRegex());
+        addRegexHighlighter(txtCommentFilter, cbRegCommentFilter);
+    }
+
+    public RegexFilter getCommentFilter() {
+        return new RegexFilter(cbCommentFilter.isSelected(), MatchType.values()[cobCommentFilter.getSelectedIndex()], txtCommentFilter.getText(), cbRegCommentFilter.isSelected());
+    }
+
     protected void _init() {
         txtTestUrl = new ExtTextField();
         txtTestUrl.setHelpText(_GUI.T.PackagizerFilterRuleDialog_PackagizerFilterRuleDialog_test_help());
@@ -182,12 +197,11 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     public void setFilesizeFilter(FilesizeFilter f) {
         if (f == null) {
             return;
-        } else {
-            cbSize.setSelected(f.isEnabled());
-            cobSize.setSelectedIndex(f.getMatchType().ordinal());
-            fromSize.setValue(f.getFrom());
-            toSize.setValue(f.getTo());
         }
+        cbSize.setSelected(f.isEnabled());
+        cobSize.setSelectedIndex(f.getMatchType().ordinal());
+        fromSize.setValue(f.getFrom());
+        toSize.setValue(f.getTo());
     }
 
     public void setConditionFilter(ConditionFilter filter) {
@@ -386,6 +400,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     private JComboBox                                 cobPackage;
     private ExtTextField                              txtPackage;
     private ExtCheckBox                               cbPackage;
+    private JToggleButton                             cbRegCommentFilter;
+    private JComboBox                                 cobCommentFilter;
+    private ExtTextField                              txtCommentFilter;
+    private ExtCheckBox                               cbCommentFilter;
     protected JLabel                                  lblSource;
     protected JLabel                                  lblCrawlerSource;
     private JComboBox                                 cobFlags;
@@ -438,6 +456,7 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         cbRegFileType = createToggle();
         cbRegHoster = createToggle();
         cbRegSource = createToggle();
+        cbRegCommentFilter = createToggle();
         panel = new MigPanel("ins 5,wrap 6", "[][][fill][][][grow,fill]", "[]");
         panel.add(createHeader(_GUI.T.FilterRuleDialog_layoutDialogContent_name()), "spanx,growx,pushx");
         txtName = new ExtTextField() {
@@ -636,6 +655,44 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         panel.add(cobPackage);
         panel.add(txtPackage, "spanx,pushx,growx,split 2");
         panel.add(cbRegPackage, "height 22!,width 22!");
+        // comment
+        cobCommentFilter = new JComboBox(new String[] { _GUI.T.FilterRuleDialog_layoutDialogContent_contains(), _GUI.T.FilterRuleDialog_layoutDialogContent_equals(), _GUI.T.FilterRuleDialog_layoutDialogContent_contains_not(), _GUI.T.FilterRuleDialog_layoutDialogContent_equals_not() });
+        txtCommentFilter = new ExtTextField() {
+            @Override
+            public JPopupMenu getPopupMenu(MouseEvent event, AbstractAction cutAction, AbstractAction copyAction, AbstractAction pasteAction, AbstractAction deleteAction, AbstractAction selectAction) {
+                JPopupMenu menu = new JPopupMenu();
+                menu.add(new TestAction(getCommentFilter(), _GUI.T.ConditionDialog_getPopupMenu_Comment_()));
+                menu.add(new JSeparator());
+                menu.add(cutAction);
+                menu.add(copyAction);
+                menu.add(pasteAction);
+                menu.add(deleteAction);
+                menu.add(selectAction);
+                return menu;
+            }
+        };
+        txtCommentFilter.setHelpText(_GUI.T.FilterRuleDialog_layoutDialogContent_ht_comment());
+        JLabel lblCommentFilter = getLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_comment());
+        cbCommentFilter = new ExtCheckBox(cobCommentFilter, txtCommentFilter, cbRegCommentFilter) {
+            @Override
+            public void updateDependencies() {
+                super.updateDependencies();
+            }
+        };
+        ml = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                cbCommentFilter.setSelected(true);
+            }
+        };
+        txtCommentFilter.addMouseListener(ml);
+        cobCommentFilter.addMouseListener(ml);
+        cbRegCommentFilter.addMouseListener(ml);
+        panel.add(cbCommentFilter);
+        panel.add(lblCommentFilter);
+        panel.add(cobCommentFilter);
+        panel.add(txtCommentFilter, "spanx,pushx,growx,split 2");
+        panel.add(cbRegCommentFilter, "height 22!,width 22!");
         //
         size = createSizeFilter();
         cobSize = new JComboBox(new String[] { _GUI.T.FilterRuleDialog_layoutDialogContent_is_between(), _GUI.T.FilterRuleDialog_layoutDialogContent_is_not_between() });
@@ -922,20 +979,19 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     }
 
     public void actionPerformed(final ActionEvent e) {
-        if (e.getSource() == this.okButton) {
-            if (validate()) {
-                super.actionPerformed(e);
-            }
-        } else {
+        if (e.getSource() != this.okButton) {
+            super.actionPerformed(e);
+            return;
+        }
+        if (validate()) {
             super.actionPerformed(e);
         }
     }
 
     private boolean validate() {
-        txtFilename.setBorder(txtName.getBorder());
-        txtCustumMime.setBorder(txtName.getBorder());
-        txtHoster.setBorder(txtName.getBorder());
-        txtSource.setBorder(txtName.getBorder());
+        for (final ExtTextField txtField : regexFields.keySet()) {
+            txtField.setBorder(txtName.getBorder());
+        }
         boolean ok = true;
         for (Entry<ExtTextField, JToggleButton> regexField : regexFields.entrySet()) {
             final ExtTextField txtField = regexField.getKey();
@@ -951,9 +1007,8 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         if (!ok) {
             Dialog.getInstance().showErrorDialog(_GUI.T.ConditionDialog_validate_object_());
             return false;
-        } else {
-            return true;
         }
+        return true;
     }
 
     private String convert(String text, boolean regex2) {

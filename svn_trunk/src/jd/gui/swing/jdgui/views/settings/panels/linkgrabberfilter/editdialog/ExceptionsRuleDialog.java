@@ -90,6 +90,7 @@ public class ExceptionsRuleDialog extends ConditionDialog<LinkgrabberFilterRule>
 
     private void save(LinkgrabberFilterRule rule) {
         rule.setPackagenameFilter(getPackagenameFilter());
+        rule.setCommentFilter(getCommentFilter());
         rule.setFilenameFilter(getFilenameFilter());
         rule.setHosterURLFilter(getHosterFilter());
         rule.setName(getName());
@@ -109,6 +110,7 @@ public class ExceptionsRuleDialog extends ConditionDialog<LinkgrabberFilterRule>
         regexFields.clear();
         setIconKey(rule.getIconKey());
         setPackagenameFilter(rule.getPackagenameFilter());
+        setCommentFilter(rule.getCommentFilter());
         setFilenameFilter(rule.getFilenameFilter());
         setHosterFilter(rule.getHosterURLFilter());
         setName(rule.getName());

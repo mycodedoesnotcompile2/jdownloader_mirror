@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 52982 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53004 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -228,11 +228,11 @@ public class OrfAt extends PluginForDecrypt {
             fp.setComment(description);
         }
         fp.setPackageKey("orfmediathek://video/" + contentIDSlashPlaylistIDSlashVideoID);
-        /* 2026-07-14: Age restriction used to be skippable via gapless streams but not anymore. */
+        /*
+         * Age restriction can still be bypassed via the gapless stream -> segment handling is skipped entirely for these items (see
+         * crawlSegments below) and only the gapless master is used instead.
+         */
         final boolean has_active_youth_protection = ((Boolean) entries.get("has_active_youth_protection")).booleanValue();
-        if (has_active_youth_protection) {
-            throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
-        }
         final ORFMediathek hosterplugin = (ORFMediathek) this.getNewPluginForHostInstance("orf.at");
         final Map<Integer, Long> cumulativeFilesizeMap = new HashMap<Integer, Long>();
         /* Selected video qualities by height (in pixels). Progressive delivery only exists for 360/540/720 (Q4A/Q6A/Q8C). */
@@ -292,20 +292,20 @@ public class OrfAt extends PluginForDecrypt {
         final boolean settingEnableFastCrawl = cfg != null ? cfg.getBooleanProperty(ORFMediathek.SETTING_ENABLE_FAST_CRAWL, ORFMediathek.SETTING_ENABLE_FAST_CRAWL_default) : true;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final boolean isCrawlGaplessAndVideoChapters;
-        boolean isCrawlGaplessOnly;
+        final boolean userSelectedGaplessOnly;
         if (cfg == null) {
             isCrawlGaplessAndVideoChapters = true;
-            isCrawlGaplessOnly = false;
+            userSelectedGaplessOnly = false;
         } else {
             final int videoFormatSettingInt = cfg.getIntegerProperty(ORFMediathek.SETTING_SELECTED_VIDEO_FORMAT, ORFMediathek.SETTING_SELECTED_VIDEO_FORMAT_default);
             isCrawlGaplessAndVideoChapters = videoFormatSettingInt == 0;
-            isCrawlGaplessOnly = videoFormatSettingInt == 2;
+            userSelectedGaplessOnly = videoFormatSettingInt == 2;
         }
         /*
          * Whether the user wants gapless results at all (either alongside chapters or exclusively) -> also needed below to decide whether
          * to bother probing HLS qualities per segment.
          */
-        final boolean userWantsGapless = isCrawlGaplessAndVideoChapters || isCrawlGaplessOnly;
+        final boolean userWantsGapless = isCrawlGaplessAndVideoChapters || userSelectedGaplessOnly;
         /*
          * Only ever written to when CACHE_HLS_QUALITY_ACROSS_SEGMENTS is true; holds the first segment's discovered HLS heights. Declared
          * here (outside crawlSegments) so the gapless handling below can reuse it instead of probing the gapless master's HLS qualities all
@@ -313,7 +313,10 @@ public class OrfAt extends PluginForDecrypt {
          */
         final HashSet<Integer> cachedAvailableHeights = new HashSet<Integer>();
         crawlSegments: {
-            if (segments == null || segments.isEmpty()) {
+            if (has_active_youth_protection) {
+                /* Age restricted items are only ever accessible via the gapless stream -> skip segment handling entirely. */
+                break crawlSegments;
+            } else if (segments == null || segments.isEmpty()) {
                 /**
                  * No segments there to crawl, maybe only one gapless item available? <br>
                  * Segments should always exist!
@@ -345,6 +348,12 @@ public class OrfAt extends PluginForDecrypt {
              * progressive quality, used to estimate (instead of measure) the filesize of every other segment of that same quality.
              */
             final Map<Integer, Double> cachedBytesPerSecondByHeight = new HashMap<Integer, Double>();
+            /*
+             * Once a progressive quality turns out to be broken (dead link), assume the whole video has no working progressive delivery at
+             * all -> skip every remaining progressive quality of every remaining segment instead of probing (and potentially offering) more
+             * broken links.
+             */
+            boolean progressiveBroken = false;
             int videoPosition = 0;
             for (final Map<String, Object> segment : segments) {
                 if (this.isAbort()) {
@@ -451,37 +460,32 @@ public class OrfAt extends PluginForDecrypt {
                             /* Q8C is often broken server-side -> tried last/as a last resort. */
                             hlsQualityTryOrder.add("Q8C");
                         }
+                        HashSet<Integer> heightsFromMaster = null;
                         for (final String hlsQualityTag : hlsQualityTryOrder) {
                             if (this.isAbort()) {
                                 throw new InterruptedException();
                             }
-                            /* Try each candidate until we find one that actually works. */
+                            /*
+                             * Only the first candidate is actually attempted: findHlsMasterQualityHeights throws instead of signalling a
+                             * bad candidate, so a broken master (e.g. Q8C) now fails loudly here instead of silently falling through to the
+                             * next quality tag.
+                             */
                             final String hlsPlaylistUrl = hlsUrlByQuality.get(hlsQualityTag);
-                            brc.getPage(hlsPlaylistUrl);
-                            if (ORFMediathek.isAgeRestricted(brc.getURL())) {
-                                /* Item is GEO-blocked */
-                                throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
-                            } else if (ORFMediathek.isGeoBlocked(brc.getURL())) {
-                                /* Item is GEO-blocked */
-                                throw new DecrypterRetryException(RetryReason.GEO);
-                            } else if (!LinkCrawlerDeepInspector.looksLikeMpegURL(brc.getHttpConnection())) {
-                                logger.info("Skipping bad HLS playlist: " + hlsPlaylistUrl);
-                                continue;
-                            }
+                            heightsFromMaster = findHlsMasterQualityHeights(brc, hlsPlaylistUrl);
                             hlsMaster = hlsPlaylistUrl;
                             workingHlsQuality = hlsQualityTag;
                             break;
                         }
-                        if (hlsMaster == null) {
+                        if (heightsFromMaster == null) {
+                            /* No HLS candidates existed for this segment at all (hlsQualityTryOrder was empty). */
                             logger.warning("Found zero usable HLS qualities");
                             break find_hls_qualities;
                         }
-                        final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(brc);
-                        for (final HlsContainer hlsQuality : hlsQualities) {
-                            if (!foundHeightAboveProgressiveCap && hlsQuality.getHeight() > 720) {
+                        for (final int height : heightsFromMaster) {
+                            if (!foundHeightAboveProgressiveCap && height > 720) {
                                 foundHeightAboveProgressiveCap = true;
                             }
-                            availableHeightsThisSegment.add(hlsQuality.getHeight());
+                            availableHeightsThisSegment.add(height);
                         }
                         cachedFoundHeightAboveProgressiveCap = Boolean.valueOf(foundHeightAboveProgressiveCap);
                         if (CACHE_HLS_QUALITY_ACROSS_SEGMENTS) {
@@ -489,6 +493,12 @@ public class OrfAt extends PluginForDecrypt {
                             cachedAvailableHeights.addAll(availableHeightsThisSegment);
                         }
                     }
+                    /*
+                     * Collect every height the HLS master actually offers here, regardless of selection/hlsCoversEverything filtering below
+                     * -> this is what makes the "Available video qualities" summary log further down accurate (it used to only reflect
+                     * heights that ended up in a result).
+                     */
+                    allVideoHeights.addAll(availableHeightsThisSegment);
                     /*
                      * If the user doesn't want HLS, only use it anyway when it actually beats progressive (something above 720p vs.
                      * progressive's assumed 720p cap) and either BEST or a quality above 720p is wanted. If HLS tops out at the same
@@ -523,7 +533,6 @@ public class OrfAt extends PluginForDecrypt {
                         video.setAvailable(true);
                         videoresults.add(video);
                         segmentAvailableHeights.add(height);
-                        allVideoHeights.add(height);
                     }
                     if (foundHeightAboveProgressiveCap && settingPreferBestVideo && PROGRESSIVE_MAX_720P) {
                         /*
@@ -542,7 +551,10 @@ public class OrfAt extends PluginForDecrypt {
                      * trick" below), do the HEAD-request filesize check anyway without producing an actual progressive result.
                      */
                     final boolean onlyProbeFilesize = !allowProgressive;
-                    if (skipProgressiveForBest_HLS) {
+                    if (progressiveBroken) {
+                        /* Already established (for an earlier segment) that progressive delivery is broken for this whole video. */
+                        break crawl_progressive_videos;
+                    } else if (skipProgressiveForBest_HLS) {
                         break crawl_progressive_videos;
                     } else if (onlyProbeFilesize && !findProgressiveFilesizeEvenIfDisabled) {
                         break crawl_progressive_videos;
@@ -564,7 +576,11 @@ public class OrfAt extends PluginForDecrypt {
                             allowedProgressiveFilesizeCheckHeights.add(progressiveHeight);
                         }
                     }
-                    for (final Map<String, Object> source : sources) {
+                    checkSources: for (final Map<String, Object> source : sources) {
+                        if (progressiveBroken) {
+                            /* Found broken mid-way through this segment's sources -> stop probing further progressive qualities. */
+                            break checkSources;
+                        }
                         final String src = (String) source.get("src");
                         final String quality = source.get("quality").toString();
                         final String quality_string = source.get("quality_string").toString();
@@ -573,16 +589,16 @@ public class OrfAt extends PluginForDecrypt {
                         allFMTs.add(quality);
                         if (!"progressive".equalsIgnoreCase(delivery)) {
                             /* HLS is handled separately above; HDS/DASH/RTMP/RTSP are unsupported/broken. */
-                            continue;
+                            continue checkSources;
                         }
                         /* Skip stuff we cannot handle */
                         if (StringUtils.equals(quality, "QXADRM")) {
-                            continue;
+                            continue checkSources;
                         } else if (!"http".equalsIgnoreCase(protocol)) {
-                            continue;
+                            continue checkSources;
                         } else if (quality_string.equalsIgnoreCase("adaptiv")) {
                             /* Split audio/video HLS items -> shouldn't occur for progressive but keep this safety check. */
-                            continue;
+                            continue checkSources;
                         }
                         final Integer qualityHeight = oldQualityIdentifierToHeight(quality);
                         if (qualityHeight == null) {
@@ -591,15 +607,15 @@ public class OrfAt extends PluginForDecrypt {
                              * which used to be legacy .3gp files (2026-06-12), and ADAPTIV.
                              */
                             logger.info("Skipping progressive item with unmapped quality: " + quality);
-                            continue;
+                            continue checkSources;
                         }
                         if (onlyProbeFilesize && !allowedProgressiveFilesizeCheckHeights.contains(qualityHeight)) {
                             /* Progressive is disabled and this quality's filesize isn't needed either -> skip entirely, no HEAD request. */
-                            continue;
+                            continue checkSources;
                         }
                         final boolean qualityIsSelected = allowedProgressiveFilesizeCheckHeights.contains(qualityHeight);
                         Long filesizeFromThisCheck = null;
-                        progressiveStreamFilesizeCheck: if (qualityIsSelected && !settingEnableFastCrawl && !has_active_youth_protection) {
+                        progressiveStreamFilesizeCheck: if (qualityIsSelected && !settingEnableFastCrawl) {
                             final Double cachedBytesPerSecond = FILESIZE_MAGIC_MODE ? cachedBytesPerSecondByHeight.get(qualityHeight) : null;
                             if (cachedBytesPerSecond != null) {
                                 /*
@@ -622,15 +638,13 @@ public class OrfAt extends PluginForDecrypt {
                             try {
                                 brc.setFollowRedirects(true);
                                 con = brc.openHeadConnection(src);
-                                if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest())) {
-                                    logger.info("Skipping \"insert_video_not_available\": " + src);
-                                    continue;
-                                } else if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
+                                if (ORFMediathek.isGeoBlocked(con.getURL().toExternalForm())) {
                                     /* Item is GEO-blocked */
                                     throw new DecrypterRetryException(RetryReason.GEO);
-                                } else if (!this.looksLikeDownloadableContent(con)) {
-                                    logger.info("Skipping broken progressive video quality: " + src);
-                                    continue;
+                                } else if (ORFMediathek.isInsertVideoNotAvailable(con.getRequest()) || !this.looksLikeDownloadableContent(con)) {
+                                    logger.info("Progressive not available | Checked URL: " + src);
+                                    progressiveBroken = true;
+                                    continue checkSources;
                                 }
                                 final long filesize = con.getCompleteContentLength();
                                 if (filesize <= 0) {
@@ -675,7 +689,7 @@ public class OrfAt extends PluginForDecrypt {
                             /*
                              * We only wanted the filesize side-effect above -> no actual progressive result since progressive is disabled.
                              */
-                            continue;
+                            continue checkSources;
                         }
                         segmentAvailableHeights.add(qualityHeight);
                         allVideoHeights.add(qualityHeight);
@@ -768,17 +782,11 @@ public class OrfAt extends PluginForDecrypt {
                 }
             }
         }
-        logger.info("Available video qualities (height in px) across all segments of this video: " + allVideoHeights);
         final boolean allowCrawlGapless;
         if (has_active_youth_protection) {
-            /**
-             * With a bit of luck, this can skip age protection <br>
-             * 2026-07-14: Not possible anymore, see upper comments.
-             */
+            /* Segment handling was skipped entirely above -> gapless is the only way to get results for this age-restricted item. */
             logger.info("Allowing to crawl gapless items to avoid youth protection");
             allowCrawlGapless = true;
-            /* Non-gapless items remain youth-blocked so let's discard them if we find gapless items. */
-            isCrawlGaplessOnly = true;
         } else if (ret.isEmpty()) {
             /* Found nothing -> Try to crawl gapless items */
             logger.info("Found nothing -> Allow to crawl gapless version as fallback");
@@ -790,7 +798,6 @@ public class OrfAt extends PluginForDecrypt {
             /* Do not crawl gapless streams */
             allowCrawlGapless = false;
         }
-        int numberofGaplessItems = 0;
         crawlGapless: {
             if (!allowCrawlGapless) {
                 break crawlGapless;
@@ -798,15 +805,8 @@ public class OrfAt extends PluginForDecrypt {
             /*
              * Gapless video handling: Unlike the per-segment sources above (one chunk per chapter), the episode-level HLS sources QXA/QXB
              * are each a single continuous, non-chaptered adaptive stream covering the whole episode -> that's what makes them "gapless".
-             * QXA and QXB are equivalent mirrors of the same content, so which one we use doesn't matter -> pick one at random. Which
-             * qualities (heights) that master offers is already known from cachedAvailableHeights (probed per-segment above) -> no need to
-             * fetch and parse this master's playlist again just to find that out.
+             * QXA and QXB are equivalent mirrors of the same content, so which one we use doesn't matter -> pick one at random.
              */
-            if (cachedAvailableHeights.isEmpty()) {
-                /* This should never happen */
-                logger.info("No cached HLS qualities available -> Gapless not possible");
-                break crawlGapless;
-            }
             logger.info("Crawling gapless video stream");
             final Map<String, Object> sourcesForGaplessVideo = (Map<String, Object>) entries.get("sources");
             if (sourcesForGaplessVideo == null || sourcesForGaplessVideo.isEmpty()) {
@@ -836,8 +836,25 @@ public class OrfAt extends PluginForDecrypt {
             }
             final Map<String, Object> chosenGaplessMaster = gaplessMasterCandidates.get(new Random().nextInt(gaplessMasterCandidates.size()));
             final String hlsMaster = chosenGaplessMaster.get("src").toString();
+            final HashSet<Integer> availableGaplessHeights;
+            if (!cachedAvailableHeights.isEmpty()) {
+                /*
+                 * Already known from per-segment HLS probing above (same encode ladder as the gapless master) -> no need to fetch and parse
+                 * this master's playlist again just to find that out.
+                 */
+                availableGaplessHeights = cachedAvailableHeights;
+            } else {
+                /*
+                 * Segment handling was skipped entirely (has_active_youth_protection) -> qualities aren't known yet, so find them by
+                 * fetching this exact gapless master's playlist.
+                 */
+                final Browser brc = br.cloneBrowser();
+                availableGaplessHeights = findHlsMasterQualityHeights(brc, hlsMaster);
+            }
+            /* Usually the same ladder as the per-segment HLS probing above, but collect them too in case they ever differ. */
+            allVideoHeights.addAll(availableGaplessHeights);
             final List<DownloadLink> gaplessresults = new ArrayList<DownloadLink>();
-            for (final int height : cachedAvailableHeights) {
+            for (final int height : availableGaplessHeights) {
                 final DownloadLink video = this.createDownloadlink(hlsMaster);
                 video.setDefaultPlugin(hosterplugin);
                 video.setHost(hosterplugin.getHost());
@@ -857,7 +874,7 @@ public class OrfAt extends PluginForDecrypt {
              * Same quality selection already used for the non-gapless (chapters) results above: BEST, else the user's selected qualities,
              * else fallback to everything found.
              */
-            final Integer bestGaplessHeight = findBestQuality(cachedAvailableHeights);
+            final Integer bestGaplessHeight = findBestQuality(availableGaplessHeights);
             final List<DownloadLink> chosenGaplessVideoResults = new ArrayList<DownloadLink>();
             if (settingPreferBestVideo) {
                 for (final DownloadLink gaplessVideoResult : gaplessresults) {
@@ -889,7 +906,11 @@ public class OrfAt extends PluginForDecrypt {
             if ((cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default)) && !StringUtils.isEmpty(thumbnailurlFromFirstSegment)) {
                 gaplessFinalResults.add(createThumbnailLink(thumbnailurlFromFirstSegment, hosterplugin));
             }
-            if (isCrawlGaplessOnly) {
+            /*
+             * Non-gapless (chaptered) results get discarded below once gapless results are found: either because the user explicitly chose
+             * gapless-only, or because youth protection leaves non-gapless items permanently blocked anyway (see above).
+             */
+            if (userSelectedGaplessOnly || has_active_youth_protection) {
                 /* Discard previously found results as we want gapless items only. */
                 ret.clear();
             }
@@ -898,11 +919,8 @@ public class OrfAt extends PluginForDecrypt {
                 result.setProperty(ORFMediathek.PROPERTY_SEGMENT_ID, "gapless");
                 ret.add(result);
             }
-            numberofGaplessItems = gaplessFinalResults.size();
         }
-        if (isCrawlGaplessOnly && numberofGaplessItems == 0) {
-            logger.info("User wants gapless only but gapless is not available for this item");
-        }
+        logger.info("Available video qualities (height in px) across all segments of this video: " + allVideoHeights);
         if (ret.isEmpty()) {
             /* Hm no results -> Check if item has been deleted */
             final String killdate = (String) entries.get("killdate");
@@ -933,6 +951,30 @@ public class OrfAt extends PluginForDecrypt {
         }
         fp.addLinks(ret);
         return ret;
+    }
+
+    /**
+     * Fetches an HLS master playlist and returns the quality heights (in pixels) it offers. Never returns null or an empty set -> throws
+     * PluginException(ERROR_PLUGIN_DEFECT) instead if this URL turns out to not be a usable HLS playlist, or throws if the URL redirects to
+     * an age-verification or GEO block page.
+     */
+    private static HashSet<Integer> findHlsMasterQualityHeights(final Browser brc, final String hlsMasterUrl) throws Exception {
+        brc.getPage(hlsMasterUrl);
+        if (ORFMediathek.isAgeRestricted(brc.getURL())) {
+            throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
+        } else if (ORFMediathek.isGeoBlocked(brc.getURL())) {
+            throw new DecrypterRetryException(RetryReason.GEO);
+        } else if (!LinkCrawlerDeepInspector.looksLikeMpegURL(brc.getHttpConnection())) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Not a usable HLS playlist: " + hlsMasterUrl);
+        }
+        final HashSet<Integer> heights = new HashSet<Integer>();
+        for (final HlsContainer hlsQuality : HlsContainer.getHlsQualities(brc)) {
+            heights.add(hlsQuality.getHeight());
+        }
+        if (heights.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "HLS playlist contains zero quality renditions: " + hlsMasterUrl);
+        }
+        return heights;
     }
 
     /** Returns the largest (best) of the given heights, or null if the set is empty. LOW (Q1A) is never part of this set. */

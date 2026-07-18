@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 52982 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53004 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                                 = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -302,6 +302,10 @@ public class ORFMediathek extends PluginForHost {
         }
     }
 
+    /**
+     * Check for link to dummy video that says "Video not available" <br>
+     * http://apasfpd.sf.apa.at/gp/online/insert_video_not_available_q6a.mp4
+     */
     public static boolean isInsertVideoNotAvailable(final Request request) throws Exception {
         return request != null && StringUtils.containsIgnoreCase(request.getURL().getPath(), "/insert_video_not_available");
     }
@@ -655,13 +659,13 @@ public class ORFMediathek extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         final ConfigEntry progressiveStream = new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), PROGRESSIVE_STREAM, "Load progressive streams").setDefaultValue(PROGRESSIVE_STREAM_default);
         getConfig().addEntry(progressiveStream);
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HLS_STREAM, "Load hls streams").setDefaultValue(HLS_STREAM_default));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED, "If progressive is disabled: Find estimated HLS file size via progressive streams anyways").setDefaultValue(SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED_default).setEnabledCondidtion(progressiveStream, false));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HLS_STREAM, "Load hls streams").setDefaultValue(HLS_STREAM_default));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Video format settings"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, VIDEO_FORMATS, "Preferred video format").setDefaultValue(SETTING_SELECTED_VIDEO_FORMAT_default));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_AUDIO_TRACK, AUDIO_TRACKS, "Preferred audio track").setDefaultValue(SETTING_SELECTED_AUDIO_TRACK_default));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_AUDIO_TRACK, AUDIO_TRACKS, "HLS formats: Preferred audio track").setDefaultValue(SETTING_SELECTED_AUDIO_TRACK_default));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Crawl behavior settings"));
         /* 2026-07-08: Hardcoded-disabled this setting since progressive video streams are often not available */

@@ -67,20 +67,23 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
             setEnabled(false);
             return;
         }
-        if (SelectionInfo.isNotEmpty(selectionInfo)) {
-            if (threshold < 0) {
+        if (SelectionInfo.isEmpty(selectionInfo)) {
+            setEnabled(false);
+            return;
+        }
+        if (threshold < 0) {
+            setEnabled(true);
+            return;
+        }
+        final List<DownloadLink> links = selectionInfo.getChildren();
+        if (links.size() > threshold) {
+            setEnabled(false);
+            return;
+        }
+        for (final DownloadLink link : links) {
+            if (link.getView().getDisplayUrl() != null) {
                 setEnabled(true);
                 return;
-            } else {
-                final List<DownloadLink> links = selectionInfo.getChildren();
-                if (links.size() <= threshold) {
-                    for (final DownloadLink link : links) {
-                        if (link.getView().getDisplayUrl() != null) {
-                            setEnabled(true);
-                            return;
-                        }
-                    }
-                }
             }
         }
         setEnabled(false);
@@ -105,17 +108,6 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
             public void run() {
                 final int delay = getOpenDelay();
                 final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, true);
-                if (urls.size() < 5 && delay < 1000) {
-                    for (String url : urls) {
-                        try {
-                            Thread.sleep(delay);
-                        } catch (InterruptedException e) {
-                            return;
-                        }
-                        CrossSystem.openURL(url);
-                    }
-                    return;
-                }
                 final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
                     private int total = -1;
                     private int current;
@@ -127,6 +119,9 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
                         for (String url : urls) {
                             CrossSystem.openURL(url);
                             current++;
+                            if (current >= total) {
+                                break;
+                            }
                             Thread.sleep(delay);
                         }
                     }
