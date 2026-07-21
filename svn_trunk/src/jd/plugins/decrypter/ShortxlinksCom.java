@@ -38,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 52999 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53018 $", interfaceVersion = 3, names = {}, urls = {})
 public class ShortxlinksCom extends PluginForDecrypt {
     public ShortxlinksCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class ShortxlinksCom extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             /* 2026-07-16: go. subdomain is used for arlinks.in */
-            ret.add("https?://(?:(?:www|go)\\.)?" + buildHostsPatternPart(domains) + "/([a-zA-Z0-9]+)");
+            ret.add("https?://(?:(?:www|go)\\.)?" + buildHostsPatternPart(domains) + "/(?!register|contact)([a-zA-Z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -117,12 +117,18 @@ public class ShortxlinksCom extends PluginForDecrypt {
             if (nextlink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            /* 2026-07-20: Looks like this delay is checked server side now. */
+            final String waitStr = br.getRegex("let wpsafelinkCount = (\\d{1,2});").getMatch(0);
+            if (waitStr != null) {
+                logger.info("Found wait time seconds: " + waitStr);
+                this.sleep(Long.parseLong(waitStr) * 1000, param);
+            }
             br.getPage(nextlink);
             this.appVars = br.getRegex("var (app_vars.*?)</script>").getMatch(0);
             if (this.appVars != null) {
                 break;
             }
-            logger.info("Going into round: " + attempt + 1);
+            logger.info("Going into round: " + (attempt + 1));
             attempt++;
         } while (!this.isAbort() && attempt <= 3);
         if (this.isAbort()) {

@@ -25,14 +25,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigKatfile;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
 import jd.controlling.faviconcontroller.FavIcons;
 import jd.http.Browser;
@@ -45,7 +37,15 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52948 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigKatfile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@HostPlugin(revision = "$Revision: 53015 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,7 @@ public class KatfileCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "katfile.space", "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
+        ret.add(new String[] { "katfile.biz", "katfile.space", "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
         return ret;
     }
 
@@ -72,7 +72,7 @@ public class KatfileCom extends XFileSharingProBasic {
             try {
                 // workaround for missing favicon
                 final Browser br = this.createNewBrowserInstance();
-                final BufferedImage ret = FavIcons.download_FavIconTag(br, "https://katfile.space/images/logo.png", host);
+                final BufferedImage ret = FavIcons.download_FavIconTag(br, "https://katfile.biz/images/logo.png", host);
                 return colorize(ret, Color.decode("#0459ab"));
             } catch (Throwable ignore) {
                 ignore.printStackTrace();
@@ -136,6 +136,7 @@ public class KatfileCom extends XFileSharingProBasic {
         /* 2025-12-08: Main domain changed to katfile.online */
         /* 2026-04-13: Main domain changed to katfile.ws */
         /* 2026-05-xx: Main domain changed to katfile.space */
+        /* 2026-07-xx: Main domain changed to katfile.biz */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
@@ -260,6 +261,7 @@ public class KatfileCom extends XFileSharingProBasic {
             return super.isOffline(link, br);
         }
     }
+
     // @Override
     // protected boolean isPremiumOnlyURL(final Browser br) {
     // final String url = br != null ? br.getURL() : null;

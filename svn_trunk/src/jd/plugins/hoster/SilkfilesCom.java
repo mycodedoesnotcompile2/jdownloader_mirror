@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49699 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53016 $", interfaceVersion = 3, names = {}, urls = {})
 public class SilkfilesCom extends XFileSharingProBasic {
     public SilkfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,8 +43,21 @@ public class SilkfilesCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "silkfiles.com" });
+        ret.add(new String[] { "silkfile.com", "silkfiles.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("silkfiles.com"); // 2026-07-20
+        return deadDomains;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-07-20: Main domain changed from silkfiles.com to silkfile.com */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

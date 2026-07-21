@@ -17,19 +17,20 @@ import org.jdownloader.updatev2.UpdateController;
 public class FFMpegInstallThread extends Thread {
     private static enum ExtensionPackages {
         MAC_BIG_SUR_AS("ffmpeg_as_11+") {
+            // old extension/folder extensionID kept for compatibility
             // https://ffmpeg.martin-riedl.de/
             @Override
             protected boolean isSupported() {
-                if (MAC_CATALINA.isSupported()) {
+                if (MAC_MONTEREY.isSupported()) {
                     // MAC_CATALINA is installed, no need to install (while Rosetta 2(to be removed with macOS27) support still exists)
                     // Apple Silicon again
-                    final File file = MAC_CATALINA.getBundledBinaryPath(BINARY.FFMPEG);
+                    final File file = MAC_MONTEREY.getBundledBinaryPath(BINARY.FFMPEG);
                     if (isFile(file)) {
                         return false;
                     }
                 }
                 // MAC_BIG_SUR is first Apple Silicon
-                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_BIG_SUR) && CrossSystem.ARCHFamily.ARM.equals(CrossSystem.getARCHFamily());
+                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_MONTEREY) && CrossSystem.ARCHFamily.ARM.equals(CrossSystem.getARCHFamily());
             }
 
             @Override
@@ -38,13 +39,13 @@ public class FFMpegInstallThread extends Thread {
                 return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
             }
         },
-        MAC_CATALINA("ffmpeg_10.10+") {
+        MAC_MONTEREY("ffmpeg_10.10+") {
             // old extension/folder extensionID kept for compatibility
             // https://ffmpeg.martin-riedl.de/
             @Override
             protected boolean isSupported() {
                 // intel package is compatible to apple silicon because of rosetta 2 support
-                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_CATALINA);
+                return CrossSystem.getOS().isMinimum(OperatingSystem.MAC_MONTEREY);
             }
 
             @Override
@@ -53,12 +54,14 @@ public class FFMpegInstallThread extends Thread {
                 return Application.getResource("tools/mac/" + extensionID + "/" + binaryName);
             }
         },
-        MAC_HIGH_SIERRA_MOJAVE("ffmpeg_10.13-14") {
+        MAC_HIGH_SIERRA_BIG_SUR("ffmpeg_10.13-14") {
+            // old extension/folder extensionID kept for compatibility
             // https://evermeet.cx/ffmpeg/
             // https://evermeet.cx/ffmpeg/note-2026-03-29
+            // The binaries are compiled for Mac OS X 10.13 and later (2026-03-29). They will not run on earlier versions.
             @Override
             protected boolean isSupported() {
-                return CrossSystem.getOS().isMaximum(OperatingSystem.MAC_MOJAVE) && CrossSystem.getOS().isMinimum(OperatingSystem.MAC_HIGH_SIERRA);
+                return CrossSystem.getOS().isMaximum(OperatingSystem.MAC_BIG_SUR) && CrossSystem.getOS().isMinimum(OperatingSystem.MAC_HIGH_SIERRA);
             }
 
             @Override

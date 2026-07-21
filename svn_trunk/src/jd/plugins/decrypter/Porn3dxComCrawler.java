@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediadeliveryNet;
 
-@DecrypterPlugin(revision = "$Revision: 52911 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53020 $", interfaceVersion = 3, names = {}, urls = {})
 public class Porn3dxComCrawler extends PluginForDecrypt {
     public Porn3dxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,12 +78,13 @@ public class Porn3dxComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String postID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final String postID = new Regex(contenturl, PATTERN_POST).getMatch(0);
         final String titleSlug = br.getRegex("/post/" + postID + "/([a-z0-9\\-_]+)").getMatch(0);
         String authorSlug = br.getRegex("href=\"https?://[^/]+/tag/([^\"]+)\" class=\"tag-artist\"[^>]*>").getMatch(0);
         if (authorSlug == null) {
@@ -100,24 +101,24 @@ public class Porn3dxComCrawler extends PluginForDecrypt {
             fp.setName(postID);
         }
         final String[] newEmbedURLs = br.getRegex("(https?://iframe\\.mediadelivery\\.net/embed/[^\"]+)\"").getColumn(0);
-        if (newEmbedURLs.length > 0) {
+        if (newEmbedURLs != null && newEmbedURLs.length > 0) {
             /* 2022-02-08 */
             int index = 0;
             for (final String newEmbedURL : newEmbedURLs) {
-                final DownloadLink dl = this.createDownloadlink(newEmbedURL);
-                dl.setReferrerUrl(br.getURL());
-                dl.setProperty(MediadeliveryNet.PROPERTY_PORN3DX_POST_ID, postID);
+                final DownloadLink link = this.createDownloadlink(newEmbedURL);
+                link.setReferrerUrl(br.getURL());
+                link.setProperty(MediadeliveryNet.PROPERTY_PORN3DX_POST_ID, postID);
                 if (authorSlug != null) {
-                    dl.setProperty(MediadeliveryNet.PROPERTY_AUTHOR, authorSlug);
+                    link.setProperty(MediadeliveryNet.PROPERTY_AUTHOR, authorSlug);
                 }
                 if (titleSlug != null) {
-                    dl.setProperty(MediadeliveryNet.PROPERTY_TITLE, titleSlug);
+                    link.setProperty(MediadeliveryNet.PROPERTY_TITLE, titleSlug);
                 }
-                dl.setProperty(MediadeliveryNet.PROPERTY_POSITION, (index + 1));
-                MediadeliveryNet.setFilename(dl);
-                dl.setAvailable(true);
-                dl._setFilePackage(fp);
-                ret.add(dl);
+                link.setProperty(MediadeliveryNet.PROPERTY_POSITION, (index + 1));
+                MediadeliveryNet.setFilename(link);
+                link.setAvailable(true);
+                link._setFilePackage(fp);
+                ret.add(link);
                 index++;
             }
             return ret;
@@ -188,6 +189,10 @@ public class Porn3dxComCrawler extends PluginForDecrypt {
             }
         }
         if (ret.isEmpty()) {
+            if (br.containsHTML("<title>Porn3dx</title>")) {
+                /* Empty page without error message e.g. /post/44652/widowmaker-playboy-cover */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;

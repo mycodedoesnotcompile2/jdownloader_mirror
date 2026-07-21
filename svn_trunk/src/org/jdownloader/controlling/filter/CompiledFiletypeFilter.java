@@ -12,13 +12,13 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jd.plugins.LinkInfo;
+
 import org.appwork.utils.ByteArrayUtils;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.FiletypeFilter.TypeMatchType;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
-
-import jd.plugins.LinkInfo;
 
 public class CompiledFiletypeFilter {
     private final Pattern[]                   list;
@@ -1417,58 +1417,51 @@ public class CompiledFiletypeFilter {
     public boolean matches(final String extension, final LinkInfo linkInfo) {
         final ExtensionsFilterInterface linkExtension = linkInfo.getExtension();
         final String ext = StringUtils.isNotEmpty(extension) ? extension : linkExtension.name();
-        for (final ExtensionsFilterInterface enabledGroup : this.filterInterfaces) {
-            if (linkExtension.isSameExtensionGroup(enabledGroup)) {
-                switch (matchType) {
-                case IS:
-                    return true;
-                case IS_NOT:
-                    return false;
-                default:
-                    return false;
+        boolean matches = false;
+        search: {
+            for (final ExtensionsFilterInterface enabledGroup : this.filterInterfaces) {
+                if (linkExtension.isSameExtensionGroup(enabledGroup)) {
+                    /* fast path: linkInfo already resolved its extension to this enabled group */
+                    matches = true;
+                    break search;
+                }
+                /* fallback: match the raw extension string against every pattern of the enabled group */
+                for (final ExtensionsFilterInterface groupMember : enabledGroup.listSameGroup()) {
+                    final Pattern pattern = groupMember.getPattern();
+                    if (pattern == null) {
+                        continue;
+                    }
+                    try {
+                        if (pattern.matcher(ext).matches()) {
+                            matches = true;
+                            break search;
+                        }
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
                 }
             }
-            for (final ExtensionsFilterInterface groupMember : enabledGroup.listSameGroup()) {
-                final Pattern pattern = groupMember.getPattern();
+            /* none of the enabled groups matched -> check for the custom/regex patterns */
+            for (final Pattern pattern : this.list) {
                 if (pattern == null) {
                     continue;
                 }
                 try {
                     if (pattern.matcher(ext).matches()) {
-                        switch (matchType) {
-                        case IS:
-                            return true;
-                        case IS_NOT:
-                            return false;
-                        default:
-                            return false;
-                        }
+                        matches = true;
+                        break search;
                     }
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
             }
         }
-        for (final Pattern pattern : this.list) {
-            if (pattern == null) {
-                continue;
-            }
-            try {
-                if (pattern.matcher(ext).matches()) {
-                    switch (matchType) {
-                    case IS:
-                        return true;
-                    case IS_NOT:
-                        return false;
-                    default:
-                        return false;
-                    }
-                }
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
-        }
+        /* Evaluate result based on selected condition */
         switch (matchType) {
+        case IS:
+            return matches;
+        case IS_NOT:
+            return !matches;
         default:
             return false;
         }

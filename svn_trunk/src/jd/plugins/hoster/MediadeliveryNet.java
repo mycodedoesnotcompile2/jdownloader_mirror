@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
@@ -35,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53020 $", interfaceVersion = 3, names = {}, urls = {})
 public class MediadeliveryNet extends antiDDoSForHost {
     public MediadeliveryNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,17 +70,19 @@ public class MediadeliveryNet extends antiDDoSForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_EMBED = Pattern.compile("/embed/(\\d+/[a-f0-9\\-]+)(#.*)?");
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://iframe\\." + buildHostsPatternPart(domains) + "/embed/(\\d+/[a-f0-9\\-]+)(#.*)?");
+            ret.add("https?://iframe\\." + buildHostsPatternPart(domains) + PATTERN_EMBED.pattern());
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public String getAGBLink() {
-        return "https://mediadelivery.net/";
+        return "https://" + getHost() + "/";
     }
 
     @Override
@@ -93,16 +96,17 @@ public class MediadeliveryNet extends antiDDoSForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).getMatch(0);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".mp4";
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         setFilename(link);
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setFinalFileName(this.getFID(link) + ".mp4");
-        }
         this.setBrowserExclusive();
         final String refererURL = this.getReferer(link);
         if (refererURL != null) {
@@ -147,9 +151,19 @@ public class MediadeliveryNet extends antiDDoSForHost {
         final String title = link.getStringProperty(PROPERTY_TITLE);
         final int position = link.getIntegerProperty(PROPERTY_POSITION, -1);
         final String porn3dxPostID = link.getStringProperty(PROPERTY_PORN3DX_POST_ID);
-        if (porn3dxPostID != null && author != null && title != null && position != -1) {
+        if (author != null && title != null && position != -1) {
             link.setFinalFileName(author + "_ " + porn3dxPostID + "_" + title + "_" + position + ".mp4");
+            return;
         }
+        if (title != null && position != -1) {
+            link.setFinalFileName(porn3dxPostID + "_" + title + "_" + position + ".mp4");
+            return;
+        }
+        if (porn3dxPostID != null) {
+            link.setFinalFileName(porn3dxPostID + "_" + position + ".mp4");
+            return;
+        }
+        /* Set nothing -> getDefaultFileName will be used. */
     }
 
     @Override
@@ -176,17 +190,5 @@ public class MediadeliveryNet extends antiDDoSForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

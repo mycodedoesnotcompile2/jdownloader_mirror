@@ -73,7 +73,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53009 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53018 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1093,68 +1093,77 @@ public class RapidGatorNet extends PluginForHost {
             accessMainpage(br);
             boolean loginSuccess = false;
             boolean accountRequires2FALoginCode = false;
+            br.getPage("/auth/login");
+            Form loginform = findLoginform(br);
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            String captcha_url = findLoginCaptchaURL(br);
+            boolean requiresLoginCaptchaCloudflareTurnstile = this.requiresLoginCaptchaCloudflareTurnstile(loginform);
+            final String two_fa_login_field_key = "LoginForm%5BtwoStepAuthCode%5D";
             for (int i = 1; i <= 3; i++) {
                 logger.info("Website login attempt " + i + " of 3");
-                br.getPage("/auth/login");
-                Form loginform = br.getFormbyProperty("id", "login");
-                if (loginform == null) {
-                    /* 2024-04-30: Form id was changed to "registration" -> id="registration" hm */
-                    loginform = br.getFormbyActionRegex(".*/auth/login");
-                }
-                if (loginform == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                String user = loginform.getBestVariable("email");
-                String pass = loginform.getBestVariable("password");
-                if (user == null) {
-                    user = "LoginForm%5Bemail%5D";
-                }
-                if (pass == null) {
-                    pass = "LoginForm%5Bpassword%5D";
-                }
-                loginform.put(user, Encoding.urlEncode(account.getUser()));
-                loginform.put(pass, Encoding.urlEncode(account.getPass()));
-                final String captcha_url = br.getRegex("\"(/auth/captcha/v/[a-z0-9]+)\"").getMatch(0);
+                loginform.put("LoginForm%5Bemail%5D", Encoding.urlEncode(account.getUser()));
+                loginform.put("LoginForm%5Bpassword%5D", Encoding.urlEncode(account.getPass()));
                 if (captcha_url != null) {
                     /* Login-captcha */
                     final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "https://" + this.getHost(), true);
                     final String code = getCaptchaCode(captcha_url, dummyLink);
                     loginform.put("LoginForm%5BverifyCode%5D", Encoding.urlEncode(code));
-                } else if (i > 1 && !accountRequires2FALoginCode) {
-                    /* 2nd+ attempt but no captcha and no 2FA login -> Invalid login credentials */
-                    throw new AccountInvalidException();
+                } else if (requiresLoginCaptchaCloudflareTurnstile) {
+                    /* 2026-07: New */
+                    final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+                    loginform.put("LoginForm%5BverifyCode%5D", Encoding.urlEncode(cfTurnstileResponse));
+                    loginform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
                 }
                 if (accountRequires2FALoginCode) {
                     logger.info("2FA code required");
                     final String twoFACode = this.getTwoFACode(account, "\\d{6}");
-                    loginform.put("LoginForm%5BtwoStepAuthCode%5D", twoFACode);
+                    loginform.put(two_fa_login_field_key, twoFACode);
                 }
                 br.submitForm(loginform);
                 if (isLoggedINWebsite(br)) {
                     logger.info("Login success");
                     loginSuccess = true;
                     break;
-                } else if (br.containsHTML(">\\s*Wrong e-mail or password\\.\\s*<")) {
-                    throw new AccountInvalidException();
-                } else {
-                    /* Try again - Maybe captcha and/or 2FA code is required for login. */
-                    logger.info("Login failed");
-                    if (br.containsHTML(">\\s*Invalid auth code")) {
-                        /**
-                         * 2FA code required or previously entered code is invalid. This also means that the users' login credentials are
-                         * valid. </br>
-                         * Ask user for 2FA login code in next round.
-                         */
-                        logger.info("2FA code needed");
-                        accountRequires2FALoginCode = true;
-                    }
-                    continue;
                 }
+                if (br.containsHTML(">\\s*Wrong e-mail or password\\.\\s*<")) {
+                    throw new AccountInvalidException();
+                }
+                logger.info("Login failed");
+                loginform = findLoginform(br);
+                if (loginform == null) {
+                    logger.warning("Failed to find loginform -> Cannot retry login to check for 2FA");
+                    break;
+                }
+                /* Try again but only if captcha and/or 2FA code is required. */
+                captcha_url = findLoginCaptchaURL(br);
+                if (accountRequires2FALoginCode && br.containsHTML(">\\s*Invalid auth code")) {
+                    /**
+                     * 2FA code required or previously entered code is invalid. This also means that the users' login credentials are valid.
+                     * </br>
+                     * Ask user for 2FA login code in next round.
+                     */
+                    logger.info("2FA login: User entered invalid 2FA code");
+                } else if (loginform.hasInputFieldByName(two_fa_login_field_key)) {
+                    logger.info("2FA login: 2FA login required");
+                    accountRequires2FALoginCode = true;
+                }
+                requiresLoginCaptchaCloudflareTurnstile = this.requiresLoginCaptchaCloudflareTurnstile(loginform);
+                if (!accountRequires2FALoginCode && captcha_url == null && !requiresLoginCaptchaCloudflareTurnstile) {
+                    logger.info("Break loginloop because: No 2FA required and no captcha");
+                    break;
+                }
+                /* Try again */
+                continue;
             }
             if (!loginSuccess) {
                 /* Login failed -> Check why */
                 if (accountRequires2FALoginCode) {
-                    /* Valid login credentials but invalid 2FA code */
+                    /*
+                     * 2FA login is only requested if credentials are valid -> Assume that we got valid login credentials but invalid 2FA
+                     * code
+                     */
                     throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
                 } else {
                     /* Invalid login credentials */
@@ -1164,6 +1173,23 @@ public class RapidGatorNet extends PluginForHost {
             setAccountTypeWebsite(account, br);
             setAccountSession(account, br);
         }
+    }
+
+    private Form findLoginform(final Browser br) {
+        Form loginform = br.getFormbyProperty("id", "login");
+        if (loginform == null) {
+            /* 2024-04-30: Form id was changed to "registration" -> id="registration" hm */
+            loginform = br.getFormbyActionRegex(".*/auth/login");
+        }
+        return loginform;
+    }
+
+    private String findLoginCaptchaURL(final Browser br) {
+        return br.getRegex("\"(/auth/captcha/v/[a-z0-9]+)\"").getMatch(0);
+    }
+
+    private boolean requiresLoginCaptchaCloudflareTurnstile(final Form form) {
+        return form.containsHTML("class=\"cf-turnstile\"");
     }
 
     private void clearAccountSession(Account account, Browser br) {

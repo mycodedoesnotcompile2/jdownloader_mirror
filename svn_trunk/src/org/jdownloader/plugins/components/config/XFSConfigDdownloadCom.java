@@ -28,4 +28,5 @@ public interface XFSConfigDdownloadCom extends XFSConfig {
     int getMaxSimultaneousFreeDownloads();
 
     void setMaxSimultaneousFreeDownloads(int maxFree);
+
 }

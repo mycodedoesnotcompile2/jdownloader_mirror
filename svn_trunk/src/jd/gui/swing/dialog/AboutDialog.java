@@ -74,6 +74,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
@@ -584,9 +585,25 @@ public class AboutDialog extends AbstractDialog<Integer> {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                ClipboardMonitoring.getINSTANCE().setCurrentContent(getName());
-                if (url != null && url.matches("(?i)https?://.+") && CrossSystem.isOpenBrowserSupported()) {
-                    CrossSystem.openURL(url);
+                String urlToOpen = url;
+                if (e.getSource() instanceof ExtButton) {
+                    final ExtButton button = (ExtButton) e.getSource();
+                    String urlFromName = new Regex(button.getText(), "((https?://|www\\.)[^ ]+)").getMatch(0);
+                    if (urlFromName != null) {
+                        try {
+                            if (!urlFromName.matches("(?i)https?://.+")) {
+                                urlFromName = "https://" + urlFromName;
+                            }
+                            URLHelper.verifyURL(new URL(urlFromName));
+                            urlToOpen = urlFromName;
+                        } catch (Exception ignore) {
+                        }
+                    }
+                }
+                final String name = getName();
+                ClipboardMonitoring.getINSTANCE().setCurrentContent(name);
+                if (urlToOpen != null && urlToOpen.matches("(?i)https?://.+") && CrossSystem.isOpenBrowserSupported()) {
+                    CrossSystem.openURL(urlToOpen);
                 } else {
                     BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
                         @Override

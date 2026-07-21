@@ -14,6 +14,8 @@
 //     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.gui.swing.laf;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -25,14 +27,16 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import javax.swing.AbstractAction;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
+import javax.swing.KeyStroke;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.plaf.metal.MetalLookAndFeel;
-
-import jd.SecondLevelLaunch;
+import javax.swing.text.JTextComponent;
+import javax.swing.text.Keymap;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
@@ -63,6 +67,8 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.gui.LAFOptions;
 import org.jdownloader.updatev2.gui.LookAndFeelType;
+
+import jd.SecondLevelLaunch;
 
 public class LookAndFeelController implements LAFManagerInterface {
     private static final LookAndFeelController INSTANCE = new LookAndFeelController();
@@ -245,6 +251,7 @@ public class LookAndFeelController implements LAFManagerInterface {
             return;
         }
         initWindowManager();
+        installGlobalCaretSelectionFix();
         long t = System.currentTimeMillis();
         try {
             // de.javasoft.plaf.synthetica.SyntheticaLookAndFeel.setLookAndFeel("de.javasoft.plaf.synthetica.SyntheticaStandardLookAndFeel");
@@ -462,6 +469,92 @@ public class LookAndFeelController implements LAFManagerInterface {
                 }
             });
         }
+    }
+
+    /**
+     * By default, Swing moves the caret one character past the end/start of the current selection when the right/left arrow key is pressed,
+     * instead of just collapsing the selection to its edge (like the Windows Explorer/most other applications do). This is installed on the
+     * shared default {@link Keymap} so it applies to every {@link JTextComponent} (JTextField, JTextArea, ...) in the application that does
+     * not install its own custom keymap/keybinding for these keys.
+     */
+    private void installGlobalCaretSelectionFix() {
+        final Keymap keymap = JTextComponent.getKeymap(JTextComponent.DEFAULT_KEYMAP);
+        if (keymap == null) {
+            return;
+        }
+        installCaretForwardSelectionFix(keymap);
+        installCaretBackwardSelectionFix(keymap);
+    }
+
+    /**
+     * Fixes the right arrow key: if there is an active selection, the caret is placed at the end of the selection.
+     *
+     * Standard Swing behavior (without this fix): the caret is moved one character to the right of its current position (which, right after
+     * a select(0, x) call, is already the end of the selection), effectively landing one character past the end of the selection instead of
+     * exactly at its end. For a renamed file this means the caret ends up right behind the "." of the extension instead of right in front
+     * of it. This is a long-standing Swing quirk - modern operating systems (Windows Explorer, macOS Finder, ...) and most other native
+     * applications simply collapse the caret to the selection's edge on the first arrow key press instead.
+     */
+    private void installCaretForwardSelectionFix(final Keymap keymap) {
+        final KeyStroke keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0);
+        keymap.addActionForKeyStroke(keyStroke, new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final Object source = e.getSource();
+                if (!(source instanceof JTextComponent)) {
+                    return;
+                }
+                final JTextComponent textComponent = (JTextComponent) source;
+                if (textComponent.getSelectionStart() != textComponent.getSelectionEnd()) {
+                    textComponent.setCaretPosition(textComponent.getSelectionEnd());
+                    return;
+                }
+                /*
+                 * No selection: there is no standard action to delegate to here. Swing only loads its default keymap's standard key
+                 * bindings lazily on first use, and at LAF setup time (when this action is installed) none exist yet to grab a
+                 * reference to. So we set the caret position ourselves, one character to the right.
+                 */
+                final int pos = textComponent.getCaretPosition();
+                if (pos < textComponent.getDocument().getLength()) {
+                    textComponent.setCaretPosition(pos + 1);
+                }
+            }
+        });
+    }
+
+    /**
+     * Fixes the left arrow key: if there is an active selection, the caret is placed at the start of the selection.
+     *
+     * Standard Swing behavior (without this fix): the caret is moved one character to the left of its current position (which, right after
+     * a select(0, x) call, is the end of the selection, not the start), effectively landing one character inside the selection instead of
+     * exactly at its start. This is a long-standing Swing quirk - modern operating systems (Windows Explorer, macOS Finder, ...) and most
+     * other native applications simply collapse the caret to the selection's edge on the first arrow key press instead.
+     */
+    private void installCaretBackwardSelectionFix(final Keymap keymap) {
+        final KeyStroke keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0);
+        keymap.addActionForKeyStroke(keyStroke, new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final Object source = e.getSource();
+                if (!(source instanceof JTextComponent)) {
+                    return;
+                }
+                final JTextComponent textComponent = (JTextComponent) source;
+                if (textComponent.getSelectionStart() != textComponent.getSelectionEnd()) {
+                    textComponent.setCaretPosition(textComponent.getSelectionStart());
+                    return;
+                }
+                /* no selection: see installCaretForwardSelectionFix for why we set the caret position ourselves here */
+                final int pos = textComponent.getCaretPosition();
+                if (pos > 0) {
+                    textComponent.setCaretPosition(pos - 1);
+                }
+            }
+        });
     }
 
     @Override

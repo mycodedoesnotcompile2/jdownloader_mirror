@@ -17,7 +17,7 @@ import org.jdownloader.plugins.config.Type;
 @PluginHost(host = "rapidgator.net", type = Type.HOSTER)
 public interface RapidGatorConfig extends PluginConfigInterface {
     final String                    text_ActivateExperimentalWaittimeHandling             = "Activate experimental waittime handling to prevent 24-hours IP ban from rapidgator?";
-    final String                    text_EnableAPIPremium                                 = "Enable API for premium downloads [recommended] (disabled = use website for premium downloads)?";
+    final String                    text_EnableAPIPremium                                 = "Enable API for login and premium downloads [recommended] (disabled = use website)?";
     final String                    text_ExperimentalEnforceSSL                           = "Activate experimental forced SSL for downloads?";
     final String                    text_Referer                                          = "Define custom referer";
     final String                    text_ReadTimeout                                      = "Define custom browser read-timeout (seconds)";
